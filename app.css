@@ -1081,3 +1081,73 @@ html[data-simple] .li .bx, html[data-simple] .li .edp{ align-self:center }
 @media(min-width:1024px) and (min-height:1000px){ html[data-simple] #iDump{ min-height:240px } }
 @media(min-width:1024px) and (min-height:820px) and (max-height:999px){
   html[data-simple] #iDump{ min-height:150px } }
+
+/* ======================= HT-18 · V5 · FOUR QUADRANTS (R70.184–R70.189) =======================
+   Cory's screenshot, 12:54: "everything else is looking really good — let's just reorganize it",
+   with a blue cross drawn over the screen. The cross is a 2x2 grid that fills the viewport.
+
+   THIS BLOCK IS LAST IN THE FILE ON PURPOSE. At equal specificity the later rule wins, so every
+   HT-17 rule written as `html[data-simple] X` is superseded here by the same selector without
+   !important. HT-17 places three panels BY ID (`#h16Month{grid-column:5/9}`), and an id beats two
+   classes — those three are answered below by a selector that is strictly more specific, because a
+   `grid-column:5/9` surviving inside a two-column grid would spawn implicit columns. */
+@media (min-width:1024px){
+  html[data-simple]{ --h18gut:32px; --h18frame:1440px }
+  html[data-simple] .app{ max-width:var(--h18frame); padding:0 var(--h18gut) var(--h18gut);
+                          height:100vh; display:flex; flex-direction:column; overflow:hidden }
+  html[data-simple] .mast{ flex:0 0 auto; margin-top:var(--h18gut) }
+  html[data-simple] .grid{
+    flex:1 1 auto; min-height:0; padding:0; margin-top:var(--h18gut);
+    display:grid;
+    grid-template-columns:repeat(2,minmax(0,1fr));
+    grid-template-rows:repeat(2,minmax(0,1fr));
+    grid-auto-rows:0;
+    column-gap:var(--h18gut); row-gap:var(--h18gut);
+    grid-template-areas:"jrnl charts" "comp life";
+  }
+  html[data-simple] .grid > .colL     { grid-area:jrnl }
+  html[data-simple] .grid > #h18Comp  { grid-area:comp }
+  html[data-simple] .grid > #h18Charts{ grid-area:charts }
+  html[data-simple] .grid > #h16Ins   { grid-area:life }
+  /* everything else still living in .grid leaves the 2x2 flow — hidden, never removed (R70.16) */
+  html[data-simple] .grid > .colR,
+  html[data-simple] .grid > #vViews,
+  html[data-simple] .grid > .vWeeksSec{ display:none }
+  /* MEASURED, and it is why this rule exists rather than being tidy: HT-17 places #h16Score with
+     `grid-column:5/13; grid-row:4/6`. Left alone inside a 2x2 template that spawns implicit COLUMNS
+     3..12, and the four quadrants collapsed to 314px of a 1214px grid at 1280. The placement is
+     released and the panel leaves the surface here; S5 gives it its home inside the adherence
+     drawer, and this selector — a DIRECT child of .grid — stops matching the moment it moves. */
+  html[data-simple] .grid > #h16Score{ grid-column:auto; grid-row:auto; display:none }
+  html[data-simple] .grid > *{ min-height:0; min-width:0 }
+  /* `position:relative` is here so S5's drawer can be `absolute; inset:0` inside #h16Ins. It also
+     woke a rule from the base sheet — `.colL{position:sticky; top:96px}` (line 71), inert while the
+     column was static — and pushed the journal quadrant 96px down into the one below it. MEASURED:
+     colL at y=202 in a row that starts at 106. `inset:auto` is the countermeasure, not a guess. */
+  html[data-simple] .h18q, html[data-simple] .grid > .colL, html[data-simple] .grid > #h16Ins{
+    display:flex; flex-direction:column; min-height:0; overflow:hidden;
+    position:relative; inset:auto }
+  /* the two charts share the top-right quadrant, on the same gutter as everything else */
+  html[data-simple] #h18Charts{ display:grid; grid-template-columns:1fr 1fr;
+    grid-template-rows:minmax(0,1fr); column-gap:var(--h18gut); row-gap:0 }
+  html[data-simple] #h18Charts > .h16p{ min-width:0; min-height:0; display:flex }
+  /* HT-17 placed these two by id on a 12-column grid. Inside #h18Charts that would create implicit
+     columns 3..8 and push YEAR off the quadrant, so the placement is released here. */
+  html[data-simple] #h18Charts > #h16Month,
+  html[data-simple] #h18Charts > #h16Year{ grid-column:auto; grid-row:auto }
+}
+/* S1c · THE FRAME GOES TO 1680 AT >=1600 (D-HT-18-2). At 1920 a 1440 frame leaves 240px of margin
+   per side, which makes "outer gutter >= 48 at 1920" vacuous and costs every quadrant 120px of
+   width. 1680 keeps a 120px side margin — still more than the top and bottom, which is what Cory
+   asked for — and gives each quadrant ~808px instead of ~700. */
+@media (min-width:1600px){ html[data-simple]{ --h18gut:48px; --h18frame:1680px } }
+
+/* S1d · PHONE (<1024) IS A SINGLE COLUMN IN HIS ORDER: JOURNAL · COMPLETION · MONTH · YEAR ·
+   ADHERENCE+LIFE. That is the order HT-16 already ships, and the LAYER keeps it by construction —
+   every DOM move in HT-18 is gated on desktop() and reverses on a resize down, so below 1024 the
+   tree is exactly the one HT-17 left. These rules only make the two new containers behave if a
+   resize ever leaves them behind. */
+@media (max-width:1023px){
+  html[data-simple] #h18Charts{ display:flex; flex-direction:column }
+  html[data-simple] #h18Comp{ display:block }
+}

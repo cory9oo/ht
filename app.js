@@ -4703,4 +4703,97 @@ function earned(k){ return committed() - remaining(k); }
   else window.addEventListener('load',function(){ setTimeout(boot,300); });
 })();
 
+
+/* ======================= HT-18 · V5 · FOUR QUADRANTS (PASTE 58 · R70.184-R70.189) =======================
+   THE CROSS CORY DREW ON THE SCREENSHOT. HT-17 won the page-height fight (3254 -> 720) and did not
+   win the SPACE fight: the left column was one strip carrying two things that each need a quadrant,
+   and the life grid drew 336x175 inside a 921x275 panel.
+
+       four quadrants, equal to the pixel, one gutter on all four sides
+
+   THE EIGHTH LAYER, inside the same sealed closure (9a-10-11-13-15-16-17-18). It runs LAST, so it
+   can move what the seven before it built without racing them, and every move is idempotent.
+
+   EXACTLY THREE DOM MOVES IN THE WHOLE WIRE, and every one of them is a MOVE (R70.16 - nothing is
+   deleted, nothing is cloned, nothing is re-rendered from scratch):
+     S1  the completion .blk + #tClose  ->  #h18Comp     (bottom left)
+     S1  #h16Month + #h16Year           ->  #h18Charts   (top right)
+     S2  the COMPLETED + PRAYER fields  ->  #h18Btm      (the journal's bottom row)
+   Everything else in this layer is CSS.
+
+   WHY MOVING IS SAFE, AND THE TRAP THAT WOULD BITE. HT-16 creates #h16Month/#h16Year/#h16Score only
+   `if(!document.getElementById(id))`, so a moved node is never re-created; every painter reaches its
+   target by getElementById, not by path, so a moved node keeps painting. The trap: HT-17's drawer
+   rewrites `#h17DrBody.innerHTML` on every open, so a live node moved into ANY element whose
+   innerHTML is rewritten would be destroyed on the first open. S5 obeys that by construction.
+
+   DESKTOP ONLY, AND THE MOVES REVERSE. Every move here is gated on `desktop()` and every one has its
+   way home, because the phone composition (R70.184 S1d: JOURNAL - COMPLETION - MONTH - YEAR -
+   ADHERENCE+LIFE, one column) is the one HT-16 already ships and a moved node would break its order.
+   A resize from 1280 to 390 puts the tree back exactly where HT-17 left it. */
+(function(){
+  function advanced(){
+    try{ if(localStorage.getItem('ht_advanced')==='1') return true; }catch(e){}
+    if(window.__ADVANCED===true) return true;
+    return /[?&]advanced=1/.test(location.search);
+  }
+  function q(s,r){ return Array.prototype.slice.call((r||document).querySelectorAll(s)); }
+  function desktop(){ return window.innerWidth >= 1024; }
+
+  /* ---- where a node lived before this layer moved it ------------------------------------
+     Recorded on the node itself the first time it moves, so the phone gets the tree back rather
+     than a second, reconstructed one. Parent AND next sibling, so order survives too. */
+  function mark(n){ if(n && !n.__h18p){ n.__h18p=n.parentElement; n.__h18n=n.nextElementSibling; } }
+  function home(n){
+    if(!n || !n.__h18p || n.parentElement===n.__h18p) return;
+    if(n.__h18n && n.__h18n.parentElement===n.__h18p) n.__h18p.insertBefore(n, n.__h18n);
+    else n.__h18p.appendChild(n);
+  }
+
+  /* ---- S1a - THE FOUR CONTAINERS (R70.184) ----------------------------------------------
+     TL = .colL      (already a grid child; it keeps #jIn and the eight .ht9a-off blocks)
+     BL = #h18Comp   NEW  <- the completion .blk (the one holding #log) and #tClose
+     TR = #h18Charts NEW  <- #h16Month and #h16Year
+     BR = #h16Ins    (already a grid child; it holds the insight strip and #vWeeks) */
+  function quadrants(){
+    var grid=document.querySelector('.grid'); if(!grid) return false;
+    var log=document.getElementById('log'); if(!log) return false;
+    var comp=log.closest('.blk'), tc=document.getElementById('tClose');
+    var bl=document.getElementById('h18Comp');
+    if(!bl){ bl=document.createElement('div'); bl.id='h18Comp'; bl.className='h18q'; grid.appendChild(bl); }
+    if(comp && comp.parentElement!==bl){ mark(comp); bl.appendChild(comp); }
+    if(tc   && tc.parentElement!==bl){ mark(tc); bl.appendChild(tc); }
+    var tr=document.getElementById('h18Charts');
+    if(!tr){ tr=document.createElement('div'); tr.id='h18Charts'; tr.className='h18q'; grid.appendChild(tr); }
+    ['h16Month','h16Year'].forEach(function(id){
+      var e=document.getElementById(id);
+      if(e && e.parentElement!==tr){ mark(e); tr.appendChild(e); } });
+    return true;
+  }
+  function unquadrants(){
+    ['h16Month','h16Year'].forEach(function(id){ home(document.getElementById(id)); });
+    var log=document.getElementById('log');
+    if(log) home(log.closest('.blk'));
+    home(document.getElementById('tClose'));
+  }
+
+  /* ---- the re-assert, the way the seven layers before this one do ------------------------ */
+  function quad(){
+    if(advanced()) return;
+    if(desktop()) quadrants(); else unquadrants();
+    document.documentElement.setAttribute('data-ht18','1');
+  }
+  var _pa=paintAll;  paintAll  = function(){ _pa.apply(null,arguments); quad(); };
+  var _pl=paintLog;  paintLog  = function(){ _pl.apply(null,arguments); quad(); };
+  if(!window.__HT18_RESIZE){
+    window.__HT18_RESIZE=1;
+    window.addEventListener('resize', function(){
+      clearTimeout(window.__HT18_T); window.__HT18_T=setTimeout(quad, 160); });
+  }
+  window.__HT18 = { quad:quad, quadrants:quadrants };
+
+  function boot(){ if(advanced()) return; if(!S.me) return; quad(); }
+  if(document.readyState==='complete') setTimeout(boot,320);
+  else window.addEventListener('load',function(){ setTimeout(boot,320); });
+})();
 })();
