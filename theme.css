@@ -84,3 +84,62 @@
   --row:32px;
   --gut:18px;
 }
+
+/* ==========================================================================
+   HT-16 · THE TOKEN SET (R70.91 · R70.92 · R70.93 · R-THEME) — Seed A.
+   Declared once, here. Every component inherits it through the MAPPING below;
+   no component declares a literal hex of its own. One ramp, everywhere a
+   percent appears: month and year chart dots, life-week squares, the
+   scorecard, the header %. Unlogged is --surface and never a ramp colour —
+   an unlogged day must not read as a bad day.
+   ========================================================================== */
+:root{
+  --bg:#0b0d10;
+  --surface:#12161b;
+  --surface-2:#171c22;
+  --border:#1e252d;
+  --text:#d8dee6;
+  --muted:#8b94a0;
+  --red:#8f2430;
+  --red-bright:#c0392b;
+  --green:#1f7a4a;
+  --green-bright:#2fbf71;
+  --grey:#5b6470;
+
+  /* THE RAMP — 0-24 · 25-49 · 50-74 · 75-89 · 90-100. Rating maps through x10. */
+  --ramp-0:#6e1b24;
+  --ramp-1:#a3302f;
+  --ramp-2:#5b6470;
+  --ramp-3:#25784a;
+  --ramp-4:#2fbf71;
+
+  /* the two chart lines. This is a change: the build shipped completion red and
+     rating grey, which read the headline series as an alarm. Both are swapped. */
+  --line-completion:var(--text);
+  --line-rating:var(--green-bright);
+  --outline-today:var(--text);
+}
+
+/* ---------- THE MAPPING (R-THEME) ----------
+   The app's existing tokens are re-pointed at the set above, so all five earlier
+   layers inherit Seed A without a single component being touched. `--g1 … --g5`
+   carry the ramp in the order the ramp is defined, which is why `gfill()` and
+   every `var(--gN)` fill already in the tree resolve to a ramp token. */
+:root[data-simple]{
+  --ground:var(--bg);
+  --sheet:var(--surface);
+  --sunk:var(--surface-2);
+  --rule:var(--border);
+  --rule2:var(--grey);
+  --ink:var(--text);
+  --ink2:var(--muted);
+  --ink3:var(--grey);
+  --accent:var(--green-bright);      /* a check-off is a positive signal; red is reserved for S6 overdue */
+  --accent-ink:var(--bg);
+  --accent-wash:var(--surface-2);
+  --sel:var(--surface-2);
+  --bad:var(--red-bright);
+  --good:var(--green-bright);
+  --g0:var(--ramp-0); --g1:var(--ramp-0); --g2:var(--ramp-1);
+  --g3:var(--ramp-2); --g4:var(--ramp-3); --g5:var(--ramp-4);
+}

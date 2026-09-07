@@ -436,15 +436,9 @@ body.small #predictBlk{display:block}
    Every rule here is scoped to html[data-simple]. With Advanced ON the attribute is absent and not one
    of these rules applies, which is how the hidden instruments stay verified by the HT-6 suite. */
 
-/* the dark lock (R70.21b). html[data-simple] outranks :root and, being later than theme.css,
-   also outranks :root[data-skin="statement"] at equal specificity. */
-html[data-simple]{
-  --ground:#0A0A0B; --sheet:#0F1012; --sunk:#151619; --rule:#25272C; --rule2:#3A3D45;
-  --ink:#F2F3F5; --ink2:#9BA0A8; --ink3:#5F646D;
-  --accent:#FF3B41; --accent-ink:#0A0A0B; --accent-wash:#2A1113; --sel:#1A1C20;
-  --bad:#FF3B41; --good:#3DDC97;
-  --g0:#2A1416; --g1:#4A181C; --g2:#7A2126; --g3:#B22B31; --g4:#FF3B41; --g5:#FF8A8E;
-}
+/* the dark lock (R70.21b). HT-16 R70.91 moved every value out of this file: the eleven literal
+   hexes that used to sit here are now the Seed A token set in `theme.css`, and `:root[data-simple]`
+   there maps the app's tokens onto it. This stylesheet declares no colour of its own. */
 
 /* chrome that is not the header (R70.22) */
 html[data-simple] #jump,
@@ -686,3 +680,38 @@ html[data-simple][data-vtab="views"] .vWeeksSec{ display:block }
 .wkg{ display:block; shape-rendering:crispEdges }
 .wkg .wl{ font:400 8.5px/1 var(--mono); fill:var(--ink3); shape-rendering:auto }
 .wkg .cw{ shape-rendering:geometricPrecision }
+
+
+/* ======================= HT-16 · S1 · THE RAMP (R70.91 · R70.92 · R70.93) =======================
+   The token set lives in `theme.css`. Nothing below declares a colour; it only names one.
+   ONE ramp, everywhere a percent appears — chart dots, life-week squares, the scorecard, the
+   header %. Unlogged is `--surface` and never a ramp colour: an unlogged day is not a bad day. */
+.ramp-0{ color:var(--ramp-0) }
+.ramp-1{ color:var(--ramp-1) }
+.ramp-2{ color:var(--ramp-2) }
+.ramp-3{ color:var(--ramp-3) }
+.ramp-4{ color:var(--ramp-4) }
+.ramp-none{ color:var(--surface) }
+.ramp-0,.ramp-1,.ramp-2,.ramp-3,.ramp-4,.ramp-none{ fill:currentColor }
+.rampbg-0{ background:var(--ramp-0) }
+.rampbg-1{ background:var(--ramp-1) }
+.rampbg-2{ background:var(--ramp-2) }
+.rampbg-3{ background:var(--ramp-3) }
+.rampbg-4{ background:var(--ramp-4) }
+.rampbg-none{ background:var(--surface) }
+
+/* THE TWO LINES, SWAPPED (R70.93). The build shipped completion in the accent red and rating in
+   grey, which read the headline series as an alarm and the honest one as noise. Completion is the
+   text colour and solid; rating is green-bright and dashed; a completion DOT carries that day's
+   ramp colour, so the line and the grade agree. */
+html[data-simple] .chart .ln-c{ stroke:var(--line-completion); stroke-width:1.6; stroke-dasharray:none }
+html[data-simple] .chart .ln-r{ stroke:var(--line-rating);     stroke-width:1.3; stroke-dasharray:4 3 }
+html[data-simple] .chart .ln-c-d{ fill:var(--line-completion) }
+html[data-simple] .chart .ln-r-d{ fill:var(--line-rating) }
+html[data-simple] .chart .dot-r{ fill:var(--line-rating) }
+html[data-simple] .chart .dot-c{ fill:currentColor }          /* the ramp class on the dot supplies it */
+
+/* one 5-swatch legend per view, and no sentence explaining it (R-NOFLUFF) */
+.h16leg{ display:flex; align-items:center; gap:0; margin-left:auto }
+.h16leg i{ display:block; width:14px; height:8px }
+html[data-simple] .gnav .lg{ display:none }                    /* the old two-word legend, superseded */

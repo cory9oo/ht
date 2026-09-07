@@ -3422,4 +3422,76 @@ function earned(k){ return committed() - remaining(k); }
   else window.addEventListener('load',function(){ setTimeout(boot,260); });
 })();
 
+/* ======================= HT-16 · THEME · SQUARE · CHARTS · LIFE · SCORECARD · TIME =======================
+   THE SIXTH LAYER, inside the same sealed closure (9a · 10 · 11 · 13 · 15). It runs AFTER all five:
+   9a restructures, 11 decorates the rows, 13 owns the tab, 15 draws the three surfaces this layer
+   re-draws. Appending after the closer would put every app function out of scope — measured, HT-9a.
+
+   WHY IT RE-DRAWS RATHER THAN PATCHES. HT-15's painters are local to HT-15's own IIFE, so they are
+   unreachable from here by name. This layer therefore owns the final drawing of `#vMonth`, `#vYear`
+   and `#vWeeks`: the same nodes, the same attributes (`data-vgd` · `data-vgy` · `circle.hit` ·
+   `rect.lw` · `rect.cw` · `text.wl`), so HT-15's click wiring and its golden both still hold, with
+   HT-16's axes, labels, ramp and lived-from-birth fill on top.
+
+   Every acceptance in this wire is a DATA golden, so every computation below is exposed on
+   `window.__HT16` — the same seam `window.__HT13_REPAINT` and `window.__HT13_TAB` already are. */
+(function(){
+  var MSDAY = 864e5, MSWEEK = 6048e5;
+  var TARGET_AGE = 100;          /* R70.95 — a constant, for everyone. The stored value is untouched. */
+  var LIFE_ROWS = 100, LIFE_COLS = 52, LIFE_TOTAL = LIFE_ROWS * LIFE_COLS;   /* 5,200 */
+
+  function advanced(){
+    try{ if(localStorage.getItem('ht_advanced')==='1') return true; }catch(e){}
+    if(window.__ADVANCED===true) return true;
+    return /[?&]advanced=1/.test(location.search);
+  }
+  function q(s,r){ return Array.prototype.slice.call((r||document).querySelectorAll(s)); }
+  function phone(){ return window.innerWidth < 1024; }
+  function pctOn(k){ var r=S.byDate[k]; return (r&&r.pct!=null&&loggedOn(k))?r.pct:null; }
+  function meanOf(a){ return a.length? a.reduce(function(x,y){return x+y;},0)/a.length : null; }
+  function birth(){ var b=S.priv0&&S.priv0.birth_date; return b?new Date(b+'T12:00:00'):null; }
+
+  /* ---- S1 · THE RAMP ------------------------------------------------------------------------
+     ONE ramp, and it is a band table, not a gradient: 0-24 · 25-49 · 50-74 · 75-89 · 90-100.
+     `rampIx` is the whole rule; everything else reads it. `null` is UNLOGGED and gets `--surface` —
+     never a ramp colour, because an unlogged day must not read as a bad day. */
+  function rampIx(p){
+    if(p==null) return null;
+    if(p<25) return 0; if(p<50) return 1; if(p<75) return 2; if(p<90) return 3; return 4;
+  }
+  function rampClass(p){ var i=rampIx(p); return i==null?'ramp-none':('ramp-'+i); }
+  function rampBg(p){ var i=rampIx(p); return i==null?'rampbg-none':('rampbg-'+i); }
+  /* `--g1 … --g5` are mapped onto `--ramp-0 … --ramp-4` in theme.css, so an SVG `fill` written as a
+     `--gN` token IS a ramp token. HT-15's golden reads that attribute, and it still reads true. */
+  function rampFill(p){ var i=rampIx(p); return i==null?'var(--surface)':('var(--g'+(i+1)+')'); }
+  function rampVar(p){ var i=rampIx(p); return i==null?'var(--surface)':('var(--ramp-'+i+')'); }
+  function legend(){
+    return '<span class="h16leg">'+[0,1,2,3,4].map(function(i){
+      return '<i class="rampbg-'+i+'"></i>'; }).join('')+'</span>';
+  }
+
+  window.__HT16 = window.__HT16 || {};
+  window.__HT16.rampIx = rampIx;
+  window.__HT16.rampClass = rampClass;
+  window.__HT16.rampFill = rampFill;
+  window.__HT16.TARGET_AGE = TARGET_AGE;
+  window.__HT16.LIFE_TOTAL = LIFE_TOTAL;
+
+  /* HT16-INSERT */
+
+  function repaint(){
+    if(advanced()) return;
+  }
+  function boot(){
+    if(advanced()) return;
+    if(!S.me) return;
+    repaint();
+  }
+  window.__HT16.repaint = repaint;
+
+  var _pa=paintAll; paintAll=function(){ _pa.apply(null,arguments); boot(); };
+  if(document.readyState==='complete') setTimeout(boot,300);
+  else window.addEventListener('load',function(){ setTimeout(boot,300); });
+})();
+
 })();
