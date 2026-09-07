@@ -5477,6 +5477,12 @@ function earned(k){ return committed() - remaining(k); }
      IT KEYS OFF THE DAY BEING VIEWED, not off today, so walking back to a Saturday shows that
      Saturday's Sabbath. DEC-055 is not touched: nothing is cut, the standards are all still there
      on the other six days, and Advanced sees every one of them every day. */
+  function mdate(k){
+    var d=dnum(k); if(!d || isNaN(d)) return '';
+    var DOW=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+    var MON=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    return DOW[d.getDay()]+' '+MON[d.getMonth()]+' '+d.getDate();
+  }
   function isSabbath(k){
     var d=dnum(k||S.date); return !!d && !isNaN(d) && d.getDay()===6;
   }
@@ -5485,14 +5491,61 @@ function earned(k){ return committed() - remaining(k); }
       if(/sabbath/i.test(S.habits[i].name||'')) return S.habits[i];
     return null;
   }
+  /* ---- HT-19 B3 - THE RULE BEFORE THE ROW (R70.235 · DEC-096) ---------------------------
+     4-HT could have added `Sabbath` to Cory's account and deliberately did not, and the reason is
+     the second half of this function. A new DAILY standard lands in TODAY'S active_set the moment
+     it exists, and his live completion percentage drops on a Tuesday for a standard that only
+     means anything on a Saturday. So the exclusion ships in the same commit as the creation:
+
+       Saturday      -> daily() is the SABBATH group and nothing else
+       any other day -> daily() is everything EXCEPT the SABBATH group
+
+     `saveDay` writes active_set from daily() and `pctOf` grades against that same list, so both
+     halves are one line each and the denominator follows for free. P4 still holds: active_set is
+     written per day, so every past day keeps the grade it already has. */
+  function isSabbathGroup(h){
+    return /^sabbath$/i.test(String(h && h.group_name || '')) || /sabbath/i.test(String(h && h.name || ''));
+  }
   var _daily=daily;
   daily=function(){
-    if(!advanced() && isSabbath(S.date)){
-      var sh=sabbathHabit();
-      if(sh) return [sh];
+    var all=_daily.apply(null, arguments);
+    if(advanced()) return all;
+    if(isSabbath(S.date)){
+      var only=all.filter(isSabbathGroup);
+      return only.length? only : all;      /* no Sabbath standard yet: change nothing (HT-18e) */
     }
-    return _daily.apply(null, arguments);
+    return all.filter(function(h){ return !isSabbathGroup(h); });
   };
+
+  /* THE ROW. Idempotent, created once, and only when the rule above is already in force. If any
+     habit already matches /sabbath/i it is USED and nothing is created (PASTE 68). Whether it was
+     found or created is logged once and goes in the receipt. */
+  var SAB_NAME='Sabbath - rest and worship', SAB_GROUP='SABBATH';
+  function ensureSabbath(){
+    if(advanced() || !S.me || window.__h18SabDone) return;
+    if(!S.hasClosedAt && !S.habits) return;
+    var found=sabbathHabit();
+    if(found){
+      window.__h18SabDone='found';
+      try{ console.log('HT-19 B3: Sabbath standard FOUND —', found.name); }catch(e){}
+      return;
+    }
+    window.__h18SabDone='creating';
+    var rec={ user_id:S.me.id, name:SAB_NAME, group_name:SAB_GROUP, cadence:'daily',
+              minutes:0, active:true,
+              sort_order:(S.habits.length? Math.max.apply(null,
+                 S.habits.map(function(x){ return x.sort_order||0; }))+1 : 0) };
+    Promise.resolve(sb.from('habits').insert(rec)).then(function(res){
+      if(res && res.error){
+        window.__h18SabDone='failed';
+        try{ console.log('HT-19 B3: Sabbath standard NOT created —', res.error.message); }catch(e){}
+        return;
+      }
+      window.__h18SabDone='created';
+      try{ console.log('HT-19 B3: Sabbath standard CREATED —', SAB_NAME); }catch(e){}
+      if(typeof reload==='function') reload();
+    }).catch(function(){ window.__h18SabDone='failed'; });
+  }
 
   /* the list is filtered after the paint rather than inside it, because paintLog belongs to the
      base app and every layer here re-asserts over it instead of rewriting it. Idempotent: it reads
@@ -5501,15 +5554,27 @@ function earned(k){ return committed() - remaining(k); }
     var log=document.getElementById('log'); if(!log) return false;
     var on = !advanced() && isSabbath(S.date);
     var sh = on ? sabbathHabit() : null;
+    /* B3: the journal header names the day for what it is */
+    var jh=document.querySelector('.colL #jIn > .blk:has(#iDump) > .sh h2');
+    if(jh){
+      if(!jh.dataset.h19) jh.dataset.h19 = jh.textContent;
+      jh.textContent = (on && sh) ? ('SABBATH \u00b7 ' + mdate(S.date)) : jh.dataset.h19;
+    }
     /* WITHOUT a Sabbath standard nothing changes but the note. daily() already falls through in
        that case, so the day keeps grading on all twenty-six — narrowing the list while the score
        still counted twenty-six would have written a 0% Saturday, which is the opposite of rest. */
     var active = on && !!sh;
     log.classList.toggle('h18sab', active);
+    /* B3: Saturday shows the SABBATH group and nothing else; every other day shows everything
+       EXCEPT it. A standard that cannot count today has no business taking a row today — daily()
+       already excludes it from the score, and this keeps the list saying the same thing. */
+    var byId={}; S.habits.forEach(function(h){ byId[h.id]=h; });
     q('#log .li').forEach(function(li){
       var b=li.querySelector('[data-tog]');
       var id=b?b.getAttribute('data-tog'):null;
-      li.hidden = !!(active && id!==sh.id);
+      var h=id?byId[id]:null;
+      li.hidden = active ? (id!==sh.id)
+                         : !!(h && !advanced() && isSabbathGroup(h));
     });
     q('#log .grp, #log .eadd, #log [data-add]').forEach(function(e){ e.hidden = active; });
     /* no Sabbath standard yet: say so where the list was, rather than showing an empty box */
@@ -5659,7 +5724,7 @@ function earned(k){ return committed() - remaining(k); }
     if(desktop()){ quadrants(); rightBlock(); journalBottom(); bindGrow(); unGrow(); chartsFit();
                    adhLine(); groupBlock(); }
     else { unquadrants(); unRightBlock(); unjournalBottom(); unAdh(); }
-    paintLife18(); watchLife(); sabbathList(); watchLog();          /* S6 - both modes: the phone gets the same shape at a fixed cell */
+    paintLife18(); watchLife(); sabbathList(); watchLog(); ensureSabbath();          /* S6 - both modes: the phone gets the same shape at a fixed cell */
     document.documentElement.setAttribute('data-ht18','1');
   }
   /* ---- HT-18e (A) - THE LIFE GRID STOPS REVERTING (Cory 2026-09-07 note 1) --------------
