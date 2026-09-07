@@ -725,8 +725,10 @@ html[data-simple] .li{ display:flex; align-items:center; gap:6px; padding:4px 0;
   cursor:default; position:relative }
 html[data-simple] .li .bxw{ flex:0 0 44px; width:44px; height:44px; padding:0;
   display:flex; align-items:center; justify-content:center; background:none; border:0 }
-html[data-simple] .li .bx{ width:26px; height:26px; border-width:2px }
-html[data-simple] .li.on .bx::after{ width:14px; height:8px; left:5px; top:6px }
+/* the visual box stays 28px (HTR-04) INSIDE the 44px tap target (R70.98) -- the two are different
+   things and the rock asks for both */
+html[data-simple] .li .bx{ width:28px; height:28px; border-width:2px }
+html[data-simple] .li.on .bx::after{ width:15px; height:9px; left:5px; top:7px }
 html[data-simple] .li .nm{ flex:0 1 auto; min-width:0; white-space:nowrap;
   overflow:hidden; text-overflow:ellipsis }
 html[data-simple] .li a.nm{ color:var(--text); text-decoration:underline;
