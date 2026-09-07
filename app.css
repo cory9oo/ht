@@ -874,3 +874,8 @@ html[data-simple] .grp.h16any{ color:var(--grey) }
   border:1px solid var(--border); padding:7px 9px }
 .esheet .h16adopt:hover{ color:var(--text); border-color:var(--grey) }
 .esheet #eTimeFld .win input.num{ max-width:110px }
+
+
+/* ======================= HT-16 · S8 · ADVANCED-ONLY CONTROLS (R70.16) ======================= */
+/* hidden, never deleted: with Advanced ON the attribute is absent and the control is back */
+html[data-simple] .h16-adv{ display:none !important }

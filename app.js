@@ -4297,6 +4297,26 @@ function earned(k){ return committed() - remaining(k); }
   window.__HT16.planOf      = planOf;
   window.__HT16.endMin      = endMin;
 
+  /* ---- S8 · THE TARGET-AGE SETTING GOES BEHIND ADVANCED (R70.16 — hidden, never deleted) ----
+     S4 made the horizon a constant 100 for everyone, so the control is no longer a question the
+     simple view asks. The FIELD stays in the DOM and the STORED VALUE is untouched; only the
+     control leaves the simple view, and Settings -> Advanced brings it straight back. */
+  function tuckTargetAge(){
+    var t=document.getElementById('pTarget'); if(!t) return;
+    var f=t.closest('.fld'); if(!f || f.dataset.ht16) return;
+    f.dataset.ht16='1';
+    f.classList.add('h16-adv');
+    /* the "needs one migration" note that HT-13 parks next to it goes with it, or the panel keeps
+       a sentence about a control nobody can see */
+    var n=f.nextElementSibling;
+    while(n){
+      if(n.classList && n.classList.contains('note') &&
+         /target age/i.test(n.textContent||'')){ n.classList.add('h16-adv'); break; }
+      n=n.nextElementSibling;
+    }
+  }
+  window.__HT16.tuckTargetAge = tuckTargetAge;
+
   /* HT16-INSERT */
 
   function repaint(){
@@ -4317,7 +4337,8 @@ function earned(k){ return committed() - remaining(k); }
   var _pl=paintLog; paintLog=function(){ _pl.apply(null,arguments);
                                          if(!advanced() && S.me) decorateTime(); };
   var _os=openSettings; openSettings=function(){ _os.apply(null,arguments);
-                                                 setTimeout(aboutScorecard,180); };
+                                                 setTimeout(function(){ aboutScorecard();
+                                                                        tuckTargetAge(); },180); };
   if(document.readyState==='complete') setTimeout(boot,300);
   else window.addEventListener('load',function(){ setTimeout(boot,300); });
 })();
