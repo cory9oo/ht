@@ -945,7 +945,9 @@ html[data-simple] .h16-adv{ display:none !important }
   html[data-simple] #jIn > .blk{ flex:0 0 auto }
   html[data-simple] #log.h17-scroll{ flex:1 1 auto; min-height:0; overflow-y:auto;
     -webkit-overflow-scrolling:touch }
-  html[data-simple] #tClose{ flex:0 0 auto; position:static; padding:6px 0 0 }
+  /* sticky is KEPT (HT-15 B2: last child, sticky, never fixed). In a column that does not scroll
+     it is inert and renders as static, so honouring the older rule costs nothing. */
+  html[data-simple] #tClose{ flex:0 0 auto; position:sticky; bottom:0; padding:6px 0 0 }
 
   /* the LIFE panel holds the insight strip and the grid, and the grid takes what is left */
   html[data-simple] #h16Ins #h16InsBody{ flex:0 0 auto }
@@ -988,3 +990,6 @@ html[data-simple] .vWeeksSec.h17-empty > .sh{ display:none }
 @media(min-width:1024px){
   html[data-simple] #log.h17-scroll{ columns:auto; column-count:auto; column-width:auto }
 }
+
+/* S2 · rotated day labels (R70.140). Every day stays labelled; below 40px per day they turn. */
+.chart text.xlrot{ font-size:8px; letter-spacing:0 }

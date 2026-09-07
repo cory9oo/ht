@@ -3671,7 +3671,9 @@ function earned(k){ return committed() - remaining(k); }
   function h16Chart(svgId, pts, opts){
     var svg=document.getElementById(svgId); if(!svg) return 0;
     var host=svg.parentNode;
-    var H=opts.height||190, L=30, R=34, T=12, B=opts.twoLine?34:24;
+    /* HT-17 S2 (R70.140): NO RIGHT AXIS. Rating x10 reads off the LEFT axis and the legend says so,
+       so the 34px right gutter that held it is reclaimed for the plot. R=10 is the half-dot bleed. */
+    var H=opts.height||190, L=30, R=10, T=12, B=opts.twoLine?34:24;
     if(!(opts.perX && window.innerWidth<=480)) H=availHeight(svg,H);
     var n=pts.length, W;
     var narrow = opts.perX && window.innerWidth<=480;
@@ -3689,15 +3691,25 @@ function earned(k){ return committed() - remaining(k); }
       W = fitSvg(svgId,H);
     }
     var pad=opts.pad||0;
+    /* rotated day labels need a taller bottom band than two stacked tspans do */
+    if(opts.twoLine){
+      var st = n>1 ? (W-L-R-2*pad)/(n-1) : (W-L-R);
+      if(st < 40) B = 40;
+    }
     var px=function(i){ return n<2 ? L+(W-L-R)/2 : L+pad+i*(W-L-R-2*pad)/(n-1); };
     var py=function(v){ return H-B-(v/100)*(H-T-B); };
     var s='';
-    /* LEFT 0-100 in tens, a gridline every ten. RIGHT 1-10 by one, the rating in its own units. */
+    /* LEFT 0-100 in tens, a gridline every ten. THE RIGHT AXIS IS DELETED (R70.140 · R70.79):
+       two axes for two series invited the reading that the dashed line was a percentage. It is not —
+       it is a 1-10 rating, and the legend now carries `rating x10` instead.
+       LABEL DENSITY IS MEASURED, NOT FIXED: every 10 when the chart has >=180px to give them, every
+       20 below that. Eleven labels in an 84px band is a grey smear, not an axis. */
+    var labelStep = H >= 180 ? 10 : 20;
     for(var v=0; v<=100; v+=10){
       s+='<line class="ax'+(v===0?' ax0':'')+'" x1="'+L+'" y1="'+py(v).toFixed(1)+'" x2="'+(W-R)+
-         '" y2="'+py(v).toFixed(1)+'"/>'+
-         '<text class="ayl" x="'+(L-5)+'" y="'+(py(v)+3).toFixed(1)+'" text-anchor="end">'+v+'</text>';
-      if(v>0) s+='<text class="ax2" x="'+(W-R+5)+'" y="'+(py(v)+3).toFixed(1)+'">'+(v/10)+'</text>';
+         '" y2="'+py(v).toFixed(1)+'"/>';
+      if(v%labelStep===0)
+        s+='<text class="ayl" x="'+(L-5)+'" y="'+(py(v)+3).toFixed(1)+'" text-anchor="end">'+v+'</text>';
     }
     function runs(get){
       var out=[], cur=[];
@@ -3729,13 +3741,26 @@ function earned(k){ return committed() - remaining(k); }
       s+='<circle class="hit" '+at+' data-tip="'+esc(tip)+'" cx="'+px(i).toFixed(1)+
          '" cy="'+(H/2)+'" r="12"/>';
     });
-    /* EVERY label, always. Two tspans in ONE <text>, so a per-day count counts days. */
+    /* EVERY label, always — NEVER THINNED (R70.140). Two tspans in ONE <text>, so a per-day count
+       counts days.
+       ROTATED 90 DEGREES when the width per x-step is under 40px: at 31 days in a 400px panel each
+       day gets ~12px, and "12 Fri" horizontal in 12px either overlaps its neighbours or gets dropped.
+       Thinning is the tempting fix and it is the wrong one — the wire says every day stays labelled,
+       so the labels turn instead. */
+    var stepPx = n>1 ? (W-L-R-2*pad)/(n-1) : (W-L-R);
+    var rotate = !!opts.twoLine && stepPx < 40;
     pts.forEach(function(p,i){
       var x=px(i).toFixed(1);
-      s+='<text class="xl" x="'+x+'" y="'+(H-(opts.twoLine?18:8))+'" text-anchor="middle">'+
-         '<tspan x="'+x+'">'+esc(p.x)+'</tspan>'+
-         (opts.twoLine?'<tspan class="xl2" x="'+x+'" dy="10">'+esc(p.x2||'')+'</tspan>':'')+
-         '</text>';
+      if(rotate){
+        var y=H-B+8;
+        s+='<text class="xl xlrot" transform="rotate(-90 '+x+' '+y.toFixed(1)+')" x="'+x+
+           '" y="'+y.toFixed(1)+'" text-anchor="end">'+esc(p.x)+(p.x2?' '+esc(p.x2):'')+'</text>';
+      } else {
+        s+='<text class="xl" x="'+x+'" y="'+(H-(opts.twoLine?18:8))+'" text-anchor="middle">'+
+           '<tspan x="'+x+'">'+esc(p.x)+'</tspan>'+
+           (opts.twoLine?'<tspan class="xl2" x="'+x+'" dy="10">'+esc(p.x2||'')+'</tspan>':'')+
+           '</text>';
+      }
     });
     svg.innerHTML=s;
     return pts.filter(function(p){ return p.c!=null||p.r!=null; }).length;
@@ -3754,7 +3779,9 @@ function earned(k){ return committed() - remaining(k); }
       var cs=ks.map(pctOn).filter(function(v){ return v!=null; });
       var rs=ks.map(ratingOf).filter(function(v){ return v!=null; });
       /* 0 LOGGED DAYS IS A GAP, NOT A ZERO. A zero reads as a month of total failure. */
-      out.push({ x:MO[m][0], x2:'', key:String(m),
+      /* HT-17 S2: THREE-LETTER months. `J F M A M J J A S O N D` has three ambiguous pairs and
+         reads as noise; `Jan Feb Mar` is the label. */
+      out.push({ x:MO[m], x2:'', key:String(m),
                  c: cs.length? Math.round(meanOf(cs)) : null,
                  r: rs.length? Math.round(meanOf(rs)*10)/10 : null });
     }
