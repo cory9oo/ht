@@ -1197,7 +1197,15 @@ html[data-simple] .li .bx, html[data-simple] .li .edp{ align-self:center }
   html[data-simple] #h18Comp #log{
     flex:1 1 auto; min-height:0; overflow-y:auto; overflow-x:hidden;
     columns:auto !important; column-count:auto !important; column-width:auto !important;
-    display:grid; grid-template-columns:1fr 1fr; gap:0 var(--h18gut); align-content:start }
+    display:grid; grid-template-columns:1fr 1fr; gap:0 var(--h18gut); align-content:start;
+    /* `align-items:start` is NOT cosmetic and it is not optional. A grid item defaults to
+       align-self:stretch, which sets its height FROM the track — and the track then sizes from the
+       stretched item's min-height, so the two agree on 36px and a wrapped name overflows its row
+       in silence. MEASURED: a 130-character standard rendered a 115px .nm inside a 36px .li,
+       with golden_ht17's "nothing clipped" check still green because nothing was clipped
+       HORIZONTALLY. With align-items:start the item sizes to its own content and the track grows
+       to fit: the same row measures 122px. R70.103's wrapping rule is only true with this line. */
+    align-items:start }
   html[data-simple] #h18Comp #log > .grp{ grid-column:1 / -1 }   /* group rules span both columns */
   html[data-simple] #h18Comp #log > [data-add]{ grid-column:1 / -1 }
   html[data-simple] #h18Comp .li{ min-height:36px; padding:3px 6px; font-size:14px }
