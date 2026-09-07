@@ -407,12 +407,52 @@ function toggle(hid){
 }
 
 /* ============================ instruments ============================ */
+/* ---- HT-19 B0.2 - A FALLBACK THAT INVENTS A NUMBER IS WORSE THAN AN ERROR (R70.239) ------
+   `Math.max(240, n.clientWidth || n.parentNode.clientWidth || 340)` turned "I could not measure"
+   into "I measured 340", and a wrong number that looks like a right one draws a whole chart. On a
+   fresh load the grid has not sized the panel yet, so both charts were drawn for a 300x620 box and
+   squeezed into 251x278 - Cory's "crunched until I switch the month". Nothing re-measured because
+   there was no ResizeObserver, no document.fonts.ready and no requestAnimationFrame anywhere in
+   this file (grep: 0). fitSvg now returns null when it cannot measure, every caller returns on
+   null, and measureAndDraw() below guarantees the measurement eventually happens. */
 function fitSvg(id,h){
-  var n=el(id), w=Math.max(240,Math.round(n.clientWidth||n.parentNode.clientWidth||340));
+  var n=el(id); if(!n) return null;
+  var w = n.clientWidth || (n.parentNode && n.parentNode.clientWidth) || 0;
+  if(w < 120) return null;                 /* unmeasurable: do NOT draw a wrong chart */
+  w = Math.round(w);                       /* no 240 floor, no 340 invention */
   n.setAttribute('viewBox','0 0 '+w+' '+h);
   n.setAttribute('preserveAspectRatio','xMinYMin meet');
   n.setAttribute('height',h); n.style.height=h+'px';
   return w;
+}
+
+/* ---- HT-19 B0.2 - ONE SHARED measureAndDraw, used by every chart painter -----------------
+   Layout has not happened when a painter is first called, so `fn` runs after TWO animation
+   frames; label widths depend on the webfont, so it runs again on document.fonts.ready; and the
+   panel can change width without any repaint firing, so a ResizeObserver per container re-runs it.
+   The observer callback NEVER draws synchronously - it schedules through requestAnimationFrame,
+   because drawing inside a ResizeObserver callback is how ResizeObserver loops are born. Installing
+   twice on the same node is a no-op: the node is stamped. */
+function measureAndDraw(id, fn){
+  var host = el(id); if(!host) { fn(); return; }
+  var box = host.parentNode || host;
+  function run(){ try{ fn(); }catch(e){} }
+  requestAnimationFrame(function(){ requestAnimationFrame(run); });
+  if(document.fonts && document.fonts.ready && !host.__mdFonts){
+    host.__mdFonts = 1;
+    document.fonts.ready.then(function(){ requestAnimationFrame(run); });
+  }
+  if(window.ResizeObserver && !box.__mdRO){
+    box.__mdRO = new ResizeObserver(function(entries){
+      var w = Math.round(entries[0].contentRect.width);
+      if(box.__mdW != null && Math.abs(w - box.__mdW) <= 1) return;
+      box.__mdW = w;
+      if(box.__mdPending) return;
+      box.__mdPending = 1;
+      requestAnimationFrame(function(){ box.__mdPending = 0; run(); });
+    });
+    box.__mdRO.observe(box);
+  }
 }
 /* fills use the density ramp; text uses ink / bad / good only */
 function gtxt(p){ return p==null?'var(--ink3)':(p<50?'var(--bad)':(p>=90?'var(--good)':'var(--ink)')); }
@@ -452,6 +492,7 @@ function paintHeatLegend(){
 /* ---- rating: the second input finally gets its outputs ---- */
 function paintRChart(){
   var N=90, H=118, W=fitSvg('rChart',H), pts=[], any=false;
+  if(W==null) return;                      /* B0.2: unmeasurable, do not draw a wrong chart */
   for(var i=N-1;i>=0;i--){ var v=ratingOf(shift(today(),-i)); pts.push(v); if(v!=null) any=true; }
   if(!any){ el('rChart').innerHTML='<text x="6" y="20">No ratings yet — rate a day on the left.</text>';
     el('rTrendC').textContent='90 days'; return; }
@@ -479,6 +520,7 @@ function pearson(a,b){
 }
 function paintRScat(){
   var H=136, W=fitSvg('rScat',H), P=[], R=[];
+  if(W==null) return;                      /* B0.2: unmeasurable, do not draw a wrong chart */
   dates().forEach(function(k){
     var r=S.byDate[k], v=ratingOf(k);
     if(r&&r.pct!=null&&v!=null){ P.push(r.pct); R.push(v); }
@@ -595,6 +637,7 @@ function paintNextMove(){
 /* ---- where the day goes: a true two-stage flow ---- */
 function paintSankey(){
   var H=156, W=fitSvg('sank',H), X=2, T1=34, BH=30, T2=110, ck=ckOf(S.date);
+  if(W==null) return;                      /* B0.2: unmeasurable, do not draw a wrong chart */
   var day=1440, com=committed();
   if(!com){ el('sank').innerHTML='<text x="2" y="20">No minutes priced yet — set them in Settings.</text>'; return; }
 
@@ -681,6 +724,7 @@ function paintHeat(){
 /* ---- trend ---- */
 function paintChart(){
   var N=90, H=118, W=fitSvg('chart',H), pts=[], i, any=false;
+  if(W==null) return;                      /* B0.2: unmeasurable, do not draw a wrong chart */
   for(i=N-1;i>=0;i--){
     var k=shift(today(),-i), r=S.byDate[k];
     pts.push(r&&r.pct!=null?r.pct:null); if(r&&r.pct!=null) any=true;
@@ -784,6 +828,7 @@ function paintPerHabit(){
 /* ---- cost against adherence ---- */
 function paintScatter(){
   var H=136,W=fitSvg('scat',H),a=stats().filter(function(s){ return s.mins>0 && s.pct!=null; });
+  if(W==null) return;                      /* B0.2: unmeasurable, do not draw a wrong chart */
   if(a.length<3){ el('scat').innerHTML='<text x="6" y="20">Price the standards to see this.</text>'; el('scatN').textContent=''; return; }
   var mx=Math.max.apply(null,a.map(function(s){return s.mins;}));
   var px=function(m){ return 30+(m/mx)*(W-44); }, py=function(p){ return H-20-(p/100)*(H-36); };
@@ -2797,6 +2842,7 @@ function earned(k){ return committed() - remaining(k); }
        240 minimum and draw a chart nobody asked for at the wrong scale. Draw when it is visible. */
     if(!svg.getClientRects().length) return;
     var H=132, W=fitSvg('vTrends',H);
+    if(W==null) return;                    /* B0.2 */
     var ks=[]; for(var i=N-1;i>=0;i--) ks.push(shift(today(),-i));
     var px=function(i){ return 26+i*(W-34)/Math.max(1,N-1); };
     var py=function(v){ return H-18-(v/100)*(H-32); };
@@ -3110,6 +3156,7 @@ function earned(k){ return committed() - remaining(k); }
     var svg=document.getElementById(svgId); if(!svg) return;
     if(!svg.getClientRects().length) return;          /* hidden surface measures 0 wide */
     var H=opts.height||150, W=fitSvg(svgId,H);
+    if(W==null) return 0;                  /* B0.2: lineChart returns a count */
     var L=26, R=30, T=12, B=22;                        /* room for BOTH axes and the x labels */
     var n=pts.length;
     var px=function(i){ return n<2 ? L+(W-L-R)/2 : L+i*(W-L-R)/(n-1); };
@@ -3603,13 +3650,13 @@ function earned(k){ return committed() - remaining(k); }
           var ym=S.calYM||[dnum(today()).getFullYear(),dnum(today()).getMonth()];
           var m=ym[1]+d, y=ym[0];
           if(m<0){ m=11; y--; } if(m>11){ m=0; y++; }
-          S.calYM=[y,m]; repaint(); return; }
+          S.calYM=[y,m]; repaintCharts(); return; }            /* B0.3: charts, and only charts */
         var yn=e.target.closest('[data-vgyn]');
         if(yn){ S.vYear=(S.vYear||dnum(today()).getFullYear())+(+yn.getAttribute('data-vgyn'));
-          repaint(); return; }
+          repaintCharts(); return; }
         var ym2=e.target.closest('[data-vgy]');
         if(ym2){ S.calYM=[S.vYear||dnum(today()).getFullYear(), +ym2.getAttribute('data-vgy')];
-          repaint(); return; }
+          repaintCharts(); return; }
         var d2=e.target.closest('[data-vgd]');
         if(d2){ var k=d2.getAttribute('data-vgd');
           if(k>today()) return;
@@ -3693,6 +3740,7 @@ function earned(k){ return committed() - remaining(k); }
       svg.removeAttribute('width'); svg.style.width='';
       if(!svg.getClientRects().length) return 0;             /* a hidden surface measures 0 wide */
       W = fitSvg(svgId,H);
+      if(W==null) return 0;               /* B0.2: unmeasurable — measureAndDraw will call back */
     }
     var pad=opts.pad||0;
     /* rotated day labels need a taller bottom band than two stacked tspans do */
@@ -3875,6 +3923,10 @@ function earned(k){ return committed() - remaining(k); }
 
   function paintMonth16(){
     var pts=monthPoints();
+    /* B0.2: draw now if the panel is already measurable, and again after layout / fonts / resize */
+    measureAndDraw('vMonth', function(){
+      h16Chart('vMonth', monthPoints(),
+               { attr:'data-vgd', height:196, twoLine:true, pad:4, perX:PHONE_DAY_PX }); });
     h16Chart('vMonth', pts, { attr:'data-vgd', height:196, twoLine:true, pad:4, perX:PHONE_DAY_PX });
     var ym=S.calYM, nav=document.getElementById('vMonthNav');
     if(nav) nav.innerHTML='<button class="mv" data-vgm="-1">\u2039</button>'+
@@ -3887,6 +3939,8 @@ function earned(k){ return committed() - remaining(k); }
   }
   function paintYear16(){
     var pts=yearPoints();
+    measureAndDraw('vYear', function(){
+      h16Chart('vYear', yearPoints(), { attr:'data-vgy', height:196, twoLine:false, pad:2 }); });
     h16Chart('vYear', pts, { attr:'data-vgy', height:196, twoLine:false, pad:2 });
     var nav=document.getElementById('vYearNav');
     if(nav) nav.innerHTML='<button class="mv" data-vgyn="-1">\u2039</button>'+
@@ -4476,12 +4530,30 @@ function earned(k){ return committed() - remaining(k); }
     decorateTime();
     paintMonth16(); paintYear16(); paintWeeks16(); paintInsights16(); paintScorecard();
   }
+  /* ---- HT-19 B0.3 - A MONTH CHANGE IS CHART STATE (R70.238) ------------------------------
+     The month and year nav called the FULL repaint(), which runs paintWeeks16() and rewrites
+     #vWeeks. HT-18e's observer then re-asserted HT-18's renderer on top - so the end state was
+     right and the two-step WAS the flash Cory saw: a bright old patch, then the correct grid.
+     MEASURED: 12 mutations on #vWeeks across ten month switches.
+     Fixing the end state is not fixing the flash. The life grid, the insight strip and the
+     scorecard do not depend on which month the chart is showing, so they are not repainted for it.
+     goDay's full repaint() is LEFT ALONE: a day change really can change a week's colour, and that
+     is the grid's own data moving rather than a caller trampling it.
+     HT-18e's observers STAY. They stop being the mechanism and become the guard - if some future
+     caller rewrites the host again the grid still ends up right. Do not delete them as redundant. */
+  function repaintCharts(){
+    if(advanced()) return;
+    if(!squareLayout()) return;
+    decorateTime();
+    paintMonth16(); paintYear16();
+  }
   function boot(){
     if(advanced()) return;
     if(!S.me) return;
     repaint();
   }
   window.__HT16.repaint = repaint;
+  window.__HT16.repaintCharts = repaintCharts;   /* B0.3 */
 
   var _pa=paintAll; paintAll=function(){ _pa.apply(null,arguments); boot(); };
   var _pl=paintLog; paintLog=function(){ _pl.apply(null,arguments);
