@@ -2100,4 +2100,384 @@ function earned(k){ return committed() - remaining(k); }
   else window.addEventListener('load', function(){ setTimeout(boot, 120); });
 })();
 
+/* ======================= HT-11 · TASKS LAYER (PASTE 35 §2 · PASTE 32 §B 8–13) =======================
+   Edit a standard from the front screen, drag it into order, add one at the foot of its group, and
+   leave the back-end table editor intact behind Settings -> Advanced.
+
+   A LAYER, for the same reason 9a and 10 are layers: `paintLog` is what the HT-6 golden suite verifies,
+   and the 9a layer already re-parents its rows under `.grp` headers. Editing the paint to add an edit
+   affordance would put 17 passing assertions at risk to gain a pencil. So this block decorates what 9a
+   has already produced, and computes nothing the app does not already compute.
+
+   THE THREE NEW COLUMNS ARE OPTIONAL BY CONSTRUCTION. `planned_start`, `planned_end` and `notes` are
+   4-HT's to run in Cory's Supabase editor; until they land the sheet probes, finds them absent, and
+   hides those rows — the same degrade-cleanly contract `habits.cue` and `day_private.predict` already
+   have. Nothing on this sheet pretends to save.
+
+   R47.3 STRICT: every read and every write below is user_id-scoped. `golden_ht11.py` records every
+   query the sheet issues and FAILS if any `habits` statement lacks a user_id filter. */
+(function(){
+  var GROUPS = ['Morning','Afternoon','Night','Standards','Weekly','Other'];
+  var LONG_PRESS = 450;     /* B2: the phone gesture, in ms */
+  var DRAG_SLOP  = 6;       /* px of movement that turns a press into a drag, never a tap */
+
+  function advanced(){
+    try{ if(localStorage.getItem('ht_advanced')==='1') return true; }catch(e){}
+    if(window.__ADVANCED===true) return true;
+    return /[?&]advanced=1/.test(location.search);
+  }
+  function q(s,r){ return Array.prototype.slice.call((r||document).querySelectorAll(s)); }
+  function hby(id){ return S.habits.filter(function(x){ return x.id===id; })[0] || null; }
+  function groupsFor(sel){
+    var out=GROUPS.slice();
+    S.habits.forEach(function(h){ var g=h.group_name; if(g && out.indexOf(g)<0) out.push(g); });
+    if(sel && out.indexOf(sel)<0) out.push(sel);
+    return out;
+  }
+  /* the 9a layer prints group headers UPPERCASE; this maps one back to the STORED value.
+     null means "this header matches no group I know" -> the drag leaves that row's group alone. */
+  function canonGroup(txt){
+    var t=String(txt||'').replace(/\s+/g,' ').trim();
+    var hit=GROUPS.filter(function(g){ return g.toUpperCase()===t.toUpperCase(); })[0];
+    if(hit) return hit;
+    return S.habits.map(function(h){ return h.group_name; })
+      .filter(function(g){ return g && g.toUpperCase()===t.toUpperCase(); })[0] || null;
+  }
+
+  /* ---- 1 · probe for the three columns, once, scoped to the signed-in user ----
+     Two probes, not one: the window pair and `notes` can land separately, and reporting "no columns"
+     because one of three is missing would hide a field that exists. */
+  var probed=false;
+  async function probe(){
+    if(probed || !S.me || !S.me.id) return;
+    probed=true;
+    var w = await sb.from('habits').select('id,planned_start,planned_end')
+              .eq('user_id',S.me.id).eq('active',true).order('sort_order');
+    S.hasWindow = !w.error;
+    var n = await sb.from('habits').select('id,notes')
+              .eq('user_id',S.me.id).eq('active',true).order('sort_order');
+    S.hasNotes = !n.error;
+    /* merge what exists onto the rows load() already has — HCOLS is fixed and golden-verified */
+    if(S.hasWindow) (w.data||[]).forEach(function(r){
+      var h=hby(r.id); if(h){ h.planned_start=r.planned_start; h.planned_end=r.planned_end; } });
+    if(S.hasNotes) (n.data||[]).forEach(function(r){
+      var h=hby(r.id); if(h){ h.notes=r.notes; } });
+  }
+
+  /* ---- 2 · THE EDIT SHEET (B2) — over TODAY, not a page ----
+     Its own element, never `#ov`: `#ov` is Settings/Guide/Circle, and opening the sheet must not tear
+     one of those down. */
+  function sheetEl(){
+    var n=document.getElementById('esheet');
+    if(n) return n;
+    n=document.createElement('div'); n.id='esheet'; n.className='esheet';
+    n.innerHTML='<div class="ebody" id="ebody"></div>';
+    document.body.appendChild(n);
+    n.addEventListener('click',function(e){
+      if(e.target===n) closeSheet();                        /* the scrim */
+      if(e.target.closest('[data-ex]')) closeSheet();
+    });
+    n.addEventListener('keydown',function(e){ if(e.key==='Escape') closeSheet(); });
+    return n;
+  }
+  function closeSheet(){ var n=document.getElementById('esheet'); if(n) n.classList.remove('on'); }
+  function fld(lab,inner){ return '<label class="fld"><span class="lab">'+lab+'</span>'+inner+'</label>'; }
+
+  function openSheet(h, presetGroup){
+    var isNew = !h;
+    h = h || { name:'', group_name:presetGroup||'Standards', cadence:'daily', minutes:0,
+               link:'', notes:'', planned_start:'', planned_end:'', cue:'' };
+    var grp = h.group_name||'Other';
+    var n=sheetEl();
+    document.getElementById('ebody').innerHTML =
+      '<div class="eh"><h3>'+(isNew?'New standard':'Edit standard')+'</h3>'+
+        '<span style="flex:1"></span><button class="tbtn" data-ex="1">Close</button></div>'+
+      fld('Name','<input id="eName" value="'+esc(h.name)+'" placeholder="standard" autocomplete="off">')+
+      fld('Group','<select id="eGroup">'+groupsFor(grp).map(function(g){
+          return '<option'+(g===grp?' selected':'')+'>'+esc(g)+'</option>'; }).join('')+'</select>')+
+      fld('Cadence','<select id="eCad">'+
+          '<option value="daily"'+(h.cadence!=='weekly'?' selected':'')+'>Daily</option>'+
+          '<option value="weekly"'+(h.cadence==='weekly'?' selected':'')+'>Weekly</option></select>')+
+      (S.hasWindow ? '<div class="fld" id="eWinFld"><span class="lab">Planned window</span>'+
+          '<div class="win"><input id="eStart" type="time" value="'+esc(h.planned_start||'')+'">'+
+          '<span class="dash">–</span>'+
+          '<input id="eEnd" type="time" value="'+esc(h.planned_end||'')+'"></div></div>' : '')+
+      fld('Planned minutes','<input id="eMin" class="num" type="number" min="0" step="5" value="'+
+          (h.minutes||0)+'">')+
+      fld('Link','<input id="eLink" value="'+esc(h.link||'')+'" placeholder="https://…" '+
+          'inputmode="url" autocomplete="off">')+
+      (S.hasNotes ? fld('Notes','<textarea id="eNotes" rows="3" placeholder="…">'+
+          esc(h.notes||'')+'</textarea>') : '')+
+      (S.hasCue ? fld('Cue','<input id="eCue" value="'+esc(h.cue||'')+'" '+
+          'placeholder="after I ___, I will ___">') : '')+
+      '<div class="etools">'+
+        (isNew?'':'<button class="btn" id="eArch">Archive</button>')+
+        '<span style="flex:1"></span>'+
+        '<button class="btn" id="eCancel">Cancel</button>'+
+        '<button class="btn pri" id="eSave">Save</button>'+
+      '</div>'+
+      (S.hasWindow&&S.hasNotes ? '' :
+        '<div class="note enote">'+
+        (!S.hasWindow&&!S.hasNotes ? 'Planned window and notes need one migration before they can be saved.'
+         : !S.hasWindow ? 'The planned window needs one migration before it can be saved.'
+         : 'Notes need one migration before they can be saved.')+
+        ' Everything else on this sheet saves now.</div>');
+
+    n.classList.add('on');
+    if(isNew) setTimeout(function(){ var f=document.getElementById('eName'); if(f) f.focus(); },60);
+    document.getElementById('eCancel').onclick=closeSheet;
+    document.getElementById('eSave').onclick=function(){ saveSheet(h,isNew); };
+    var ar=document.getElementById('eArch');
+    if(ar) ar.onclick=function(){ archiveOne(h); };
+  }
+
+  function num(id){ var n=document.getElementById(id); return n?(+n.value||0):0; }
+  function str(id){ var n=document.getElementById(id); return n?String(n.value||'').trim():''; }
+
+  async function saveSheet(h,isNew){
+    var name=str('eName');
+    if(!name){ toast('a standard needs a name'); return; }
+    var rec={ user_id:S.me.id, name:name, group_name:str('eGroup'),
+              cadence:str('eCad')==='weekly'?'weekly':'daily',
+              minutes:num('eMin'), link:str('eLink')||null };
+    if(S.hasCue)    rec.cue = str('eCue');
+    if(S.hasWindow){ rec.planned_start = str('eStart')||null; rec.planned_end = str('eEnd')||null; }
+    if(S.hasNotes)   rec.notes = str('eNotes')||null;
+    var res;
+    if(isNew){
+      /* a new row goes to the foot of its OWN group, not the foot of the list */
+      var peers=S.habits.filter(function(x){ return (x.group_name||'Other')===rec.group_name; });
+      rec.sort_order = peers.length
+        ? Math.max.apply(null,peers.map(function(x){ return x.sort_order||0; }))+1
+        : S.habits.length;
+      res = await sb.from('habits').insert(rec);
+    } else {
+      res = await sb.from('habits').update(rec).eq('id',h.id).eq('user_id',S.me.id);
+    }
+    if(res && res.error){ toast('not saved — '+String(res.error.message||'').slice(0,60)); return; }
+    closeSheet(); toast(isNew?'standard added':'standard saved');
+    await reload();
+  }
+
+  /* archive is `active=false` + `archived_at` — DEC-037: it leaves TODAY, it stays in every past day */
+  async function archiveOne(h){
+    if(!confirm('Archive "'+label(h.name)+'"? It leaves TODAY and stays in every past day and export.')) return;
+    var res = await sb.from('habits')
+      .update({ active:false, archived_at:new Date().toISOString() })
+      .eq('id',h.id).eq('user_id',S.me.id);
+    if(res && res.error){ toast('not archived — '+String(res.error.message||'').slice(0,60)); return; }
+    closeSheet(); toast('archived');
+    await reload();
+  }
+  async function reload(){ probed=false; await load(); await probe(); paintAll(); }
+
+  /* ---- 3 · the affordances: a pencil on hover (desktop), a long press (phone) ---- */
+  function decorate(){
+    var log=document.getElementById('log'); if(!log) return;
+    q('.li',log).forEach(function(r){
+      if(r.querySelector('.edp')) return;
+      var p=document.createElement('span');
+      p.className='edp'; p.setAttribute('role','button'); p.setAttribute('tabindex','-1');
+      p.title='edit this standard'; p.textContent='✎';
+      r.appendChild(p);
+    });
+    addFooters();
+  }
+
+  /* ---- 4 · "+ Add standard" at the foot of each group, pre-filled with that group (B4) ---- */
+  function addFooters(){
+    var log=document.getElementById('log'); if(!log) return;
+    q('.eadd',log).forEach(function(n){ n.parentNode.removeChild(n); });
+    var kids=Array.prototype.slice.call(log.children);
+    var heads=kids.filter(function(k){ return k.classList.contains('grp'); });
+    if(!heads.length){
+      /* advanced / full sheet: no group headers, so one button at the foot of the list */
+      if(kids.filter(function(k){ return k.classList.contains('li'); }).length) log.appendChild(mkAdd(null));
+      return;
+    }
+    var cur=null;
+    kids.forEach(function(k){
+      if(!k.classList.contains('grp')) return;
+      if(cur!==null) log.insertBefore(mkAdd(cur),k);
+      cur=canonGroup(k.textContent) || String(k.textContent||'').trim();
+    });
+    if(cur!==null) log.appendChild(mkAdd(cur));
+  }
+  function mkAdd(group){
+    var b=document.createElement('button');
+    b.className='eadd'; b.type='button';
+    b.setAttribute('data-add', group==null?'':group);
+    b.textContent='+ Add standard'+(group?' to '+String(group).toLowerCase():'');
+    return b;
+  }
+
+  /* ---- 5 · DRAG TO REORDER (B3) — within and across groups, persisted in sort_order ----
+     One pointer handler for both surfaces. Desktop: a drag begins as soon as the pointer passes the
+     slop. Touch: nothing happens until the 450 ms press has ARMED the row, so the page still scrolls
+     normally — then a move drags, and a lift with no move opens the sheet. Crossing a group header
+     is how a row changes group; that is the same gesture, and it is deliberate. */
+  var st=null;                                    /* the live gesture, or null */
+  var suppressClick=false;
+
+  function midOf(n){ var r=n.getBoundingClientRect(); return r.top + r.height/2; }
+
+  function beginDrag(){
+    st.dragging=true;
+    st.row.classList.add('dragging');
+    var log=document.getElementById('log'); if(log) log.classList.add('reordering');
+    try{ st.row.setPointerCapture(st.pid); }catch(e){}
+  }
+
+  function moveDrag(y){
+    var log=document.getElementById('log'); if(!log) return;
+    var others=q('.li',log).filter(function(n){ return n!==st.row; });
+    var before=null;
+    for(var i=0;i<others.length;i++){ if(y < midOf(others[i])){ before=others[i]; break; } }
+    if(before){
+      /* a row lands ABOVE a group header only when the pointer is genuinely above it */
+      var prev=before.previousElementSibling;
+      if(prev && prev.classList && prev.classList.contains('grp') && y > midOf(prev)) before=prev.nextSibling;
+      if(before!==st.row && before!==st.row.nextSibling) log.insertBefore(st.row,before);
+    } else {
+      var last=others[others.length-1];
+      if(last && last!==st.row){
+        var after=last.nextSibling;
+        while(after && after.classList && after.classList.contains('eadd')) after=after.nextSibling;
+        if(after!==st.row) log.insertBefore(st.row,after);
+      }
+    }
+  }
+
+  /* the row is passed in: `st` is already cleared by the time the drop is committed */
+  async function endDrag(row){
+    var log=document.getElementById('log');
+    if(row) row.classList.remove('dragging');
+    if(log) log.classList.remove('reordering');
+    if(!log) return;
+    var order=0, cur=null, ops=[], moved=0;
+    Array.prototype.slice.call(log.children).forEach(function(k){
+      if(k.classList.contains('grp')){ cur=canonGroup(k.textContent); return; }
+      if(!k.classList.contains('li')) return;
+      var hid=k.getAttribute('data-h'), h=hby(hid); if(!h) return;
+      var so=order++;
+      var grp=(cur==null)?null:cur;
+      var chg={};
+      if(h.sort_order!==so) chg.sort_order=so;
+      if(grp!==null && (h.group_name||'')!==grp) chg.group_name=grp;
+      if(!Object.keys(chg).length) return;
+      h.sort_order=so; if(chg.group_name!==undefined) h.group_name=grp;
+      moved++;
+      ops.push(sb.from('habits').update(chg).eq('id',hid).eq('user_id',S.me.id));
+    });
+    if(!moved){ paintLog(); return; }
+    var res = await Promise.all(ops);
+    var bad = res.filter(function(r){ return r && r.error; });
+    toast(bad.length ? (bad.length+' row'+(bad.length>1?'s':'')+' did not save')
+                     : ('order saved · '+moved+' row'+(moved>1?'s':'')));
+    paintLog();
+  }
+
+  function cancelPress(){ if(st && st.timer){ clearTimeout(st.timer); st.timer=null; } }
+
+  function onDown(e){
+    if(e.button!=null && e.button!==0) return;
+    if(e.target.closest('.eadd')) return;
+    if(e.target.closest('.edp')) return;                      /* the pencil is a click, not a drag */
+    var row=e.target.closest('.li'); if(!row) return;
+    var touch=(e.pointerType==='touch'||e.pointerType==='pen');
+    st={ row:row, hid:row.getAttribute('data-h'), x:e.clientX, y:e.clientY, pid:e.pointerId,
+         touch:touch, armed:!touch, dragging:false, timer:null };
+    if(touch) st.timer=setTimeout(function(){
+      if(!st) return;
+      st.armed=true; st.row.classList.add('armed');
+      try{ if(navigator.vibrate) navigator.vibrate(12); }catch(err){}
+    },LONG_PRESS);
+  }
+  function onMove(e){
+    if(!st) return;
+    var d=Math.abs(e.clientY-st.y)+Math.abs(e.clientX-st.x);
+    if(!st.armed){ if(d>10) cancelPress(); return; }           /* a scroll, not a press */
+    if(!st.dragging){ if(d<=DRAG_SLOP) return; beginDrag(); }
+    e.preventDefault();
+    moveDrag(e.clientY);
+  }
+  function onUp(){
+    if(!st) return;
+    cancelPress();
+    var s=st; st=null;
+    s.row.classList.remove('armed');
+    if(s.dragging){ suppressClick=true; endDrag(s.row); return; }
+    if(s.touch && s.armed){                                    /* long press, no move: the sheet */
+      suppressClick=true;
+      var h=hby(s.hid); if(h) openSheet(h);
+      return;
+    }
+    /* desktop press with no movement: leave it — the app's own click toggles the row */
+  }
+
+  function bind(){
+    var log=document.getElementById('log'); if(!log || log.dataset.ht11) return;
+    log.dataset.ht11='1';
+    /* CAPTURE, so this runs BEFORE the app's own bubble listener on #log: the pencil, the add button
+       and the tail of a drag must never reach toggle(). */
+    log.addEventListener('click',function(e){
+      var add=e.target.closest('.eadd');
+      if(add){ e.stopPropagation(); e.preventDefault();
+               var g=add.getAttribute('data-add'); openSheet(null,g||undefined); return; }
+      if(e.target.closest('.edp')){ e.stopPropagation(); e.preventDefault();
+               var r=e.target.closest('.li'), h=r&&hby(r.getAttribute('data-h'));
+               if(h) openSheet(h); return; }
+      if(suppressClick){ suppressClick=false; e.stopPropagation(); e.preventDefault(); }
+    },true);
+    log.addEventListener('pointerdown',onDown);
+    window.addEventListener('pointermove',onMove,{passive:false});
+    window.addEventListener('pointerup',onUp);
+    window.addEventListener('pointercancel',function(){
+      cancelPress();
+      if(st&&st.row){ st.row.classList.remove('armed'); st.row.classList.remove('dragging'); }
+      var log2=document.getElementById('log'); if(log2) log2.classList.remove('reordering');
+      st=null;
+    });
+  }
+
+  /* ---- 6 · the back-end editor moves behind Settings -> Advanced (B5 · R70.16) ----
+     Hidden, never deleted: the nodes are collected into one wrapper and that wrapper carries the class
+     the 9a stylesheet already hides in simple mode. Turn Advanced on and the whole table is back. */
+  function tuckEditor(){
+    var list=document.getElementById('edList'); if(!list) return;
+    if(document.getElementById('beEditor')) return;
+    var back=[], p=list.previousElementSibling;
+    while(p){ back.unshift(p); if(p.classList.contains('sh')) break; p=p.previousElementSibling; }
+    var nodes=back.concat([list]);
+    var fwd=list.nextElementSibling;
+    if(fwd && fwd.classList.contains('tools')) nodes.push(fwd);
+    var host=nodes[0].parentNode;
+    var wrap=document.createElement('div'); wrap.id='beEditor';
+    host.insertBefore(wrap,nodes[0]);
+    nodes.forEach(function(x){ wrap.appendChild(x); });
+    if(!advanced()){
+      wrap.classList.add('ht9a-off');
+      var note=document.createElement('div');
+      note.className='note'; note.id='beNote'; note.style.padding='14px 0 0';
+      note.textContent='Standards are edited from the front screen now — press and hold a row on the '+
+        'phone, or use the pencil on the desktop. The full table editor is still here, under Advanced.';
+      host.insertBefore(note,wrap);
+    }
+  }
+
+  /* ---- 7 · re-apply after every repaint, the way 9a and 10 do ---- */
+  var _log=paintLog;
+  paintLog=function(){ _log.apply(null,arguments); decorate(); bind(); };
+  var _os=openSettings;
+  openSettings=function(){ _os.apply(null,arguments); setTimeout(tuckEditor,80); };
+
+  async function boot(){
+    await probe();
+    decorate(); bind();
+    if(S.hasWindow||S.hasNotes) paintLog();      /* the merged columns are on the rows now */
+  }
+  if(document.readyState==='complete') setTimeout(boot,160);
+  else window.addEventListener('load',function(){ setTimeout(boot,160); });
+})();
+
 })();

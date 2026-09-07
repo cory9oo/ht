@@ -513,3 +513,59 @@ html[data-simple] #iDump, html[data-simple] #iTasks, html[data-simple] #iPrayer{
   overflow:hidden; resize:none }                    /* they auto-grow; the handle would lie */
 html[data-simple] #rateWrap{ padding-bottom:10px; border-bottom:1px solid var(--rule) }
 html[data-simple] #whyFld{ display:none !important }   /* the field goes; the column stays (DEC-037) */
+
+
+/* ======================= HT-11 · TASKS (PASTE 35 §2 · PASTE 32 §B 8–13) ======================= */
+/* the row is the anchor for the pencil; nothing else about it changes */
+.li{position:relative}
+
+/* the pencil: DESKTOP ONLY, and absolutely positioned so it can never widen a row.
+   A hover affordance on a touch screen is a permanently visible ✎ that nobody can hover away, and
+   on phone the gesture is the long press instead — so it is gated on a real hover-capable pointer. */
+.li .edp{display:none}
+@media(hover:hover) and (pointer:fine){
+  .li .edp{position:absolute;right:2px;top:50%;transform:translateY(-50%);
+    width:22px;height:22px;line-height:22px;text-align:center;
+    font-size:12px;color:var(--ink3);background:var(--sheet);
+    border:1px solid var(--rule);cursor:pointer;z-index:2}
+  .li:hover .edp{display:block}
+  .li .edp:hover{color:var(--accent);border-color:var(--accent)}
+}
+
+/* the drag. `touch-action:none` only while reordering — otherwise the row would eat page scrolling. */
+.li.armed{background:var(--sel);box-shadow:inset 2px 0 0 var(--accent)}
+.li.dragging{opacity:.65;background:var(--sel)}
+.log.reordering{touch-action:none;user-select:none;-webkit-user-select:none}
+.log.reordering .li{cursor:grabbing}
+
+/* + Add standard, at the foot of every group */
+.eadd{display:block;width:100%;text-align:left;
+  font:500 9.5px/1 var(--mono);letter-spacing:.12em;text-transform:uppercase;
+  color:var(--ink3);background:none;border:0;border-bottom:1px solid var(--rule);
+  padding:11px 2px;cursor:pointer}
+.eadd:hover{color:var(--accent)}
+
+/* THE EDIT SHEET — a sheet over TODAY, not a page. Its own element, never #ov. */
+.esheet{position:fixed;inset:0;z-index:90;display:none;
+  background:color-mix(in srgb, var(--ground) 72%, transparent)}
+@supports not (background:color-mix(in srgb,red,blue)){ .esheet{background:rgba(0,0,0,.62)} }
+.esheet.on{display:block}
+.esheet .ebody{position:absolute;left:0;right:0;bottom:0;
+  max-height:88vh;overflow-y:auto;-webkit-overflow-scrolling:touch;
+  background:var(--ground);border-top:1px solid var(--rule2);
+  padding:0 var(--gut) calc(18px + env(safe-area-inset-bottom));
+  max-width:640px;margin:0 auto;
+  animation:eup .2s cubic-bezier(.2,0,0,1)}
+@keyframes eup{ from{ transform:translateY(14px) } to{ transform:none } }
+@media(min-width:720px){
+  .esheet .ebody{top:50%;bottom:auto;transform:translateY(-50%);border:1px solid var(--rule2);
+    animation:none}
+}
+.esheet .eh{position:sticky;top:0;background:var(--ground);border-bottom:1px solid var(--rule2);
+  display:flex;align-items:center;gap:10px;padding:14px 0 11px;z-index:2}
+.esheet .eh h3{font:500 11px/1 var(--mono);letter-spacing:.17em;text-transform:uppercase;color:var(--ink)}
+.esheet .win{display:flex;align-items:center;gap:8px}
+.esheet .win input{flex:1;min-width:0}
+.esheet .win .dash{color:var(--ink3);font:400 12px/1 var(--mono)}
+.esheet .etools{display:flex;align-items:center;gap:6px;flex-wrap:wrap;padding:14px 0 0}
+.esheet .enote{padding:10px 0 0}
