@@ -715,3 +715,89 @@ html[data-simple] .chart .dot-c{ fill:currentColor }          /* the ramp class 
 .h16leg{ display:flex; align-items:center; gap:0; margin-left:auto }
 .h16leg i{ display:block; width:14px; height:8px }
 html[data-simple] .gnav .lg{ display:none }                    /* the old two-word legend, superseded */
+
+
+/* ======================= HT-16 · S2 · LAYOUT (R70.98 · R70.99 · R70.100) =======================
+   R70.98 — LINKS AND EDIT NEVER OVERLAP. Every control is in flow and owns a 44x44 hit target.
+   The pencil was an absolutely-positioned hover overlay sitting on top of the row's right edge,
+   which is exactly how a link and an edit came to share one box. */
+html[data-simple] .li{ display:flex; align-items:center; gap:6px; padding:4px 0;
+  cursor:default; position:relative }
+html[data-simple] .li .bxw{ flex:0 0 44px; width:44px; height:44px; padding:0;
+  display:flex; align-items:center; justify-content:center; background:none; border:0 }
+html[data-simple] .li .bx{ width:26px; height:26px; border-width:2px }
+html[data-simple] .li.on .bx::after{ width:14px; height:8px; left:5px; top:6px }
+html[data-simple] .li .nm{ flex:0 1 auto; min-width:0; white-space:nowrap;
+  overflow:hidden; text-overflow:ellipsis }
+html[data-simple] .li a.nm{ color:var(--text); text-decoration:underline;
+  text-decoration-color:var(--border); text-underline-offset:3px }
+html[data-simple] .li a.nm:hover{ text-decoration-color:var(--muted) }
+html[data-simple] .li a.nm .lk{ display:inline-block; vertical-align:-1px; padding-left:5px;
+  color:var(--muted) }
+html[data-simple] .li a.nm .lk svg{ display:inline-block; width:11px; height:11px;
+  stroke:currentColor; stroke-width:2; fill:none }
+html[data-simple] .li .sp16{ flex:1 1 auto; min-width:8px; align-self:stretch }
+/* the pencil is a control, not a hover affordance: in flow, always present, 44x44 on every pointer */
+html[data-simple] .li .edp{ position:static; display:flex; flex:0 0 44px;
+  width:44px; height:44px; align-items:center; justify-content:center;
+  font-size:13px; line-height:1; color:var(--muted); background:none;
+  border:1px solid var(--border); cursor:pointer; z-index:auto; transform:none }
+html[data-simple] .li .edp:hover{ color:var(--green-bright); border-color:var(--green-bright) }
+@media(min-width:1024px){ html[data-simple] .li{ min-height:48px } }
+
+/* R70.99 — A FRAME, NOT FULLSCREEN. --bg shows around it, --surface inside. */
+html[data-simple]{ font-size:15px }
+html[data-simple] body{ background:var(--bg) }
+html[data-simple] .app{ max-width:1200px; margin:0 auto; padding-left:24px; padding-right:24px;
+  background:var(--surface); border-left:1px solid var(--border); border-right:1px solid var(--border) }
+html[data-simple] .mast{ background:var(--surface) }
+html[data-simple] #tClose{ background:var(--surface) }
+@media(max-width:767px){
+  html[data-simple] .app{ padding-left:12px; padding-right:12px; border-left:0; border-right:0 }
+}
+
+/* R70.100 — THE SQUARE. A strict 12-column grid on a fixed row unit. Every panel declares its
+   column-span x row-span and stretches to fill, so the composite is a rectangle: no holes, equal
+   gutters, no masonry, no ragged bottom. Charts scale to their cell and never overflow it. */
+.h16p{ min-width:0; min-height:0; display:flex; flex-direction:column }
+.h16p > .sh{ padding-top:14px }
+.h16p .pan.flat{ flex:1 1 auto; min-height:0 }
+.h16p svg.chart{ width:100% }
+
+/* PHONE / NARROW — one column, equal widths and gaps, and the tab still separates output from
+   input (R70.17 stands: no output above an input). Source order is TODAY -> MONTH -> YEAR ->
+   SCORECARD -> LIFE, which is the order R70.100 names. */
+html[data-simple] #h16Month, html[data-simple] #h16Year,
+html[data-simple] #h16Score, html[data-simple] #h16Ins{ display:none }
+html[data-simple][data-vtab="views"] #h16Month, html[data-simple][data-vtab="views"] #h16Year,
+html[data-simple][data-vtab="views"] #h16Score, html[data-simple][data-vtab="views"] #h16Ins{
+  display:flex }
+
+@media(min-width:1024px){
+  html[data-simple] .grid{
+    display:grid;
+    grid-template-columns:repeat(12,minmax(0,1fr));
+    grid-auto-rows:minmax(74px,auto);
+    column-gap:20px; row-gap:0;
+    align-items:stretch }
+  html[data-simple] .grid > *{ min-width:0; min-height:0 }
+  html[data-simple] .colL{ grid-column:1 / 6;  grid-row:1 / 7;  position:static; display:block }
+  html[data-simple] #h16Month{ grid-column:6 / 13; grid-row:1 / 4;  display:flex }
+  html[data-simple] #h16Year { grid-column:6 / 13; grid-row:4 / 7;  display:flex }
+  html[data-simple] #h16Score{ grid-column:1 / 6;  grid-row:7 / 9;  display:flex }
+  html[data-simple] #h16Ins  { grid-column:6 / 13; grid-row:7 / 9;  display:flex }
+  html[data-simple] .vWeeksSec{ grid-column:1 / 13; grid-row:9 / 14; padding:0; max-width:none;
+    margin:0; display:block }
+  /* #vViews now carries only the hidden HT-13 instruments and #vNav, which R70.16 keeps in the
+     tree. It is pinned to its own full-width row under the square rather than left to auto-place
+     itself into one of the twelve columns. */
+  html[data-simple] #vViews{ grid-column:1 / 13; grid-row:14; display:block }
+}
+/* the weeks section became a grid item in this wire; as a grid item its `max-width:1500px` no
+   longer bounds it to the track, and MEASURED at 390 the page itself scrolled sideways 190px.
+   The scroller inside it is what may scroll, never the page (R70.100 · golden_ht15 12d). */
+html[data-simple] .vWeeksSec{ min-width:0; max-width:100%; overflow:hidden }
+html[data-simple] #vWeeks{ min-width:0; max-width:100% }
+
+/* the trends panel's wrapper outlived the chart R70.67 cut; it rendered as an empty box */
+html[data-simple] #vViews > .pan.flat:has(#vTrends){ display:none !important }

@@ -321,18 +321,30 @@ function paintLog(){
   el('log').innerHTML = list.map(function(h){
     var on = doneOn(h,S.date);
     var ad = adherence30(h.id);
-    return '<button class="li'+(on?' on':'')+(h.id===nx?' nx':'')+'" data-h="'+h.id+'">'+
-      '<span class="bx"></span>'+
-      '<span class="nm">'+esc(label(h.name))+
-        ((S.hasCue && h.cue)?'<i class="cue">'+esc(h.cue)+'</i>':'')+'</span>'+
+    /* HT-16 R70.98 · ROW ANATOMY, and it is fixed:
+         [checkbox 44x44] [name - an <a> when the task has a URL] [flex spacer] [edit 44x44]
+       No absolutely-positioned overlays; each control owns its hit target; tapping the name never
+       opens the editor and the editor never follows the link. Tab order is DOM order:
+       checkbox -> link -> edit. The row is a <div> now, not a <button>: a <button> cannot legally
+       contain the <a>, and nesting them is how a link and an edit come to share one hit box. */
+    var nmIn = esc(label(h.name)) +
+      ((S.hasCue && h.cue)?'<i class="cue">'+esc(h.cue)+'</i>':'');
+    var LK = '<span class="lk"><svg viewBox="0 0 24 24"><path d="M10 13a5 5 0 007.5.5l3-3a5 5 0 00-7-7L11.5 5"/><path d="M14 11a5 5 0 00-7.5-.5l-3 3a5 5 0 007 7L12 19"/></svg></span>';
+    var nm = h.link
+      ? '<a class="nm lnk" href="'+esc(h.link)+'" target="_blank" rel="noopener">'+nmIn+LK+'</a>'
+      : '<span class="nm">'+nmIn+'</span>';
+    return '<div class="li'+(on?' on':'')+(h.id===nx?' nx':'')+'" data-h="'+h.id+'">'+
+      '<button class="bxw" type="button" data-tog="'+h.id+'" aria-pressed="'+(on?'true':'false')+
+        '" title="'+esc(label(h.name))+'"><span class="bx"></span></button>'+
+      nm+
       (function(){ var mr=missRun(h.id); return mr>=3?'<span class="mrun" title="'+mr+
         ' days running">⚑'+mr+'</span>':''; })()+
       (returnedOn(h,S.date)?'<span class="back" title="back after a miss — the return is the win">↩</span>':'')+
-      (h.link?'<span class="lk"><svg viewBox="0 0 24 24"><path d="M10 13a5 5 0 007.5.5l3-3a5 5 0 00-7-7L11.5 5"/><path d="M14 11a5 5 0 00-7.5-.5l-3 3a5 5 0 007 7L12 19"/></svg></span>':'')+
       (h.cadence==='weekly'?'<span class="wk">WEEKLY</span>':'')+
+      '<span class="sp16"></span>'+
       '<span class="mn">'+(h.minutes?h.minutes+'m':'—')+'</span>'+
       '<span class="ad" style="color:'+gtxt(ad)+'">'+(ad==null?'—':ad+'%')+'</span>'+
-      '</button>';
+      '</div>';
   }).join('') || '<div class="empty">Nothing matches.</div>';
 
   var ids=daily().map(function(x){return x.id;});
@@ -1244,6 +1256,8 @@ function wire(){
 
   el('log').addEventListener('click',function(e){
     var b=e.target.closest('[data-h]'); if(!b) return;
+    /* HT-16 R70.98: the name IS the link now. It navigates itself; it must never also toggle. */
+    if(e.target.closest('a')) return;
     if(e.target.closest('.lk')){
       var h=S.habits.filter(function(x){return x.id===b.getAttribute('data-h');})[0];
       if(h&&h.link){ window.open(h.link,'_blank','noopener'); return; }
@@ -2305,7 +2319,8 @@ function earned(k){ return committed() - remaining(k); }
     q('.li',log).forEach(function(r){
       if(r.querySelector('.edp')) return;
       var p=document.createElement('span');
-      p.className='edp'; p.setAttribute('role','button'); p.setAttribute('tabindex','-1');
+      p.className='edp'; p.setAttribute('role','button');
+      p.setAttribute('tabindex','0');           /* HT-16 R70.98: checkbox -> link -> edit */
       p.title='edit this standard'; p.textContent='✎';
       r.appendChild(p);
     });
@@ -3477,10 +3492,144 @@ function earned(k){ return committed() - remaining(k); }
   window.__HT16.TARGET_AGE = TARGET_AGE;
   window.__HT16.LIFE_TOTAL = LIFE_TOTAL;
 
+  /* ---- S2 · THE SQUARE (R70.100) --------------------------------------------------------
+     One grid, twelve columns, one fixed row unit. The panels have to be DIRECT CHILDREN of `.grid`
+     for a column-span to mean anything, and HT-13/HT-15 left them nested two deep inside `#vViews`.
+     `display:contents` on the wrapper was the cheaper fix and it is the wrong one: `#vViews` also
+     holds eleven hidden instruments and `#vNav`, and every one of them would auto-place itself into
+     a column. So the five panels are MOVED, once, idempotently, and `#vViews` keeps everything
+     R70.16 says must stay in the tree. */
+  function panel(id, cls){
+    var n=document.getElementById(id);
+    if(!n){ n=document.createElement('div'); n.id=id; }
+    n.className='h16p'+(cls?' '+cls:'');
+    return n;
+  }
+  function squareLayout(){
+    var grid=document.querySelector('.grid'); if(!grid) return false;
+    var vMonth=document.getElementById('vMonth'), vYear=document.getElementById('vYear');
+    if(!vMonth || !vYear) return false;                       /* HT-15 has not built yet */
+
+    if(!document.getElementById('h16Month')){
+      var pm=panel('h16Month');
+      var nav=document.getElementById('vMonthNav');
+      var head=nav && nav.previousElementSibling;             /* the .sh carrying #vMonthTip */
+      if(head) pm.appendChild(head);
+      if(nav) pm.appendChild(nav);
+      pm.appendChild(vMonth.closest('.pan') || vMonth);
+      grid.appendChild(pm);
+    }
+    if(!document.getElementById('h16Year')){
+      var py=panel('h16Year');
+      var ynav=document.getElementById('vYearNav');
+      var yhead=ynav && ynav.previousElementSibling;
+      if(yhead) py.appendChild(yhead);
+      if(ynav) py.appendChild(ynav);
+      py.appendChild(vYear.closest('.pan') || vYear);
+      grid.appendChild(py);
+    }
+    if(!document.getElementById('h16Score')){
+      var g=document.getElementById('vGroups');
+      if(g){
+        var ps=panel('h16Score');
+        var gh=g.previousElementSibling;                      /* the .sh carrying #vGroupsC */
+        if(gh) ps.appendChild(gh);
+        ps.appendChild(g);
+        grid.appendChild(ps);
+      }
+    }
+    if(!document.getElementById('h16Ins')){
+      var pi=panel('h16Ins');
+      pi.innerHTML='<div class="sh"><h2>Life</h2><span class="ln"></span>'+
+                   '<span class="c" id="h16InsC"></span></div><div id="h16InsBody"></div>';
+      grid.appendChild(pi);
+    }
+    var wk=document.querySelector('.vWeeksSec');
+    if(wk && wk.parentNode!==grid) grid.appendChild(wk);
+    document.documentElement.setAttribute('data-ht16','1');
+    return true;
+  }
+
+  /* the measured frame, for the receipt and for the golden */
+  function metrics(){
+    var app=document.querySelector('.app');
+    var r=app?app.getBoundingClientRect():null;
+    var row=q('#log .li').filter(function(r){ return r.querySelector('a.nm'); })[0]
+            || document.querySelector('#log .li');
+    var bx=row&&row.querySelector('.bxw'), ed=row&&row.querySelector('.edp');
+    function box(n){ if(!n) return null; var b=n.getBoundingClientRect();
+      return {x:Math.round(b.left),y:Math.round(b.top),w:Math.round(b.width),h:Math.round(b.height)}; }
+    function hit(a,b){ if(!a||!b) return null;
+      return !(a.x+a.w<=b.x || b.x+b.w<=a.x || a.y+a.h<=b.y || b.y+b.h<=a.y); }
+    var A=box(bx), B=box(ed);
+    return { viewport:window.innerWidth,
+             frame:r?Math.round(r.width):null,
+             frameLeft:r?Math.round(r.left):null,
+             frameRight:r?Math.round(window.innerWidth-r.right):null,
+             centred:!!(r && Math.abs(r.left-(window.innerWidth-r.right))<=2),
+             rootFont:parseFloat(getComputedStyle(document.documentElement).fontSize),
+             checkbox:A, edit:B, intersect:hit(A,B),
+             nameIsLink:!!(row && row.querySelector('a.nm')) };
+  }
+  window.__HT16.metrics = metrics;
+  window.__HT16.squareLayout = squareLayout;
+
+  /* ---- S2b · THE WIRING FOLLOWS THE PANELS ----------------------------------------------
+     HT-15 delegates its chart clicks from `#vViews`. Moving the two graphs out of it into their own
+     grid panels takes them out of that subtree, so the dots go dead — MEASURED, golden_ht15 6 and 7.
+     The same four behaviours are re-bound here, on the panels themselves, using the app's own
+     navigators: `goDay(k)` for a day, `S.calYM` for a month. No second copy of date state. */
+  function bindPanels(){
+    ['h16Month','h16Year'].forEach(function(id){
+      var n=document.getElementById(id); if(!n || n.dataset.ht16) return;
+      n.dataset.ht16='1';
+      n.addEventListener('click',function(e){
+        var mn=e.target.closest('[data-vgm]');
+        if(mn){ var d=+mn.getAttribute('data-vgm');
+          var ym=S.calYM||[dnum(today()).getFullYear(),dnum(today()).getMonth()];
+          var m=ym[1]+d, y=ym[0];
+          if(m<0){ m=11; y--; } if(m>11){ m=0; y++; }
+          S.calYM=[y,m]; repaint(); return; }
+        var yn=e.target.closest('[data-vgyn]');
+        if(yn){ S.vYear=(S.vYear||dnum(today()).getFullYear())+(+yn.getAttribute('data-vgyn'));
+          repaint(); return; }
+        var ym2=e.target.closest('[data-vgy]');
+        if(ym2){ S.calYM=[S.vYear||dnum(today()).getFullYear(), +ym2.getAttribute('data-vgy')];
+          repaint(); return; }
+        var d2=e.target.closest('[data-vgd]');
+        if(d2){ var k=d2.getAttribute('data-vgd');
+          if(k>today()) return;
+          goDay(k);
+          if(phone() && window.__HT13_TAB) window.__HT13_TAB('today');
+          return; }
+      });
+      n.addEventListener('pointerover',function(e){
+        var h=e.target.closest('[data-tip]'); if(!h) return;
+        var svg=h.closest('svg'); if(!svg) return;
+        var tip=document.getElementById(svg.id==='vYear'?'vYearTip':'vMonthTip');
+        if(tip) tip.textContent=h.getAttribute('data-tip');
+      });
+    });
+    if(!window.__HT16_RESIZE){
+      window.__HT16_RESIZE=1;
+      var rT=null;
+      window.addEventListener('resize',function(){ clearTimeout(rT); rT=setTimeout(repaint,240); });
+    }
+    var tabs=document.getElementById('vTabs');
+    if(tabs && !tabs.dataset.ht16){
+      tabs.dataset.ht16='1';
+      tabs.addEventListener('click',function(e){
+        if(e.target.closest('[data-v]')) setTimeout(repaint,80);
+      });
+    }
+  }
+
   /* HT16-INSERT */
 
   function repaint(){
     if(advanced()) return;
+    if(!squareLayout()) return;
+    bindPanels();
   }
   function boot(){
     if(advanced()) return;
