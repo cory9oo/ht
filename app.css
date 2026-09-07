@@ -830,3 +830,27 @@ html[data-simple] .wkg .cw{ shape-rendering:geometricPrecision }
 .h16ins{ font:400 11.5px/1.6 var(--mono); color:var(--text); padding:4px 0 }
 .h16ins2{ color:var(--muted); border-top:1px solid var(--border); padding-top:8px; margin-top:4px }
 #h16InsC .h16leg{ margin-left:0 }
+
+
+/* ======================= HT-16 · S5 · THE SCORECARD (R70.97) ======================= */
+.h16sc{ width:100%; border-collapse:collapse; table-layout:auto }
+.h16sc th{ font:500 8.5px/1 var(--mono); letter-spacing:.12em; text-transform:uppercase;
+  color:var(--muted); text-align:left; padding:6px 6px 6px 0; border-bottom:1px solid var(--border);
+  white-space:nowrap }
+.h16sc td{ font:400 11px/1.3 var(--sans); color:var(--text); padding:7px 6px 7px 0;
+  border-bottom:1px solid var(--border); vertical-align:middle }
+.h16sc th.r, .h16sc td.r{ text-align:right; padding-right:0 }
+.h16sc td.num{ font-family:var(--mono); font-variant-numeric:tabular-nums; white-space:nowrap }
+.h16sc td.g{ font:500 10px/1 var(--mono); letter-spacing:.1em; text-transform:uppercase;
+  color:var(--text); white-space:nowrap }
+.h16sc td.dl{ color:var(--muted) }
+.h16sc td.wk{ color:var(--muted); max-width:150px; overflow:hidden; text-overflow:ellipsis;
+  white-space:nowrap }
+.h16sc td.wk s{ text-decoration:none; color:var(--grey); font-family:var(--mono); padding-left:4px }
+.h16sc .spark{ display:block }
+.h16sc .spl{ fill:none; stroke:var(--muted); stroke-width:1.2 }
+.h16sc .sp1{ fill:var(--muted) }
+.h16sc .spd{ fill:currentColor }
+@media(max-width:479px){
+  .h16sc td.wk, .h16sc th:nth-child(5){ display:none }     /* the phone keeps the numbers */
+}

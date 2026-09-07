@@ -2782,52 +2782,12 @@ function earned(k){ return committed() - remaining(k); }
     }
   }
 
-  /* ---- B5 · GROUP ADHERENCE · hits ÷ opportunities for the selected month -----------
-     An opportunity is a habit in that day's `active_set` carrying that group. A WEEKLY habit is one
-     opportunity per WEEK, not per day — counting it daily would divide by seven and read as failure. */
-  function paintGroups13(){
-    var host=document.getElementById('vGroups'); if(!host) return;
-    var ym=S.vYM||[dnum(today()).getFullYear(),dnum(today()).getMonth()];
-    var y=ym[0], m=ym[1];
-    var byId={}; S.habits.forEach(function(h){ byId[h.id]=h; });
-    var hit={}, opp={}, seenWeek={};
-    for(var i=1;i<=31;i++){
-      var d=new Date(y,m,i); if(d.getMonth()!==m) break;
-      var k=dk(d); if(k>today()) continue;
-      var r=S.byDate[k]; if(!r||!loggedOn(k)) continue;
-      var set=r.active_set||Object.keys(byId);
-      var ck=r.checked||{};
-      set.forEach(function(hid){
-        var h=byId[hid]; if(!h) return;
-        var g=h.group_name||'Other';
-        if(h.cadence==='weekly'){
-          var wk=g+'|'+weekKey(k);
-          if(seenWeek[wk]) return;                   /* one opportunity per week */
-          seenWeek[wk]=1;
-          opp[g]=(opp[g]||0)+1;
-          if(weekDone(hid,k)) hit[g]=(hit[g]||0)+1;
-          return;
-        }
-        opp[g]=(opp[g]||0)+1;
-        if(ck[hid]) hit[g]=(hit[g]||0)+1;
-      });
-    }
-    var groups=GRP_ORDER.filter(function(g){ return opp[g]; })
-      .concat(Object.keys(opp).filter(function(g){ return GRP_ORDER.indexOf(g)<0; }).sort());
-    if(!groups.length){
-      host.innerHTML='<div class="vempty">Nothing logged this month yet.</div>';
-      var c0=document.getElementById('vGroupsC'); if(c0) c0.textContent=MO[m]+' '+y;
-      return;
-    }
-    var vals=groups.map(function(g){ return Math.round(hit[g]/opp[g]*100); });
-    colChart('vGroups', vals, groups.map(function(g){ return g.slice(0,3); }), 100,
-      function(x){ return x+'%'; }, dens);
-    var cap=document.getElementById('vGroupsC');
-    if(cap) cap.textContent=MO[m]+' '+y+' · hits ÷ opportunities'+
-      (groups.some(function(g){ return (S.habits.filter(function(h){
-        return (h.group_name||'Other')===g && h.cadence==='weekly'; }).length); })
-        ? ' · weekly counted once a week' : '');
-  }
+  /* ---- B5 · GROUP ADHERENCE -----------------------------------------------------------------
+     THE BAR RENDERER IS GONE (HT-16 S5 · R70.97 · R70.79 · DEC-096). It drew one column per group
+     into `#vGroups` for the selected calendar month. Its named replacement -- the scorecard, worst
+     first, with the delta, the streak, the weakest habit, a 12-week sparkline and an on-time column
+     -- lands in the same commit and renders into the same node. Two renderers for one number is how
+     a surface starts disagreeing with itself, so there is only ever one. */
   function weekKey(k){ var d=dnum(k); d.setDate(d.getDate()-((d.getDay()+6)%7)); return dk(d); }
 
   /* ---- B6 · THREE INSIGHTS, each one line and one small chart -----------------------
@@ -3022,7 +2982,7 @@ function earned(k){ return committed() - remaining(k); }
     if(!document.getElementById('vViews')) return;
     paintLife13();
     monthGrid('vMonthC','pct'); monthGrid('vMonthR','rate');
-    paintTrends(); paintGroups13(); insights();
+    paintTrends(); insights();          /* group adherence is HT-16's scorecard now */
   }
   window.__HT13_REPAINT=repaint;
   /* HT-15 needs this: clicking a dot on the month graph navigates TODAY, and on the phone the
@@ -3940,13 +3900,169 @@ function earned(k){ return committed() - remaining(k); }
   window.__HT16.lifeFacts  = lifeFacts;
   window.__HT16.paintWeeks = paintWeeks16;
 
+  /* ---- S5 · THE SCORECARD (R70.97) ------------------------------------------------------
+     PASTE 42 C1 is answered: keep, rebuilt. The bars said one number per group and nothing about
+     whether it was moving, which habit was carrying the loss, or how long the run was -- so the
+     bars are replaced, worst first, and the old renderer is deleted in this same commit (R70.79,
+     DEC-096: a named replacement, landing together).
+
+     THE DEFINITION, and it ships with the table (Settings -> About): of all the habit check-offs
+     that were SCHEDULED in a group over the last 30 days, the share you actually completed.
+     100% = every scheduled habit in that group done every scheduled day. A weekly standard is ONE
+     opportunity per week, not per day -- counting it daily divides by seven and reads as failure. */
+  function groupsOf(){
+    var out=[], seen={};
+    S.habits.forEach(function(h){
+      var g=h.group_name||'Other';
+      if(!seen[g]){ seen[g]=1; out.push(g); }
+    });
+    return out;
+  }
+  /* hits and opportunities for one group over the window [from, to] in day-offsets back from today */
+  function adherenceWindow(group, back0, back1){
+    var byId={}; S.habits.forEach(function(h){ byId[h.id]=h; });
+    var hit=0, opp=0, seenWeek={};
+    for(var i=back0;i<=back1;i++){
+      var k=shift(today(),-i);
+      var r=S.byDate[k]; if(!r||!loggedOn(k)) continue;
+      var set=r.active_set||Object.keys(byId);
+      var ck=r.checked||{};
+      set.forEach(function(hid){
+        var h=byId[hid]; if(!h) return;
+        if((h.group_name||'Other')!==group) return;
+        if(h.cadence==='weekly'){
+          var d=dnum(k); d.setDate(d.getDate()-((d.getDay()+6)%7));
+          var wk=dk(d); if(seenWeek[hid+'|'+wk]) return;
+          seenWeek[hid+'|'+wk]=1; opp++;
+          if(weekDone(hid,k)) hit++;
+          return;
+        }
+        opp++; if(ck[hid]) hit++;
+      });
+    }
+    return { hit:hit, opp:opp, pct: opp? Math.round(hit/opp*100) : null };
+  }
+  /* consecutive days on which EVERY standard scheduled in the group was done */
+  function groupStreak(group){
+    var byId={}; S.habits.forEach(function(h){ byId[h.id]=h; });
+    var n=0, k=today(), guard=0;
+    if(!loggedOn(k)) k=shift(k,-1);
+    while(guard++<400){
+      var r=S.byDate[k]; if(!r||!loggedOn(k)) break;
+      var set=r.active_set||Object.keys(byId), ck=r.checked||{}, any=false, all=true;
+      set.forEach(function(hid){
+        var h=byId[hid]; if(!h||(h.group_name||'Other')!==group) return;
+        any=true;
+        var done = h.cadence==='weekly' ? weekDone(hid,k) : !!ck[hid];
+        if(!done) all=false;
+      });
+      if(!any || !all) break;
+      n++; k=shift(k,-1);
+    }
+    return n;
+  }
+  function weakestIn(group){
+    var out=null;
+    S.habits.forEach(function(h){
+      if((h.group_name||'Other')!==group) return;
+      var a=adherence30(h.id); if(a==null) return;
+      if(out==null || a<out.pct) out={ name:label(h.name), pct:a };
+    });
+    return out;
+  }
+  /* twelve weekly figures, oldest first; a week with no opportunity is a gap, not a zero */
+  function weeklyAdherence(group){
+    var out=[];
+    for(var w=11;w>=0;w--) out.push(adherenceWindow(group, w*7, w*7+6).pct);
+    return out;
+  }
+  function sparkSvg(vals){
+    var W=84, H=20, n=vals.length;
+    var px=function(i){ return n<2?W/2:1+i*(W-2)/(n-1); };
+    var py=function(v){ return H-2-(v/100)*(H-5); };
+    var runs=[], cur=[];
+    vals.forEach(function(v,i){ if(v==null){ if(cur.length){runs.push(cur);cur=[];} return; } cur.push([i,v]); });
+    if(cur.length) runs.push(cur);
+    var s='';
+    runs.forEach(function(r){
+      if(r.length===1) s+='<circle class="sp1" cx="'+px(r[0][0]).toFixed(1)+'" cy="'+py(r[0][1]).toFixed(1)+'" r="1.4"/>';
+      else s+='<path class="spl" d="'+r.map(function(pt,j){
+        return (j?'L':'M')+px(pt[0]).toFixed(1)+' '+py(pt[1]).toFixed(1); }).join(' ')+'"/>';
+    });
+    var last=null, li=-1;
+    for(var i=vals.length-1;i>=0;i--){ if(vals[i]!=null){ last=vals[i]; li=i; break; } }
+    if(last!=null) s+='<circle class="spd '+rampClass(last)+'" cx="'+px(li).toFixed(1)+'" cy="'+
+      py(last).toFixed(1)+'" r="2.2"/>';
+    return '<svg class="spark" viewBox="0 0 '+W+' '+H+'" width="'+W+'" height="'+H+'">'+s+'</svg>';
+  }
+
+  function scorecardRows(){
+    return groupsOf().map(function(g){
+      var cur=adherenceWindow(g,0,29), prv=adherenceWindow(g,30,59);
+      var wk=weakestIn(g);
+      return { group:g, pct:cur.pct, hit:cur.hit, opp:cur.opp,
+               prev:prv.pct,
+               delta:(cur.pct==null||prv.pct==null)?null:(cur.pct-prv.pct),
+               streak:groupStreak(g), weakest:wk,
+               spark:weeklyAdherence(g),
+               onTime:(typeof onTime30==='function'? onTime30(g) : null) };
+    }).sort(function(a,b){
+      var x=a.pct==null?101:a.pct, y=b.pct==null?101:b.pct;
+      return x-y || (a.group<b.group?-1:1);
+    });
+  }
+
+  function paintScorecard(){
+    var host=document.getElementById('vGroups'); if(!host) return;
+    var rows=scorecardRows();
+    var cap=document.getElementById('vGroupsC');
+    if(cap) cap.textContent='last 30 days \u00b7 worst first';
+    if(!rows.length){ host.innerHTML='<div class="vempty">No active standards yet.</div>'; return; }
+    host.innerHTML=
+      '<table class="h16sc"><thead><tr>'+
+        '<th>Group</th><th class="r">30d</th><th class="r">\u0394</th><th class="r">Streak</th>'+
+        '<th>Weakest</th><th>12 weeks</th><th class="r">On time</th>'+
+      '</tr></thead><tbody>'+
+      rows.map(function(r){
+        var d=r.delta;
+        return '<tr>'+
+          '<td class="g">'+esc(r.group)+'</td>'+
+          '<td class="r num '+rampClass(r.pct)+'">'+(r.pct==null?'\u2014':r.pct+'%')+'</td>'+
+          '<td class="r num dl">'+(d==null?'\u2014':(d>0?'\u25b2':(d<0?'\u25bc':'\u00b7'))+
+            (d===0?'':Math.abs(d)))+'</td>'+
+          '<td class="r num">'+r.streak+'</td>'+
+          '<td class="wk">'+(r.weakest? esc(r.weakest.name)+' <s>'+r.weakest.pct+'%</s>' : '\u2014')+'</td>'+
+          '<td>'+sparkSvg(r.spark)+'</td>'+
+          '<td class="r num">'+(r.onTime==null?'\u2014':r.onTime+'%')+'</td>'+
+        '</tr>'; }).join('')+
+      '</tbody></table>';
+  }
+
+  /* the definition ships with the table (R70.97), in Cory's words */
+  var ADHERENCE_DEF =
+    'Group adherence \u2014 of all the habit check-offs that were scheduled in a group over the last ' +
+    '30 days, the share you actually completed. 100 % = every scheduled habit in that group done ' +
+    'every scheduled day.';
+  function aboutScorecard(){
+    var a=document.getElementById('vAbout'); if(!a || a.dataset.ht16) return;
+    a.dataset.ht16='1';
+    var d=document.createElement('div');
+    d.id='h16About'; d.style.paddingTop='6px';
+    d.innerHTML='<b>The scorecard</b> \u2014 '+ADHERENCE_DEF;
+    a.appendChild(d);
+  }
+  window.__HT16.scorecardRows    = scorecardRows;
+  window.__HT16.adherenceWindow  = adherenceWindow;
+  window.__HT16.groupStreak      = groupStreak;
+  window.__HT16.ADHERENCE_DEF    = ADHERENCE_DEF;
+
   /* HT16-INSERT */
 
   function repaint(){
     if(advanced()) return;
     if(!squareLayout()) return;
     bindPanels();
-    paintMonth16(); paintYear16(); paintWeeks16(); paintInsights16();
+    paintMonth16(); paintYear16(); paintWeeks16(); paintInsights16(); paintScorecard();
   }
   function boot(){
     if(advanced()) return;
@@ -3956,6 +4072,8 @@ function earned(k){ return committed() - remaining(k); }
   window.__HT16.repaint = repaint;
 
   var _pa=paintAll; paintAll=function(){ _pa.apply(null,arguments); boot(); };
+  var _os=openSettings; openSettings=function(){ _os.apply(null,arguments);
+                                                 setTimeout(aboutScorecard,180); };
   if(document.readyState==='complete') setTimeout(boot,300);
   else window.addEventListener('load',function(){ setTimeout(boot,300); });
 })();
