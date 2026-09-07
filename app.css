@@ -628,3 +628,52 @@ html[data-simple][data-vtab="views"] .vViews{ display:block }
 .vmeter{ height:6px; background:var(--sunk) }
 .vmeter i{ display:block; height:6px; background:var(--accent) }
 .vsub{ font:400 10px/1 var(--mono); color:var(--ink3); padding-top:5px }
+
+
+/* ======================= HT-15 · VIEWS v2 (R70.67–R70.72) ======================= */
+/* B1 · THE ALLOW-LIST. Cory cut six views; none of them leaves the code. This is the same
+   `html[data-simple]` mechanism HT-9a established, so Settings → Advanced brings every one of them
+   straight back and the HT-6 suite still reaches them — which is why golden_ht6 is 17/17 in BOTH
+   modes, five layers deep. NOTHING is removed from the DOM (R70.16 · R70.37a). */
+html[data-simple] #vLife,      html[data-simple] #vLifeC,
+html[data-simple] #vMonthC,    html[data-simple] #vMonthCC,
+html[data-simple] #vMonthR,    html[data-simple] #vMonthRC,
+html[data-simple] #vTrends,    html[data-simple] #vTrendsC,   html[data-simple] #vRange,
+html[data-simple] #vInsights,  html[data-simple] #vInsightsC, html[data-simple] #vDow{
+  display:none !important }
+/* their section headings and the life-graph credit go with them, or the page keeps empty headers */
+html[data-simple] #vViews > .sh:has(#vLifeC),
+html[data-simple] #vViews > .sh:has(#vMonthCC),
+html[data-simple] #vViews > .sh:has(#vMonthRC),
+html[data-simple] #vViews > .sh:has(#vTrendsC),
+html[data-simple] #vViews > .sh:has(#vInsightsC),
+html[data-simple] #vViews > .vabout{ display:none !important }
+
+/* the two graphs lead the Views surface */
+.gnav{ display:flex; align-items:center; gap:6px; padding:2px 0 4px;
+  font:400 10px/1 var(--mono); color:var(--ink3) }
+.gnav b{ color:var(--ink); font-weight:500; letter-spacing:.1em }
+.gnav .lg{ margin-left:auto; display:flex; align-items:center; gap:5px; font-size:9px }
+.gnav .lg i{ display:inline-block; width:10px; height:0; border-top:1.5px solid var(--accent) }
+.gnav .lg i.s-r{ border-top:1.2px dashed var(--ink3) }
+
+/* the right-hand axis is the rating in its OWN units — the dashed line is not a percentage */
+.chart .ax2{ font:400 9px/1 var(--sans); fill:var(--ink3) }
+.chart .xl{ font:400 9px/1 var(--mono); fill:var(--ink3) }
+.chart .dot-c{ fill:var(--accent) }
+.chart .dot-r{ fill:var(--ink3) }
+/* every dot is clickable, and the target is 24px even though the dot is 5 — a 4px target on a phone
+   is decoration, not a control */
+.chart .hit{ fill:transparent; cursor:pointer }
+.chart .hit:hover{ fill:var(--accent); fill-opacity:.06 }
+
+/* B5 · LIFE IN WEEKS — full width, after both columns, the bottom of the whole app */
+.vWeeksSec{ padding:0 var(--gut) 34px; max-width:1500px; margin:0 auto }
+@media(min-width:1024px){ html[data-simple] .vWeeksSec{ padding-top:6px } }
+/* phone: a FIXED cell size in a horizontal scroller. Squeezing 52 weeks into 340px makes a cell
+   under 6px, which is a texture, not a chart you can read a week off. */
+.wkscroll{ overflow-x:auto; -webkit-overflow-scrolling:touch; padding-bottom:6px }
+.wkscroll.fit svg{ width:100%; height:auto }
+.wkg{ display:block; shape-rendering:crispEdges }
+.wkg .wl{ font:400 8.5px/1 var(--mono); fill:var(--ink3); shape-rendering:auto }
+.wkg .cw{ shape-rendering:geometricPrecision }

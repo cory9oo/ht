@@ -2529,7 +2529,7 @@ function earned(k){ return committed() - remaining(k); }
   var DOW=['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
   var DOWFULL=['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
   var LIFE_ESSAY='https://waitbutwhy.com/2014/05/life-weeks.html';
-  var DEFAULT_TARGET=80;
+  var DEFAULT_TARGET=90;   /* HT-15 R70.68 raised this from 80; one default in the app, not two */
 
   function advanced(){
     try{ if(localStorage.getItem('ht_advanced')==='1') return true; }catch(e){}
@@ -3010,6 +3010,9 @@ function earned(k){ return committed() - remaining(k); }
     paintTrends(); paintGroups13(); insights();
   }
   window.__HT13_REPAINT=repaint;
+  /* HT-15 needs this: clicking a dot on the month graph navigates TODAY, and on the phone the
+     navigation is invisible unless the tab comes back with it. */
+  window.__HT13_TAB=show;
 
   function boot(){
     if(advanced()) return;                 /* the full sheet already renders all of this */
@@ -3028,6 +3031,395 @@ function earned(k){ return committed() - remaining(k); }
                                                    setTimeout(settingsFields,90); };
   if(document.readyState==='complete') setTimeout(boot,200);
   else window.addEventListener('load',function(){ setTimeout(boot,200); });
+})();
+
+/* ======================= HT-15 · VIEWS v2 (PASTE 42 §1–§2 · R70.67–R70.72) =======================
+   Cory looked at HT-13's Views and cut most of them. Out of sight: the three insights, the trends line,
+   both month grids, and the life view as built. In: a month LINE graph whose dots are clickable, a year
+   graph of the same two series, and life-in-weeks across the bottom. And the journal moves to the top
+   of TODAY, above the check-offs.
+
+   NOTHING IS DELETED (R70.16). The six removed views keep their code, their data and their tests; they
+   are hidden by the same `html[data-simple]` mechanism 9a established, so Settings -> Advanced brings
+   all of it straight back and `golden_ht6` still reaches it. That is why the suite stays 17/17 in both
+   modes, three wires running.
+
+   THE FIFTH LAYER, inside the same sealed closure (9a · 10 · 11 · 13 · 15). It must run AFTER the
+   earlier four: 9a's restructure() and 10's journalise() both assemble the journal, and reordering
+   before them flips back on the next repaint. Guarded with data-ht15 and re-asserted from the same
+   patched paints the earlier layers use. */
+(function(){
+  var DEFAULT_TARGET = 90;         /* R70.68 — HT-13 used 80; this wire supersedes it */
+  var WEEKS_ESSAY = 'https://www.bryanbraun.com/your-life/weeks.html';
+  var MSWEEK = 6048e5;
+
+  function advanced(){
+    try{ if(localStorage.getItem('ht_advanced')==='1') return true; }catch(e){}
+    if(window.__ADVANCED===true) return true;
+    return /[?&]advanced=1/.test(location.search);
+  }
+  function q(s,r){ return Array.prototype.slice.call((r||document).querySelectorAll(s)); }
+  function birth(){ var b=S.priv0&&S.priv0.birth_date; return b?new Date(b+'T12:00:00'):null; }
+  function targetAge(){
+    var t=S.priv0&&S.priv0.target_age;
+    return (t==null||t==='')?DEFAULT_TARGET:+t;
+  }
+  function pctOn(k){ var r=S.byDate[k]; return (r&&r.pct!=null&&loggedOn(k))?r.pct:null; }
+  function meanOf(a){ return a.length? a.reduce(function(x,y){return x+y;},0)/a.length : null; }
+  function gfill(p){ var g=grade(p); return g[1]==null?'var(--sunk)':'var(--g'+Math.max(1,g[1])+')'; }
+  function monthKeys(y,m){
+    var out=[]; for(var i=1;i<=31;i++){ var d=new Date(y,m,i); if(d.getMonth()!==m) break; out.push(dk(d)); }
+    return out;
+  }
+  function phone(){ return window.innerWidth < 1024; }
+
+  /* ---- B3/B4 · ONE LINE-CHART RENDERER, two series, gaps break the line ----------------
+     Month and year are the same chart over a different x domain, so they are one function. A gap is
+     never interpolated: each unbroken run is its own <path>, because a line drawn across a missing day
+     asserts a day that never happened. */
+  function lineChart(svgId, pts, opts){
+    var svg=document.getElementById(svgId); if(!svg) return;
+    if(!svg.getClientRects().length) return;          /* hidden surface measures 0 wide */
+    var H=opts.height||150, W=fitSvg(svgId,H);
+    var L=26, R=30, T=12, B=22;                        /* room for BOTH axes and the x labels */
+    var n=pts.length;
+    var px=function(i){ return n<2 ? L+(W-L-R)/2 : L+i*(W-L-R)/(n-1); };
+    var py=function(v){ return H-B-(v/100)*(H-T-B); };
+    var s='';
+    /* left axis 0-100 (completion) and right axis 0-10 (rating, in its own units) */
+    [0,50,100].forEach(function(v){
+      s+='<line class="ax" x1="'+L+'" y1="'+py(v)+'" x2="'+(W-R)+'" y2="'+py(v)+'"/>'+
+         '<text x="'+(L-4)+'" y="'+(py(v)+3)+'" text-anchor="end">'+v+'</text>'+
+         '<text class="ax2" x="'+(W-R+4)+'" y="'+(py(v)+3)+'">'+(v/10)+'</text>';
+    });
+    function runs(get){
+      var out=[], cur=[];
+      pts.forEach(function(p,i){ var v=get(p);
+        if(v==null){ if(cur.length){ out.push(cur); cur=[]; } return; }
+        cur.push([i,v]); });
+      if(cur.length) out.push(cur);
+      return out;
+    }
+    function draw(rs,cls){
+      return rs.map(function(r){
+        if(r.length===1) return '<circle class="'+cls+'-d" cx="'+px(r[0][0]).toFixed(1)+
+                                '" cy="'+py(r[0][1]).toFixed(1)+'" r="1.8"/>';
+        return '<path class="'+cls+'" d="'+r.map(function(p,j){
+          return (j?'L':'M')+px(p[0]).toFixed(1)+' '+py(p[1]).toFixed(1); }).join(' ')+'"/>';
+      }).join('');
+    }
+    s+=draw(runs(function(p){ return p.c; }),'ln-c');
+    s+=draw(runs(function(p){ return p.r==null?null:p.r*10; }),'ln-r');
+    /* the dots, and behind each a hit area no smaller than 24px: a 4px target on a phone is
+       decoration, not a control (R70.69). */
+    pts.forEach(function(p,i){
+      if(p.c==null && p.r==null) return;
+      var tip=(p.c==null?'—':Math.round(p.c)+'%')+' · '+(p.r==null?'—':p.r+'/10');
+      var at=opts.attr+'="'+p.key+'"';
+      if(p.c!=null) s+='<circle class="dot dot-c" '+at+' data-tip="'+esc(tip)+'" cx="'+px(i).toFixed(1)+
+                       '" cy="'+py(p.c).toFixed(1)+'" r="2.6"/>';
+      if(p.r!=null) s+='<circle class="dot dot-r" '+at+' data-tip="'+esc(tip)+'" cx="'+px(i).toFixed(1)+
+                       '" cy="'+py(p.r*10).toFixed(1)+'" r="2.2"/>';
+      s+='<circle class="hit" '+at+' data-tip="'+esc(tip)+'" cx="'+px(i).toFixed(1)+
+         '" cy="'+(H/2)+'" r="12"/>';
+    });
+    /* x labels: every label on the year chart, a readable subset on the month chart */
+    pts.forEach(function(p,i){
+      if(opts.everyLabel || i===0 || i===n-1 || (i+1)%5===0)
+        s+='<text class="xl" x="'+px(i).toFixed(1)+'" y="'+(H-6)+'" text-anchor="middle">'+
+           esc(p.x)+'</text>';
+    });
+    svg.innerHTML=s;
+  }
+
+  /* ---- B3 · THE MONTH GRAPH ------------------------------------------------------------ */
+  function paintMonthGraph(){
+    var ym=S.calYM||(S.calYM=[dnum(today()).getFullYear(),dnum(today()).getMonth()]);
+    var y=ym[0], m=ym[1];
+    var pts=monthKeys(y,m).map(function(k,i){
+      return { x:String(i+1), key:k, c:pctOn(k), r:ratingOf(k) };
+    });
+    lineChart('vMonth', pts, { attr:'data-vgd', height:150 });
+    var nav=document.getElementById('vMonthNav');
+    if(nav) nav.innerHTML='<button class="mv" data-vgm="-1">‹</button>'+
+      '<b>'+MO[m].toUpperCase()+' '+y+'</b>'+
+      '<button class="mv" data-vgm="1">›</button>'+
+      '<span class="lg"><i class="s-c"></i>completion<i class="s-r"></i>rating ×10</span>';
+    var got=pts.filter(function(p){ return p.c!=null; }).length;
+    var tip=document.getElementById('vMonthTip');
+    if(tip) tip.textContent = got? got+' logged this month · tap a dot to go to that day'
+                                 : 'nothing logged this month yet';
+  }
+
+  /* ---- B4 · THE YEAR GRAPH · clicking a month drills into the month graph -------------- */
+  function paintYearGraph(){
+    var yr=S.vYear||(S.vYear=dnum(today()).getFullYear());
+    var pts=[];
+    for(var m=0;m<12;m++){
+      var ks=monthKeys(yr,m);
+      var cs=ks.map(pctOn).filter(function(v){ return v!=null; });
+      var rs=ks.map(ratingOf).filter(function(v){ return v!=null; });
+      /* a month with no logged day is a GAP, not a zero — a zero would read as a month of failure */
+      pts.push({ x:MO[m][0], key:String(m),
+                 c: cs.length? Math.round(meanOf(cs)) : null,
+                 r: rs.length? Math.round(meanOf(rs)*10)/10 : null });
+    }
+    lineChart('vYear', pts, { attr:'data-vgy', height:150, everyLabel:true });
+    var nav=document.getElementById('vYearNav');
+    if(nav) nav.innerHTML='<button class="mv" data-vgyn="-1">‹</button><b>'+yr+'</b>'+
+      '<button class="mv" data-vgyn="1">›</button>'+
+      '<span class="lg">tap a month to open it below</span>';
+    var got=pts.filter(function(p){ return p.c!=null; }).length;
+    var tip=document.getElementById('vYearTip');
+    if(tip) tip.textContent=got+' of 12 months logged';
+  }
+
+  /* ---- B5 · LIFE IN WEEKS · full width, the bottom of the whole app -------------------
+     Our own markup and our own skin. The concept is the well-known "your life in weeks" chart and it
+     is CREDITED AND LINKED in Settings -> About; nothing is copied from it — not a stylesheet, not a
+     snippet, not an asset.
+     ~4,700 cells, drawn the way HT-13 learned to: one run per year plus one <pattern> for the cell
+     edges. A run alone has no edges and renders as solid stripes; the texture IS the chart. */
+  function paintWeeks(){
+    var host=document.getElementById('vWeeks'); if(!host) return;
+    var cap=document.getElementById('vWeeksC');
+    var b=birth(), tgt=targetAge();
+    var GAP=1, cols=52;
+    var logged=dates().filter(function(k){ return pctOn(k)!=null; });
+
+    if(!b){
+      /* it does not guess: the logged weeks only, and one sentence with no number in it */
+      var wk={};
+      logged.forEach(function(k){ var m=weekMon(k); (wk[m]=wk[m]||[]).push(pctOn(k)); });
+      var keys=Object.keys(wk).sort();
+      var C=9, W0=Math.max(1,keys.length)*(C+GAP);
+      host.innerHTML='<div class="wkscroll"><svg class="wkg" width="'+W0+'" height="'+(C+GAP)+
+        '" viewBox="0 0 '+W0+' '+(C+GAP)+'">'+
+        keys.map(function(m,i){
+          return '<rect x="'+(i*(C+GAP))+'" y="0" width="'+C+'" height="'+C+'" fill="'+
+                 gfill(meanOf(wk[m]))+'"/>'; }).join('')+'</svg></div>'+
+        '<div class="vempty">Add your birthdate in Settings to see the whole life.</div>';
+      if(cap) cap.textContent='the weeks you have logged';
+      return;
+    }
+
+    var rows=tgt;
+    var LEFT=24, TOP=14;
+    var born=b;
+    var bornMon=new Date(born); bornMon.setDate(bornMon.getDate()-((bornMon.getDay()+6)%7));
+    var nowWeeks=Math.floor((new Date()-bornMon)/MSWEEK);
+    var totalWeeks=rows*cols;
+    var left=Math.max(0,totalWeeks-nowWeeks);
+    /* mean completion for each week of life that carries a logged day */
+    var byWeek={};
+    logged.forEach(function(k){
+      var wi=Math.floor((dnum(k)-bornMon)/MSWEEK);
+      if(wi<0) return; (byWeek[wi]=byWeek[wi]||[]).push(pctOn(k));
+    });
+
+    function render(cell){
+      var W=LEFT+cols*(cell+GAP), H=TOP+rows*(cell+GAP);
+      var s='<text class="wl" x="'+LEFT+'" y="'+(TOP-5)+'">weeks →</text>';
+      for(var r=0;r<rows;r++){
+        var yy=TOP+r*(cell+GAP);
+        s+='<rect x="'+LEFT+'" y="'+yy+'" width="'+(cols*(cell+GAP)-GAP)+'" height="'+cell+
+           '" fill="var(--sunk)" opacity=".45"/>';
+        var start=r*cols, end=start+cols-1;
+        var livedTo=Math.min(end,nowWeeks);
+        if(livedTo>=start){
+          var w=(livedTo-start+1)*(cell+GAP)-GAP;
+          if(w>0) s+='<rect x="'+LEFT+'" y="'+yy+'" width="'+w+'" height="'+cell+
+                     '" fill="var(--rule2)"/>';
+        }
+        if(r>0 && r%10===0)
+          s+='<text class="wl" x="'+(LEFT-5)+'" y="'+(yy+cell)+'" text-anchor="end">'+r+'</text>';
+      }
+      /* the logged weeks, coloured by that week's mean completion */
+      Object.keys(byWeek).forEach(function(wi){
+        var i=+wi, r=Math.floor(i/cols), c=i%cols;
+        if(r>=rows) return;
+        s+='<rect class="lw" x="'+(LEFT+c*(cell+GAP))+'" y="'+(TOP+r*(cell+GAP))+'" width="'+cell+
+           '" height="'+cell+'" fill="'+gfill(meanOf(byWeek[wi]))+'"/>';
+      });
+      /* the cell texture, then the current week outlined on top of it */
+      var P=cell+GAP;
+      var pat='<defs><pattern id="wkcell" width="'+P+'" height="'+P+'" patternUnits="userSpaceOnUse">'+
+        '<rect x="'+cell+'" y="0" width="'+GAP+'" height="'+P+'" fill="var(--ground)"/>'+
+        '<rect x="0" y="'+cell+'" width="'+P+'" height="'+GAP+'" fill="var(--ground)"/></pattern></defs>';
+      var cur='';
+      var cr=Math.floor(nowWeeks/cols), cc=nowWeeks%cols;
+      if(cr<rows) cur='<rect class="cw" x="'+(LEFT+cc*(cell+GAP)-0.5)+'" y="'+(TOP+cr*(cell+GAP)-0.5)+
+        '" width="'+(cell+1)+'" height="'+(cell+1)+'" fill="none" stroke="var(--ink)" stroke-width="1"/>';
+      return { svg:pat+s+'<rect x="'+LEFT+'" y="'+TOP+'" width="'+(cols*(cell+GAP))+'" height="'+
+                 (rows*(cell+GAP))+'" fill="url(#wkcell)" pointer-events="none"/>'+cur,
+               W:W, H:H };
+    }
+
+    var cell = phone()? 9 : 12;
+    var cc=nowWeeks%cols;                       /* the current week's column, for the scroll below */
+    var o=render(cell);
+    /* phone: a FIXED cell size in a horizontal scroller — never squeezed to illegibility.
+       desktop: the same drawing, scaled to the width it has. */
+    host.innerHTML='<div class="wkscroll'+(phone()?'':' fit')+'">'+
+      '<svg class="wkg" viewBox="0 0 '+o.W+' '+o.H+'"'+
+      (phone()? ' width="'+o.W+'" height="'+o.H+'"' : ' preserveAspectRatio="xMinYMin meet"')+
+      '>'+o.svg+'</svg></div>';
+    if(cap) cap.textContent='Week '+nowWeeks.toLocaleString()+' of ~'+totalWeeks.toLocaleString()+
+      ' · '+left.toLocaleString()+' weeks left at '+tgt+' · '+logged.length+' days logged';
+    /* SCROLL THE CURRENT WEEK INTO VIEW, and it is not a nicety.
+       MEASURED on the phone: the grid is a fixed-cell horizontal scroller (R70.68 — never squeezed),
+       the current week sits at column 41 of 52, and the visible strip is ~34 columns wide. So the one
+       cell the chart exists to show, and every logged week beside it, opened OFF SCREEN and the whole
+       thing read as empty. Centre it on load instead. */
+    var sc=host.querySelector('.wkscroll');
+    if(sc && sc.scrollWidth>sc.clientWidth){
+      var x=LEFT+cc*(cell+GAP);
+      sc.scrollLeft=Math.max(0, x-sc.clientWidth/2);
+    }
+  }
+  function weekMon(k){ var d=dnum(k); d.setDate(d.getDate()-((d.getDay()+6)%7)); return dk(d); }
+
+  /* ---- build the two graphs into #vViews, and the weeks section full width ------------- */
+  function build(){
+    var views=document.getElementById('vViews');
+    if(views && !document.getElementById('vMonth')){
+      var wrap=document.createElement('div');
+      wrap.id='vGraphs';
+      wrap.innerHTML=
+        '<div class="sh"><h2>The month</h2><span class="ln"></span>'+
+          '<span class="c" id="vMonthTip"></span></div>'+
+        '<div class="gnav" id="vMonthNav"></div>'+
+        '<div class="pan flat"><svg id="vMonth" class="chart"></svg></div>'+
+        '<div class="sh"><h2>The year</h2><span class="ln"></span>'+
+          '<span class="c" id="vYearTip"></span></div>'+
+        '<div class="gnav" id="vYearNav"></div>'+
+        '<div class="pan flat"><svg id="vYear" class="chart"></svg></div>';
+      views.insertBefore(wrap, views.firstChild);       /* the graphs lead the Views surface */
+    }
+    if(!document.getElementById('vWeeks')){
+      var grid=document.querySelector('.grid'); if(!grid) return;
+      var sec=document.createElement('section');
+      sec.id='vWeeksSec'; sec.className='vWeeksSec';
+      sec.innerHTML='<div class="sh"><h2>Life in weeks</h2><span class="ln"></span>'+
+        '<span class="c" id="vWeeksC"></span></div><div id="vWeeks"></div>'+
+        '<div class="note vabout">One square per week of your life — the idea is the well-known '+
+        '<a href="'+WEEKS_ESSAY+'" target="_blank" rel="noopener">your life in weeks</a> chart. '+
+        'Ours is drawn from scratch in this skin.</div>';
+      grid.parentNode.insertBefore(sec, grid.nextSibling);   /* after BOTH columns, full width */
+    }
+  }
+
+  /* ---- B2 · JOURNAL FIRST (R70.71) ----------------------------------------------------
+     Idempotent, and re-asserted from the patched paints: 9a's restructure() and 10's journalise()
+     both assemble this block, and moving it before they run would flip back on the next repaint. */
+  function journalFirst(){
+    if(advanced()) return;
+    var jIn=document.getElementById('jIn'); if(!jIn) return;
+    var dump=document.getElementById('iDump'); if(!dump) return;   /* layer 10 not up yet */
+    var blk=dump.closest('.blk'); if(!blk) return;
+    if(jIn.firstElementChild===blk) return;                        /* already first: nothing to do */
+    jIn.insertBefore(blk, jIn.firstElementChild);
+    /* CLOSE THE DAY stays the last child, and stays sticky — never fixed */
+    var t=document.getElementById('tClose');
+    if(t && jIn.lastElementChild!==t) jIn.appendChild(t);
+    document.documentElement.setAttribute('data-ht15','1');
+  }
+
+  /* ---- Settings -> About gains the weeks credit ---------------------------------------- */
+  function aboutCredit(){
+    var a=document.getElementById('vAbout'); if(!a || a.dataset.ht15) return;
+    a.dataset.ht15='1';
+    var d=document.createElement('div');
+    d.style.paddingTop='6px';
+    d.innerHTML='<b>Life in weeks</b> — one square per week, birth year to your target age. '+
+      'Inspired by <a href="'+WEEKS_ESSAY+'" target="_blank" rel="noopener">your life in weeks</a>; '+
+      'our markup and our skin, nothing copied.';
+    a.appendChild(d);
+  }
+
+  /* ---- wiring ------------------------------------------------------------------------- */
+  function bind(){
+    var views=document.getElementById('vViews');
+    if(views && !views.dataset.ht15){
+      views.dataset.ht15='1';
+      views.addEventListener('click',function(e){
+        var mn=e.target.closest('[data-vgm]');
+        if(mn){ var d=+mn.getAttribute('data-vgm');
+          var ym=S.calYM||[dnum(today()).getFullYear(),dnum(today()).getMonth()];
+          var m=ym[1]+d, y=ym[0];
+          if(m<0){ m=11; y--; } if(m>11){ m=0; y++; }
+          S.calYM=[y,m]; paintMonthGraph(); return; }
+        var yn=e.target.closest('[data-vgyn]');
+        if(yn){ S.vYear=(S.vYear||dnum(today()).getFullYear())+(+yn.getAttribute('data-vgyn'));
+          paintYearGraph(); return; }
+        /* B4 drill-down: a month on the year graph opens that month below */
+        var ym2=e.target.closest('[data-vgy]');
+        if(ym2){ S.calYM=[S.vYear||dnum(today()).getFullYear(), +ym2.getAttribute('data-vgy')];
+          paintMonthGraph();
+          var t=document.getElementById('vMonthNav'); if(t) t.scrollIntoView({block:'center'});
+          return; }
+        /* B3: EVERY DOT IS CLICKABLE, and it navigates through the app's own day navigator */
+        var d2=e.target.closest('[data-vgd]');
+        if(d2){
+          var k=d2.getAttribute('data-vgd');
+          if(k>today()) return;
+          goDay(k);                                  /* the same call the header's arrows make */
+          if(phone() && window.__HT13_TAB) window.__HT13_TAB('today');
+          return;
+        }
+      });
+      /* the active-dot label: the raw values, in their own units (R70.72) */
+      views.addEventListener('pointerover',function(e){
+        var h=e.target.closest('[data-tip]'); if(!h) return;
+        var svg=h.closest('svg'); if(!svg) return;
+        var tip=document.getElementById(svg.id==='vYear'?'vYearTip':'vMonthTip');
+        if(tip) tip.textContent=h.getAttribute('data-tip');
+      });
+    }
+    /* THE TAB SWITCH HAS TO REPAINT THIS LAYER TOO, and it is worth saying why.
+       `fitSvg` measures clientWidth, so a chart drawn while the Views tab is hidden measures 0 and
+       draws nothing — MEASURED: monthDots 7 on desktop, 0 on the phone. HT-13 owns the tab and calls
+       its own repaint, which knows nothing about HT-15. Rather than reach into HT-13, add a second
+       listener on the same control: both fire, and this one redraws after layout has settled. */
+    var tabs=document.getElementById('vTabs');
+    if(tabs && !tabs.dataset.ht15){
+      tabs.dataset.ht15='1';
+      tabs.addEventListener('click',function(e){
+        if(e.target.closest('[data-v]')) setTimeout(repaint,60);
+      });
+    }
+    var rT=null;
+    if(!window.__HT15_RESIZE){
+      window.__HT15_RESIZE=1;
+      window.addEventListener('resize',function(){
+        clearTimeout(rT); rT=setTimeout(repaint,220);
+      });
+    }
+  }
+
+  function repaint(){
+    if(advanced()) return;
+    build();
+    paintMonthGraph(); paintYearGraph(); paintWeeks();
+  }
+
+  function boot(){
+    if(advanced()) return;
+    if(!S.me) return;
+    build(); journalFirst(); bind(); aboutCredit();
+    repaint();
+  }
+
+  /* re-apply after the app repaints, exactly as the four layers before this one do */
+  var _pa=paintAll;      paintAll      = function(){ _pa.apply(null,arguments); boot(); };
+  var _pl=paintLog;      paintLog      = function(){ _pl.apply(null,arguments); journalFirst(); };
+  var _pm=paintMast;     paintMast     = function(){ _pm.apply(null,arguments); journalFirst(); };
+  var _pji=paintJournalInputs;
+  paintJournalInputs = function(){ _pji.apply(null,arguments); journalFirst(); };
+  var _os=openSettings;  openSettings  = function(){ _os.apply(null,arguments);
+                                                     setTimeout(aboutCredit,140); };
+  if(document.readyState==='complete') setTimeout(boot,260);
+  else window.addEventListener('load',function(){ setTimeout(boot,260); });
 })();
 
 })();
