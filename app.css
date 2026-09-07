@@ -1176,6 +1176,54 @@ html[data-simple] .li .bx, html[data-simple] .li .edp{ align-self:center }
 /* below 1024 the two fields go home (the layer reverses its own move), so the wrapper is inert */
 @media (max-width:1023px){ html[data-simple] #h18Btm{ display:none } }
 
+
+/* S3 · COMPLETION FILLS ITS QUADRANT (R70.186). MEASURED before: 7 of 26 rows visible on live data
+   (4 of 12 in the harness), rows 53px, 1757px of content in a 487px box.
+
+   TWO COLUMNS, AND NOT WITH `columns` — THIS IS THE HT-17 (1) DEFECT AND IT MUST NOT RECUR.
+   `.log` carries `columns:1`. HT-17 gave it a bounded height plus overflow-y:auto and got a MULTICOL
+   box: the content overflowed SIDEWAYS (scrollWidth 1224 vs clientWidth 399), 4 of 12 rows visible,
+   and the page-height golden stayed green the whole time. Grid, and the multicol properties killed
+   by name. Auto-placement fills left, right, left, right WITHIN each group because the .grp rule
+   spans the full width and starts a new row — reading order is preserved and no JS reorders. */
+@media (min-width:1024px){
+  html[data-simple] #h18Comp{ display:flex; flex-direction:column; min-height:0 }
+  html[data-simple] #h18Comp > .blk{ display:flex; flex-direction:column; flex:1 1 auto;
+    min-height:0; overflow:hidden }
+  html[data-simple] #h18Comp > .blk > .sh,
+  html[data-simple] #h18Comp > .blk > .tools{ flex:0 0 auto }
+  html[data-simple] #h18Comp .h16load{ flex:0 0 auto; position:sticky; top:0; z-index:2;
+    background:var(--surface) }                                  /* Planned · Done · Left */
+  html[data-simple] #h18Comp #log{
+    flex:1 1 auto; min-height:0; overflow-y:auto; overflow-x:hidden;
+    columns:auto !important; column-count:auto !important; column-width:auto !important;
+    display:grid; grid-template-columns:1fr 1fr; gap:0 var(--h18gut); align-content:start }
+  html[data-simple] #h18Comp #log > .grp{ grid-column:1 / -1 }   /* group rules span both columns */
+  html[data-simple] #h18Comp #log > [data-add]{ grid-column:1 / -1 }
+  html[data-simple] #h18Comp .li{ min-height:36px; padding:3px 6px; font-size:14px }
+  html[data-simple] #h18Comp .li .nm{ font-size:14px; line-height:1.25 }  /* wrap rules unchanged */
+  /* R70.186's 36px row cannot hold a 44px control. DESKTOP 28x28, PHONE 44x44 — tap targets exist
+     for taps and the desktop has a mouse. The 44 the golden measures lives on `.bxw`, the button
+     WRAPPING the 28px visual `.bx`, so the wrapper is what has to come down; setting only `.bx`
+     would have left the hit box at 44 and the row at 53. */
+  html[data-simple] #h18Comp .li .bxw{ flex:0 0 28px; width:28px; height:28px }
+  html[data-simple] #h18Comp .li .bx{ width:22px; height:22px }
+  html[data-simple] #h18Comp .li.on .bx::after{ width:12px; height:7px; left:4px; top:5px }
+  html[data-simple] #h18Comp .li .edp{ flex:0 0 28px; width:28px; height:28px; font-size:11px }
+  html[data-simple] #h18Comp #tClose{ flex:0 0 auto; position:static; padding-top:8px }
+  /* HT-9a moved #bClose out into #tClose and left its wrapper behind. MEASURED: that EMPTY
+     `.tools` costs 19px inside the one quadrant whose whole point is rows — 19px is half a row.
+     Hidden, never removed (R70.16); the same move HT-17 made with `.vWeeksSec.h17-empty`. */
+  /* `:empty` does NOT match it: HT-9a took the BUTTON and left the whitespace text nodes, and
+     `:empty` counts those. `:not(:has(*))` asks the question that was actually meant — no
+     ELEMENT children — and `:has()` is verified supported here (HT-17 S1 relies on it). */
+  html[data-simple] #h18Comp > .blk > .tools:not(:has(*)){ display:none }
+}
+/* a quadrant narrower than ~560px is one column: two 280px columns cannot hold a standard's name */
+@media (min-width:1024px) and (max-width:1119px){
+  html[data-simple] #h18Comp #log{ grid-template-columns:1fr }
+}
+
 /* S1d · PHONE (<1024) IS A SINGLE COLUMN IN HIS ORDER: JOURNAL · COMPLETION · MONTH · YEAR ·
    ADHERENCE+LIFE. That is the order HT-16 already ships, and the LAYER keeps it by construction —
    every DOM move in HT-18 is gated on desktop() and reverses on a resize down, so below 1024 the
