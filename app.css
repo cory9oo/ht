@@ -833,16 +833,23 @@ html[data-simple] .wkg .cw{ shape-rendering:geometricPrecision }
 
 
 /* ======================= HT-16 · S5 · THE SCORECARD (R70.97) ======================= */
+/* #vGroups still carries HT-13's `.cols` class -- a 74px-tall flex row with align-items:flex-end,
+   which lifted the table 16px out of its own panel and drew it on top of the section heading.
+   MEASURED. The node is kept (R70.16 · golden_ht15 KEPT list); its bar-chart layout is not. */
+html[data-simple] #vGroups{ display:block; height:auto; align-items:initial; gap:0 }
 .h16sc{ width:100%; border-collapse:collapse; table-layout:auto }
 .h16sc th{ font:500 8.5px/1 var(--mono); letter-spacing:.12em; text-transform:uppercase;
-  color:var(--muted); text-align:left; padding:6px 6px 6px 0; border-bottom:1px solid var(--border);
+  color:var(--muted); text-align:left; padding:6px 12px; border-bottom:1px solid var(--border);
   white-space:nowrap }
-.h16sc td{ font:400 11px/1.3 var(--sans); color:var(--text); padding:7px 6px 7px 0;
+.h16sc td{ font:400 11px/1.3 var(--sans); color:var(--text); padding:8px 12px;
   border-bottom:1px solid var(--border); vertical-align:middle }
-.h16sc th.r, .h16sc td.r{ text-align:right; padding-right:0 }
+.h16sc th:first-child, .h16sc td:first-child{ padding-left:0 }
+.h16sc th:last-child,  .h16sc td:last-child{ padding-right:0 }
+.h16sc th.r, .h16sc td.r{ text-align:right }
 .h16sc td.num{ font-family:var(--mono); font-variant-numeric:tabular-nums; white-space:nowrap }
 .h16sc td.g{ font:500 10px/1 var(--mono); letter-spacing:.1em; text-transform:uppercase;
   color:var(--text); white-space:nowrap }
+.h16sc thead th{ padding-top:0 }
 .h16sc td.dl{ color:var(--muted) }
 .h16sc td.wk{ color:var(--muted); max-width:150px; overflow:hidden; text-overflow:ellipsis;
   white-space:nowrap }

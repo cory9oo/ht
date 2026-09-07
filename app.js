@@ -3656,10 +3656,23 @@ function earned(k){ return committed() - remaining(k); }
     return (c==null?'\u2014':Math.round(c)+'%')+' \u00b7 '+(r==null?'\u2014':r+'/10');
   }
 
+  /* THE CHART FILLS ITS CELL (R70.100). A 196px chart anchored at the top of a 742px panel is a
+     hole in the square with a picture in the corner of it. The panel's height comes from the grid,
+     which is driven by the input column, so measuring it here cannot feed back into itself. */
+  function availHeight(svg, dflt){
+    var panel=svg.closest? svg.closest('.h16p') : null;
+    if(!panel || !panel.clientHeight) return dflt;
+    var used=0;
+    Array.prototype.slice.call(panel.children).forEach(function(c){
+      if(c.contains(svg)) return; used+=c.offsetHeight; });
+    var h=panel.clientHeight-used-10;
+    return Math.max(dflt, Math.min(620, Math.round(h)));
+  }
   function h16Chart(svgId, pts, opts){
     var svg=document.getElementById(svgId); if(!svg) return 0;
     var host=svg.parentNode;
     var H=opts.height||190, L=30, R=34, T=12, B=opts.twoLine?34:24;
+    if(!(opts.perX && window.innerWidth<=480)) H=availHeight(svg,H);
     var n=pts.length, W;
     var narrow = opts.perX && window.innerWidth<=480;
     if(narrow){
