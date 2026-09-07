@@ -4312,8 +4312,26 @@ function earned(k){ return committed() - remaining(k); }
   }
   /* THE LEARNING: the median close time of a standard's last 30 check-offs, as HH:MM. It is a
      SUGGESTION and nothing writes it -- one tap in the editor adopts it (R70.103). */
-  function medianClose(hid){
-    var h=S.habits.filter(function(x){ return x.id===hid; })[0];
+  /* ---- HT-19 B0.1 - THE NAME AND THE TYPE AGREE NOW (R70.239) ---------------------------
+     Six receipts carried `NaN:NaN` in the drawer's USUAL column, and the cause was never the
+     drawer. `closeMin`, `nowMin` and `endMin` all return MINUTES; `medianClose` returned a
+     FORMATTED STRING from a name that reads like the others, and it had two callers with opposite
+     expectations - the edit sheet wanted the string (correct all along) and `usualTime` divided it
+     by 60 (NaN all along). Patching usualTime alone would have left the ambiguity that made it.
+     So the computation is `medianCloseMin` -> Number|null, the formatting is its own function, and
+     `medianClose` stays exactly what it was for the caller that was right.
+
+     THE FORMATTER IS **NOT** CALLED `fmtHM`, AND THE WIRE ASKED FOR THAT NAME. `fmtHM` already
+     exists at app.js:63 as minutes -> "1h 45m" and it is used TWELVE LINES FROM HERE for the load
+     line ("Planned 5h 7m"). A second `fmtHM` declared in this closure would shadow it and break
+     that line - the identical class of defect this section exists to remove. `hhmm()` is not it
+     either: its contract is string -> string. Contradiction reported; the name is `fmtClock`. */
+  function fmtClock(min){
+    if(min==null) return null;
+    var m=Math.max(0, Math.round(min));
+    return ('0'+Math.floor(m/60)).slice(-2)+':'+('0'+(m%60)).slice(-2);
+  }
+  function medianCloseMin(hid){
     var vals=[], k=today(), guard=0;
     while(guard++<400 && vals.length<30){
       var r=S.byDate[k];
@@ -4325,9 +4343,10 @@ function earned(k){ return committed() - remaining(k); }
     if(vals.length<3) return null;               /* three points is the floor for a median to mean anything */
     vals.sort(function(a,b){ return a-b; });
     var mid=Math.floor(vals.length/2);
-    var m=vals.length%2? vals[mid] : Math.round((vals[mid-1]+vals[mid])/2);
-    return ('0'+Math.floor(m/60)).slice(-2)+':'+('0'+(m%60)).slice(-2);
+    return vals.length%2? vals[mid] : Math.round((vals[mid-1]+vals[mid])/2);
   }
+  /* unchanged for its caller: the edit sheet at ~2287 wants "HH:MM" and always did */
+  function medianClose(hid){ return fmtClock(medianCloseMin(hid)); }
 
   /* ---- the row prefix, the overdue tint, the ANYTIME block and the load line ---- */
   function nowMin(){ var d=new Date(); return d.getHours()*60+d.getMinutes(); }
@@ -4421,7 +4440,10 @@ function earned(k){ return committed() - remaining(k); }
   window.__HT16.loadSums    = loadSums;
   window.__HT16.onTimeOn    = onTimeOn;
   window.__HT16.onTime30    = onTime30;
-  window.__HT16.medianClose = medianClose;
+  window.__HT16.medianClose    = medianClose;      /* "HH:MM" or null */
+  window.__HT16.medianCloseMin = medianCloseMin;   /* minutes or null - the seam a caller
+                                                      doing arithmetic should reach for */
+  window.__HT16.fmtClock       = fmtClock;
   window.__HT16.planOf      = planOf;
   window.__HT16.endMin      = endMin;
 
@@ -4686,11 +4708,10 @@ function earned(k){ return committed() - remaining(k); }
     }
     return out;
   }
+  /* HT-19 B0.1: it wanted the formatted string all along. The division was the bug. */
   function usualTime(h){
-    var m=window.__HT16.medianClose ? window.__HT16.medianClose(h.id) : null;
-    if(m==null) return '—';
-    var hh=Math.floor(m/60), mm=Math.round(m%60);
-    return (hh%24)+':'+String(mm).padStart(2,'0');
+    var s=window.__HT16.medianClose ? window.__HT16.medianClose(h.id) : null;
+    return s || '—';
   }
 
   function drawerEl(){
