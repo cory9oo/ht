@@ -4777,10 +4777,52 @@ function earned(k){ return committed() - remaining(k); }
     home(document.getElementById('tClose'));
   }
 
+
+  /* ---- S2a - THE JOURNAL'S BOTTOM ROW (R70.185) ------------------------------------------
+     "I don't like the scroll wheels; just click and brain dump." The third and last DOM move in
+     this wire: COMPLETED and PRAYER are wrapped so they can sit side by side on the bottom edge,
+     which is what lets the dump take everything above them. */
+  function journalBottom(){
+    var t=document.getElementById('iTasks'), p=document.getElementById('iPrayer');
+    if(!t||!p) return false;
+    var ft=t.closest('.fld'), fp=p.closest('.fld'); if(!ft||!fp) return false;
+    var b=document.getElementById('h18Btm');
+    if(!b){ b=document.createElement('div'); b.id='h18Btm'; ft.parentNode.insertBefore(b, ft); }
+    if(ft.parentElement!==b){ mark(ft); b.appendChild(ft); }
+    if(fp.parentElement!==b){ mark(fp); b.appendChild(fp); }
+    return true;
+  }
+  function unjournalBottom(){
+    var t=document.getElementById('iTasks'), p=document.getElementById('iPrayer');
+    if(t) home(t.closest('.fld'));
+    if(p) home(p.closest('.fld'));
+  }
+
+  /* HT-10's `grow()` writes an INLINE height on #iDump / #iTasks / #iPrayer on every paint and
+     every keystroke ("t.style.height=(t.scrollHeight+2)+'px'"), and an inline height beats a
+     stylesheet. MEASURED: with the quadrant in place it pinned the brain dump to 25px — the
+     scrollHeight of an EMPTY textarea — inside a 240px box. In the quadrant the flex column owns
+     the height, so the inline one is CLEARED rather than fought with !important. The phone keeps
+     `grow()` exactly as it is: this runs on the desktop only. */
+  function unGrow(){
+    if(!desktop()) return;
+    ['iDump','iTasks','iPrayer'].forEach(function(id){
+      var n=document.getElementById(id); if(n && n.style.height) n.style.height=''; });
+  }
+  function bindGrow(){
+    ['iDump','iTasks','iPrayer'].forEach(function(id){
+      var n=document.getElementById(id); if(!n || n.dataset.h18g) return;
+      n.dataset.h18g='1';
+      /* HT-10 bound its listener first, so this one runs after grow() has written the height */
+      n.addEventListener('input', unGrow);
+      n.addEventListener('focus', unGrow);
+    });
+  }
   /* ---- the re-assert, the way the seven layers before this one do ------------------------ */
   function quad(){
     if(advanced()) return;
-    if(desktop()) quadrants(); else unquadrants();
+    if(desktop()){ quadrants(); journalBottom(); bindGrow(); unGrow(); }
+    else { unquadrants(); unjournalBottom(); }
     document.documentElement.setAttribute('data-ht18','1');
   }
   var _pa=paintAll;  paintAll  = function(){ _pa.apply(null,arguments); quad(); };

@@ -1142,6 +1142,40 @@ html[data-simple] .li .bx, html[data-simple] .li .edp{ align-self:center }
    asked for — and gives each quadrant ~808px instead of ~700. */
 @media (min-width:1600px){ html[data-simple]{ --h18gut:48px; --h18frame:1680px } }
 
+
+/* S2 · THE JOURNAL IS ONE BOX (R70.185) — "I don't like the scroll wheels; just click and brain
+   dump." MEASURED before this block: the journal's `.pan` carried 378px of content in a 92px
+   window — 24% visible, with a scroll wheel, and three of its four fields below the fold. HT-17
+   put that clamp there (`:has(#iDump){max-height:46%}` plus `> .pan{overflow-y:auto}`) to win the
+   page-height fight; the quadrant makes the clamp unnecessary and it is RETIRED here (R70.79 — the
+   rule goes when its replacement lands), not overridden and left to fight.
+   Focus grows the field DOWNWARD in source order and UPWARD on screen: #h18Btm is the last flex
+   child of a column whose middle child (#iDump) is `flex:1 1 auto; min-height:0`, so the dump
+   yields the pixels and the bottom row's top edge rises. No JS, no measurement, no layout thrash. */
+@media (min-width:1024px){
+  html[data-simple] .grid > .colL{ overflow:hidden }
+  html[data-simple] #jIn{ flex:1 1 auto; min-height:0; display:flex; flex-direction:column;
+    overflow:hidden }
+  html[data-simple] #jIn > .blk:has(#iDump){
+    flex:1 1 auto; min-height:0; max-height:none;
+    display:flex; flex-direction:column; overflow:hidden }
+  html[data-simple] #jIn > .blk:has(#iDump) > .pan{
+    flex:1 1 auto; min-height:0; overflow:visible;           /* THE SCROLL WHEEL IS GONE */
+    display:flex; flex-direction:column; gap:10px }
+  html[data-simple] #jIn .rate, html[data-simple] #jIn #rateWrap{ flex:0 0 auto }
+  html[data-simple] #jIn .fld:has(#iDump){ flex:1 1 auto; min-height:0;
+    display:flex; flex-direction:column }
+  html[data-simple] #iDump{ flex:1 1 auto; min-height:0; height:auto; resize:none }
+  html[data-simple] #h18Btm{ flex:0 0 auto; display:grid; grid-template-columns:1fr 1fr;
+    gap:var(--h18gut); align-items:end }
+  html[data-simple] #h18Btm .fld{ min-width:0; border:0; padding:0 }
+  html[data-simple] #h18Btm textarea{ height:34px; min-height:34px; resize:none;
+    transition:height .12s ease }
+  html[data-simple] #h18Btm textarea:focus{ height:clamp(90px, 30vh, 260px) }
+}
+/* below 1024 the two fields go home (the layer reverses its own move), so the wrapper is inert */
+@media (max-width:1023px){ html[data-simple] #h18Btm{ display:none } }
+
 /* S1d · PHONE (<1024) IS A SINGLE COLUMN IN HIS ORDER: JOURNAL · COMPLETION · MONTH · YEAR ·
    ADHERENCE+LIFE. That is the order HT-16 already ships, and the LAYER keeps it by construction —
    every DOM move in HT-18 is gated on desktop() and reverses on a resize down, so below 1024 the
