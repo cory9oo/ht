@@ -4360,4 +4360,58 @@ function earned(k){ return committed() - remaining(k); }
   else window.addEventListener('load',function(){ setTimeout(boot,300); });
 })();
 
+/* ======================= HT-17 · V4 · ONE SCREEN (PASTE 51 · R70.139–R70.146) =======================
+   THE DESKTOP APP MUST FIT ON THE SCREEN. Measured before this wire: page 3254px against a 720px
+   viewport — 4.5 screens of scroll. Everything here serves one line of arithmetic:
+
+       document.documentElement.scrollHeight <= window.innerHeight   at 1280x720 and 1920x1080
+
+   The seventh layer, inside the same sealed closure (9a·10·11·13·15·16·17). It runs LAST, so it can
+   move what the earlier six built without racing them, and every move is idempotent and re-asserted
+   from the same patched paints.
+
+   WHAT MOVES, AND WHY IT IS A MOVE AND NOT A REBUILD (R70.16): HT-16 laid the panels out over
+   FOURTEEN auto-height rows — that is where the 3254px came from. S1 puts them on EIGHT rows of
+   `(100vh - header)/8` and the panels stretch to fill. The life grid stops being a full-width band
+   below the square and becomes the bottom-right panel together with the insight strip, which is what
+   frees rows 9-14 entirely. Nothing is deleted; two containers stop occupying rows. */
+(function(){
+  function advanced(){
+    try{ if(localStorage.getItem('ht_advanced')==='1') return true; }catch(e){}
+    if(window.__ADVANCED===true) return true;
+    return /[?&]advanced=1/.test(location.search);
+  }
+  function q(s,r){ return Array.prototype.slice.call((r||document).querySelectorAll(s)); }
+  function desktop(){ return window.innerWidth >= 1024; }
+
+  /* ---- S1 · the LIFE panel: insight strip + transposed grid, one cell -------------------
+     `#h16Ins` already holds the insight strip. The weeks grid lived in `.vWeeksSec`, a body-level
+     section that HT-16 had made a grid item spanning rows 9-14. Moving `#vWeeks` into `#h16Ins`
+     collapses two bands into one panel and is what makes eight rows possible at all. */
+  function oneScreen(){
+    if(advanced()) return;
+    var ins=document.getElementById('h16Ins');
+    var wk=document.getElementById('vWeeks');
+    if(ins && wk && wk.parentNode!==ins){
+      ins.appendChild(wk);
+      var sec=document.querySelector('.vWeeksSec');
+      /* the emptied shell keeps its credit note (R70.68 asked for the attribution) but stops being
+         a grid item — an empty row 9 is 74px of page height for nothing. */
+      if(sec){ sec.classList.add('h17-empty'); }
+    }
+    /* the TODAY task list is one of the only two things allowed to scroll internally */
+    var log=document.getElementById('log');
+    if(log) log.classList.add('h17-scroll');
+    document.documentElement.setAttribute('data-ht17','1');
+  }
+
+  /* ---- re-assert after every repaint, the way the six layers before this one do ---------- */
+  var _pa=paintAll;  paintAll  = function(){ _pa.apply(null,arguments); oneScreen(); };
+  var _pl=paintLog;  paintLog  = function(){ _pl.apply(null,arguments); oneScreen(); };
+
+  function boot(){ if(advanced()) return; if(!S.me) return; oneScreen(); }
+  if(document.readyState==='complete') setTimeout(boot,300);
+  else window.addEventListener('load',function(){ setTimeout(boot,300); });
+})();
+
 })();

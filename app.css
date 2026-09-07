@@ -888,3 +888,69 @@ html[data-simple] .grp.h16any{ color:var(--grey) }
 /* ======================= HT-16 · S8 · ADVANCED-ONLY CONTROLS (R70.16) ======================= */
 /* hidden, never deleted: with Advanced ON the attribute is absent and the control is back */
 html[data-simple] .h16-adv{ display:none !important }
+
+
+/* ======================= HT-17 · V4 · ONE SCREEN (R70.139–R70.146) ======================= */
+/* S1 · R70.139 amends R70.99. THE TEST IS ONE LINE: page height <= window height at 1280x720 and
+   1920x1080. Before this block: 3254px against 720 — 4.5 screens. HT-16 laid five panels over
+   FOURTEEN auto-height rows (`grid-auto-rows:minmax(74px,auto)`, life on rows 9-14, #vViews on 14);
+   that is the whole 3254. Eight rows of `(100vh - header)/8`, panels stretching to fill, and the
+   life grid folded into the bottom-right panel is what makes the arithmetic work. */
+@media(min-width:1024px){
+  html[data-simple]{ font-size:14px }                       /* was 15 */
+  html[data-simple] body{ overflow:hidden }                 /* the PAGE never scrolls */
+  html[data-simple] .app{
+    max-width:1440px;                                       /* was 1200 */
+    height:100vh; display:flex; flex-direction:column; overflow:hidden }
+  html[data-simple] .mast{ flex:0 0 auto }
+
+  /* 12 columns x 8 rows. `1fr` rows over a flex child with min-height:0 IS the row unit
+     (100vh - header) / 8 — computed by the browser rather than by a magic number that would drift
+     the moment the header changed. */
+  html[data-simple] .grid{
+    display:grid;
+    grid-template-columns:repeat(12,minmax(0,1fr));
+    grid-template-rows:repeat(8,minmax(0,1fr));
+    grid-auto-rows:0;                                       /* anything unplaced takes no height */
+    column-gap:16px; row-gap:6px;
+    flex:1 1 auto; min-height:0; overflow:hidden;
+    align-items:stretch; padding-bottom:10px }
+
+  /* COMPOSITION A (ships) */
+  html[data-simple] .colL    { grid-column:1 / 5;  grid-row:1 / 9 }
+  html[data-simple] #h16Month{ grid-column:5 / 9;  grid-row:1 / 4;  display:flex }
+  html[data-simple] #h16Year { grid-column:9 / 13; grid-row:1 / 4;  display:flex }
+  html[data-simple] #h16Score{ grid-column:5 / 13; grid-row:4 / 6;  display:flex }
+  html[data-simple] #h16Ins  { grid-column:5 / 13; grid-row:6 / 9;  display:flex }
+
+  /* the two containers that used to eat rows 9-14. They stay in the tree (R70.16) and stop being
+     grid items — an empty band is page height spent on nothing. */
+  html[data-simple] .vWeeksSec, html[data-simple] #vViews{
+    grid-area:1 / 1 / 1 / 1; height:0; overflow:hidden; padding:0; margin:0; border:0;
+    visibility:hidden; pointer-events:none }
+
+  /* every panel clips rather than grows: a panel that overflows its cell is what makes a page taller
+     than its viewport, and that is the defect this wire exists to remove. */
+  html[data-simple] .h16p{ min-height:0; overflow:hidden }
+  html[data-simple] .h16p > .sh{ padding-top:6px; padding-bottom:2px; flex:0 0 auto }
+  html[data-simple] .h16p .pan.flat{ flex:1 1 auto; min-height:0; overflow:hidden; padding:0 }
+  html[data-simple] .h16p svg.chart{ width:100%; display:block }
+  html[data-simple] .gnav{ flex:0 0 auto; padding:0 0 2px }
+
+  /* TODAY: the journal is fixed, the TASK LIST is the scroller, CLOSE THE DAY is pinned last.
+     One of the only two things in the app allowed to scroll internally (S1). */
+  html[data-simple] .colL{ min-height:0; overflow:hidden; display:flex; flex-direction:column }
+  html[data-simple] #jIn{ min-height:0; display:flex; flex-direction:column; flex:1 1 auto;
+    padding-bottom:0; overflow:hidden }
+  html[data-simple] #jIn > .blk{ flex:0 0 auto }
+  html[data-simple] #log.h17-scroll{ flex:1 1 auto; min-height:0; overflow-y:auto;
+    -webkit-overflow-scrolling:touch }
+  html[data-simple] #tClose{ flex:0 0 auto; position:static; padding:6px 0 0 }
+
+  /* the LIFE panel holds the insight strip and the grid, and the grid takes what is left */
+  html[data-simple] #h16Ins #h16InsBody{ flex:0 0 auto }
+  html[data-simple] #h16Ins #vWeeks{ flex:1 1 auto; min-height:0; overflow:hidden; display:flex }
+  html[data-simple] #h16Ins #vWeeks .wkscroll{ flex:1 1 auto; min-height:0; overflow:hidden }
+}
+/* the emptied weeks shell below 1024: it keeps the credit note and nothing else */
+html[data-simple] .vWeeksSec.h17-empty > .sh{ display:none }
