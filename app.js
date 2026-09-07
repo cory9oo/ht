@@ -259,9 +259,13 @@ function paintMast(){
     tp('Today', '<span style="color:'+gtxt(pct)+'">'+pct+'%</span><s>'+g[0]+'</s>') +
     tp('Done',  done+'<s>of '+ids.length+'</s>') +
     tp('Earned today', fmt(com-rem)+'<s>of '+fmt(com)+'</s>') +
-    tp('7-day',  (r7==null?'—':r7+'%')+'<s>'+(r7==null?'':grade(r7)[0])+'</s>') +
-    tp('30-day', (r30==null?'—':r30+'%')) +
-    tp('90-day', (r90==null?'—':r90+'%')) +
+    /* HT-18 S5e (R70.187): the mast said `30-day 35%` and the surface now says `ADHERENCE 34%`.
+       Two numbers, one word, one screen — and they are DIFFERENT metrics: rolling() is the mean of
+       the daily completion percentages, adherence is hits over opportunities. The LABEL is what was
+       wrong, so the label is what changes; no data and no arithmetic moves. */
+    tp('7d mean',  (r7==null?'—':r7+'%')+'<s>'+(r7==null?'':grade(r7)[0])+'</s>') +
+    tp('30d mean', (r30==null?'—':r30+'%')) +
+    tp('90d mean', (r90==null?'—':r90+'%')) +
     tp('Consistency', (function(){ var c=consistency(90);
         return c.pct+'%<s>'+c.hit+' of 90 d at 80%+</s>'; })()) +
     tp('Streak', (function(){ var f=streakShowedUp();
@@ -4145,6 +4149,9 @@ function earned(k){ return committed() - remaining(k); }
     d.innerHTML='<b>The scorecard</b> \u2014 '+ADHERENCE_DEF;
     a.appendChild(d);
   }
+  /* HT-18 S5b (R70.187): ONE sparkline renderer in the app (CONSOLIDATE). The adherence line
+     draws its twelve weeks with the same function the scorecard's twelve-week column uses. */
+  window.__HT16.sparkSvg          = sparkSvg;
   window.__HT16.scorecardRows    = scorecardRows;
   window.__HT16.adherenceWindow  = adherenceWindow;
   window.__HT16.groupStreak      = groupStreak;
@@ -4629,18 +4636,13 @@ function earned(k){ return committed() - remaining(k); }
     if(n) n.classList.remove('on');
   }
 
-  function openDrawer(g){
-    var n=drawerEl();
-    var hs=groupHabits(g);
-    var cur=window.__HT16.adherenceWindow(g,0,29);
-    var prv=window.__HT16.adherenceWindow(g,30,59);
-    var ot=window.__HT16.onTime30 ? window.__HT16.onTime30(g) : null;
-    var wp=weekPcts(g,12).filter(function(v){ return v!=null; });
-    var best=wp.length? Math.max.apply(null,wp) : null;
-    var worst=wp.length? Math.min.apply(null,wp) : null;
+  /* HT-18 S5b (R70.187) · ONE habit-row renderer in the app. This is the EXACT <tr> map that was
+     inline in openDrawer — same string, same order, same helpers — lifted out so the adherence
+     drawer and the group drawer render a habit the same way. A pure extraction: golden_ht17's
+     drawer checks stay green with no edit, and if they do not, the extraction was not pure. */
+  function habitRows(hs){
     var rf=window.__HT16.rampFill;
-
-    var rows=hs.map(function(h){
+    return hs.map(function(h){
       var p=adherence30(h.id);
       var ms=missRun(h.id);
       return '<tr data-h="'+h.id+'">'+
@@ -4651,6 +4653,20 @@ function earned(k){ return committed() - remaining(k); }
         '<td class="t">'+esc(lastDoneOn(h))+'</td>'+
         '<td class="t">'+esc(usualTime(h))+'</td></tr>';
     }).join('');
+  }
+  window.__HT17 = { openDrawer:openDrawer, habitRows:habitRows };
+
+  function openDrawer(g){
+    var n=drawerEl();
+    var hs=groupHabits(g);
+    var cur=window.__HT16.adherenceWindow(g,0,29);
+    var prv=window.__HT16.adherenceWindow(g,30,59);
+    var ot=window.__HT16.onTime30 ? window.__HT16.onTime30(g) : null;
+    var wp=weekPcts(g,12).filter(function(v){ return v!=null; });
+    var best=wp.length? Math.max.apply(null,wp) : null;
+    var worst=wp.length? Math.min.apply(null,wp) : null;
+
+    var rows=habitRows(hs);   /* HT-18 S5b: the local `rf` retired with the map that used it */
 
     document.getElementById('h17DrBody').innerHTML=
       '<div class="h17dh"><h3>'+esc(g)+'</h3><span style="flex:1"></span>'+
@@ -4833,11 +4849,113 @@ function earned(k){ return committed() - remaining(k); }
     _h18ChartBox=k;
     if(window.__HT16 && window.__HT16.repaint) window.__HT16.repaint();
   }
+
+  /* ---- S5 - ADHERENCE IS ONE LINE (R70.187) ----------------------------------------------
+     "Way simpler: a percentage, a color, a graph." DISTILL on the surface, DEEPEN in the drawer.
+     Nothing is deleted; one level down is not gone (R70.16).
+
+     THE NUMBER IS DEFINED ONCE. The surface figure is the ROLL-UP of the drawer's own rows, so the
+     two can never disagree — and a golden asserts that identity rather than trusting it. NO NEW
+     COUNTING LOGIC IS WRITTEN: the groups partition the habits, so summing HT-16's own
+     `adherenceWindow` over them is exact, and it is the same function the scorecard prints. */
+  function adhAll(b0,b1){
+    if(!window.__HT16 || !window.__HT16.scorecardRows) return { hit:0, opp:0, pct:null };
+    var gs=window.__HT16.scorecardRows().map(function(r){ return r.group; });
+    var hit=0, opp=0;
+    gs.forEach(function(g){
+      var a=window.__HT16.adherenceWindow(g,b0,b1); hit+=a.hit; opp+=a.opp; });
+    return { hit:hit, opp:opp, pct: opp? Math.round(hit/opp*100) : null };
+  }
+  function adhSpark(){ var o=[]; for(var w=11;w>=0;w--) o.push(adhAll(w*7, w*7+6).pct); return o; }
+
+  /* S5d - THE DRAWER, AND THE TRAP. #h16Score is MOVED into #h18Draw, never cloned and never
+     re-rendered, because paintScorecard() keeps painting into #vGroups wherever that node lives —
+     one renderer, one node, one source of truth. #h18Draw's OWN innerHTML is never rewritten (that
+     is what would destroy the moved node); only its `hidden` attribute is toggled, and the habit
+     table is a separate child that IS rewritten. */
+  function drawerEl(){
+    var ins=document.getElementById('h16Ins'); if(!ins) return null;
+    var d=document.getElementById('h18Draw');
+    if(!d){
+      d=document.createElement('div'); d.id='h18Draw'; d.hidden=true;
+      ins.appendChild(d);
+      var h=document.createElement('div'); h.id='h18DrawH'; d.appendChild(h);
+    }
+    var sc=document.getElementById('h16Score');
+    if(sc && sc.parentElement!==d){ mark(sc); d.insertBefore(sc, d.firstChild); }
+    return d;
+  }
+  function drawerBody(){
+    var host=document.getElementById('h18DrawH'); if(!host) return 0;
+    if(!window.__HT17 || !window.__HT17.habitRows) return 0;
+    /* every habit, worst 30-day first — the DEEPEN half of R70.187 */
+    var hs=S.habits.slice().sort(function(a,b){
+      var x=adherence30(a.id), y=adherence30(b.id);
+      x=(x==null?101:x); y=(y==null?101:y);
+      return x-y || (label(a.name)<label(b.name)?-1:1);
+    });
+    host.innerHTML='<table class="h17dt h18dt"><thead><tr><th>standard</th><th>30d</th>'+
+      '<th>streak</th><th>missed</th><th>last done</th><th>usual</th></tr></thead><tbody>'+
+      window.__HT17.habitRows(hs)+'</tbody></table>';
+    return hs.length;
+  }
+  function setDrawer(open){
+    var d=drawerEl(); if(!d) return;
+    if(open) drawerBody();
+    d.hidden=!open;
+    var a=document.getElementById('h18Adh');
+    if(a) a.setAttribute('aria-expanded', open?'true':'false');
+  }
+  function toggleDrawer(){
+    var d=document.getElementById('h18Draw');
+    setDrawer(!d || d.hidden);
+  }
+
+  /* S5c - THE SURFACE LINE: a percentage, a color, a graph, and nothing else. No group rows, no
+     streak, no weakest, no columns. The percent carries the ramp colour; the sparkline is HT-16's
+     OWN renderer (CONSOLIDATE — one sparkline in the app, exported at S5b). */
+  function adhLine(){
+    var ins=document.getElementById('h16Ins'); if(!ins) return false;
+    var body=document.getElementById('h16InsBody'); if(!body) return false;
+    if(!window.__HT16 || !window.__HT16.sparkSvg) return false;
+    var a=document.getElementById('h18Adh');
+    if(!a){
+      a=document.createElement('button');
+      a.id='h18Adh'; a.className='h18adh'; a.type='button';
+      a.setAttribute('aria-expanded','false');
+      a.setAttribute('aria-controls','h18Draw');
+      body.parentNode.insertBefore(a, body);
+      a.addEventListener('click', toggleDrawer);
+    }
+    var all=adhAll(0,29);
+    a.title=window.__HT16.ADHERENCE_DEF || '';
+    a.innerHTML='<span class="k">ADHERENCE</span>'+
+      '<b class="v '+window.__HT16.rampClass(all.pct)+'">'+
+        (all.pct==null?'\u2014':all.pct+' %')+'</b>'+
+      '<span class="sp">'+window.__HT16.sparkSvg(adhSpark())+'</span>'+
+      '<span class="w">30 days</span>';
+    drawerEl();
+    if(!window.__HT18_ESC){
+      window.__HT18_ESC=1;
+      document.addEventListener('keydown', function(e){
+        if(e.key!=='Escape') return;
+        var d=document.getElementById('h18Draw');
+        if(d && !d.hidden) setDrawer(false);
+      });
+    }
+    return true;
+  }
+  /* below 1024 the scorecard goes home: the phone's order is MONTH - YEAR - SCORECARD - LIFE and a
+     node parked in a hidden drawer would break it. */
+  function unAdh(){
+    home(document.getElementById('h16Score'));
+    var a=document.getElementById('h18Adh'); if(a) a.hidden=true;
+  }
   /* ---- the re-assert, the way the seven layers before this one do ------------------------ */
   function quad(){
     if(advanced()) return;
-    if(desktop()){ quadrants(); journalBottom(); bindGrow(); unGrow(); chartsFit(); }
-    else { unquadrants(); unjournalBottom(); }
+    if(desktop()){ quadrants(); journalBottom(); bindGrow(); unGrow(); chartsFit(); adhLine(); }
+    else { unquadrants(); unjournalBottom(); unAdh(); }
     document.documentElement.setAttribute('data-ht18','1');
   }
   var _pa=paintAll;  paintAll  = function(){ _pa.apply(null,arguments); quad(); };

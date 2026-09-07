@@ -1242,6 +1242,54 @@ html[data-simple] .li .bx, html[data-simple] .li .edp{ align-self:center }
   html[data-simple] #h18Charts svg.chart{ width:100%; height:100%; display:block }
 }
 
+
+/* S5 · ADHERENCE IS ONE LINE (R70.187) — "way simpler: a percentage, a color, a graph".
+   The drawer COVERS the quadrant (`absolute; inset:0`) so opening it can never make the page grow;
+   #h16Ins carries `position:relative` from the S1 block, which is why that rule is there.
+   `background` is `--surface` and not the wire's `--bg`: HT-16 S2 made `.app` a FRAME painted in
+   --surface against a --bg ground, so a drawer in --bg would read as a hole in the panel rather
+   than as the panel's own second level. Same reason for the load line's background in S3. */
+@media (min-width:1024px){
+  /* THE LINE STAYS ON TOP OF ITS OWN DRAWER, and this is a defect the acceptance caught rather
+     than a preference: with the wire's `inset:0` the open drawer covered #h18Adh, so "click again
+     -> hidden" was unreachable — Playwright timed out with `<th>Weakest</th> intercepts pointer
+     events`. The line is the control, so it outranks the panel it opens: z-index 6 over the
+     drawer's 5, and an opaque --surface behind it so the drawer's rows scroll UNDER it rather than
+     through it. --h18adh is the line's own height (4 top + 18 line + 6 bottom + 1 border + 5), and
+     golden_ht18 S5 asserts the drawer's first row clears it, so the constant cannot drift silently. */
+  html[data-simple] #h16Ins{ --h18adh:34px }
+  html[data-simple] #h18Adh{ flex:0 0 auto; display:flex; align-items:center; gap:12px; width:100%;
+    background:var(--surface); border:0; border-bottom:1px solid var(--border); padding:4px 0 6px;
+    cursor:pointer; text-align:left; font:inherit; color:var(--text);
+    position:relative; z-index:6 }
+  html[data-simple] #h18Adh:hover{ border-bottom-color:var(--grey) }
+  html[data-simple] #h18Adh .k{ font:400 10px/1 var(--mono); letter-spacing:.08em;
+    color:var(--muted) }
+  html[data-simple] #h18Adh .v{ font:600 18px/1 var(--mono) }
+  html[data-simple] #h18Adh .sp{ display:flex; align-items:center }
+  html[data-simple] #h18Adh .w{ margin-left:auto; font:400 10px/1 var(--mono); color:var(--muted) }
+  /* the sparkline styles were scoped to `.h16sc`; the line draws with the SAME renderer, so it
+     needs the same three rules where it now lives */
+  html[data-simple] #h18Adh .spark{ display:block }
+  html[data-simple] #h18Adh .spl{ fill:none; stroke:var(--muted); stroke-width:1.2 }
+  html[data-simple] #h18Adh .sp1{ fill:var(--muted) }
+  html[data-simple] #h18Adh .spd{ fill:currentColor }
+
+  html[data-simple] #h18Draw{ position:absolute; inset:0; z-index:5; background:var(--surface);
+    overflow-y:auto; padding:calc(var(--h18adh) + 10px) 12px 10px }
+  html[data-simple] #h18Draw[hidden]{ display:none !important }
+  /* the moved scorecard is visible INSIDE the drawer only. The S1 rule that took it off the
+     surface is `.grid > #h16Score` — a DIRECT child of .grid — so it stops matching here. */
+  html[data-simple] #h16Ins > #h18Draw > #h16Score{ display:flex; overflow:visible }
+  html[data-simple] #h18Draw #h16Score .h16p, html[data-simple] #h18Draw > #h16Score{
+    min-height:0; overflow:visible }
+  html[data-simple] #h18Draw .h18dt{ width:100%; border-collapse:collapse; font-size:11.5px;
+    margin-top:10px; display:table }
+  html[data-simple] #h18Draw .h18dt thead th{ position:sticky; top:0; background:var(--surface);
+    text-align:left; font:500 9px/1 var(--mono); letter-spacing:.12em; text-transform:uppercase;
+    color:var(--muted); padding:8px 6px 6px; border-bottom:1px solid var(--border) }
+}
+
 /* S1d · PHONE (<1024) IS A SINGLE COLUMN IN HIS ORDER: JOURNAL · COMPLETION · MONTH · YEAR ·
    ADHERENCE+LIFE. That is the order HT-16 already ships, and the LAYER keeps it by construction —
    every DOM move in HT-18 is gated on desktop() and reverses on a resize down, so below 1024 the
