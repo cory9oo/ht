@@ -669,7 +669,16 @@ html[data-simple] #vViews > .vabout{ display:none !important }
 
 /* B5 · LIFE IN WEEKS — full width, after both columns, the bottom of the whole app */
 .vWeeksSec{ padding:0 var(--gut) 34px; max-width:1500px; margin:0 auto }
-@media(min-width:1024px){ html[data-simple] .vWeeksSec{ padding-top:6px } }
+/* BELOW 1024 THE WEEKS CHART FOLLOWS THE TAB, and it has to.
+   `#vWeeksSec` is a body-level section so it sits outside `#vViews`, which means the tab switcher did
+   not govern it — MEASURED: the Today tab rendered the inputs AND a ~900px output chart under them,
+   which is exactly what the second tab exists to prevent (R70.17 · the tab is the separation). It is
+   output, so it belongs to VIEWS on the phone. At 1024+ it spans the bottom of both columns, always. */
+html[data-simple] .vWeeksSec{ display:none }
+html[data-simple][data-vtab="views"] .vWeeksSec{ display:block }
+@media(min-width:1024px){
+  html[data-simple] .vWeeksSec{ display:block; padding-top:6px }
+}
 /* phone: a FIXED cell size in a horizontal scroller. Squeezing 52 weeks into 340px makes a cell
    under 6px, which is a texture, not a chart you can read a week off. */
 .wkscroll{ overflow-x:auto; -webkit-overflow-scrolling:touch; padding-bottom:6px }
