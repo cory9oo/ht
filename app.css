@@ -569,3 +569,62 @@ html[data-simple] #whyFld{ display:none !important }   /* the field goes; the co
 .esheet .win .dash{color:var(--ink3);font:400 12px/1 var(--mono)}
 .esheet .etools{display:flex;align-items:center;gap:6px;flex-wrap:wrap;padding:14px 0 0}
 .esheet .enote{padding:10px 0 0}
+
+
+/* ======================= HT-13 · VIEWS (PASTE 35 §2 · PASTE 32 §D 15–17) ======================= */
+/* `#vViews` lives in `.grid` but OUTSIDE `.colR` — `.colR` stays hidden in simple mode, so none of the
+   legacy instrument ids can reach the visible tree. Only these six `#v…` ids render. */
+html[data-simple] .vViews{ display:none }
+
+/* PHONE / NARROW — a second TAB. Output never sits above an input (R70.17): one of the two is shown,
+   never both, and Today is the landing screen. */
+html[data-simple] .vtabs{ margin:0 0 4px }
+html[data-simple][data-vtab="views"] .colL{ display:none }
+html[data-simple][data-vtab="views"] .vViews{ display:block }
+
+/* DESKTOP ≥1024 — the right column, beside Today, and the tabs go away.
+   Scoped to `html[data-simple]` so the full sheet keeps its own 1080px grid untouched. */
+@media(min-width:1024px){
+  html[data-simple] .grid{ grid-template-columns:minmax(0,1.02fr) minmax(0,1fr);
+    column-gap:32px; align-items:start }
+  html[data-simple] .colL{ grid-column:1; display:block }
+  html[data-simple] .vViews{ grid-column:2; display:block }
+  html[data-simple] .vtabs{ display:none }
+  /* the input column keeps its sticky CLOSE bar; the views column scrolls with the page */
+  html[data-simple] #jIn{ padding-bottom:78px }
+}
+
+.vViews section{ min-width:0 }
+.vViews .vnav{ font:400 10px/1 var(--mono); color:var(--ink3); padding:2px 0 0 }
+.vViews .vempty{ font-size:11.5px; color:var(--ink3); padding:10px 2px }
+.vViews .vabout{ padding:7px 0 0 }
+.vViews .vabout a, .vViews a{ color:var(--ink2); text-decoration:underline;
+  text-decoration-color:var(--rule2); text-underline-offset:2px }
+.vViews .vabout a:hover, .vViews a:hover{ color:var(--accent); text-decoration-color:var(--accent) }
+
+/* the life graph. One SVG, drawn as runs — see the layer comment for why it is not 29,200 nodes. */
+.lifeg{ width:100%; display:block; shape-rendering:crispEdges }
+.lifeg rect.tdy{ shape-rendering:geometricPrecision }
+
+/* trends: two series on one 0-100 axis. Completion is the accent; rating is the quieter line, because
+   it is a scaled proxy sharing someone else's axis and should not read as the headline. */
+.chart .ln-c{ fill:none; stroke:var(--accent); stroke-width:1.5 }
+.chart .ln-r{ fill:none; stroke:var(--ink3); stroke-width:1.2; stroke-dasharray:3 2 }
+.chart .ln-c-d{ fill:var(--accent) }
+.chart .ln-r-d{ fill:var(--ink3) }
+
+/* insights: one line, one small chart, three times */
+.vins{ padding:11px 0; border-bottom:1px solid var(--rule) }
+.vins:last-child{ border-bottom:0 }
+.vins .vline{ font-size:12px; line-height:1.45; color:var(--ink2); padding:5px 0 8px }
+.vins .vline b{ color:var(--ink); font-weight:500 }
+.vins .vline i{ color:var(--ink3); font-style:normal; font-size:11px }
+.vbars{ display:flex; flex-direction:column; gap:4px }
+.vb{ display:grid; grid-template-columns:minmax(0,1fr) 96px 38px; gap:8px; align-items:center }
+.vb .k{ font-size:11px; color:var(--ink2); overflow:hidden; text-overflow:ellipsis; white-space:nowrap }
+.vb .t{ height:6px; background:var(--sunk); display:block }
+.vb .t i{ display:block; height:6px }
+.vb .v{ font:400 10.5px/1 var(--mono); color:var(--ink3); text-align:right }
+.vmeter{ height:6px; background:var(--sunk) }
+.vmeter i{ display:block; height:6px; background:var(--accent) }
+.vsub{ font:400 10px/1 var(--mono); color:var(--ink3); padding-top:5px }

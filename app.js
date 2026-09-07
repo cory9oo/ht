@@ -129,7 +129,12 @@ async function load(){
   if(!u){ authScreen(); return false; }
   var uid=u.id;
   var p  = await sb.from('profiles').select('id,display_name,handle').eq('id',uid).maybeSingle();
-  var pp = await sb.from('profile_private').select('birth_date').eq('id',uid).maybeSingle();
+  /* HT-13 B1: `target_age` is optional until its migration lands. Probe widest first, then step
+     down — the same contract as habits.cue and day_private.predict / brain_dump. */
+  var pp = await sb.from('profile_private').select('birth_date,target_age').eq('id',uid).maybeSingle();
+  if(pp.error){ S.hasTargetAge=false;
+    pp = await sb.from('profile_private').select('birth_date').eq('id',uid).maybeSingle();
+  } else { S.hasTargetAge=true; }
   S.me = p.data || { id:uid, display_name:(u.email||'').split('@')[0], handle:null };
   S.me.id = uid; S.me.email = u.email;
   S.priv0 = pp.data || {};
@@ -146,7 +151,13 @@ async function load(){
   } else { S.hasCue=true; }
   S.habits = (h.data||[]).map(function(x,i){ if(x.sort_order==null) x.sort_order=i; return x; });
 
-  var d = await sb.from('days').select('date,checked,active_set,pct,floor_pct').eq('user_id',uid).order('date');
+  /* HT-13 G2: probe `closed_at` the way `cue` and `predict` are probed, then degrade. The column is
+     live as of 2026-09-07, but the same build must run against a database that does not have it. */
+  var DCOLS='date,checked,active_set,pct,floor_pct';
+  var d = await sb.from('days').select(DCOLS+',closed_at').eq('user_id',uid).order('date');
+  if(d.error){ S.hasClosedAt=false;
+    d = await sb.from('days').select(DCOLS).eq('user_id',uid).order('date');
+  } else { S.hasClosedAt=true; }
   S.days = d.data||[];
   S.byDate = {}; S.days.forEach(function(r){ S.byDate[r.date]=r; });
   if(!S.date) S.date = today();
@@ -201,14 +212,24 @@ function rollRate(n,upto){
   if(!a.length) return null;
   return Math.round(a.reduce(function(x,y){return x+y;},0)/a.length*10)/10;
 }
-async function saveDay(){
+/* HT-13 G2 · `closed_at` is written HERE and only on an explicit close.
+   HT-10 shipped CLOSE THE DAY and the column landed after it, so the write was never wired: measured
+   non-null on 0 of 15 days. `opts.close` is passed by the button and by nothing else — an autosave
+   must never stamp a day as closed, or the column stops meaning "you finished". Re-closing UPDATES
+   rather than duplicating, because the upsert already conflicts on (user_id,date).
+   `S.hasClosedAt` is probed in load(): a missing column would fail the whole upsert and silently
+   stop the day from saving at all, which is a far worse bug than a missing timestamp. */
+async function saveDay(opts){
   var r=S.byDate[S.date], ids=daily().map(function(h){return h.id;});
   r.pct = pctOf(r.checked||{}, ids);
-  var res = await sb.from('days').upsert({
-    user_id:S.me.id, date:S.date, checked:r.checked||{},
-    active_set:ids, pct:r.pct
-  },{ onConflict:'user_id,date' });
-  if(res.error) toast('not saved'); 
+  var row = { user_id:S.me.id, date:S.date, checked:r.checked||{}, active_set:ids, pct:r.pct };
+  if(opts && opts.close && S.hasClosedAt){
+    row.closed_at = new Date().toISOString();
+    r.closed_at = row.closed_at;
+  }
+  var res = await sb.from('days').upsert(row,{ onConflict:'user_id,date' });
+  if(res.error) toast('not saved');
+  return res;
 }
 
 /* ============================ paint: masthead ============================ */
@@ -1029,9 +1050,16 @@ async function saveProfile(){
   var n=el('pName').value.trim(), b=el('pBirth').value||null;
   S.me.display_name=n;
   await sb.from('profiles').update({display_name:n}).eq('id',S.me.id);
-  await sb.from('profile_private').upsert({id:S.me.id,birth_date:b},{onConflict:'id'});
+  /* HT-13 B1: birthdate and target age are the life graph's two inputs and they live in the
+     owner-only table, never in `profiles`. The field is only read when its column exists. */
+  var rec={ id:S.me.id, birth_date:b };
+  var tn=el('pTarget'), t=null;
+  if(S.hasTargetAge && tn){ t = tn.value===''? null : clamp(+tn.value||0, 1, 120); rec.target_age=t; }
+  await sb.from('profile_private').upsert(rec,{onConflict:'id'});
   S.priv0=S.priv0||{}; S.priv0.birth_date=b;
+  if(S.hasTargetAge && tn) S.priv0.target_age=t;
   toast('profile saved'); paintLife();
+  if(window.__HT13_REPAINT) window.__HT13_REPAINT();
 }
 
 /* ---- the guide: what every number on the sheet means ---- */
@@ -1241,7 +1269,7 @@ function wire(){
     S.byDate[S.date].checked={}; queueSave(); paintMast(); paintLog(); paintRail(); paintRight();
   };
   el('bClose').onclick=async function(){
-    await saveDay(); await load(); paintAll();
+    await saveDay({close:true}); await load(); paintAll();     /* HT-13 G2: the explicit close */
     var p=S.byDate[S.date].pct;
     toast('closed · '+fmt(earned(S.date))+' earned · '+p+'% · '+grade(p)[0]);
     /* R-B rides this action: one optional tap, about tomorrow. */
@@ -2478,6 +2506,528 @@ function earned(k){ return committed() - remaining(k); }
   }
   if(document.readyState==='complete') setTimeout(boot,160);
   else window.addEventListener('load',function(){ setTimeout(boot,160); });
+})();
+
+/* ======================= HT-13 · VIEWS LAYER (PASTE 35 §2 · PASTE 32 §D 15–17) =======================
+   The first wire since 9a that renders OUTPUT. Six views: the life graph, two month grids, trends,
+   group adherence, three insights.
+
+   WHY A NEW SURFACE AND NOT `.colR`. The old right column is hidden wholesale in simple mode and it
+   holds every legacy instrument id — `life`, `cal`, `chart`, `dow`, `byMo`, `heat`, twenty more. Making
+   it visible would render all of them and break the one invariant 9a bought: no hidden id in the visible
+   tree. So `#vViews` is built OUTSIDE `.colR`, `.colR` stays hidden, and the allow-list gains exactly
+   the six `#v…` ids this wire names and nothing else (R70.16 · smoke check 2).
+
+   R70.17 — no output above an input. TODAY keeps the left column and stays the landing screen. Below
+   1024px VIEWS is a SECOND TAB, so output never sits above the inputs; at 1024px and up it is the right
+   column, beside them, never over them.
+
+   Everything here reads S and recomputes from it. No new query, no new column beyond B1's `target_age`,
+   and every number is derived from the same selectors TODAY already uses. */
+(function(){
+  var GRP_ORDER=['Morning','Afternoon','Night','Standards','Weekly','Other'];
+  var DOW=['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+  var DOWFULL=['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
+  var LIFE_ESSAY='https://waitbutwhy.com/2014/05/life-weeks.html';
+  var DEFAULT_TARGET=80;
+
+  function advanced(){
+    try{ if(localStorage.getItem('ht_advanced')==='1') return true; }catch(e){}
+    if(window.__ADVANCED===true) return true;
+    return /[?&]advanced=1/.test(location.search);
+  }
+  function q(s,r){ return Array.prototype.slice.call((r||document).querySelectorAll(s)); }
+  function targetAge(){
+    var t=S.priv0&&S.priv0.target_age;
+    return (t==null||t==='')?DEFAULT_TARGET:+t;
+  }
+  function birth(){ var b=S.priv0&&S.priv0.birth_date; return b?new Date(b+'T12:00:00'):null; }
+  /* completion colour: the app's own grade bands, so a day reads the same here as on the sheet */
+  function gfill(p){ var g=grade(p); return g[1]==null?'var(--sunk)':'var(--g'+Math.max(1,g[1])+')'; }
+  function pctOn(k){ var r=S.byDate[k]; return (r&&r.pct!=null&&loggedOn(k))?r.pct:null; }
+  function loggedDates(){ return dates().filter(function(k){ return pctOn(k)!=null; }); }
+  function meanOf(a){ return a.length? a.reduce(function(x,y){return x+y;},0)/a.length : null; }
+
+  /* ---- the surface ------------------------------------------------------------------ */
+  var VIEW_IDS=['vLife','vMonthC','vMonthR','vTrends','vGroups','vInsights'];
+  function head(t,c,id){
+    return '<div class="sh"><h2>'+t+'</h2><span class="ln"></span>'+
+           '<span class="c"'+(id?' id="'+id+'"':'')+'>'+(c||'')+'</span></div>';
+  }
+  function build(){
+    if(document.getElementById('vViews')) return document.getElementById('vViews');
+    var grid=document.querySelector('.grid'); if(!grid) return null;
+    var sec=document.createElement('section');
+    sec.id='vViews'; sec.className='vViews';
+    sec.innerHTML=
+      head('The life','','vLifeC')+'<div class="pan flat" id="vLife"></div>'+
+      '<div class="note vabout">The whole life, one cell at a time — after '+
+        '<a href="'+LIFE_ESSAY+'" target="_blank" rel="noopener">Your Life in Weeks</a>.</div>'+
+      head('Month · completion','','vMonthCC')+
+      '<div class="vnav" id="vNav"></div><div class="cal" id="vMonthC"></div>'+
+      head('Month · rating','same ramp, 1–10 scaled','vMonthRC')+'<div class="cal" id="vMonthR"></div>'+
+      head('Trends','7-day rolling','vTrendsC')+
+      '<div class="seg mini" id="vRange">'+
+        '<button data-r="30" class="on">30</button><button data-r="90">90</button>'+
+        '<button data-r="all">All</button></div>'+
+      '<div class="pan flat"><svg id="vTrends" class="chart"></svg></div>'+
+      head('Group adherence','','vGroupsC')+'<div class="cols" id="vGroups"></div>'+
+      head('Insights','three','vInsightsC')+'<div id="vInsights"></div>';
+    grid.appendChild(sec);
+    return sec;
+  }
+
+  /* ---- B2 · THE LIFE GRAPH ----------------------------------------------------------
+     Rows are years. Desktop one cell per DAY (365/row), phone one cell per WEEK (52/row), same data.
+     Drawn as RUNS, not cells: a lived-but-unlogged stretch is one rect per row, and only logged days
+     and today get their own. A per-day grid for 80 years is 29,200 nodes; this is ~80 plus one per
+     logged day, and it renders identically. */
+  function paintLife13(){
+    var host=document.getElementById('vLife'); if(!host) return;
+    var cap=document.getElementById('vLifeC');
+    var b=birth(), tgt=targetAge();
+    var perWeek = window.innerWidth < 1024;             /* phone: a cell is a week */
+    var cols = perWeek ? 52 : 365;
+    var logged=loggedDates();
+    var mean=meanOf(logged.map(pctOn));
+
+    if(!b){
+      /* it does not guess. The logged days alone, and one sentence. */
+      var n=logged.length;
+      var W=Math.max(1,Math.min(n,cols)), Hh=Math.max(4,Math.ceil(n/W)*4);
+      host.innerHTML='<svg class="lifeg" viewBox="0 0 '+(W*4)+' '+Hh+'" preserveAspectRatio="xMinYMin meet">'+
+        logged.map(function(k,i){
+          return '<rect x="'+(i%W*4)+'" y="'+(Math.floor(i/W)*4)+'" width="3" height="3" fill="'+
+                 gfill(pctOn(k))+'"/>'; }).join('')+'</svg>'+
+        '<div class="vempty">Add your birthdate in Settings to see the whole life.</div>';
+      if(cap) cap.textContent=n+' day'+(n===1?'':'s')+' logged';
+      return;
+    }
+
+    var now=new Date();
+    var dayNo=Math.floor((now-b)/864e5)+1;               /* day 1 is the day of birth */
+    var totalDays=Math.round(tgt*365.2425);
+    var left=Math.max(0,totalDays-dayNo);
+    var rows=tgt;
+    var CW=perWeek?7:2, CH=perWeek?7:2, GAP=1;
+    var W=cols*(CW+GAP), H=rows*(CH+GAP);
+    var lg={}; logged.forEach(function(k){ lg[k]=pctOn(k); });
+
+    var s='';
+    for(var y=0;y<rows;y++){
+      var startDay=Math.floor(y*365.2425)+1;             /* 1-based day-of-life at this row's start */
+      var endDay=Math.floor((y+1)*365.2425);
+      var rowY=y*(CH+GAP);
+      /* the row's ground: future/unlived */
+      s+='<rect x="0" y="'+rowY+'" width="'+(cols*(CW+GAP)-GAP)+'" height="'+CH+
+         '" fill="var(--sunk)" opacity=".45"/>';
+      /* the lived RUN on this row */
+      var livedTo=Math.min(endDay,dayNo);
+      if(livedTo>=startDay){
+        var n0=livedTo-startDay+1;
+        var wCells=perWeek?Math.ceil(n0/7):n0;
+        var runW=Math.min(cols,wCells)*(CW+GAP)-GAP;
+        if(runW>0) s+='<rect x="0" y="'+rowY+'" width="'+runW+'" height="'+CH+
+                      '" fill="var(--rule2)"/>';
+      }
+    }
+    /* the logged days, each in its own cell, coloured by completion */
+    logged.forEach(function(k){
+      var d=Math.floor((dnum(k)-b)/864e5)+1; if(d<1) return;
+      var y=Math.floor((d-1)/365.2425);
+      if(y>=rows) return;
+      var within=d-Math.floor(y*365.2425)-1;
+      var cx=perWeek?Math.floor(within/7):within;
+      if(cx>=cols) cx=cols-1;
+      s+='<rect x="'+(cx*(CW+GAP))+'" y="'+(y*(CH+GAP))+'" width="'+CW+'" height="'+CH+
+         '" fill="'+gfill(lg[k])+'"/>';
+    });
+    /* today, outlined — the wire asks for the outline by name. Drawn LAST, over the grid overlay. */
+    var todayRect='';
+    var td=Math.floor((dnum(today())-b)/864e5)+1;
+    var ty=Math.floor((td-1)/365.2425);
+    if(ty<rows){
+      var tw=td-Math.floor(ty*365.2425)-1;
+      var tx=perWeek?Math.floor(tw/7):tw;
+      todayRect='<rect class="tdy" x="'+(tx*(CW+GAP)-0.5)+'" y="'+(ty*(CH+GAP)-0.5)+'" width="'+(CW+1)+
+         '" height="'+(CH+1)+'" fill="none" stroke="var(--ink)" stroke-width="1"/>';
+    }
+    /* THE CELL TEXTURE, and why it is a pattern and not 29,200 rects.
+       Drawing each lived year as one run is what keeps this cheap — but a run has no cell edges, and
+       measured on the phone the graph came out as 80 solid stripes. The whole claim of this view is
+       "one cell at a time", so the texture is not decoration; it IS the view. One <pattern> of gap
+       lines laid over the finished drawing restores every cell edge at any density, for two nodes. */
+    var CELL=(CW+GAP);
+    var pat='<defs><pattern id="lifecell" width="'+CELL+'" height="'+CELL+
+      '" patternUnits="userSpaceOnUse">'+
+      '<rect x="'+CW+'" y="0" width="'+GAP+'" height="'+CELL+'" fill="var(--ground)"/>'+
+      '<rect x="0" y="'+CH+'" width="'+CELL+'" height="'+GAP+'" fill="var(--ground)"/>'+
+      '</pattern></defs>';
+    host.innerHTML='<svg class="lifeg" viewBox="0 0 '+W+' '+H+'" preserveAspectRatio="xMinYMin meet">'+
+      pat+s+
+      '<rect x="0" y="0" width="'+W+'" height="'+H+'" fill="url(#lifecell)" pointer-events="none"/>'+
+      todayRect+'</svg>';
+    if(cap) cap.textContent =
+      'Day '+dayNo.toLocaleString()+' of ~'+totalDays.toLocaleString()+
+      ' · ~'+left.toLocaleString()+' days left at '+tgt+
+      ' · '+logged.length+' days logged'+
+      (mean==null?'':' · '+Math.round(mean)+'% mean completion');
+  }
+
+  /* ---- B3 · THE TWO GRIDS · one ramp for both --------------------------------------- */
+  function monthGrid(id,mode){
+    var host=document.getElementById(id); if(!host) return;
+    var ym=S.vYM||(S.vYM=[dnum(today()).getFullYear(),dnum(today()).getMonth()]);
+    var y=ym[0], m=ym[1];
+    var first=new Date(y,m,1), start=new Date(first);
+    start.setDate(1-((first.getDay()+6)%7));                /* Monday-led, like the app's own grid */
+    var h=DOW.map(function(d){ return '<div class="hd">'+d.slice(0,2)+'</div>'; }).join('');
+    for(var i=0;i<42;i++){
+      var d=new Date(start); d.setDate(start.getDate()+i);
+      var k=dk(d), out=(d.getMonth()!==m), fut=(k>today());
+      var v,f,txt='';
+      if(mode==='rate'){
+        /* a day RATED but not logged still colours here — the rating is its own input (R35.6) */
+        v=ratingOf(k); f=(v==null?'var(--sunk)':dens(v*10)); if(v!=null) txt=v;
+      } else {
+        v=fut?null:pctOn(k); f=dens(v); if(v!=null) txt=v;
+      }
+      h+='<button class="d'+(out?' out':'')+(k===today()?' tdy':'')+'" data-vd="'+k+
+         '" style="background:'+f+'"><b>'+d.getDate()+'</b>'+
+         (txt===''?'':'<s>'+txt+'</s>')+'</button>';
+    }
+    host.innerHTML=h;
+    var nav=document.getElementById('vNav');
+    if(nav && id==='vMonthC')
+      nav.innerHTML='<button class="mv" data-vm="-1">‹</button> '+MO[m]+' '+y+
+                    ' <button class="mv" data-vm="1">›</button>';
+    var cap=document.getElementById(id==='vMonthC'?'vMonthCC':'vMonthRC');
+    if(cap){
+      var days=[],i2;
+      for(i2=1;i2<=31;i2++){ var dd=new Date(y,m,i2); if(dd.getMonth()!==m) break;
+        days.push(dk(dd)); }
+      if(mode==='rate'){
+        var rs=days.map(ratingOf).filter(function(x){return x!=null;});
+        cap.textContent = rs.length? rs.length+' rated · mean '+(meanOf(rs)).toFixed(1) : 'nothing rated';
+      } else {
+        var ps=days.map(pctOn).filter(function(x){return x!=null;});
+        cap.textContent = ps.length? ps.length+' logged · mean '+Math.round(meanOf(ps))+'%' : 'nothing logged';
+      }
+    }
+  }
+
+  /* ---- B4 · TRENDS · two lines, one axis, and GAPS BREAK THE LINE -------------------
+     A line drawn across a gap asserts a day that never happened. Each unbroken run is its own path. */
+  function paintTrends(){
+    var svg=document.getElementById('vTrends'); if(!svg) return;
+    var range=S.vRange||'30';
+    var all=dates();
+    var N = range==='all' ? Math.max(14,(all.length?Math.floor((dnum(today())-dnum(all[0]))/864e5)+1:14))
+                          : +range;
+    /* a hidden surface measures 0 wide (the phone's Today tab), and fitSvg would floor it to its
+       240 minimum and draw a chart nobody asked for at the wrong scale. Draw when it is visible. */
+    if(!svg.getClientRects().length) return;
+    var H=132, W=fitSvg('vTrends',H);
+    var ks=[]; for(var i=N-1;i>=0;i--) ks.push(shift(today(),-i));
+    var px=function(i){ return 26+i*(W-34)/Math.max(1,N-1); };
+    var py=function(v){ return H-18-(v/100)*(H-32); };
+    var s='';
+    [0,50,100].forEach(function(v){
+      s+='<line class="ax" x1="24" y1="'+py(v)+'" x2="'+(W-4)+'" y2="'+py(v)+'"/>'+
+         '<text x="20" y="'+(py(v)+3)+'" text-anchor="end">'+v+'</text>'; });
+    /* series: 7-day rolling completion, and 7-day rolling rating x10 on the same 0-100 axis */
+    function runs(valAt){
+      var out=[], cur=[];
+      ks.forEach(function(k,i){
+        var v=valAt(k);
+        if(v==null){ if(cur.length){ out.push(cur); cur=[]; } return; }
+        cur.push([i,v]);
+      });
+      if(cur.length) out.push(cur);
+      return out;
+    }
+    function draw(rs,cls){
+      return rs.map(function(r){
+        if(r.length===1) return '<circle class="'+cls+'-d" cx="'+px(r[0][0])+'" cy="'+py(r[0][1])+'" r="1.6"/>';
+        return '<path class="'+cls+'" d="'+r.map(function(p,j){
+          return (j?'L':'M')+px(p[0]).toFixed(1)+' '+py(p[1]).toFixed(1); }).join(' ')+'"/>';
+      }).join('');
+    }
+    /* a rolling value exists only where the day itself is logged/rated — otherwise it is a gap */
+    var cRuns=runs(function(k){ return pctOn(k)==null?null:rolling(7,k); });
+    var rRuns=runs(function(k){ var v=ratingOf(k); if(v==null) return null;
+                                var rr=rollRate(7,k); return rr==null?null:rr*10; });
+    svg.innerHTML=s+draw(cRuns,'ln-c')+draw(rRuns,'ln-r');
+    var cap=document.getElementById('vTrendsC');
+    if(cap){
+      var gaps=0, prev=null;
+      ks.forEach(function(k){ var on=pctOn(k)!=null; if(prev===true&&!on) gaps++; prev=on; });
+      cap.textContent='7-day rolling · completion + rating ×10 · '+
+        (gaps? gaps+' gap'+(gaps>1?'s':'')+' break the line' : 'no gaps');
+    }
+  }
+
+  /* ---- B5 · GROUP ADHERENCE · hits ÷ opportunities for the selected month -----------
+     An opportunity is a habit in that day's `active_set` carrying that group. A WEEKLY habit is one
+     opportunity per WEEK, not per day — counting it daily would divide by seven and read as failure. */
+  function paintGroups13(){
+    var host=document.getElementById('vGroups'); if(!host) return;
+    var ym=S.vYM||[dnum(today()).getFullYear(),dnum(today()).getMonth()];
+    var y=ym[0], m=ym[1];
+    var byId={}; S.habits.forEach(function(h){ byId[h.id]=h; });
+    var hit={}, opp={}, seenWeek={};
+    for(var i=1;i<=31;i++){
+      var d=new Date(y,m,i); if(d.getMonth()!==m) break;
+      var k=dk(d); if(k>today()) continue;
+      var r=S.byDate[k]; if(!r||!loggedOn(k)) continue;
+      var set=r.active_set||Object.keys(byId);
+      var ck=r.checked||{};
+      set.forEach(function(hid){
+        var h=byId[hid]; if(!h) return;
+        var g=h.group_name||'Other';
+        if(h.cadence==='weekly'){
+          var wk=g+'|'+weekKey(k);
+          if(seenWeek[wk]) return;                   /* one opportunity per week */
+          seenWeek[wk]=1;
+          opp[g]=(opp[g]||0)+1;
+          if(weekDone(hid,k)) hit[g]=(hit[g]||0)+1;
+          return;
+        }
+        opp[g]=(opp[g]||0)+1;
+        if(ck[hid]) hit[g]=(hit[g]||0)+1;
+      });
+    }
+    var groups=GRP_ORDER.filter(function(g){ return opp[g]; })
+      .concat(Object.keys(opp).filter(function(g){ return GRP_ORDER.indexOf(g)<0; }).sort());
+    if(!groups.length){
+      host.innerHTML='<div class="vempty">Nothing logged this month yet.</div>';
+      var c0=document.getElementById('vGroupsC'); if(c0) c0.textContent=MO[m]+' '+y;
+      return;
+    }
+    var vals=groups.map(function(g){ return Math.round(hit[g]/opp[g]*100); });
+    colChart('vGroups', vals, groups.map(function(g){ return g.slice(0,3); }), 100,
+      function(x){ return x+'%'; }, dens);
+    var cap=document.getElementById('vGroupsC');
+    if(cap) cap.textContent=MO[m]+' '+y+' · hits ÷ opportunities'+
+      (groups.some(function(g){ return (S.habits.filter(function(h){
+        return (h.group_name||'Other')===g && h.cadence==='weekly'; }).length); })
+        ? ' · weekly counted once a week' : '');
+  }
+  function weekKey(k){ var d=dnum(k); d.setDate(d.getDate()-((d.getDay()+6)%7)); return dk(d); }
+
+  /* ---- B6 · THREE INSIGHTS, each one line and one small chart -----------------------
+     GATES ARE THE POINT. Below the gate the line names what is missing IN WORDS, with no number in
+     it — an insight computed from nine days is noise with a decimal point, and this lane has already
+     watched a capacity score mislead at n=13. ① reports ASSOCIATION: the copy says "goes with". */
+  function insights(){
+    var host=document.getElementById('vInsights'); if(!host) return;
+    var logged=loggedDates();
+    var nLogged=logged.length;
+    var weeksSpanned=(function(){
+      if(!logged.length) return 0;
+      var w={}; logged.forEach(function(k){ w[weekKey(k)]=1; });
+      return Object.keys(w).length;
+    })();
+    var out=[], dowMeans=null;
+
+    /* ① RATING LIFT — mean rating on days a standard was done vs days it was not */
+    if(nLogged<14){
+      out.push(card('Rating lift',
+        'Not enough logged days yet — this one needs a couple of weeks of days before it can say anything honest.',
+        ''));
+    } else {
+      var rank=[];
+      S.habits.forEach(function(h){
+        var on=[], off=[];
+        logged.forEach(function(k){
+          var v=ratingOf(k); if(v==null) return;
+          (doneOn(h,k)?on:off).push(v);
+        });
+        if(on.length<3||off.length<3) return;
+        rank.push({ n:label(h.name), lift:meanOf(on)-meanOf(off), on:on.length, off:off.length });
+      });
+      rank.sort(function(a,b){ return b.lift-a.lift; });
+      if(!rank.length){
+        out.push(card('Rating lift',
+          'No standard has enough days both done and not done to compare yet.',''));
+      } else {
+        var top=rank[0];
+        var bars=rank.slice(0,5);
+        var mx=Math.max.apply(null,bars.map(function(r){ return Math.abs(r.lift); }))||1;
+        out.push(card('Rating lift',
+          '<b>Your one thing: '+esc(top.n)+' ('+(top.lift>=0?'+':'')+top.lift.toFixed(1)+')</b> — '+
+          'rating goes with doing it, on '+top.on+' days done against '+top.off+' not. '+
+          /* the wire forbids the word, and it is right to: "goes with" is the whole claim. Which way
+             round it runs — or whether a third thing drives both — this cannot tell you. */
+          '<i>Association only — it does not say which way round it runs.</i>',
+          '<div class="vbars">'+bars.map(function(r){
+            var w=Math.round(Math.abs(r.lift)/mx*100);
+            return '<div class="vb"><span class="k">'+esc(r.n)+'</span>'+
+              '<span class="t"><i style="width:'+w+'%;background:'+
+              (r.lift>=0?'var(--accent)':'var(--rule2)')+'"></i></span>'+
+              '<span class="v num">'+(r.lift>=0?'+':'')+r.lift.toFixed(1)+'</span></div>';
+          }).join('')+'</div>'));
+      }
+    }
+
+    /* ② WEEKDAY PROFILE — completion % and mean rating by weekday */
+    if(weeksSpanned<4){
+      out.push(card('Weekday profile',
+        'Not enough weeks yet — a weekday needs to come round several times before its number means anything.',
+        ''));
+    } else {
+      var pc=[[],[],[],[],[],[],[]], rt=[[],[],[],[],[],[],[]];
+      logged.forEach(function(k){
+        var i=(dnum(k).getDay()+6)%7;
+        var p=pctOn(k); if(p!=null) pc[i].push(p);
+        var v=ratingOf(k); if(v!=null) rt[i].push(v);
+      });
+      var means=pc.map(function(a){ return a.length?Math.round(meanOf(a)):null; });
+      var worst=null;
+      means.forEach(function(v,i){ if(v==null) return; if(worst==null||v<means[worst]) worst=i; });
+      out.push(card('Weekday profile',
+        worst==null?'Nothing to rank yet.':
+          '<b>'+DOWFULL[worst]+'s break you ('+means[worst]+'%)</b> — your weakest weekday across '+
+          weeksSpanned+' weeks.',
+        '<div class="cols" id="vDow"></div>'));
+      dowMeans=means;
+    }
+
+    /* ③ CONSISTENCY — coverage and momentum. No gate: both are honest at any n. */
+    var elapsed=30, cov=0;
+    for(var i=0;i<elapsed;i++){ if(pctOn(shift(today(),-i))!=null) cov++; }
+    var r7=rolling(7), r30=rolling(30);
+    var mom=(r7==null||r30==null)?null:(r7-r30);
+    out.push(card('Consistency',
+      '<b>Logged '+cov+' of '+elapsed+'</b>'+
+      (mom==null?' · not enough to compare your 7-day with your 30-day yet'
+               :' · 7-day is '+(mom>=0?'+':'')+mom+' over your 30-day'),
+      '<div class="vmeter"><i style="width:'+Math.round(cov/elapsed*100)+'%"></i></div>'+
+      '<div class="vsub">'+(r7==null?'—':r7+'% last 7')+' · '+(r30==null?'—':r30+'% last 30')+'</div>'));
+
+    host.innerHTML=out.join('');
+    if(dowMeans){
+      colChart('vDow', dowMeans, DOW.map(function(d){ return d[0]; }), 100,
+        function(x){ return x+'%'; }, dens);
+    }
+    var cap=document.getElementById('vInsightsC');
+    if(cap) cap.textContent=nLogged+' logged day'+(nLogged===1?'':'s')+
+      (nLogged<14?' · one gate still closed':'');
+  }
+  function card(t,line,chart){
+    return '<div class="vins"><div class="lab">'+t+'</div>'+
+           '<div class="vline">'+line+'</div>'+(chart||'')+'</div>';
+  }
+
+  /* ---- B1 · the two Settings fields ------------------------------------------------- */
+  function settingsFields(){
+    var b=document.getElementById('pBirth'); if(!b) return;
+    if(document.getElementById('pTarget')) return;
+    var host=b.closest('.fld'); if(!host) return;
+    var lab=host.querySelector('.lab');
+    if(lab) lab.textContent='Birthday · powers the life graph';
+    var f=document.createElement('label');
+    f.className='fld';
+    f.innerHTML='<span class="lab">Target age · the life graph’s horizon</span>'+
+      '<input id="pTarget" class="num" type="number" min="1" max="120" step="1" '+
+      'value="'+(S.priv0&&S.priv0.target_age!=null?S.priv0.target_age:'')+'" '+
+      'placeholder="'+DEFAULT_TARGET+'">';
+    host.parentNode.insertBefore(f,host.nextSibling);
+    if(!S.hasTargetAge){
+      var n=document.createElement('div');
+      n.className='note'; n.style.padding='6px 0 0';
+      n.textContent='Target age needs one migration before it can be saved; the graph uses '+
+        DEFAULT_TARGET+' until then.';
+      f.parentNode.insertBefore(n,f.nextSibling);
+      document.getElementById('pTarget').disabled=true;
+    }
+    var about=document.createElement('div');
+    about.className='note'; about.id='vAbout'; about.style.padding='8px 0 0';
+    about.innerHTML='<b>About this view</b> — the life graph is one cell per day of your life. '+
+      'The idea is <a href="'+LIFE_ESSAY+'" target="_blank" rel="noopener">Your Life in Weeks</a>. '+
+      'A link, not a copy.';
+    f.parentNode.insertBefore(about, f.nextSibling);
+  }
+
+  /* ---- the tab switcher, below 1024px only ------------------------------------------ */
+  function tabs(){
+    if(document.getElementById('vTabs')) return;
+    var mast=document.querySelector('.mast'); if(!mast) return;
+    var t=document.createElement('div');
+    t.className='seg vtabs'; t.id='vTabs';
+    t.innerHTML='<button data-v="today" class="on">Today</button><button data-v="views">Views</button>';
+    mast.parentNode.insertBefore(t,mast.nextSibling);
+    t.addEventListener('click',function(e){
+      var b=e.target.closest('[data-v]'); if(!b) return;
+      show(b.getAttribute('data-v'));
+    });
+  }
+  function show(which){
+    S.vTab = which==='views'?'views':'today';
+    document.documentElement.setAttribute('data-vtab',S.vTab);
+    q('#vTabs button').forEach(function(b){
+      b.classList.toggle('on', b.getAttribute('data-v')===S.vTab); });
+    try{ localStorage.setItem('ht_vtab',S.vTab); }catch(e){}
+    if(S.vTab==='views') repaint();
+  }
+
+  /* ---- wiring ----------------------------------------------------------------------- */
+  function bind(){
+    var sec=document.getElementById('vViews'); if(!sec || sec.dataset.bound) return;
+    sec.dataset.bound='1';
+    sec.addEventListener('click',function(e){
+      var mv=e.target.closest('[data-vm]');
+      if(mv){
+        var d=+mv.getAttribute('data-vm');
+        var ym=S.vYM||[dnum(today()).getFullYear(),dnum(today()).getMonth()];
+        var m=ym[1]+d, y=ym[0];
+        if(m<0){ m=11; y--; } if(m>11){ m=0; y++; }
+        S.vYM=[y,m];
+        monthGrid('vMonthC','pct'); monthGrid('vMonthR','rate'); paintGroups13();
+        return;
+      }
+      var r=e.target.closest('[data-r]');
+      if(r){
+        S.vRange=r.getAttribute('data-r');
+        q('#vRange button').forEach(function(b){ b.classList.toggle('on',b===r); });
+        paintTrends(); return;
+      }
+      var d2=e.target.closest('[data-vd]');
+      if(d2){ var k=d2.getAttribute('data-vd'); if(k<=today()){ goDay(k); show('today'); } }
+    });
+    var rT=null;
+    window.addEventListener('resize',function(){
+      clearTimeout(rT); rT=setTimeout(function(){
+        if(!document.getElementById('vViews')) return;
+        paintLife13(); paintTrends(); },200);
+    });
+  }
+
+  function repaint(){
+    if(!document.getElementById('vViews')) return;
+    paintLife13();
+    monthGrid('vMonthC','pct'); monthGrid('vMonthR','rate');
+    paintTrends(); paintGroups13(); insights();
+  }
+  window.__HT13_REPAINT=repaint;
+
+  function boot(){
+    if(advanced()) return;                 /* the full sheet already renders all of this */
+    if(!S.me) return;                      /* signed out: nothing to draw */
+    if(!build()) return;
+    tabs(); bind();
+    var saved='today';
+    try{ saved=localStorage.getItem('ht_vtab')||'today'; }catch(e){}
+    show(saved==='views'?'views':'today');
+    repaint();
+  }
+
+  /* re-apply after the app repaints, the way 9a · 10 · 11 do */
+  var _pa=paintAll;   paintAll   = function(){ _pa.apply(null,arguments); boot(); };
+  var _os=openSettings; openSettings = function(){ _os.apply(null,arguments);
+                                                   setTimeout(settingsFields,90); };
+  if(document.readyState==='complete') setTimeout(boot,200);
+  else window.addEventListener('load',function(){ setTimeout(boot,200); });
 })();
 
 })();
