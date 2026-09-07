@@ -4818,10 +4818,25 @@ function earned(k){ return committed() - remaining(k); }
       n.addEventListener('focus', unGrow);
     });
   }
+
+  /* ---- S4 - THE CHARTS FILL THE TOP-RIGHT (R70.189) --------------------------------------
+     The charts are drawn to a viewBox, so height comes free — but a chart sized from a box it no
+     longer occupies keeps its OLD aspect, so the painters are re-run AFTER the move. Only when the
+     quadrant's box has actually changed: repaint() redraws two SVGs, the scorecard and the insight
+     strip, and paintLog fires on every keystroke. */
+  var _h18ChartBox='';
+  function chartsFit(){
+    var tr=document.getElementById('h18Charts'); if(!tr) return;
+    var b=tr.getBoundingClientRect(); if(!b.width) return;
+    var k=Math.round(b.width)+'x'+Math.round(b.height);
+    if(k===_h18ChartBox) return;
+    _h18ChartBox=k;
+    if(window.__HT16 && window.__HT16.repaint) window.__HT16.repaint();
+  }
   /* ---- the re-assert, the way the seven layers before this one do ------------------------ */
   function quad(){
     if(advanced()) return;
-    if(desktop()){ quadrants(); journalBottom(); bindGrow(); unGrow(); }
+    if(desktop()){ quadrants(); journalBottom(); bindGrow(); unGrow(); chartsFit(); }
     else { unquadrants(); unjournalBottom(); }
     document.documentElement.setAttribute('data-ht18','1');
   }

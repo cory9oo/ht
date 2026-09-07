@@ -1224,6 +1224,16 @@ html[data-simple] .li .bx, html[data-simple] .li .edp{ align-self:center }
   html[data-simple] #h18Comp #log{ grid-template-columns:1fr }
 }
 
+
+/* S4 · THE CHARTS SHARE THE TOP-RIGHT (R70.189). They were already side by side and already equal
+   (measured 453x359 each in the harness); S1a moved them into #h18Charts and S4 only makes them
+   fill the quadrant's HEIGHT. Every V4 axis rule is re-asserted, not re-litigated. */
+@media (min-width:1024px){
+  html[data-simple] #h18Charts > .h16p{ flex-direction:column; overflow:hidden }
+  html[data-simple] #h18Charts .pan.flat{ flex:1 1 auto; min-height:0 }
+  html[data-simple] #h18Charts svg.chart{ width:100%; height:100%; display:block }
+}
+
 /* S1d · PHONE (<1024) IS A SINGLE COLUMN IN HIS ORDER: JOURNAL · COMPLETION · MONTH · YEAR ·
    ADHERENCE+LIFE. That is the order HT-16 already ships, and the LAYER keeps it by construction —
    every DOM move in HT-18 is gated on desktop() and reverses on a resize down, so below 1024 the
