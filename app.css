@@ -1010,3 +1010,15 @@ html[data-simple] .vWeeksSec.h17-empty > .sh{ display:none }
     letter-spacing:-.01em }
 }
 .wkg .lw{ cursor:default }
+
+/* S4 · TASK NAMES WRAP (R70.142). No ellipsis. No truncation. Ever.
+   `.li .nm` has carried `white-space:nowrap; overflow:hidden; text-overflow:ellipsis` since the
+   original sheet, which means a long standard has always been a name you cannot read. The row grows
+   instead: the checkbox and the edit affordance stay vertically centred against however many lines
+   the name takes, and the time prefix (R70.103) stays on the first line because it is a span inside
+   the same flow, not a separate column. */
+html[data-simple] .li{ align-items:center }
+html[data-simple] .li .nm{
+  white-space:normal; overflow:visible; text-overflow:clip;
+  overflow-wrap:anywhere; word-break:normal; line-height:1.3; padding:5px 0 }
+html[data-simple] .li .bx, html[data-simple] .li .edp{ align-self:center }
