@@ -5026,8 +5026,19 @@ function earned(k){ return committed() - remaining(k); }
        is not a replacement), and the 546x1016 grid keeps golden_ht16's phone scroller green. */
     if(!desktop()) return false;
     var box=host.getBoundingClientRect();
-    var plan=foldPlan(Math.max(160, Math.round(box.width)),
-                      Math.max(60,  Math.round(box.height)));
+    /* HT-18b (Cory, 2026-09-07): ONE GRAPH. The fold existed because a half-height quadrant could
+       not hold 100 square rows; LIFE has a full-height column of its own now, so the cell comes
+       straight off the height and the folds are gone. The COLUMN's width follows from the cell —
+       and the height does not depend on the width, so writing --h19life here cannot start a
+       feedback loop; the track settles on the first paint. */
+    var availH=Math.max(80, Math.round(box.height));
+    var cellOne=Math.max(MINCELL, Math.min(9, Math.floor(availH/YEARS) - GAP));
+    var Pone=cellOne+GAP;
+    var plan={ f:1, rows:YEARS, cols:WEEKS, cell:cellOne, P:Pone,
+               W:LEFT+WEEKS*Pone, H:TOP+YEARS*Pone, fits:true, scale:1, eff:cellOne,
+               table:'one graph (Cory 2026-09-07): cell=min(9,floor('+availH+'/100)-1)='+cellOne+
+                     ' -> '+(LEFT+WEEKS*Pone)+'x'+(TOP+YEARS*Pone) };
+    document.documentElement.style.setProperty('--h19life', (LEFT+WEEKS*Pone+26)+'px');
     var f=plan.f, rows=plan.rows, cell=plan.cell, P=plan.P;
     var foldW=LEFT+WEEKS*P;
     function foldX(i){ return i*(foldW+FOLDGAP); }

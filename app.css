@@ -1302,6 +1302,142 @@ html[data-simple] .li .bx, html[data-simple] .li .edp{ align-self:center }
 /* the current-age rule: a line across the row, never a label — his age is DATA (R70.95) */
 .wkg .cage{ shape-rendering:geometricPrecision }
 
+
+/* ======================= HT-18b · THREE COLUMNS (Cory's review, 2026-09-07 14:26 CDT) =========
+   Cory looked at HT-18 live and gave seven notes: zoom the whole screen out · the journal is cut
+   off · lose the completion filters · expand the list, two columns, NO SCROLLING, no fluff space ·
+   fill the dead band above the journal with features we already have · LIFE is ONE graph, sized to
+   its quadrant · and use my own judgment on the rest.
+
+   THE ARITHMETIC THAT FORCED THE SHAPE, and he picked it: 26 habits in two columns is 13 lines,
+   which needs ~600px. One unfolded life graph is 100 rows down, which needs ~600px. A half-height
+   quadrant offers ~310px. So "no scrolling" and "one graph" cannot both live in the 2x2 cross —
+   COMPLETION and LIFE each need a FULL-HEIGHT column, and the journal and the two charts share the
+   middle one. Three columns:
+
+       COMPLETION (full height)  |  JOURNAL over MONTH+YEAR  |  LIFE (full height, one graph)
+
+   This block comes after the HT-18 block, so at equal specificity it wins; the 2x2 rules it
+   supersedes are left in place and unfought, because every one of them is re-stated here. */
+@media (min-width:1024px){
+  /* (1) ZOOM OUT. 14px -> 13px is ~7% off every line of type, every row and every label at once,
+     which is the one lever that gives all four regions more content without moving anything. The
+     outer gutter comes down with it, 32/48 -> 24, and the frame goes out to 1760 at >=1600. */
+  html[data-simple]{ font-size:13px }
+  html[data-simple]{ --h18gut:24px; --h18frame:1500px; --h19life:300px; --h19row:34px }
+
+  html[data-simple] .app{ max-width:var(--h18frame); padding:0 var(--h18gut) var(--h18gut) }
+  html[data-simple] .mast{ margin-top:var(--h18gut) }
+
+  /* (7) THREE COLUMNS. The LIFE track is set by the renderer — it computes its cell from the
+     column's HEIGHT (100 rows down), and the width follows from the cell. Height does not depend
+     on the width, so there is no feedback loop and the track settles on the first paint. */
+  html[data-simple] .grid{
+    margin-top:var(--h18gut);
+    grid-template-columns:minmax(0,1fr) minmax(0,1fr) var(--h19life);
+    grid-template-rows:minmax(0,1fr) minmax(0,1fr);
+    grid-template-areas:"comp jrnl life"
+                        "comp charts life";
+    column-gap:var(--h18gut); row-gap:var(--h18gut);
+  }
+  html[data-simple] .grid > #h18Comp  { grid-area:comp }
+  html[data-simple] .grid > .colL     { grid-area:jrnl }
+  html[data-simple] .grid > #h18Charts{ grid-area:charts }
+  html[data-simple] .grid > #h16Ins   { grid-area:life }
+
+  /* (5) THE DEAD BAND ABOVE THE JOURNAL, FILLED WITH A FEATURE WE ALREADY BUILT.
+     `#tape` is the day's own dashboard — Today · Done · Earned · the three means · Consistency ·
+     Streak · Weekly · Rating · Logged · Gaps — and R70.67 hid it in simple mode, so it has been
+     rendering into `display:none` ever since. It is un-hidden HERE and nowhere else: the phone
+     keeps its hidden tape, and Advanced is untouched. Nothing new was written for this. */
+  /* HT-9a hides it with `display:none !important` (R70.22, "chrome that is not the header"), so
+     the only way back is a more specific selector carrying !important of its own. Named, not
+     sneaked: this un-hides ONE id, on the desktop simple surface only. */
+  html[data-simple] .mast #tape{ display:flex !important; flex-wrap:nowrap; gap:0 18px;
+    padding:6px 0 0; margin-top:6px; border-top:1px solid var(--border);
+    overflow-x:auto; scrollbar-width:none }
+  /* ONE line, not two. Wrapped it measured 81px and took that straight off all three columns —
+     which is the fluff he asked me to remove, arriving in the fix for the space he asked me to
+     fill. One row is 40px and the base sheet already scrolls it without a visible bar. */
+  html[data-simple] .mast #tape .tp{ display:flex; align-items:baseline; gap:6px }
+  html[data-simple] .mast #tape .tp .k{ font:400 9px/1.4 var(--mono); letter-spacing:.08em;
+    text-transform:uppercase; color:var(--muted) }
+  html[data-simple] .mast #tape .tp .v{ font:500 12px/1.4 var(--mono); color:var(--text) }
+  html[data-simple] .mast #tape .tp .v s{ text-decoration:none; color:var(--muted);
+    font-size:9.5px; padding-left:4px }
+
+  /* ---- (3)+(4) COMPLETION: a full-height column, no filters, no fluff ---------------------
+     (3) THE FILTERS GO. Order/Undone/Weakest/Heaviest/A-Z, All/Daily/Weekly, the find box and
+     Clear cost 38px of a column whose whole job is rows, and Cory does not use them. Hidden, never
+     removed (R70.16) — Advanced still has every one of them.
+     (4) NO FLUFF SPACE. The group rules come down from 37px to 22 and the per-group "+ add
+     standard" from 33 to 20; together that is 108px, which is three more standards on the screen.
+     The rows themselves stay at 34px so they are still easy to hit. */
+  /* THE FILTERS WERE NEVER A FEATURE CORY DISLIKED — THEY WERE A REGRESSION I INTRODUCED.
+     HT-9a hides them with `html[data-simple] #jIn .tools{display:none !important}` (R70.22), and
+     they had been invisible since. HT-18 S1 moved the completion block OUT of #jIn into #h18Comp,
+     the selector stopped matching, and 38px of sort/group/find/clear appeared on his screen for
+     the first time. This restores the state R70.22 always intended. */
+  html[data-simple] #h18Comp > .blk > .tools{ display:none !important }
+  html[data-simple] #h18Comp #log{ grid-template-columns:1fr 1fr; gap:0 var(--h18gut);
+    overflow-y:auto }
+  html[data-simple] #h18Comp #log > .grp{
+    grid-column:1 / -1; min-height:0; padding:4px 0 0; font-size:9.5px; letter-spacing:.14em }
+  html[data-simple] #h18Comp #log > [data-add], html[data-simple] #h18Comp #log > .eadd{
+    grid-column:1 / -1; min-height:0; padding:0 0 4px; font-size:10px }
+  /* the last row's trailing padding is 4px of scroll range and nothing else. The plain
+     `> *:last-child` lost on specificity to the .eadd rule above it — named because that is why
+     the first attempt did nothing. */
+  html[data-simple] #h18Comp #log > .eadd:last-child,
+  html[data-simple] #h18Comp #log > [data-add]:last-child,
+  html[data-simple] #h18Comp #log > .li:last-child{ padding-bottom:0; margin-bottom:0 }
+  html[data-simple] #h18Comp .li{ min-height:var(--h19row); padding:2px 6px; font-size:13.5px }
+  html[data-simple] #h18Comp .li .nm{ font-size:13.5px; line-height:1.22 }
+  html[data-simple] #h18Comp .h16load{ padding:4px 0 4px }
+  html[data-simple] #h18Comp > .blk > .sh{ padding-top:0; padding-bottom:0 }
+  html[data-simple] #h18Comp > .blk > .sh h2{ padding-top:0 }
+  /* the last 4px between 26 rows and a scrollbar at his own window height. CLOSE THE DAY carries
+     its own button padding, so the wrapper's is pure spacing and this is where it was cheapest. */
+  html[data-simple] #h18Comp #tClose{ padding-top:0 }
+  html[data-simple] #h18Comp #tClose .btn{ padding-top:9px; padding-bottom:9px }
+  /* a narrow COMPLETION column falls back to one sub-column rather than shredding the names */
+  @media (max-width:1279px){
+    html[data-simple] #h18Comp #log{ grid-template-columns:1fr }
+  }
+
+  /* ---- (2) THE JOURNAL IS NOT CUT OFF ----------------------------------------------------
+     MEASURED on Cory's screen: COMPLETED held two lines ("- Closed X" / "- Called Y") and the
+     panel edge cut the second one in half, because the unfocused field was pinned to one line's
+     34px while `.colL` clips. Two lines unfocused is the floor now, the field still grows on
+     focus, and the dump yields the pixels either way. */
+  html[data-simple] #h18Btm{ gap:var(--h18gut) }
+  html[data-simple] #h18Btm textarea{ height:46px; min-height:46px }
+  html[data-simple] #h18Btm textarea:focus{ height:clamp(90px, 26vh, 220px) }
+  html[data-simple] #jIn > .blk:has(#iDump) > .pan{ gap:6px }
+  html[data-simple] #iDump{ min-height:52px }
+  /* THE RATING STRIP GOES ON ONE LINE WITH ITS OWN LABEL. It was a 10px label stacked over a 33px
+     row of buttons with 17px of margin between them — 60px of a 334px box to ask one question with
+     ten answers. Inline it is 38px, and the 22px goes to the brain dump, which is the thing he
+     actually writes in. This is D-HT-18-5's cheap half, taken on the judgment he asked me to use;
+     the expensive half (moving the strip onto the JOURNAL heading row) is still his to call. */
+  html[data-simple] #jIn #rateWrap{ display:flex; align-items:center; gap:12px; margin:0 }
+  html[data-simple] #jIn #rateWrap > .lab{ margin:0 !important; flex:0 0 auto }
+  html[data-simple] #jIn #rateWrap .rate{ flex:1 1 auto; margin:0 }
+  html[data-simple] #jIn .fld > .lab{ margin-bottom:2px }
+
+  /* ---- the charts share the middle column's bottom row ---------------------------------- */
+  html[data-simple] #h18Charts{ column-gap:var(--h18gut) }
+
+  /* ---- (6) LIFE: ONE graph, its own full-height column ---------------------------------- */
+  html[data-simple] .grid > #h16Ins{ overflow:hidden }
+  html[data-simple] #h16Ins #vWeeks{ flex:1 1 auto; min-height:0; overflow:hidden; display:flex }
+  html[data-simple] .wkscroll.h18fit{ align-items:flex-start; justify-content:flex-start }
+  html[data-simple] #h16Ins #h16InsBody .h16ins{ white-space:normal; font-size:9.5px;
+    line-height:1.35 }
+}
+/* at >=1600 the frame opens up rather than the gutters: more grid, not more margin */
+@media (min-width:1600px){ html[data-simple]{ --h18gut:24px; --h18frame:1760px } }
+
 /* S1d · PHONE (<1024) IS A SINGLE COLUMN IN HIS ORDER: JOURNAL · COMPLETION · MONTH · YEAR ·
    ADHERENCE+LIFE. That is the order HT-16 already ships, and the LAYER keeps it by construction —
    every DOM move in HT-18 is gated on desktop() and reverses on a resize down, so below 1024 the
