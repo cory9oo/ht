@@ -348,8 +348,14 @@ function paintLog(){
       '<button class="bxw" type="button" data-tog="'+h.id+'" aria-pressed="'+(on?'true':'false')+
         '" title="'+esc(label(h.name))+'"><span class="bx"></span></button>'+
       nm+
-      (function(){ var mr=missRun(h.id); return mr>=3?'<span class="mrun" title="'+mr+
-        ' days running">⚑'+mr+'</span>':''; })()+
+      /* HT-16 S7 · R70.104 — THE RED FLAG RENDERER IS DELETED. It printed a red flag glyph and a
+         number to the right of a name whenever missRun(habit) >= 3, meaning "you have missed this
+         standard N days running". Display-only: computed live from days.checked, carrying no data
+         of its own, so under R70.104 and R70.79 the renderer goes and nothing in the database
+         changes -- the misses are still in `days` and every other view still counts them.
+         Root cause worth recording: HT-9a's allow-list hid five row spans (.gp .mn .ad .cue .back)
+         and missed this one, which is why an unexplained red marker survived into the simple view
+         for four wires. After this the only red on a task row is S6's overdue tint. */
       (returnedOn(h,S.date)?'<span class="back" title="back after a miss — the return is the win">↩</span>':'')+
       (h.cadence==='weekly'?'<span class="wk">WEEKLY</span>':'')+
       '<span class="sp16"></span>'+
