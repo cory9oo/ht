@@ -3694,7 +3694,11 @@ function earned(k){ return committed() - remaining(k); }
     /* rotated day labels need a taller bottom band than two stacked tspans do */
     if(opts.twoLine){
       var st = n>1 ? (W-L-R-2*pad)/(n-1) : (W-L-R);
-      if(st < 40) B = 40;
+      /* 52, not 40. MEASURED: at B=40 the rotated string "31 Wed" ran past the bottom of the viewBox
+         and the DAY NUMBER was clipped off — the labels rendered as "Tue Wed Thu" with no dates, and
+         the golden did not catch it because it counted labels rather than reading them. S2 asks for
+         day number AND weekday, so the band is sized to the longest string it has to hold. */
+      if(st < 40) B = 52;
     }
     var px=function(i){ return n<2 ? L+(W-L-R)/2 : L+pad+i*(W-L-R-2*pad)/(n-1); };
     var py=function(v){ return H-B-(v/100)*(H-T-B); };
@@ -3752,7 +3756,7 @@ function earned(k){ return committed() - remaining(k); }
     pts.forEach(function(p,i){
       var x=px(i).toFixed(1);
       if(rotate){
-        var y=H-B+8;
+        var y=H-B+10;                       /* the anchor sits just under the 0 gridline */
         s+='<text class="xl xlrot" transform="rotate(-90 '+x+' '+y.toFixed(1)+')" x="'+x+
            '" y="'+y.toFixed(1)+'" text-anchor="end">'+esc(p.x)+(p.x2?' '+esc(p.x2):'')+'</text>';
       } else {
