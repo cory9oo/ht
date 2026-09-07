@@ -817,3 +817,16 @@ html[data-simple] .h16scroll > svg.chart{ max-width:none }
 html[data-simple] .gnav{ padding:2px 0 6px }
 html[data-simple] .gnav .mv{ padding:2px 6px; border:1px solid var(--border); color:var(--muted) }
 html[data-simple] .gnav .mv:hover{ color:var(--text); border-color:var(--grey) }
+
+
+/* ======================= HT-16 · S4 · LIFE IN WEEKS (R70.95 · R70.96) ======================= */
+html[data-simple] .wkscroll.natural{ overflow-x:auto }
+/* LEFT-ALIGNED, not centred: centring a 702px chart inside a 1148px panel reads as a hole in the
+   square, which is the one thing R70.100 forbids. It starts where every other panel starts. */
+html[data-simple] .wkscroll.natural > svg.wkg{ width:auto; height:auto; margin:0 }
+html[data-simple] .wkg .wl{ font:400 8.5px/1 var(--mono); fill:var(--muted); shape-rendering:auto }
+html[data-simple] .wkg .cw{ shape-rendering:geometricPrecision }
+/* the insight strip: tokens only, no caption, no sentence explaining it (R-NOFLUFF) */
+.h16ins{ font:400 11.5px/1.6 var(--mono); color:var(--text); padding:4px 0 }
+.h16ins2{ color:var(--muted); border-top:1px solid var(--border); padding-top:8px; margin-top:4px }
+#h16InsC .h16leg{ margin-left:0 }

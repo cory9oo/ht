@@ -3766,13 +3766,187 @@ function earned(k){ return committed() - remaining(k); }
   window.__HT16.yearPoints  = yearPoints;
   window.__HT16.tipOf       = tipOf;
 
+  /* ---- S4 · LIFE IN WEEKS (R70.95 · R70.96) ---------------------------------------------
+     TARGET AGE IS A CONSTANT: 100, for everyone. The setting leaves the simple view in S8; the
+     stored value is untouched (R70.79 -- code retires via git, data never).
+
+     THE ITEM-8 BUG, and what it was. The week index was measured from the MONDAY of the birth week
+     and the lived run was drawn row by row against that -- but the ground rect for every row was
+     painted first at 45% and the lived run only covered the rows it reached, so a life that has been
+     lived for 1,900 weeks read as a handful of coloured squares in an empty field. LIVED is now an
+     explicit fill of every week from 0 through today's index, --grey at 60%, and the golden counts
+     the filled cells against `todayWeek + 1`.
+
+     Week index is `floor((date - birthdate) / 7 days)`; week 0 IS the birth week -- anchored on the
+     birthdate itself, not on a Monday, because "your 1,000th week" is measured from the day you were
+     born and off-by-a-Monday is a whole week of someone's life.
+
+     ~5,200 cells. Drawn as HT-13 learned to: one run per lived year plus one <pattern> of gap lines
+     laid over the finished drawing, which restores every cell edge for two nodes. A run alone has no
+     edges and renders as solid stripes -- that is exactly how the last life graph came out. */
+  function weekIndex(k, b){
+    if(!b) return null;
+    var d = (typeof k==='string') ? dnum(k) : k;
+    return Math.floor((d - b) / MSWEEK);
+  }
+  function loggedWeeks(b){
+    var by={};
+    dates().forEach(function(k){
+      var v=pctOn(k); if(v==null) return;
+      var wi=weekIndex(k,b); if(wi==null||wi<0) return;
+      (by[wi]=by[wi]||[]).push(v);
+    });
+    return by;
+  }
+  function lifeFacts(){
+    var b=birth();
+    if(!b) return { birth:null };
+    var now=weekIndex(new Date(), b);
+    var by=loggedWeeks(b);
+    var keys=Object.keys(by).map(Number).sort(function(x,y){ return x-y; });
+    var means={}; keys.forEach(function(i){ means[i]=meanOf(by[i]); });
+    var best=null;
+    keys.forEach(function(i){ if(best==null||means[i]>means[best]) best=i; });
+    /* the logging streak: consecutive weeks with at least one logged day, ending at the most
+       recent logged week. A gap ends it; it is not forgiving, and it does not need to be. */
+    var streak=0;
+    if(keys.length){
+      var w=keys[keys.length-1]; streak=1;
+      while(by[w-1]!=null){ streak++; w--; }
+    }
+    var yr=new Date().getFullYear();
+    var yrKeys=keys.filter(function(i){
+      var d=new Date(b.getTime()+i*MSWEEK); return d.getFullYear()===yr; });
+    return {
+      birth: dk(b), week: now, total: LIFE_TOTAL,
+      pctLived: Math.round(now/LIFE_TOTAL*1000)/10,
+      left: Math.max(0, LIFE_TOTAL-now),
+      loggedWeeks: keys.length,
+      meanPct: keys.length? Math.round(meanOf(keys.map(function(i){ return means[i]; }))) : null,
+      bestWeek: best, bestPct: best==null?null:Math.round(means[best]),
+      streak: streak,
+      yearLogged: yrKeys.length,
+      yearMean: yrKeys.length? Math.round(meanOf(yrKeys.map(function(i){ return means[i]; }))) : null,
+      thousandAge: (function(){
+        if(keys.length>=1000) return null;
+        if(!streak) return null;
+        return Math.floor((now + (1000-keys.length))/52.1775);
+      })()
+    };
+  }
+
+  function paintInsights16(){
+    var host=document.getElementById('h16InsBody'); if(!host) return;
+    var cap=document.getElementById('h16InsC');
+    var f=lifeFacts();
+    if(!f.birth){
+      host.innerHTML='<div class="h16ins">Add your birthdate in Settings to see the whole life.</div>';
+      if(cap) cap.textContent='';
+      return;
+    }
+    var n=function(x){ return x==null?'\u2014':x.toLocaleString(); };
+    host.innerHTML=
+      '<div class="h16ins">Week '+n(f.week)+' of '+n(f.total)+' \u00b7 '+f.pctLived+' % lived \u00b7 '+
+        n(f.left)+' weeks left \u00b7 '+n(f.loggedWeeks)+' weeks logged \u00b7 mean '+
+        (f.meanPct==null?'\u2014':f.meanPct)+' % \u00b7 best week W'+
+        (f.bestWeek==null?'\u2014':f.bestWeek)+' ('+(f.bestPct==null?'\u2014':f.bestPct)+' %)'+
+        ' \u00b7 logging streak '+f.streak+' wks</div>'+
+      '<div class="h16ins h16ins2">this year: '+f.yearLogged+' of 52 logged \u00b7 mean '+
+        (f.yearMean==null?'\u2014':f.yearMean)+' % \u00b7 '+
+        (f.thousandAge==null
+          ? 'a logging streak is what projects the 1,000th logged week; there is not one yet'
+          : 'at your streak you reach 1,000 logged weeks at age '+f.thousandAge)+'</div>';
+    if(cap) cap.innerHTML=legend();
+  }
+
+  function paintWeeks16(){
+    var host=document.getElementById('vWeeks'); if(!host) return;
+    var cap=document.getElementById('vWeeksC');
+    var b=birth(), GAP=1, cols=LIFE_COLS, rows=LIFE_ROWS;
+
+    if(!b){
+      /* IT DOES NOT GUESS: the weeks it has, and one line saying what is missing. No number. */
+      var wk={}, C=9;
+      dates().forEach(function(k){ var v=pctOn(k); if(v==null) return;
+        var d=dnum(k); d.setDate(d.getDate()-((d.getDay()+6)%7));
+        (wk[dk(d)]=wk[dk(d)]||[]).push(v); });
+      var keys=Object.keys(wk).sort();
+      var W0=Math.max(1,keys.length)*(C+GAP);
+      host.innerHTML='<div class="wkscroll"><svg class="wkg" width="'+W0+'" height="'+(C+GAP)+
+        '" viewBox="0 0 '+W0+' '+(C+GAP)+'">'+
+        keys.map(function(m,i){
+          return '<rect class="lw" x="'+(i*(C+GAP))+'" y="0" width="'+C+'" height="'+C+'" fill="'+
+                 rampFill(meanOf(wk[m]))+'"/>'; }).join('')+'</svg></div>'+
+        '<div class="vempty">Add your birthdate in Settings to see the whole life.</div>';
+      if(cap) cap.textContent='the weeks you have logged';
+      return;
+    }
+
+    var nowWeek=weekIndex(new Date(), b);
+    var by=loggedWeeks(b);
+    var LEFT=26, TOP=16;
+    var cell = phone()? 9 : 12;
+    var P=cell+GAP;
+    var W=LEFT+cols*P, H=TOP+rows*P;
+    var s='<text class="wl" x="'+LEFT+'" y="'+(TOP-5)+'">weeks \u2192</text>';
+    var lived=0;
+    for(var r=0;r<rows;r++){
+      var yy=TOP+r*P;
+      /* the future: --surface, never a ramp colour */
+      s+='<rect x="'+LEFT+'" y="'+yy+'" width="'+(cols*P-GAP)+'" height="'+cell+
+         '" fill="var(--surface)"/>';
+      var start=r*cols, end=start+cols-1;
+      var livedTo=Math.min(end, nowWeek);
+      if(livedTo>=start){
+        var count=livedTo-start+1;
+        lived+=count;
+        s+='<rect class="lv" x="'+LEFT+'" y="'+yy+'" width="'+(count*P-GAP)+'" height="'+cell+
+           '" fill="var(--grey)" opacity=".6"/>';
+      }
+      if(r%10===0)
+        s+='<text class="wl" x="'+(LEFT-5)+'" y="'+(yy+cell)+'" text-anchor="end">'+r+'</text>';
+    }
+    /* the logged weeks, each in its own cell, carrying that week's mean completion on the ramp */
+    Object.keys(by).forEach(function(wi){
+      var i=+wi, rr=Math.floor(i/cols), cc=i%cols;
+      if(rr>=rows) return;
+      s+='<rect class="lw" x="'+(LEFT+cc*P)+'" y="'+(TOP+rr*P)+'" width="'+cell+'" height="'+cell+
+         '" fill="'+rampFill(meanOf(by[i]))+'"/>';
+    });
+    var pat='<defs><pattern id="wkcell" width="'+P+'" height="'+P+'" patternUnits="userSpaceOnUse">'+
+      '<rect x="'+cell+'" y="0" width="'+GAP+'" height="'+P+'" fill="var(--bg)"/>'+
+      '<rect x="0" y="'+cell+'" width="'+P+'" height="'+GAP+'" fill="var(--bg)"/></pattern></defs>';
+    var cur='';
+    var cr=Math.floor(nowWeek/cols), cc2=nowWeek%cols;
+    if(cr<rows) cur='<rect class="cw" x="'+(LEFT+cc2*P-0.5)+'" y="'+(TOP+cr*P-0.5)+'" width="'+
+      (cell+1)+'" height="'+(cell+1)+'" fill="none" stroke="var(--outline-today)" stroke-width="1.5"/>';
+
+    host.innerHTML='<div class="wkscroll'+(phone()?'':' natural')+'">'+
+      '<svg class="wkg" viewBox="0 0 '+W+' '+H+'" width="'+W+'" height="'+H+'">'+
+      pat+s+'<rect x="'+LEFT+'" y="'+TOP+'" width="'+(cols*P)+'" height="'+(rows*P)+
+      '" fill="url(#wkcell)" pointer-events="none"/>'+cur+'</svg></div>';
+
+    var loggedDays=dates().filter(function(k){ return pctOn(k)!=null; }).length;
+    if(cap) cap.textContent='Week '+nowWeek.toLocaleString()+' of '+LIFE_TOTAL.toLocaleString()+
+      ' \u00b7 '+Math.max(0,LIFE_TOTAL-nowWeek).toLocaleString()+' weeks left at '+TARGET_AGE+
+      ' \u00b7 '+loggedDays+' days logged';
+
+    /* the current week centred in the phone scroller: at column '+cc2+' of 52 it opens off screen */
+    var sc=host.querySelector('.wkscroll');
+    if(sc && sc.scrollWidth>sc.clientWidth) sc.scrollLeft=Math.max(0,(LEFT+cc2*P)-sc.clientWidth/2);
+    return { lived:lived, nowWeek:nowWeek };
+  }
+  window.__HT16.weekIndex  = weekIndex;
+  window.__HT16.lifeFacts  = lifeFacts;
+  window.__HT16.paintWeeks = paintWeeks16;
+
   /* HT16-INSERT */
 
   function repaint(){
     if(advanced()) return;
     if(!squareLayout()) return;
     bindPanels();
-    paintMonth16(); paintYear16();
+    paintMonth16(); paintYear16(); paintWeeks16(); paintInsights16();
   }
   function boot(){
     if(advanced()) return;
