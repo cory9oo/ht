@@ -954,3 +954,37 @@ html[data-simple] .h16-adv{ display:none !important }
 }
 /* the emptied weeks shell below 1024: it keeps the credit note and nothing else */
 html[data-simple] .vWeeksSec.h17-empty > .sh{ display:none }
+
+/* S1 FIX, found by looking at the 720px frame rather than at the number.
+   The page-height golden passed while the TODAY column was WRONG: the journal block took its full
+   natural height (#iDump alone carries min-height:230px at >=1024 from HT-10) and the task list —
+   the other half of what S1 calls "TODAY (journal + tasks)" — was pushed to zero. One screen has to
+   mean both halves are on it, so the journal is now bounded and shrinkable and the list keeps a
+   floor. The list is the scroller; the journal is not. */
+/* POSITIONAL SELECTORS WERE THE WRONG TOOL and the measurement said so: `#jIn`'s children have been
+   reordered by three separate layers (9a moved #tClose, 10 assembled the journal, 15 moved it first),
+   so `:nth-child(2)` is the hidden `.band`, not COMPLETION — the rule matched nothing and the journal
+   collapsed to 0px. Anchor to the CONTENT instead; `:has()` is verified supported here. */
+@media(min-width:1024px){
+  html[data-simple] #jIn > .blk:has(#iDump){ flex:0 1 auto; min-height:120px; max-height:46%;
+    display:flex; flex-direction:column; overflow:hidden }
+  html[data-simple] #jIn > .blk:has(#iDump) > .pan{ flex:1 1 auto; min-height:0; overflow-y:auto }
+  html[data-simple] #iDump{ min-height:64px }
+  html[data-simple] #iTasks, html[data-simple] #iPrayer{ min-height:40px }
+  /* the COMPLETION block: heading fixed, list scrolls, and it takes whatever is left */
+  html[data-simple] #jIn > .blk:has(#log){ flex:1 1 auto; min-height:150px;
+    display:flex; flex-direction:column; overflow:hidden }
+  html[data-simple] #jIn > .blk:has(#log) > .sh,
+  html[data-simple] #jIn > .blk:has(#log) > .tools{ flex:0 0 auto }
+}
+
+/* THE DEFECT THE PAGE-HEIGHT GOLDEN COULD NOT SEE, and it is the worst kind.
+   `.log` carries `columns:1` (from `@media(min-width:1080px){ .log{columns:1} }`). Giving it a bounded
+   height plus `overflow-y:auto` did NOT make a vertical scroller — it made a MULTICOL box, so the
+   overflow went SIDEWAYS: measured scrollWidth 1224 against clientWidth 399, rows at x 25 / 437 / 850,
+   and only 4 of 12 tasks inside the visible box. Eight tasks were simply gone, while
+   `scrollHeight <= innerHeight` stayed green because the page itself was fine.
+   A bounded scroller must not be a multicol box. `golden_ht17` now asserts every row is inside. */
+@media(min-width:1024px){
+  html[data-simple] #log.h17-scroll{ columns:auto; column-count:auto; column-width:auto }
+}
