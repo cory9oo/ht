@@ -156,9 +156,20 @@ async function load(){
   /* the whole private record — rating and journal are inputs, so they get outputs */
   /* `predict` may not exist yet (its migration is Cory's to run) — probe, then degrade. */
   var PVCOLS='date,rating,why,tasks,prayer';
-  var pv = await sb.from('day_private').select(PVCOLS+',predict').eq('user_id',uid);
-  if(pv.error){ S.hasPredict=false; pv = await sb.from('day_private').select(PVCOLS).eq('user_id',uid); }
-  else { S.hasPredict=true; }
+  /* HT-10: two optional columns now. Probe widest first and step down, so the app runs whether or not
+     either migration has been applied — the same degrade-cleanly contract `predict` already had. */
+  var pv = await sb.from('day_private').select(PVCOLS+',predict,brain_dump').eq('user_id',uid);
+  if(!pv.error){ S.hasPredict=true; S.hasDump=true; }
+  else {
+    pv = await sb.from('day_private').select(PVCOLS+',predict').eq('user_id',uid);
+    if(!pv.error){ S.hasPredict=true; S.hasDump=false; }
+    else {
+      pv = await sb.from('day_private').select(PVCOLS+',brain_dump').eq('user_id',uid);
+      if(!pv.error){ S.hasPredict=false; S.hasDump=true; }
+      else { S.hasPredict=false; S.hasDump=false;
+             pv = await sb.from('day_private').select(PVCOLS).eq('user_id',uid); }
+    }
+  }
   S.privAll = {}; (pv.data||[]).forEach(function(r){ S.privAll[r.date]=r; });
   S.priv = S.privAll[S.date] || null;
   return true;
@@ -176,9 +187,10 @@ async function savePriv(){
   var res = await sb.from('day_private').upsert({
     user_id:S.me.id, date:S.date,
     rating:(p.rating==null?null:p.rating), why:p.why||'', tasks:p.tasks||'', prayer:p.prayer||''
+  , brain_dump:(S.hasDump ? (p.brain_dump||'') : undefined)
   },{ onConflict:'user_id,date' });
   if(res.error) toast('note not saved'); else toast('saved');
-  var n=0; ['why','tasks','prayer'].forEach(function(k){ if(p[k]) n++; });
+  var n=0; ['brain_dump','tasks','prayer'].forEach(function(k){ if(p[k]) n++; });
   el('jrnC').textContent = n? n+' of 3 written · autosaves' : 'saves as you type';
   paintRating(); paintRChart(); paintRScat(); paintRByMo(); paintJournal(); paintCal();
 }
@@ -1982,6 +1994,110 @@ function earned(k){ return committed() - remaining(k); }
   function boot(){ lockSkin(); simplify(); loadDump(); }
   if(document.readyState === 'complete') setTimeout(boot, 0);
   else window.addEventListener('load', function(){ setTimeout(boot, 0); });
+})();
+
+
+
+/* ======================= HT-10 · JOURNAL LAYER (PASTE 32 §A) =======================
+   One section, four fields, every day editable. Appended to the HT-9a layer's scope, inside the same
+   sealed closure, so it can call savePriv/queuePriv/paintJournalInputs directly. */
+(function(){
+  function advanced(){
+    try{ if(localStorage.getItem('ht_advanced')==='1') return true; }catch(e){}
+    if(window.__ADVANCED===true) return true;
+    return /[?&]advanced=1/.test(location.search);
+  }
+  function grow(t){ if(!t) return; t.style.height='auto'; t.style.height=(t.scrollHeight+2)+'px'; }
+
+  /* ---- 1 · one section: rating moves in above the three journals, "why" leaves ---- */
+  function journalise(){
+    if(advanced() || document.documentElement.hasAttribute('data-ht10')) return;
+    var dump = document.getElementById('iDump'); if(!dump) return;      /* 9a layer not up yet */
+    var host = dump.closest('.pan') || dump.parentNode.parentNode;
+    var rate = document.getElementById('rate');
+    if(rate && !document.getElementById('rateWrap')){
+      var w = document.createElement('div'); w.id = 'rateWrap';
+      var lab = document.createElement('span'); lab.className = 'lab';
+      lab.textContent = 'Rate the day'; lab.style.display = 'block'; lab.style.marginBottom = '6px';
+      w.appendChild(lab); w.appendChild(rate);
+      host.insertBefore(w, host.firstChild);
+      var rblk = document.querySelector('.blk .rate') ? null : null;
+    }
+    var why = document.getElementById('iWhy');
+    if(why){ var f = why.closest('.fld'); if(f) f.id = 'whyFld'; }
+    /* the emptied "Rate the day" block, and the journal head, renamed */
+    var blks = Array.prototype.slice.call(document.querySelectorAll('#jIn .blk'));
+    blks.forEach(function(b){
+      var h = b.querySelector('.sh h2');
+      var t = h ? h.textContent.toUpperCase() : '';
+      if(t.indexOf('RATE THE DAY') >= 0 && !b.querySelector('#rate')) b.classList.add('ht9a-off');
+      if(t.indexOf('JOURNAL') >= 0 && h) h.textContent = 'Journal';
+    });
+    var pray = document.getElementById('iPrayer');
+    if(pray) pray.setAttribute('placeholder', '\u2026');
+    document.documentElement.setAttribute('data-ht10','1');
+  }
+
+  /* ---- 2 · the fifth field is a real column now ---- */
+  function bindDump(){
+    var t = document.getElementById('iDump'); if(!t || t.dataset.bound) return;
+    t.dataset.bound = '1';
+    t.addEventListener('input', function(){
+      S.priv = S.priv || {}; S.priv.brain_dump = t.value; grow(t); queuePriv();
+    });
+    ['iDump','iTasks','iPrayer','iWhy'].forEach(function(id){
+      var n = document.getElementById(id); if(!n || n.dataset.blurred) return;
+      n.dataset.blurred = '1';
+      n.addEventListener('blur', function(){ savePriv(); });     /* A2: upsert on blur, not only debounced */
+    });
+    var c = document.getElementById('bClose');
+    if(c && !c.dataset.flush){ c.dataset.flush = '1';
+      c.addEventListener('click', function(){ savePriv(); }, true); }   /* A2: and on CLOSE THE DAY */
+  }
+
+  /* ---- 3 · every day populates, including the new field ---- */
+  var _pji = paintJournalInputs;
+  paintJournalInputs = function(){
+    _pji.apply(null, arguments);
+    var t = document.getElementById('iDump');
+    if(t){ t.value = (S.priv && S.priv.brain_dump) || ''; grow(t); }
+    grow(document.getElementById('iTasks')); grow(document.getElementById('iPrayer'));
+    journalise(); bindDump();
+  };
+
+  /* ---- 4 · import the 9a stopgap, once, then clear it ----
+     9a persisted the brain dump per device in localStorage because the column did not exist. Those
+     entries are Cory's writing and they are NOT dropped: they move into day_private the first time
+     this build runs with the column present, and only where the column is empty. */
+  async function importStopgap(){
+    if(!S.hasDump) return;
+    var keys = [];
+    try{ for(var i=0;i<localStorage.length;i++){ var k=localStorage.key(i);
+           if(k && k.indexOf('ht_dump_')===0) keys.push(k); } }catch(e){ return; }
+    var moved = 0;
+    for(var j=0;j<keys.length;j++){
+      var date = keys[j].slice(8), val = '';
+      try{ val = localStorage.getItem(keys[j]) || ''; }catch(e){}
+      if(!val.trim()){ try{ localStorage.removeItem(keys[j]); }catch(e){} continue; }
+      var row = S.privAll[date];
+      if(row && (row.brain_dump||'').trim()){ try{ localStorage.removeItem(keys[j]); }catch(e){} continue; }
+      var res = await sb.from('day_private').upsert(
+        { user_id:S.me.id, date:date, brain_dump:val }, { onConflict:'user_id,date' });
+      if(!res.error){
+        S.privAll[date] = S.privAll[date] || { date:date };
+        S.privAll[date].brain_dump = val;
+        try{ localStorage.removeItem(keys[j]); }catch(e){}
+        moved++;
+      }
+    }
+    if(moved) { toast(moved + ' brain dump' + (moved>1?'s':'') + ' moved to the database');
+                if(S.privAll[S.date]) S.priv = S.privAll[S.date];
+                paintJournalInputs(); }
+  }
+
+  function boot(){ journalise(); bindDump(); importStopgap(); }
+  if(document.readyState === 'complete') setTimeout(boot, 120);
+  else window.addEventListener('load', function(){ setTimeout(boot, 120); });
 })();
 
 })();

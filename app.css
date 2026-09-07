@@ -503,3 +503,13 @@ html[data-simple] #tClose .btn{ width:100% }
 /* header extras */
 html[data-simple] #hCount{ white-space:nowrap }
 html[data-simple] #hPrev, html[data-simple] #hNext{ padding:5px 9px }
+
+
+/* ======================= HT-10 · JOURNAL (PASTE 32 §A) ======================= */
+/* the brain dump is the "why" now, so it is the big one */
+html[data-simple] #iDump{ min-height:150px }
+@media(min-width:1024px){ html[data-simple] #iDump{ min-height:230px } }
+html[data-simple] #iDump, html[data-simple] #iTasks, html[data-simple] #iPrayer{
+  overflow:hidden; resize:none }                    /* they auto-grow; the handle would lie */
+html[data-simple] #rateWrap{ padding-bottom:10px; border-bottom:1px solid var(--rule) }
+html[data-simple] #whyFld{ display:none !important }   /* the field goes; the column stays (DEC-037) */
