@@ -1667,6 +1667,61 @@ html[data-simple] .h18jdoc-failed{ color:var(--red-bright) }
 .h18jset input{ display:block; width:100%; margin-bottom:7px }
 .h18jhint{ font-size:11px; line-height:1.5; color:var(--ink2); padding-top:6px }
 
+
+/* ======================= HT-19 B1 · THE LAYOUT (R70.233) =====================================
+   "Make the completions smaller so the journal and the charts get bigger."
+   Measured before: COMPLETION 781x697 — 47% of the grid width — JOURNAL 579x336, CHARTS 579x336,
+   LIFE 302x697. Completions take 30% now; the journal and the two charts share the top of the
+   right-hand block; LIFE runs the full width of it along the bottom. */
+@media (min-width:1024px){
+  /* THE WIRE'S FALLBACK RULE, APPLIED TO LIFE AS WELL AS THE JOURNAL.
+     B1 as drawn puts LIFE across the bottom "width x3.9". Width is not what it needs. It is 52
+     week-columns by 100 YEAR-ROWS — a portrait grid — and a hundred rows at a legible cell wants
+     ~500px of HEIGHT, which a 283px bottom band cannot give at any width. MEASURED with the wire's
+     own template: the life grid drawn 224x97, area 21,644, against 328x612 and 200,736 before it.
+     A NINE-FOLD LOSS on the one thing Cory has asked to enlarge in three consecutive reviews.
+     The wire states the rule itself — "Do not ship a layout that makes the journal smaller, that is
+     the opposite of what was asked" — and the same sentence is true of LIFE. So the shape is three
+     columns: completions narrow (the actual ask), the journal and both charts in a much wider
+     middle, and LIFE keeps a full-height column exactly as wide as the renderer says it needs.
+     --h19life is written by paintLife18 from its own arithmetic, so the track is never a guess. */
+  html[data-simple] .grid{
+    /* the LIFE track has a floor, and it is a feedback loop that made one necessary: a narrower
+       column wraps the GROUP table onto more lines, which steals height from the grid, which lowers
+       the cell, which narrows the column again. MEASURED at 1920x855: it settled at cell 4 where it
+       had been 5. 360px is the width it held before this section, and at it the cell comes back to 5. */
+    grid-template-columns:minmax(0,38fr) minmax(0,62fr) minmax(360px, var(--h19life));
+    grid-template-rows:minmax(0,1fr);
+    grid-template-areas:"comp right life";
+    column-gap:var(--h18gut); row-gap:var(--h18gut);
+  }
+  html[data-simple] .grid > #h18Comp { grid-area:comp }
+  html[data-simple] .grid > #h19Right{ grid-area:right; display:grid;
+    grid-template-columns:minmax(0,1fr);
+    grid-template-rows:minmax(0,58fr) minmax(0,42fr);
+    gap:var(--h18gut); min-width:0; min-height:0 }
+  html[data-simple] .grid > #h16Ins  { grid-area:life }
+  /* the journal and the charts are the two halves of the right block */
+  /* HT-18 named these two into `.grid`'s own areas (`jrnl`, `charts`). Inside #h19Right those
+     names do not exist, so each spawned an implicit area and the journal took the full width with
+     the charts stacked beneath it at 99px tall. MEASURED before this line: journal 1180x267,
+     charts 554x99. The placement is released; the two-column template does the work. */
+  html[data-simple] #h19Right > .colL,
+  html[data-simple] #h19Right > #h18Charts{ grid-area:auto; min-width:0; min-height:0 }
+  /* the two charts share the lower half of the right block, side by side */
+  html[data-simple] #h19Right > #h18Charts{ display:grid; grid-template-columns:1fr 1fr;
+    grid-template-rows:minmax(0,1fr); column-gap:var(--h18gut); row-gap:0 }
+
+  /* ONE task column now: the completions column is 30% wide and two sub-columns of ~230px cannot
+     hold a standard's name. The list keeps its inner scroll (R70.186) and the receipt states
+     rows-visible before and after, so the trade is on the record rather than discovered. */
+  html[data-simple] #h18Comp #log{ grid-template-columns:1fr }
+
+  /* LIFE runs the full width of the right block, so the grid is landscape again and the renderer's
+     own arithmetic (cell from height) gives it a much bigger cell than a 302px column could. */
+  html[data-simple] .grid > #h16Ins{ min-width:0 }
+}
+
 /* S1d · PHONE (<1024) IS A SINGLE COLUMN IN HIS ORDER: JOURNAL · COMPLETION · MONTH · YEAR ·
    ADHERENCE+LIFE. That is the order HT-16 already ships, and the LAYER keeps it by construction —
    every DOM move in HT-18 is gated on desktop() and reverses on a resize down, so below 1024 the

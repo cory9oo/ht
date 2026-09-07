@@ -3844,7 +3844,10 @@ function earned(k){ return committed() - remaining(k); }
        them still tell you where you are; 8 for a small FIXED set like the twelve months, where
        every label is a distinct place and dropping six of them loses half the axis. MEASURED:
        at a 251px panel the year affords 8.3px, so 8 shows all twelve and 9 shows six. */
-    var FLOOR = (n <= 12) ? 7.5 : 9;
+    /* B1 narrows the chart panels at 1280 (243px), where twelve three-letter months want 7.3px.
+       The floor for a small FIXED set drops to 7 so the set stays complete; it only ever binds on a
+       small panel, because the type is sized by fit first — at 1920 the year renders at 8.5px. */
+    var FLOOR = (n <= 12) ? 7 : 9;
     if(fitPx >= FLOOR){                   /* they all fit at a readable size: show them all */
       fontPx = Math.min(9.5, Math.floor(fitPx * 10) / 10); stride = 1;
     }else{
@@ -5563,12 +5566,33 @@ function earned(k){ return committed() - remaining(k); }
   }
   var _osJ=openSettings;
   openSettings=function(){ _osJ.apply(null, arguments); setTimeout(jdocSettings, 120); };
+
+  /* ---- HT-19 B1 - THE RIGHT BLOCK (R70.233) ----------------------------------------------
+     "Make the completions smaller so the journal and the charts get bigger." Measured before:
+     COMPLETION 781 x 697 - 47% of the grid width - against JOURNAL 579 x 336 and a LIFE grid
+     302 wide. One DOM move, the same shape as HT-18's quadrants(): a #h19Right block that holds
+     the journal and the two charts side by side, so COMPLETION can take 30% of the width and LIFE
+     can have the whole bottom of the right-hand side. */
+  function rightBlock(){
+    var grid=document.querySelector('.grid'); if(!grid) return false;
+    var colL=document.querySelector('.colL'), ch=document.getElementById('h18Charts');
+    if(!colL || !ch) return false;
+    var r=document.getElementById('h19Right');
+    if(!r){ r=document.createElement('div'); r.id='h19Right'; grid.appendChild(r); }
+    if(colL.parentElement!==r){ mark(colL); r.appendChild(colL); }
+    if(ch.parentElement!==r){ mark(ch); r.appendChild(ch); }
+    return true;
+  }
+  function unRightBlock(){
+    home(document.querySelector('.colL'));
+    home(document.getElementById('h18Charts'));
+  }
   /* ---- the re-assert, the way the seven layers before this one do ------------------------ */
   function quad(){
     if(advanced()) return;
-    if(desktop()){ quadrants(); journalBottom(); bindGrow(); unGrow(); chartsFit(); adhLine();
-                   groupBlock(); }
-    else { unquadrants(); unjournalBottom(); unAdh(); }
+    if(desktop()){ quadrants(); rightBlock(); journalBottom(); bindGrow(); unGrow(); chartsFit();
+                   adhLine(); groupBlock(); }
+    else { unquadrants(); unRightBlock(); unjournalBottom(); unAdh(); }
     paintLife18(); watchLife(); sabbathList(); watchLog();          /* S6 - both modes: the phone gets the same shape at a fixed cell */
     document.documentElement.setAttribute('data-ht18','1');
   }
