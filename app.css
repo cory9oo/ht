@@ -854,3 +854,23 @@ html[data-simple] .wkg .cw{ shape-rendering:geometricPrecision }
 @media(max-width:479px){
   .h16sc td.wk, .h16sc th:nth-child(5){ display:none }     /* the phone keeps the numbers */
 }
+
+
+/* ======================= HT-16 · S6 · TASK TIME (R70.103) ======================= */
+/* the prefix is small and muted and NOTHING ELSE ON THE ROW CHANGES */
+html[data-simple] .li .tpfx{ flex:0 0 auto; font:400 10px/1 var(--mono); color:var(--muted);
+  letter-spacing:.02em; white-space:nowrap; padding-right:2px }
+/* OVERDUE: the slot has passed and the box is not ticked. The only red on a task row (S7). */
+html[data-simple] .li.h16-over .nm{ color:var(--red) }
+html[data-simple] .li.h16-over a.nm{ color:var(--red) }
+html[data-simple] .li.h16-over .tpfx{ color:var(--red) }
+/* the day load line, under the TODAY header and above the list */
+.h16load{ font:400 10.5px/1 var(--mono); letter-spacing:.06em; color:var(--muted);
+  padding:8px 0 9px; border-bottom:1px solid var(--border) }
+.h16load.h16off{ display:none }
+html[data-simple] .grp.h16any{ color:var(--grey) }
+/* the median-close suggestion in the editor: a button, so adopting it is a deliberate tap */
+.esheet .h16adopt{ margin-top:8px; font:400 10.5px/1 var(--mono); color:var(--muted);
+  border:1px solid var(--border); padding:7px 9px }
+.esheet .h16adopt:hover{ color:var(--text); border-color:var(--grey) }
+.esheet #eTimeFld .win input.num{ max-width:110px }

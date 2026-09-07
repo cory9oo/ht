@@ -51,6 +51,17 @@ function dens(p){
   var t=Math.round(8+clamp(p,0,100)*0.92);
   return 'color-mix(in srgb, var(--accent) '+t+'%, var(--sunk))';
 }
+/* HT-16 S6: postgres `time` comes back as HH:MM:SS; the row prefix and the <input type=time>
+   both want HH:MM, and a null must stay a null rather than becoming the string "null". */
+function hhmm(t){
+  if(t==null||t==='') return null;
+  var m=String(t).match(/^(\d{1,2}):(\d{2})/);
+  return m? (('0'+m[1]).slice(-2)+':'+m[2]) : null;
+}
+function minsOf(t){ var v=hhmm(t); if(!v) return null;
+  return (+v.slice(0,2))*60 + (+v.slice(3,5)); }
+function fmtHM(m){ if(m==null) return '\u2014'; m=Math.max(0,Math.round(m));
+  var h=Math.floor(m/60), r=m%60; return h? (h+'h'+(r?' '+r+'m':'')) : (r+'m'); }
 function toast(t){ var n=el('toast'); n.textContent=t; n.classList.add('on');
   clearTimeout(toast._t); toast._t=setTimeout(function(){ n.classList.remove('on'); },1500); }
 
@@ -2199,11 +2210,19 @@ function earned(k){ return committed() - remaining(k); }
     var n = await sb.from('habits').select('id,notes')
               .eq('user_id',S.me.id).eq('active',true).order('sort_order');
     S.hasNotes = !n.error;
+    /* HT-16 S6 (R70.103): a third probe. `time_anchor` and `minutes_planned` land together but a
+       probe that asks for both and gets one is still a probe that reports "no columns", so they get
+       their own. Absent -> the two fields are hidden and TODAY keeps its existing order. */
+    var t = await sb.from('habits').select('id,time_anchor,minutes_planned')
+              .eq('user_id',S.me.id).eq('active',true).order('sort_order');
+    S.hasTime = !t.error;
     /* merge what exists onto the rows load() already has — HCOLS is fixed and golden-verified */
     if(S.hasWindow) (w.data||[]).forEach(function(r){
       var h=hby(r.id); if(h){ h.planned_start=r.planned_start; h.planned_end=r.planned_end; } });
     if(S.hasNotes) (n.data||[]).forEach(function(r){
       var h=hby(r.id); if(h){ h.notes=r.notes; } });
+    if(S.hasTime) (t.data||[]).forEach(function(r){
+      var h=hby(r.id); if(h){ h.time_anchor=r.time_anchor; h.minutes_planned=r.minutes_planned; } });
   }
 
   /* ---- 2 · THE EDIT SHEET (B2) — over TODAY, not a page ----
@@ -2246,6 +2265,20 @@ function earned(k){ return committed() - remaining(k); }
           '<input id="eEnd" type="time" value="'+esc(h.planned_end||'')+'"></div></div>' : '')+
       fld('Planned minutes','<input id="eMin" class="num" type="number" min="0" step="5" value="'+
           (h.minutes||0)+'">')+
+      /* HT-16 S6 · R70.103 — when in the day, and how long. Both optional, both degrade with the
+         column. The suggestion under the anchor is the MEDIAN close time of this standard's last 30
+         check-offs; one tap adopts it, and it is never written without the tap. */
+      (S.hasTime ? '<div class="fld" id="eTimeFld"><span class="lab">Time anchor \u00b7 optional</span>'+
+          '<div class="win"><input id="eAnchor" type="time" value="'+esc(hhmm(h.time_anchor)||'')+'">'+
+          '<input id="ePlan" class="num" type="number" min="0" step="5" placeholder="minutes" value="'+
+          (h.minutes_planned==null?'':h.minutes_planned)+'"></div>'+
+          (function(){
+             if(h.time_anchor || !h.id) return '';
+             var m = (window.__HT16 && window.__HT16.medianClose) ? window.__HT16.medianClose(h.id) : null;
+             return m? '<button class="btn h16adopt" id="eAdopt" data-t="'+m+'">usually done ~'+m+
+                       '</button>' : '';
+           })()+
+          '</div>' : '')+
       fld('Link','<input id="eLink" value="'+esc(h.link||'')+'" placeholder="https://…" '+
           'inputmode="url" autocomplete="off">')+
       (S.hasNotes ? fld('Notes','<textarea id="eNotes" rows="3" placeholder="…">'+
@@ -2258,6 +2291,9 @@ function earned(k){ return committed() - remaining(k); }
         '<button class="btn" id="eCancel">Cancel</button>'+
         '<button class="btn pri" id="eSave">Save</button>'+
       '</div>'+
+      (S.hasTime ? '' :
+        '<div class="note enote">A time anchor and its planned minutes need one migration before '+
+        'they can be saved. Everything else on this sheet saves now.</div>')+
       (S.hasWindow&&S.hasNotes ? '' :
         '<div class="note enote">'+
         (!S.hasWindow&&!S.hasNotes ? 'Planned window and notes need one migration before they can be saved.'
@@ -2271,6 +2307,11 @@ function earned(k){ return committed() - remaining(k); }
     document.getElementById('eSave').onclick=function(){ saveSheet(h,isNew); };
     var ar=document.getElementById('eArch');
     if(ar) ar.onclick=function(){ archiveOne(h); };
+    var ad=document.getElementById('eAdopt');
+    if(ad) ad.onclick=function(e){ e.preventDefault();
+      var f=document.getElementById('eAnchor');
+      if(f) f.value=ad.getAttribute('data-t');
+      ad.parentNode.removeChild(ad); };
   }
 
   function num(id){ var n=document.getElementById(id); return n?(+n.value||0):0; }
@@ -2285,6 +2326,9 @@ function earned(k){ return committed() - remaining(k); }
     if(S.hasCue)    rec.cue = str('eCue');
     if(S.hasWindow){ rec.planned_start = str('eStart')||null; rec.planned_end = str('eEnd')||null; }
     if(S.hasNotes)   rec.notes = str('eNotes')||null;
+    if(S.hasTime){ rec.time_anchor = str('eAnchor')||null;
+                   var mp=document.getElementById('ePlan');
+                   rec.minutes_planned = (mp && String(mp.value||'').trim()!=='') ? (+mp.value||0) : null; }
     var res;
     if(isNew){
       /* a new row goes to the foot of its OWN group, not the foot of the list */
@@ -4056,12 +4100,204 @@ function earned(k){ return committed() - remaining(k); }
   window.__HT16.groupStreak      = groupStreak;
   window.__HT16.ADHERENCE_DEF    = ADHERENCE_DEF;
 
+  /* ---- S6 · TASK TIME (R70.103) — absorbs HT-12 TIME entirely ---------------------------
+     Two optional fields per standard: `time_anchor` (when in the day) and `minutes_planned` (how
+     long). Both are additive columns with their own probe, so this build runs before and after the
+     migration; before it, TODAY keeps the order it has and nothing on the row changes.
+
+     NO TIMER, AND NO SECOND CALENDAR. ClickUp stays the system of record for committed time; HT
+     holds the habit's slot only. ACTUAL is the day's existing `closed_at` (HT-13 G2) — the only
+     completion timestamp this app has ever written, and inventing a second one would mean two
+     answers to "when did you finish".
+
+     Cory's 9/6 "no time next to tasks" is superseded by his 9/7 R70.103 prefix. Said here so a
+     later wire does not read the older ruling and strip it back out. */
+  function anchorOf(h){ return hhmm(h && h.time_anchor); }
+  function planOf(h){
+    if(!h) return null;
+    if(h.minutes_planned!=null && h.minutes_planned!=='') return +h.minutes_planned;
+    return h.minutes? +h.minutes : null;      /* the price stands in until a slot length is set */
+  }
+  function anchorMin(h){ return minsOf(h && h.time_anchor); }
+  function endMin(h){
+    var a=anchorMin(h); if(a==null) return null;
+    return a + (planOf(h)||0);
+  }
+  function timedHabits(){ return S.habits.filter(function(h){ return anchorMin(h)!=null; }); }
+
+  /* TODAY SORTS BY ANCHOR; everything unanchored falls to an ANYTIME block at the bottom in the
+     order it already had. Only when at least one standard carries an anchor -- otherwise the list
+     Cory has today must not move under him. */
+  function sortToday(list){
+    var timed=[], any=[];
+    list.forEach(function(h){ (anchorMin(h)==null?any:timed).push(h); });
+    if(!timed.length) return { timed:[], any:list, split:false };
+    timed.sort(function(a,b){
+      return anchorMin(a)-anchorMin(b) || (a.sort_order||0)-(b.sort_order||0); });
+    return { timed:timed, any:any, split:true };
+  }
+
+  /* the day load: planned, done (planned minutes of what is checked) and what is left */
+  function loadSums(k){
+    var day=k||S.date, ck=ckOf(day), planned=0, done=0;
+    S.habits.forEach(function(h){
+      if(h.cadence==='weekly') return;
+      var m=planOf(h); if(m==null) return;
+      planned+=m; if(ck[h.id]) done+=m;
+    });
+    return { planned:planned, done:done, left:Math.max(0,planned-done) };
+  }
+
+  /* the day's close time, in minutes past local midnight; null when the day was never closed */
+  function closeMin(k){
+    var r=S.byDate[k]; var c=r&&r.closed_at; if(!c) return null;
+    var d=new Date(c); if(isNaN(d)) return null;
+    return d.getHours()*60+d.getMinutes();
+  }
+  /* ON TIME = a timed standard, checked, on a day whose close is at or before anchor + minutes.
+     A day that was never closed carries no answer and is not counted either way. */
+  function onTimeOn(k, filter){
+    var r=S.byDate[k]; if(!r||!loggedOn(k)) return null;
+    var cm=closeMin(k); if(cm==null) return null;
+    var ck=r.checked||{}, n=0, ok=0;
+    timedHabits().forEach(function(h){
+      if(filter && !filter(h)) return;
+      if(h.cadence==='weekly'? !weekDone(h.id,k) : !ck[h.id]) return;
+      n++; if(cm<=endMin(h)) ok++;
+    });
+    return n? { n:n, ok:ok, pct:Math.round(ok/n*100) } : null;
+  }
+  function onTime30(group){
+    var n=0, ok=0;
+    for(var i=0;i<30;i++){
+      var r=onTimeOn(shift(today(),-i), group? function(h){
+        return (h.group_name||'Other')===group; } : null);
+      if(!r) continue; n+=r.n; ok+=r.ok;
+    }
+    return n? Math.round(ok/n*100) : null;
+  }
+  /* THE LEARNING: the median close time of a standard's last 30 check-offs, as HH:MM. It is a
+     SUGGESTION and nothing writes it -- one tap in the editor adopts it (R70.103). */
+  function medianClose(hid){
+    var h=S.habits.filter(function(x){ return x.id===hid; })[0];
+    var vals=[], k=today(), guard=0;
+    while(guard++<400 && vals.length<30){
+      var r=S.byDate[k];
+      if(r && loggedOn(k) && (r.checked||{})[hid]){
+        var cm=closeMin(k); if(cm!=null) vals.push(cm);
+      }
+      k=shift(k,-1);
+    }
+    if(vals.length<3) return null;               /* three points is the floor for a median to mean anything */
+    vals.sort(function(a,b){ return a-b; });
+    var mid=Math.floor(vals.length/2);
+    var m=vals.length%2? vals[mid] : Math.round((vals[mid-1]+vals[mid])/2);
+    return ('0'+Math.floor(m/60)).slice(-2)+':'+('0'+(m%60)).slice(-2);
+  }
+
+  /* ---- the row prefix, the overdue tint, the ANYTIME block and the load line ---- */
+  function nowMin(){ var d=new Date(); return d.getHours()*60+d.getMinutes(); }
+
+  function decorateTime(){
+    var log=document.getElementById('log'); if(!log) return;
+    var rows=q('.li',log);
+    if(!rows.length) return;
+    var ck=ckOf(S.date), isToday=(S.date===today());
+    var anySplit=false;
+
+    rows.forEach(function(row){
+      var h=S.habits.filter(function(x){ return x.id===row.getAttribute('data-h'); })[0];
+      if(!h) return;
+      var a=anchorOf(h), pm=planOf(h);
+      var old=row.querySelector('.tpfx');
+      if(a){
+        anySplit=true;
+        var txt=a+(pm?' \u00b7 '+pm+'m':'');
+        if(old) old.textContent=txt;
+        else{
+          var sp=document.createElement('span');
+          sp.className='tpfx'; sp.textContent=txt;
+          var bx=row.querySelector('.bxw');
+          row.insertBefore(sp, bx? bx.nextSibling : row.firstChild);
+        }
+      } else if(old){ old.parentNode.removeChild(old); }
+      /* OVERDUE: the slot has passed and the box is not ticked. The ONLY red on a task row. */
+      var over = isToday && a!=null && !ck[h.id] && h.cadence!=='weekly' && nowMin() > endMin(h);
+      row.classList.toggle('h16-over', !!over);
+    });
+
+    if(anySplit) reorderToday(log);
+    loadLine();
+  }
+
+  function reorderToday(log){
+    var order=sortToday(S.habits.slice());
+    if(!order.split) return;
+    var byId={}; q('.li',log).forEach(function(r){ byId[r.getAttribute('data-h')]=r; });
+    var frag=document.createDocumentFragment();
+    order.timed.forEach(function(h){ if(byId[h.id]) frag.appendChild(byId[h.id]); });
+    var anyRows=order.any.filter(function(h){ return byId[h.id]; });
+    if(anyRows.length){
+      var hd=document.createElement('div');
+      hd.className='grp h16any'; hd.textContent='ANYTIME';
+      frag.appendChild(hd);
+      anyRows.forEach(function(h){ frag.appendChild(byId[h.id]); });
+    }
+    /* the group headers go: with anchors the anchor IS the order, and two orderings in one list is
+       two answers to "what is next". HT-11's "+ Add standard" is a control, not an ordering, so one
+       of them is carried to the foot rather than dropped. */
+    var add=log.querySelector('.eadd');
+    if(add){ add.setAttribute('data-add',''); add.textContent='+ Add standard'; frag.appendChild(add); }
+    log.innerHTML='';
+    log.appendChild(frag);
+  }
+
+  function loadLine(){
+    var log=document.getElementById('log'); if(!log) return;
+    var n=document.getElementById('h16Load');
+    if(!n){
+      n=document.createElement('div'); n.id='h16Load'; n.className='h16load';
+      log.parentNode.insertBefore(n, log);
+    }
+    var L=loadSums(S.date);
+    if(!L.planned){ n.textContent=''; n.classList.add('h16off'); return; }
+    n.classList.remove('h16off');
+    var ot=onTimeOn(S.date);
+    n.textContent='Planned '+fmtHM(L.planned)+' \u00b7 Done '+fmtHM(L.done)+
+      ' \u00b7 Left '+fmtHM(L.left)+
+      (ot? ' \u00b7 On time '+ot.pct+'%' : (timedHabits().length? ' \u00b7 On time \u2014' : ''));
+  }
+
+  /* the DATA SEAM (R70.102). Every acceptance in this wire is a data golden, and `S` lives inside
+     the sealed closure where no test can reach it. This exposes a READ-ONLY projection of exactly
+     what the goldens assert against -- nothing here writes. */
+  window.__HT16.state = function(){
+    return { hasTime:!!S.hasTime, date:S.date, today:today(),
+             habits:S.habits.map(function(h){
+               return { id:h.id, name:label(h.name), group:h.group_name||'Other',
+                        cadence:h.cadence||'daily', minutes:h.minutes||0,
+                        time_anchor:h.time_anchor==null?null:h.time_anchor,
+                        minutes_planned:h.minutes_planned==null?null:h.minutes_planned,
+                        link:h.link||null, plan:planOf(h), endMin:endMin(h) }; }),
+             days:dates().map(function(k){ var r=S.byDate[k];
+               return { date:k, pct:r.pct, closed_at:r.closed_at||null,
+                        checked:Object.keys(r.checked||{}) }; }) };
+  };
+  window.__HT16.sortToday   = function(){ return sortToday(S.habits.slice()); };
+  window.__HT16.loadSums    = loadSums;
+  window.__HT16.onTimeOn    = onTimeOn;
+  window.__HT16.onTime30    = onTime30;
+  window.__HT16.medianClose = medianClose;
+  window.__HT16.planOf      = planOf;
+  window.__HT16.endMin      = endMin;
+
   /* HT16-INSERT */
 
   function repaint(){
     if(advanced()) return;
     if(!squareLayout()) return;
     bindPanels();
+    decorateTime();
     paintMonth16(); paintYear16(); paintWeeks16(); paintInsights16(); paintScorecard();
   }
   function boot(){
@@ -4072,6 +4308,8 @@ function earned(k){ return committed() - remaining(k); }
   window.__HT16.repaint = repaint;
 
   var _pa=paintAll; paintAll=function(){ _pa.apply(null,arguments); boot(); };
+  var _pl=paintLog; paintLog=function(){ _pl.apply(null,arguments);
+                                         if(!advanced() && S.me) decorateTime(); };
   var _os=openSettings; openSettings=function(){ _os.apply(null,arguments);
                                                  setTimeout(aboutScorecard,180); };
   if(document.readyState==='complete') setTimeout(boot,300);
