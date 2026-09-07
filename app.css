@@ -454,7 +454,7 @@ html[data-simple] #skins,
 html[data-simple] #bView,
 html[data-simple] #bGuide,
 html[data-simple] #logC,
-html[data-simple] .tools,
+html[data-simple] #jIn .tools,
 html[data-simple] .band{ display:none !important }
 
 /* outputs that sit INSIDE the input column, so a heading filter alone will not catch them:
