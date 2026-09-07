@@ -1638,7 +1638,10 @@ html[data-simple] .li .bx, html[data-simple] .li .edp{ align-self:center }
   /* (1b · 3) the axis: a weekday letter under every day, and Saturday said quietly, because that
      is the day the list becomes one box */
   html[data-simple] .chart text.xl2{ fill:var(--muted) }
-  html[data-simple] .chart text.xl-sat{ fill:var(--ink2); font-weight:600 }
+  /* B2 (R70.234): Saturday tinted with the token B3 shares, today outlined on both lines */
+  html[data-simple] .chart text.xl-sat{ fill:var(--sabbath, var(--green-bright)); font-weight:600 }
+  html[data-simple] .chart text.xl2-today{ fill:var(--text); font-weight:600 }
+  html[data-simple]{ --sabbath:var(--green-bright) }
 
   /* (4) SATURDAY IS ONE BOX, and it gets the room the other twenty-five gave back */
   /* `[hidden]` is a UA rule and `.li{display:flex}` outranks it, so hiding a row by attribute

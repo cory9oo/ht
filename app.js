@@ -3795,7 +3795,10 @@ function earned(k){ return committed() - remaining(k); }
        hit shapes are emitted first and the dots land on top of them. */
     pts.forEach(function(p,i){
       if(p.c==null && p.r==null) return;
-      var tip=tipOf(p.c,p.r), at=opts.attr+'="'+p.key+'"';
+      /* B2 (R70.234): the hover carries the full date. It was "60% · 8/10" with no way to tell
+         which day you were over — on a 30-point axis where only half the numbers render, that is
+         the difference between a tooltip and a guess. */
+      var tip=(p.full? p.full+' · ' : '')+tipOf(p.c,p.r), at=opts.attr+'="'+p.key+'"';
       var hw=Math.max(6, (n>1?(W-L-R-2*pad)/(n-1):24));
       s+='<rect class="hitcol" '+at+' data-tip="'+esc(tip)+'" x="'+(px(i)-hw/2).toFixed(1)+
          '" y="0" width="'+hw.toFixed(1)+'" height="'+H+'" fill="transparent"/>';
@@ -3834,7 +3837,29 @@ function earned(k){ return committed() - remaining(k); }
     /* the 3px of breathing room is part of what a label costs, so it comes off the space
        BEFORE the type is sized — without it the year sized to 9.5px, then failed its own
        fit test by 3px and thinned to seven months anyway. */
-    var fitPx = (stepPx - 3) / Math.max(1, maxChars * 0.62);
+    /* B2 (R70.234): "the label width is MEASURED, never assumed". The 0.62em-per-glyph estimate
+       below is what kept the numbers strided at 15 of 30 - it makes a two-digit label 11.7px wide
+       against an 11px column, when the rendered width at 7px is 8.7px and fits with room. One probe
+       node, reused, tells the truth about this font at this size; the estimate stays as the
+       fallback for a surface that will not measure. */
+    var probeEl=null;
+    function labWidth(txt, fontPx){
+      try{
+        if(!probeEl){
+          probeEl=document.createElementNS('http://www.w3.org/2000/svg','text');
+          probeEl.setAttribute('class','xl');
+          probeEl.setAttribute('x','-999'); probeEl.setAttribute('y','-999');
+          svg.appendChild(probeEl);
+        }
+        probeEl.setAttribute('font-size', fontPx);
+        probeEl.textContent = String(txt);
+        var w = probeEl.getComputedTextLength();
+        if(w > 0) return w;
+      }catch(e){}
+      return String(txt).length * fontPx * 0.62;
+    }
+    var widest = pts.reduce(function(a,p){
+      var t=String(p.x==null?'':p.x); return t.length>String(a).length ? t : a; }, '');
     var fontPx, stride;
     /* HT-18e (B): the floor was 7px and Cory's word for the result was "incredibly crunched and
        thin". 7px is not a size a number is read at - it is a size a number is counted at. The floor
@@ -3847,13 +3872,30 @@ function earned(k){ return committed() - remaining(k); }
     /* B1 narrows the chart panels at 1280 (243px), where twelve three-letter months want 7.3px.
        The floor for a small FIXED set drops to 7 so the set stays complete; it only ever binds on a
        small panel, because the type is sized by fit first — at 1920 the year renders at 8.5px. */
-    var FLOOR = (n <= 12) ? 7 : 9;
-    if(fitPx >= FLOOR){                   /* they all fit at a readable size: show them all */
-      fontPx = Math.min(9.5, Math.floor(fitPx * 10) / 10); stride = 1;
-    }else{
-      fontPx = FLOOR;
-      stride = Math.ceil((maxChars * FLOOR * 0.62 + 3) / Math.max(1, stepPx));
+    /* B2 (R70.234) asks for EVERY day numbered. B1 widened the month chart from 277 to 392, and a
+       two-digit number at 7px needs ~11.7px of column against the ~12.6px a 31-day month now gets -
+       so all 31 fit, and the stride below stays only as the safety net for a panel that genuinely
+       cannot hold them. 9 stays the floor for a chart with no second line to carry the rhythm. */
+    var FLOOR = (n <= 12) ? 7 : (opts.twoLine ? 7 : 9);
+    /* the largest size at which the WIDEST real label fits its own column, measured. The stride
+       is reached only when even the floor will not fit - a panel too small for the set. */
+    fontPx = FLOOR; stride = 1;
+    var sz, wAtFloor = labWidth(widest, FLOOR);
+    for(sz = 9.5; sz >= FLOOR; sz -= 0.5){
+      if(labWidth(widest, sz) + 2 <= stepPx){ fontPx = sz; break; }
     }
+    if(sz < FLOOR){
+      fontPx = FLOOR;
+      stride = Math.ceil((wAtFloor + 2) / Math.max(1, stepPx));
+    }
+    if(probeEl && probeEl.parentNode) probeEl.parentNode.removeChild(probeEl);
+    /* the axis states its own arithmetic. Invisible, three dozen bytes, and it is the difference
+       between "the numbers are thinned" and "a 30 is 13.0px rendered against a 11.0px column, so
+       thirty of them do not fit and fifteen do" - which is the claim a receipt has to be able to
+       make (B2 asked for the width to be MEASURED; this is where the measurement is kept). */
+    try{ svg.setAttribute('data-axis', 'n='+n+' step='+stepPx.toFixed(2)+
+      ' label="'+widest+'" w@'+FLOOR+'='+wAtFloor.toFixed(2)+
+      ' font='+fontPx+' stride='+stride); }catch(e){}
     /* the two rounding steps used to disagree by a fraction of a pixel and thin the YEAR to seven
        months when twelve fitted; deciding the stride from `fitPx` directly removes the argument. */
     /* HT-18e (C, Cory note 3): "I want to see Monday through Sunday abbreviation somehow. And
@@ -3887,17 +3929,38 @@ function earned(k){ return committed() - remaining(k); }
          (H-(twoLine?18:8))+'" text-anchor="middle" font-size="'+fontPx+'"'+at+'>'+
          '<tspan x="'+x+'">'+esc(p.x)+'</tspan></text>';
     });
-    /* the weekday line: EVERY day, its own smaller type, and Saturday marked because that is the
-       day the list becomes one box (note 4) */
-    if(twoLine) pts.forEach(function(p,i){
-      if(!p.x2) return;
-      var xx=px(i).toFixed(1);
-      var at2 = p.key!=null ? ' '+opts.attr+'="'+p.key+'"' : '';
-      var lab = dowChars===3 ? String(p.x2) : String(p.x2).charAt(0);
-      var sat = /^sat/i.test(String(p.x2));
-      s+='<text class="xl2'+(sat?' xl-sat':'')+'" x="'+xx+'" y="'+(H-6)+
-         '" text-anchor="middle" font-size="8"'+at2+'>'+esc(lab)+'</text>';
-    });
+    /* ---- HT-19 B2 - THE DAY AXIS (R70.234) ---------------------------------------------
+       Every day carries a weekday letter AND its number. The two lines do different jobs: the
+       letter is the rhythm of the week, the number is the date you click. Saturdays are tinted
+       because Saturday is the day the list becomes one box (B3), today is outlined, and the full
+       date rides on the hover the dots already have.
+       THE FORM IS CHOSEN BY MEASUREMENT, NOT BY A BREAKPOINT. `Mon` at >=1600 is what the wire
+       asks for, but a wide window does not guarantee a wide PANEL - B1 just changed every panel
+       width in the app. So the three-letter form is used when it actually fits the per-day column
+       and the one-letter form when it does not; getComputedTextLength on a rendered probe is the
+       measurement, and it is taken once per paint rather than per label. */
+    if(twoLine) (function(){
+      var col = n>1 ? (W-L-R-2*pad)/(n-1) : (W-L-R);
+      var three = false;
+      try{
+        var probe=document.createElementNS('http://www.w3.org/2000/svg','text');
+        probe.setAttribute('font-size','8'); probe.setAttribute('x','-999'); probe.setAttribute('y','-999');
+        probe.setAttribute('class','xl2');
+        probe.textContent='Mon';
+        svg.appendChild(probe);
+        three = probe.getComputedTextLength() + 2 <= col;
+        svg.removeChild(probe);
+      }catch(e){ three = col >= 22; }
+      pts.forEach(function(p,i){
+        if(!p.x2) return;
+        var xx=px(i).toFixed(1);
+        var at2 = p.key!=null ? ' '+opts.attr+'="'+p.key+'"' : '';
+        var lab = three ? String(p.x2) : String(p.x2).charAt(0);
+        var sat = /^sat/i.test(String(p.x2));
+        s+='<text class="xl2'+(sat?' xl-sat':'')+(i===todayIx?' xl2-today':'')+'" x="'+xx+
+           '" y="'+(H-6)+'" text-anchor="middle" font-size="8"'+at2+'>'+esc(lab)+'</text>';
+      });
+    })();
     svg.innerHTML=s;
     return pts.filter(function(p){ return p.c!=null||p.r!=null; }).length;
   }
@@ -3905,7 +3968,10 @@ function earned(k){ return committed() - remaining(k); }
   function monthPoints(){
     var ym=S.calYM||(S.calYM=[dnum(today()).getFullYear(),dnum(today()).getMonth()]);
     return monthKeys(ym[0],ym[1]).map(function(k,i){
-      return { x:String(i+1), x2:DOW3[dnum(k).getDay()], key:k, c:pctOn(k), r:ratingOf(k) };
+      var d=dnum(k);
+      return { x:String(i+1), x2:DOW3[d.getDay()], key:k, c:pctOn(k), r:ratingOf(k),
+               /* B2: the full date, for the hover the dots already carry */
+               full: DOW3[d.getDay()]+' '+MO[d.getMonth()]+' '+d.getDate() };
     });
   }
   function yearPoints(){
