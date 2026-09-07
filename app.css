@@ -971,6 +971,14 @@ html[data-simple] .vWeeksSec.h17-empty > .sh{ display:none }
   html[data-simple] #jIn > .blk:has(#iDump){ flex:0 1 auto; min-height:120px; max-height:46%;
     display:flex; flex-direction:column; overflow:hidden }
   html[data-simple] #jIn > .blk:has(#iDump) > .pan{ flex:1 1 auto; min-height:0; overflow-y:auto }
+  /* THE BRAIN DUMP vs ONE SCREEN, and how it was settled.
+     HT-10 gave `#iDump` min-height:230px at >=1024 ("the brain dump is the why now, so it is the big
+     one") — set when the page was free to be 3254px tall. On a 720px screen the left column is 608px,
+     and ten lines of dump plus the rating strip, completed, prayer and their labels is ~474px, which
+     leaves the TASK LIST two rows. The list is the daily driver, so a flat 240px floor is the wrong
+     trade at 720px and the right one at 1080px.
+     So it GROWS instead of being fixed: it takes whatever the journal block has spare above a floor,
+     which is ~3 lines at 720px and ~10 at 1080px. The rule is the viewport's, not a constant. */
   html[data-simple] #iDump{ min-height:64px }
   html[data-simple] #iTasks, html[data-simple] #iPrayer{ min-height:40px }
   /* the COMPLETION block: heading fixed, list scrolls, and it takes whatever is left */
@@ -1059,3 +1067,17 @@ html[data-simple] .li .bx, html[data-simple] .li .edp{ align-self:center }
 .h17dr .h17dt td.num{ font:400 11px/1 var(--mono); text-align:right }
 .h17dr .h17dt td.num.bad{ color:var(--red-bright) }
 .h17dr .h17dt td.t{ font:400 10.5px/1 var(--mono); color:var(--muted) }
+
+/* THE BRAIN DUMP IS BANDED BY VIEWPORT HEIGHT, and here is the arithmetic that decided it.
+   HT-10 gave `#iDump` min-height:230px at >=1024 ("the brain dump is the why now, so it is the big
+   one") — set when the page was free to be 3254px tall. Under one screen it trades directly against
+   visible task rows, and the trade is different at every height:
+     720px viewport -> left column 608px -> journal cap 280px -> ten lines (240px) plus the rating
+       strip, completed, prayer and labels is ~474px, so the TASK LIST gets two rows.
+     900px  -> column 788px -> cap 362px -> ten lines still does not fit, even at a 55% cap.
+     1080px -> column ~1000px -> ten lines fits with the list keeping eight rows.
+   So the floor follows the height it actually has. Flex-growing it was tried first and did nothing:
+   the journal's content already exceeds its cap, so there is no spare space to grow into. */
+@media(min-width:1024px) and (min-height:1000px){ html[data-simple] #iDump{ min-height:240px } }
+@media(min-width:1024px) and (min-height:820px) and (max-height:999px){
+  html[data-simple] #iDump{ min-height:150px } }
