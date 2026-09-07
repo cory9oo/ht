@@ -993,3 +993,20 @@ html[data-simple] .vWeeksSec.h17-empty > .sh{ display:none }
 
 /* S2 · rotated day labels (R70.140). Every day stays labelled; below 40px per day they turn. */
 .chart text.xlrot{ font-size:8px; letter-spacing:0 }
+
+/* S3 · LIFE, TRANSPOSED (R70.141). Years across, weeks down, and it fits its three-row cell. */
+@media(min-width:1024px){
+  /* A 100x52 grid of square cells has an aspect of 1.92; the panel's is ~4.1. Height is therefore
+     always the binding constraint and the grid can never fill the width without stretching the cells
+     out of square — so it is CENTRED rather than left-aligned against a ragged 60% of empty panel. */
+  html[data-simple] .wkscroll.h17fit{ overflow:hidden; display:flex; min-height:0;
+    justify-content:center }
+  html[data-simple] .wkscroll.h17fit svg.h17life{ height:100%; width:auto; max-width:100%;
+    display:block }
+  /* ONE LINE, AND NOT BY TRUNCATION. The strip carries facts — weeks lived, weeks left, mean, best
+     week, streak, this year — and an ellipsis silently drops some of them. Its own smaller type is
+     what fits it, not `text-overflow`. */
+  html[data-simple] #h16InsBody .h16ins{ white-space:nowrap; overflow:hidden; font-size:10px;
+    letter-spacing:-.01em }
+}
+.wkg .lw{ cursor:default }

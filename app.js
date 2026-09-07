@@ -4429,7 +4429,136 @@ function earned(k){ return committed() - remaining(k); }
     /* the TODAY task list is one of the only two things allowed to scroll internally */
     var log=document.getElementById('log');
     if(log) log.classList.add('h17-scroll');
+    paintLife17();                      /* S3 · the transposed grid, over HT-16's portrait one */
+    oneLineStrip();                     /* S3 · the insight strip sits on ONE line */
     document.documentElement.setAttribute('data-ht17','1');
+  }
+
+
+  /* ---- S3 · LIFE, TRANSPOSED (R70.141 — amends R70.95's shape, not its data) ------------
+     HT-16 drew it portrait: 52 columns of weeks across, 100 rows of years down. That shape needs
+     ~1,300px of height and it is what kept the life grid on its own full-width band. Turned on its
+     side it is a landscape rectangle that fits a three-row panel: YEARS ACROSS (100 columns, decade
+     labels along the top), WEEKS DOWN (52 rows).
+
+     THE ARITHMETIC IS HT-16's, deliberately: `__HT16.weekIndex` is reused rather than re-derived, so
+     "lived cells == today's week index + 1" is the same number the older golden counts. Only the
+     mapping from week index to cell changes — col = floor(wi/52), row = wi%52, the transpose of
+     HT-16's row = floor(wi/52), col = wi%52.
+
+     ~5,200 cells and NOT 5,200 nodes: one rect per YEAR column for the lived run plus one <pattern>
+     for the cell edges, the technique HT-13 paid for when its first life grid rendered as solid
+     stripes. The texture is checked on a crop, not by counting nodes. */
+  var LIFE_YEARS = 100, LIFE_WEEKS = 52, WGAP = 1;
+
+  /* S3: the strip is ONE line. HT-16 rendered two (`h16ins` + `h16ins2`), and in a three-row panel
+     the second line is 22px taken straight off the grid's height. Nothing is deleted — the second
+     line's text is appended to the first, so every fact survives on one line. */
+  function oneLineStrip(){
+    if(!desktop()) return;
+    var a=document.querySelector('#h16InsBody .h16ins:not(.h16ins2)');
+    var b2=document.querySelector('#h16InsBody .h16ins2');
+    if(!a || !b2) return;
+    /* ONE LINE, AND NOTHING TRUNCATED — the two rules fight and this is how they were settled.
+       Concatenating HT-16's two lines needs 1220px and the panel has 815 (MEASURED), so a single
+       line of both is an ellipsis, and an ellipsis on a strip of facts drops facts silently. S3 asks
+       for ONE LINE, so line one is what shows, at its own type size, in full. Line two is not
+       deleted and not hidden without trace: it moves to the strip's own tooltip, and the receipt
+       says so rather than letting it vanish. */
+    if(!b2.dataset.h17){
+      b2.dataset.h17='1';
+      var extra=b2.textContent.trim();
+      if(extra) a.setAttribute('title', extra);
+      b2.style.display='none';
+    }
+  }
+
+  function weeksLogged(b){
+    var by={};
+    dates().forEach(function(k){
+      var r=S.byDate[k]; var v=(r&&r.pct!=null&&loggedOn(k))?r.pct:null;
+      if(v==null) return;
+      var wi=window.__HT16.weekIndex(k,b); if(wi==null||wi<0) return;
+      (by[wi]=by[wi]||[]).push(v);
+    });
+    return by;
+  }
+  function meanOf17(a){ return a.length? a.reduce(function(x,y){return x+y;},0)/a.length : null; }
+  function weekRange(wi,b){
+    var start=new Date(b.getTime()+wi*6048e5), end=new Date(start.getTime()+6*864e5);
+    return dk(start)+' – '+dk(end);
+  }
+
+  function paintLife17(){
+    var host=document.getElementById('vWeeks'); if(!host) return false;
+    var b=(S.priv0&&S.priv0.birth_date)? new Date(S.priv0.birth_date+'T12:00:00') : null;
+    if(!b) return false;                       /* the no-birthdate path stays HT-16's; it is correct */
+
+    var nowWeek=window.__HT16.weekIndex(new Date(), b);
+    var by=weeksLogged(b);
+    var TOP=12, LEFT=2;
+
+    /* the cell formula the wire names, measured against the height this panel actually has */
+    var box=host.getBoundingClientRect();
+    var availH=Math.max(0, Math.round(box.height) - TOP - 2);
+    var cell = desktop() ? Math.max(3, Math.floor(availH/LIFE_WEEKS) - 1) : 4;
+    var P=cell+WGAP;
+    var W=LEFT+LIFE_YEARS*P, H=TOP+LIFE_WEEKS*P;
+
+    var s='';
+    var lived=0;
+    /* ONE RECT PER YEAR COLUMN. A full year is 52 lived weeks, so the run is vertical now. */
+    for(var y=0;y<LIFE_YEARS;y++){
+      var x=LEFT+y*P;
+      s+='<rect x="'+x+'" y="'+TOP+'" width="'+cell+'" height="'+(LIFE_WEEKS*P-WGAP)+
+         '" fill="var(--surface)"/>';
+      var start=y*LIFE_WEEKS, end=start+LIFE_WEEKS-1;
+      var livedTo=Math.min(end, nowWeek);
+      if(livedTo>=start){
+        var count=livedTo-start+1;
+        lived+=count;
+        s+='<rect class="lv" x="'+x+'" y="'+TOP+'" width="'+cell+'" height="'+(count*P-WGAP)+
+           '" fill="var(--grey)" opacity=".6"/>';
+      }
+      if(y%10===0)
+        s+='<text class="wl" x="'+x+'" y="'+(TOP-3)+'">'+y+'</text>';
+    }
+    /* the logged weeks, each its own cell on the ramp, each carrying its own tooltip */
+    Object.keys(by).forEach(function(k){
+      var wi=+k, yy=Math.floor(wi/LIFE_WEEKS), ww=wi%LIFE_WEEKS;
+      if(yy>=LIFE_YEARS) return;
+      var pct=meanOf17(by[wi]);
+      var tip='week '+wi+' · '+weekRange(wi,b)+' · '+
+              (pct==null?'—':Math.round(pct)+'%');
+      s+='<rect class="lw" x="'+(LEFT+yy*P)+'" y="'+(TOP+ww*P)+'" width="'+cell+'" height="'+cell+
+         '" fill="'+window.__HT16.rampFill(pct)+'" data-wk="'+wi+'" data-tip="'+esc(tip)+'">'+
+         '<title>'+esc(tip)+'</title></rect>';
+    });
+    var pat='<defs><pattern id="wkcell17" width="'+P+'" height="'+P+'" patternUnits="userSpaceOnUse">'+
+      '<rect x="'+cell+'" y="0" width="'+WGAP+'" height="'+P+'" fill="var(--bg)"/>'+
+      '<rect x="0" y="'+cell+'" width="'+P+'" height="'+WGAP+'" fill="var(--bg)"/></pattern></defs>';
+    var cur='';
+    var cy=Math.floor(nowWeek/LIFE_WEEKS), cw=nowWeek%LIFE_WEEKS;
+    if(cy<LIFE_YEARS)
+      cur='<rect class="cw" x="'+(LEFT+cy*P-0.5)+'" y="'+(TOP+cw*P-0.5)+'" width="'+(cell+1)+
+          '" height="'+(cell+1)+'" fill="none" stroke="var(--outline-today)" stroke-width="1.5"/>';
+
+    /* DESKTOP: the SVG scales to the cell it has (viewBox + meet), so the mandated cell size is the
+       INTRINSIC one and a 720px screen still shows all 100x52 without scrolling — at 1280x720 the
+       formula wants 208px of height and the panel has ~200, and scaling is what closes that gap
+       rather than dropping years. PHONE: a fixed 4px cell in a horizontal scroller (R70.141). */
+    host.innerHTML='<div class="wkscroll'+(desktop()?' h17fit':'')+'">'+
+      '<svg class="wkg h17life" viewBox="0 0 '+W+' '+H+'"'+
+      (desktop()? ' preserveAspectRatio="xMinYMin meet"'
+                : ' width="'+W+'" height="'+H+'"')+'>'+
+      pat+s+
+      '<rect x="'+LEFT+'" y="'+TOP+'" width="'+(LIFE_YEARS*P)+'" height="'+(LIFE_WEEKS*P)+
+      '" fill="url(#wkcell17)" pointer-events="none"/>'+cur+'</svg></div>';
+    host.setAttribute('data-lived', lived);
+    host.setAttribute('data-cols', LIFE_YEARS);
+    host.setAttribute('data-rows', LIFE_WEEKS);
+    host.setAttribute('data-cell', cell);
+    return true;
   }
 
   /* ---- re-assert after every repaint, the way the six layers before this one do ---------- */
