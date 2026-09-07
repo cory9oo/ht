@@ -1,59 +1,310 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
 <title>Habit Tracker</title>
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<!-- This page owns its colours. Dark Reader honours this lock and steps aside. -->
 <meta name="darkreader-lock">
 <meta name="color-scheme" content="light">
 <meta name="theme-color" content="#F4F3EF">
-<style>
-  :root{color-scheme:light}
-  html,body{margin:0;height:100%;background:#F4F3EF;color:#1A1917;
-    font:15px/1.5 Inter,system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
-  main{height:100%;display:grid;place-content:center;text-align:center;padding:24px;gap:10px}
-  .wm{font-weight:600;letter-spacing:.02em;font-size:17px}
-  .m{color:#6B6862;max-width:34ch}
-  a{color:#8C2F2A}
-</style>
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="HT">
+<meta name="mobile-web-app-capable" content="yes">
+<link rel="manifest" href="./manifest.webmanifest">
+<link rel="apple-touch-icon" href="./apple-touch-icon.png">
+<link rel="apple-touch-startup-image" href="./splash/splash-640x1136.png" media="(device-width:320px) and (device-height:568px) and (-webkit-device-pixel-ratio:2) and (orientation:portrait)">
+<link rel="apple-touch-startup-image" href="./splash/splash-750x1334.png" media="(device-width:375px) and (device-height:667px) and (-webkit-device-pixel-ratio:2) and (orientation:portrait)">
+<link rel="apple-touch-startup-image" href="./splash/splash-1242x2208.png" media="(device-width:414px) and (device-height:736px) and (-webkit-device-pixel-ratio:3) and (orientation:portrait)">
+<link rel="apple-touch-startup-image" href="./splash/splash-1125x2436.png" media="(device-width:375px) and (device-height:812px) and (-webkit-device-pixel-ratio:3) and (orientation:portrait)">
+<link rel="apple-touch-startup-image" href="./splash/splash-828x1792.png" media="(device-width:414px) and (device-height:896px) and (-webkit-device-pixel-ratio:2) and (orientation:portrait)">
+<link rel="apple-touch-startup-image" href="./splash/splash-1242x2688.png" media="(device-width:414px) and (device-height:896px) and (-webkit-device-pixel-ratio:3) and (orientation:portrait)">
+<link rel="apple-touch-startup-image" href="./splash/splash-1170x2532.png" media="(device-width:390px) and (device-height:844px) and (-webkit-device-pixel-ratio:3) and (orientation:portrait)">
+<link rel="apple-touch-startup-image" href="./splash/splash-1179x2556.png" media="(device-width:393px) and (device-height:852px) and (-webkit-device-pixel-ratio:3) and (orientation:portrait)">
+<link rel="apple-touch-startup-image" href="./splash/splash-1284x2778.png" media="(device-width:428px) and (device-height:926px) and (-webkit-device-pixel-ratio:3) and (orientation:portrait)">
+<link rel="apple-touch-startup-image" href="./splash/splash-1290x2796.png" media="(device-width:430px) and (device-height:932px) and (-webkit-device-pixel-ratio:3) and (orientation:portrait)">
+<link rel="apple-touch-startup-image" href="./splash/splash-1206x2622.png" media="(device-width:402px) and (device-height:874px) and (-webkit-device-pixel-ratio:3) and (orientation:portrait)">
+<link rel="apple-touch-startup-image" href="./splash/splash-1320x2868.png" media="(device-width:440px) and (device-height:956px) and (-webkit-device-pixel-ratio:3) and (orientation:portrait)">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Inter:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="./theme.css">
+<link rel="stylesheet" href="./app.css">
 </head>
 <body>
-<main>
-  <div class="wm">Habit&nbsp;Tracker</div>
-  <div class="m" id="m">This address has moved. Taking you to the app&hellip;</div>
-  <div class="m"><a id="go" href="./v3/">Open the app</a></div>
-</main>
-<script>
-/* TOMBSTONE — retires the legacy Apps-Script-era app (ISS-033 TWO_WRITERS_ONE_TRUTH).
-   Three jobs, in this order, and the order matters:
-     1. unregister ONLY the legacy service worker (scope .../standard/). The v7 worker at
-        .../standard/v3/ must survive — killing it would take the live app offline-blind.
-     2. delete ONLY the legacy cache ('standard-v4'). Caches are per-ORIGIN, not per-path:
-        both workers' activate handlers delete every cache but their own, which is how these
-        two apps have been evicting each other's offline shell. Do not touch 'standard-v7'
-        or its successor.
-     3. redirect to the live app.
-   The legacy worker was NETWORK-FIRST, which is the only reason an installed phone can
-   receive this page at all. A cache-first worker could not have been retired remotely. */
-(async function(){
-  var LEGACY_SCOPE = new URL('./', location.href).href;   // .../standard/
-  var KEEP = /^ht-v|^standard-v7$/;                        // current + successor cache names
-  try {
-    if (navigator.serviceWorker) {
-      var regs = await navigator.serviceWorker.getRegistrations();
-      for (var i=0;i<regs.length;i++){
-        if (regs[i].scope === LEGACY_SCOPE) { await regs[i].unregister(); }
-      }
-    }
-  } catch(e){}
-  try {
-    var keys = await caches.keys();
-    for (var j=0;j<keys.length;j++){
-      if (!KEEP.test(keys[j])) { await caches.delete(keys[j]); }
-    }
-  } catch(e){}
-  location.replace('./v3/');
-})();
-</script>
+
+<div class="app">
+
+  <!-- ======================= MASTHEAD ======================= -->
+  <header class="mast">
+    <div class="r1">
+      <span class="wm">HT<b>.</b></span>
+      <span class="sub" id="mDate"></span>
+      <span class="sp"></span>
+      <span class="swatches" id="skins"></span>
+      <button class="tbtn" id="bView">Full sheet</button>
+      <button class="tbtn" id="bGuide" title="What everything means">?</button>
+      <button class="tbtn" id="bSet">Settings</button>
+    </div>
+    <div class="tape" id="tape"></div>
+  </header>
+
+  <!-- ======================= JUMP (mobile) ======================= -->
+  <div class="jump" id="jump">
+    <button data-j="jIn" class="on">Input</button>
+    <button data-j="jDay">Day</button>
+    <button data-j="jRec">Record</button>
+    <button data-j="jRate">Rating</button>
+    <button data-j="jStand">Standards</button>
+    <button data-j="jCircle">Circle</button>
+  </div>
+
+  <!-- ======================= SHEET ======================= -->
+  <div class="grid">
+
+    <!-- ================= LEFT — THE THREE INPUTS ================= -->
+    <div class="colL">
+      <section id="jIn">
+
+        <div class="band">Input · the three things you put in</div>
+
+        <!-- ---- 1. COMPLETION ---- -->
+        <div class="blk">
+          <div class="sh"><h2><i class="n">1</i>Completion</h2><span class="ln"></span><span class="c" id="logC"></span></div>
+          <div class="rail" id="rail"></div>
+          <div class="tools">
+            <div class="seg" id="sortSeg">
+              <button data-s="order" class="on">Order</button>
+              <button data-s="undone">Undone</button>
+              <button data-s="weak">Weakest</button>
+              <button data-s="heavy">Heaviest</button>
+              <button data-s="az">A–Z</button>
+            </div>
+            <div class="seg" id="grpSeg">
+              <button data-g="all" class="on">All</button>
+              <button data-g="daily">Daily</button>
+              <button data-g="weekly">Weekly</button>
+            </div>
+            <input class="find" id="find" placeholder="filter…" autocomplete="off">
+            <button class="tbtn" id="bAllOff" title="Clear every mark on this day">Clear</button>
+          </div>
+          <div class="log" id="log"></div>
+          <div class="tools" style="padding-top:12px">
+            <button class="btn pri" id="bClose" style="flex:1">Close the day</button>
+          </div>
+        </div>
+
+        <!-- ---- 60-SECOND START (empty account only) ---- -->
+        <div class="blk" id="starterBlk"><div id="starter"></div></div>
+
+        <!-- ---- CAPACITY + NEXT MOVE (small view lives here) ---- -->
+        <div class="blk" id="deck">
+          <div class="sh"><h2>Capacity</h2><span class="ln"></span><span class="c">can I take this on</span></div>
+          <div class="pan">
+            <div id="cap"></div>
+            <div id="capNext"></div>
+          </div>
+        </div>
+
+        <!-- ---- WEEKLY REVIEW — the Monday-seven feed ---- -->
+        <div class="blk" id="weeklyBlk">
+          <div class="sh"><h2>The week</h2><span class="ln"></span><span class="c">read it once, on the same day</span></div>
+          <div class="pan"><div id="weekly"></div></div>
+        </div>
+
+        <!-- ---- LEAD MEASURES (dark until GOAL MATH locks) ---- -->
+        <div class="blk" id="kpi" style="display:none"></div>
+
+        <!-- ---- R-B · the call on tomorrow (rides the close action) ---- -->
+        <div class="blk" id="predictBlk"><div id="predict"></div></div>
+
+        <!-- ---- 2. RATING ---- -->
+        <div class="blk">
+          <div class="sh"><h2><i class="n">2</i>Rate the day</h2><span class="ln"></span><span class="c" id="rateC">1 low · 10 high</span></div>
+          <div class="pan">
+            <div class="rate" id="rate"></div>
+            <label class="fld" style="border:0;padding:10px 0 0">
+              <span class="lab">Why was it that number?</span>
+              <textarea id="iWhy" rows="2" placeholder="Because…"></textarea>
+            </label>
+          </div>
+        </div>
+
+        <!-- ---- 3. JOURNAL ---- -->
+        <div class="blk">
+          <div class="sh"><h2><i class="n">3</i>Journal</h2><span class="ln"></span><span class="c" id="jrnC">saves as you type</span></div>
+          <div id="mcii" style="display:none"></div>
+          <div class="pan">
+            <label class="fld"><span class="lab">Tasks completed today</span>
+              <textarea id="iTasks" rows="3" placeholder="- Closed X&#10;- Called Y"></textarea></label>
+            <label class="fld" style="border:0"><span class="lab">Prayer journal</span>
+              <textarea id="iPrayer" rows="3" placeholder="Father…"></textarea></label>
+          </div>
+        </div>
+
+      </section>
+    </div>
+
+    <!-- ================= RIGHT — THE OUTPUTS ================= -->
+    <div class="colR">
+
+      <!-- ---------------- THE DAY ---------------- -->
+      <section id="jDay">
+        <div class="band">Output · this day</div>
+
+        <div class="blk">
+          <div class="sh"><h2>Where the day goes</h2><span class="ln"></span><span class="c">24h · committed vs done</span></div>
+          <div class="pan"><svg class="sank" id="sank"></svg></div>
+        </div>
+
+        <div class="blk">
+          <div class="sh"><h2>Time ledger</h2><span class="ln"></span><span class="c">last 30</span></div>
+          <div class="pan" id="tledger"></div>
+        </div>
+      </section>
+
+      <!-- ---------------- THE RECORD ---------------- -->
+      <section id="jRec">
+        <div class="band">Output · the record</div>
+
+        <div class="blk">
+          <div class="sh"><h2>Every day logged</h2><span class="ln"></span><span class="c" id="heatC"></span></div>
+          <div class="pan">
+            <div class="mrow" id="mrow"></div>
+            <div class="heat" id="heat"></div>
+            <div class="legend" id="heatLeg"></div>
+          </div>
+        </div>
+
+        <div class="blk">
+          <div class="sh"><h2>Month</h2><span class="ln"></span><span class="c" id="calNav"></span></div>
+          <div class="pan">
+            <div class="seg mini" id="calMode">
+              <button data-m="pct" class="on">Completion</button>
+              <button data-m="rate">Rating</button>
+            </div>
+            <div class="cal" id="cal"></div>
+          </div>
+        </div>
+
+        <div class="blk">
+          <div class="sh"><h2>Trend</h2><span class="ln"></span><span class="c" id="trendC">90 days</span></div>
+          <div class="pan"><svg class="chart" id="chart"></svg></div>
+        </div>
+
+        <div class="blk">
+          <div class="sh"><h2>Momentum</h2><span class="ln"></span><span class="c">7d vs prior 7d</span></div>
+          <div class="pan" id="momo"></div>
+        </div>
+
+        <div class="blk">
+          <div class="sh"><h2>By day of week</h2><span class="ln"></span><span class="c">where you leak</span></div>
+          <div class="pan"><div class="cols" id="dow"></div></div>
+        </div>
+
+        <div class="blk">
+          <div class="sh"><h2>By month</h2><span class="ln"></span><span class="c" id="byMoC">completion, Jan–Dec</span></div>
+          <div class="pan"><div class="cols" id="byMo"></div></div>
+        </div>
+
+        <div class="blk">
+          <div class="sh"><h2>By year</h2><span class="ln"></span><span class="c">all time</span></div>
+          <div class="pan" id="byYear"></div>
+        </div>
+
+        <div class="blk">
+          <div class="sh"><h2>Grade distribution</h2><span class="ln"></span><span class="c" id="gdC"></span></div>
+          <div class="pan"><div class="cols" id="gdist"></div></div>
+        </div>
+      </section>
+
+      <!-- ---------------- RATING ---------------- -->
+      <section id="jYear">
+        <div class="blk">
+          <div class="sh"><h2>The year</h2><span class="ln"></span>
+            <span class="c"><button class="tbtn" id="yPrev">‹</button> <b id="yearLab"></b>
+            <button class="tbtn" id="yNext">›</button> · <span id="yearC"></span></span></div>
+          <div class="pan"><div class="ygrid" id="yearGrid"></div></div>
+        </div>
+      </section>
+
+      <section id="jRate">
+        <div class="band">Output · how it felt</div>
+
+        <div class="blk">
+          <div class="sh"><h2>Daily rating</h2><span class="ln"></span><span class="c" id="rTrendC">90 days</span></div>
+          <div class="pan"><svg class="chart" id="rChart"></svg></div>
+        </div>
+
+        <div class="blk">
+          <div class="sh"><h2>Rating against completion</h2><span class="ln"></span><span class="c">the honest question</span></div>
+          <div class="pan"><svg class="chart scatter" id="rScat"></svg><div class="note" id="rScatN" style="padding-top:8px"></div></div>
+        </div>
+
+        <div class="blk">
+          <div class="sh"><h2>Rating by month</h2><span class="ln"></span><span class="c">average, Jan–Dec</span></div>
+          <div class="pan"><div class="cols" id="rByMo"></div></div>
+        </div>
+
+        <div class="blk">
+          <div class="sh"><h2>Journal</h2><span class="ln"></span><span class="c" id="jArcC">most recent</span></div>
+          <div class="pan" id="jArc"></div>
+        </div>
+      </section>
+
+      <!-- ---------------- STANDARDS ---------------- -->
+      <section id="jStand">
+        <div class="band">Output · the standards themselves</div>
+
+        <div class="blk">
+          <div class="sh"><h2>Every standard</h2><span class="ln"></span><span class="c" id="phC">weakest first</span></div>
+          <div class="pan" id="perHabit"></div>
+        </div>
+
+        <div class="blk">
+          <div class="sh"><h2>Cost against adherence</h2><span class="ln"></span><span class="c">does price explain the misses?</span></div>
+          <div class="pan"><svg class="chart scatter" id="scat"></svg><div class="note" id="scatN" style="padding-top:8px"></div></div>
+        </div>
+
+        <div class="blk">
+          <div class="sh"><h2>Streaks</h2><span class="ln"></span><span class="c">current · longest</span></div>
+          <div class="pan" id="streaks"></div>
+        </div>
+
+        <div class="blk">
+          <div class="sh"><h2>By group</h2><span class="ln"></span><span class="c">last 30</span></div>
+          <div class="pan" id="groups"></div>
+        </div>
+
+        <div class="blk">
+          <div class="sh"><h2>Next move</h2><span class="ln"></span><span class="c">highest leverage</span></div>
+          <div class="pan" id="nextMove"></div>
+        </div>
+      </section>
+
+      <!-- ---------------- CIRCLE / LIFE ---------------- -->
+      <section id="jCircle">
+        <div class="band">Output · other people, and the clock</div>
+
+        <div class="blk">
+          <div class="sh"><h2>Circle</h2><span class="ln"></span><button class="c" id="bCircle">manage</button></div>
+          <div class="pan" id="circle"><div class="empty">Loading…</div></div>
+        </div>
+
+        <div class="blk">
+          <div class="sh"><h2>Life</h2><span class="ln"></span><span class="c" id="lifeC"></span></div>
+          <div class="pan"><div class="life" id="life"></div></div>
+        </div>
+      </section>
+
+    </div>
+  </div>
+</div>
+
+<div class="ov" id="ov"><div class="inner" id="ovBody"></div></div>
+<div class="toast" id="toast">saved</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script src="./app.js"></script>
 </body>
 </html>

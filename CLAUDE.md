@@ -1,4 +1,4 @@
-# CLAUDE.md — `standard` (HT · Habit Tracker, the self-ledger)
+# CLAUDE.md — `ht` (HT · Habit Tracker, the self-ledger)
 
 **Read `..\life-taxonomy\DOCTRINE_INDEX.md` before the first substantive tool call (D13.1).**
 This file is repo-operational law per D10 and carries the mount countermeasure per ISS-036/ISS-037.
@@ -34,12 +34,12 @@ on every activate — **do not reintroduce a second app here.**
 
 | Path | What |
 |---|---|
-| `/` (root) | tombstone: unregisters the legacy worker, drops the legacy cache, redirects to `./v3/`. Plus the three shared icons — **`v3/` links them as `../icon-192.png`, `../icon-512.png`, `../apple-touch-icon.png`. Removing them breaks the PWA install, and nothing on screen shows it.** |
-| `/v3/` | **the app.** Brand A (`Habit Tracker` · `HT`), capacity score, small default view, cue field, KPI band **dark** until GOAL MATH locks. SW cache `ht-v9`. |
+| `/` (root) | **the app** — promoted from `v3/` by HT-8. Plus the three shared icons — **the root page links them as `./icon-192.png`, `./icon-512.png`, `./apple-touch-icon.png`. Removing them breaks the PWA install, and nothing on screen shows it.** |
+| `/v3/` | a redirect stub only. Brand A (`Habit Tracker` · `HT`), capacity score, small default view, cue field, KPI band **dark** until GOAL MATH locks. SW cache `ht-v12`. |
 
 The legacy source is archived at `..\_archive\2026-08-31_standard_legacy_app\` (DEC-037 — archived,
 never deleted). **HT-MIGRATE-1** renames this repo to `ht` and moves the app to the root; until
-then `/standard/v3/` is the live URL.
+then `https://cory9oo.github.io/ht/` is the live URL — the app is served from the repo ROOT (HT-8, R70.15). `v3/` holds only a redirect stub for phones installed before the move.
 
 `STANDARD_LIVE_STATE.md` (Birds Eye View Project) is the state doc — DEC-064: state docs are NOT
 mirrored into this repo. Cite it by name; never copy it here.
