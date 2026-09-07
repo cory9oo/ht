@@ -1239,7 +1239,12 @@ html[data-simple] .li .bx, html[data-simple] .li .edp{ align-self:center }
 @media (min-width:1024px){
   html[data-simple] #h18Charts > .h16p{ flex-direction:column; overflow:hidden }
   html[data-simple] #h18Charts .pan.flat{ flex:1 1 auto; min-height:0 }
-  html[data-simple] #h18Charts svg.chart{ width:100%; height:100%; display:block }
+  /* MEASURED after the panel frame landed: a 278px svg inside a 271px `overflow:hidden` pan, so
+     the bottom 7px — which is exactly where the day numbers and the month names live — was cut.
+     `height:100%` on a viewBox'd svg does not promise to FIT; `height:auto` + `max-height:100%`
+     does, because the aspect ratio then drives the height and the clamp catches the remainder. */
+  html[data-simple] #h18Charts svg.chart{ width:100%; height:auto; max-height:100%;
+    display:block }
 }
 
 
@@ -1413,6 +1418,13 @@ html[data-simple] .li .bx, html[data-simple] .li .edp{ align-self:center }
   html[data-simple] #h18Btm{ gap:var(--h18gut) }
   html[data-simple] #h18Btm textarea{ height:46px; min-height:46px }
   html[data-simple] #h18Btm textarea:focus{ height:clamp(90px, 26vh, 220px) }
+  /* two unfocused lines is right on a window with the room for them and wrong on one without:
+     MEASURED at 1280x720, a 46px field plus its label overflowed the journal's own box by 7px and
+     put a scroller back inside the region that exists to have none. Below 820px of viewport the
+     field is one line again — the height Cory's cut-off note was about is his 855, which keeps two. */
+  @media (max-height:820px){
+    html[data-simple] #h18Btm textarea{ height:34px; min-height:34px }
+  }
   html[data-simple] #jIn > .blk:has(#iDump) > .pan{ gap:6px }
   html[data-simple] #iDump{ min-height:52px }
   /* THE RATING STRIP GOES ON ONE LINE WITH ITS OWN LABEL. It was a 10px label stacked over a 33px
@@ -1437,6 +1449,117 @@ html[data-simple] .li .bx, html[data-simple] .li .edp{ align-self:center }
 }
 /* at >=1600 the frame opens up rather than the gutters: more grid, not more margin */
 @media (min-width:1600px){ html[data-simple]{ --h18gut:24px; --h18frame:1760px } }
+
+
+/* ======================= HT-18c · CORY'S 13 NOTES (2026-09-07 15:05 CDT) =====================
+   Second review. Notes 1-11 below; 12 was "ask me questions" (two were asked and answered: the
+   circle is seeded with dummies, and the day closes on the last check-off) and 13 was "execute". */
+@media (min-width:1024px){
+
+  /* (1) THE TASK LINES WERE ON TOP OF EACH OTHER, and it is one property.
+     REPRODUCED with his own habit names — a fixture of short labels cannot fail this way, which is
+     why it shipped: 19 overlapping pairs at 1920x855, e.g. "Affirmations telling God who He is…"
+     drawn 97px tall inside a 38.7px track, straight over "Read the Bible" beneath it.
+     THE CAUSE: an auto row track's max sizing function is max-content, and a grid item's
+     max-content height is measured against its UNWRAPPED inline size — one line, 34px. The item
+     then wraps to the column's real width and overflows the track it was given. `min-content`
+     measures against the column width the item actually gets, which is the wrapped height.
+     MEASURED, not reasoned: auto -> 19 overlaps, min-content -> 0. */
+  html[data-simple] #h18Comp #log{ grid-auto-rows:min-content;
+    /* and STRETCH, now that the track is sized correctly. `start` left every short row sitting at
+       the top of a track as tall as its four-line neighbour, so the list read as ragged holes —
+       "no fluff space", in his words, arriving as whitespace. Stretch fills the track and the row
+       centres its own contents. It was `start` before only because the track was mis-sized; with
+       min-content tracks it re-measures at 0 overlaps and the same 801px of content. */
+    align-items:stretch }
+
+  /* COMPLETION TAKES THE WIDER SHARE, and this is the arithmetic behind it rather than a taste.
+     Once the rows size to their WRAPPED height (above), his real names are what they are: twelve
+     of the twenty-six wrap, the longest to 97px, and the list needs 881px against a 627px column.
+     Widening COMPLETION from 1fr to 1.35fr drops the wrapping rows to eleven and the content to
+     832px, and the middle column still clears the brain dump and both charts. The rest is a real
+     ~200px scroll in the list, which is the honest cost of names up to 155 characters and NO
+     truncation (R70.142 forbids the ellipsis that would hide it). */
+  html[data-simple] .grid{
+    grid-template-columns:minmax(0,1.35fr) minmax(0,1fr) var(--h19life) }
+  html[data-simple] #h18Comp .li{ padding:1px 6px }
+  html[data-simple] #h18Comp .li .nm{ line-height:1.18 }
+
+  /* (2) "remove all insights on top row besides today %" */
+  html[data-simple] .mast #tape .tp:nth-child(n+2){ display:none }
+  html[data-simple] .mast #tape{ gap:0; border-top:0; padding-top:2px; margin-top:4px }
+  html[data-simple] .mast #tape .tp .v{ font-size:14px }
+
+  /* (3) "Remove all soft language on the sheet, all sub grey language, this is all noise."
+     The `<s>` sub-figures ("of 10", "of 3h 15m", "7d avg", "d logged"), the section captions
+     ("saves as you type", "1 low · 10 high", "last 30 · worst first", "N LOGGED") and the life
+     panel's caption. Hidden, never removed (R70.16) — Advanced still carries every one. */
+  html[data-simple] .mast #tape .tp .v s{ display:none }
+  html[data-simple] .grid .sh .c,
+  html[data-simple] #h16InsC,
+  html[data-simple] #h18Adh .w{ display:none }
+
+  /* (4) the x axis is upright now and never rotated — the rest of that note is in app.js */
+  html[data-simple] .chart text.xl{ font-size:9.5px; letter-spacing:0 }
+  html[data-simple] .chart text.xl-today tspan{ fill:var(--text); font-weight:600 }
+  html[data-simple] .chart .hitcol{ cursor:pointer }
+  html[data-simple] .chart text.xl[data-vgd]{ cursor:pointer }
+  html[data-simple] .chart text.xl[data-vgd]:hover tspan{ fill:var(--text) }
+
+  /* (5) the life grid's new WEEK axis across the top */
+  html[data-simple] .wkg .wlx{ font:400 8px/1 var(--mono); fill:var(--muted) }
+
+  /* (6) "remove the insights from the life graph, the clumped paragraph of words" */
+  html[data-simple] #h16Ins #h16InsBody{ display:none }
+
+  /* (7) the circle, as test dummies — the surface says TEST DATA so it can never read as a number */
+  html[data-simple] #h18Draw .h18circ{ margin-bottom:14px }
+  html[data-simple] #h18Draw .h18circh{ display:flex; align-items:center; gap:10px;
+    font:500 9px/1 var(--mono); letter-spacing:.14em; text-transform:uppercase;
+    color:var(--muted); padding:2px 0 6px }
+  html[data-simple] #h18Draw .h18test{ font-size:8px; letter-spacing:.1em; color:var(--bg);
+    background:var(--grey); padding:2px 5px }
+  html[data-simple] #h18Draw .h18me td{ color:var(--text) }
+
+  /* (10) CLOSE THE DAY is gone from the surface — the day closes on your last check-off now */
+  html[data-simple] #h18Comp #tClose{ display:none }
+
+  /* (11) "Make the grouping around each section more clearly organized and more aesthetically
+     pleasing, the location of the features is good." Each region becomes a real panel: a hairline
+     frame, a slightly sunk ground, and its title on the frame's own line rather than floating on
+     the page. The four regions read as four objects instead of four clusters of text. */
+  html[data-simple] .grid > .colL,
+  html[data-simple] .grid > #h18Comp,
+  html[data-simple] .grid > #h16Ins,
+  html[data-simple] #h18Charts > .h16p{
+    border:1px solid var(--border); background:var(--surface); padding:0 12px 10px }
+  html[data-simple] .grid > .colL > *:first-child,
+  html[data-simple] #h18Comp > .blk > .sh,
+  html[data-simple] .grid > #h16Ins > .sh,
+  html[data-simple] #h18Charts > .h16p > .sh{
+    margin:0 -12px 8px; padding:7px 12px 6px; border-bottom:1px solid var(--border);
+    background:var(--surface-2) }
+  html[data-simple] .grid .sh h2{ font:500 9.5px/1 var(--mono); letter-spacing:.16em;
+    text-transform:uppercase; color:var(--muted) }
+  html[data-simple] .grid .sh .ln{ display:none }
+  html[data-simple] #h18Charts{ column-gap:var(--h18gut) }
+  /* the journal's own heading is inside #jIn, so the panel's top line is drawn on the section */
+  html[data-simple] .grid > .colL{ padding-top:0 }
+  html[data-simple] .grid > .colL #jIn > .blk:has(#iDump) > .sh{
+    margin:0 -12px 8px; padding:7px 12px 6px; border-bottom:1px solid var(--border);
+    background:var(--surface-2) }
+  html[data-simple] #h18Adh{ margin:0 -12px; padding:6px 12px 7px;
+    border-bottom:1px solid var(--border); background:var(--surface-2); width:auto }
+  html[data-simple] #h18Draw{ inset:0 }
+}
+
+/* (8) "Allow minimal scrolling on the page, very small, just so it does not feel stuck."
+   The page has been pinned to exactly 100vh since HT-17 and it reads as a locked screen. A 56px
+   tail gives it somewhere to go without giving anything back to the 3,254px it came from — and
+   `golden_ht18` asserts the scroll is BOUNDED rather than absent, which is the honest test now. */
+@media (min-width:1024px){
+  html[data-simple] body{ overflow-y:auto; padding-bottom:56px }
+}
 
 /* S1d · PHONE (<1024) IS A SINGLE COLUMN IN HIS ORDER: JOURNAL · COMPLETION · MONTH · YEAR ·
    ADHERENCE+LIFE. That is the order HT-16 already ships, and the LAYER keeps it by construction —

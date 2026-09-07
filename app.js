@@ -3748,6 +3748,12 @@ function earned(k){ return committed() - remaining(k); }
                        '" cy="'+py(p.r*10).toFixed(1)+'" r="2.4"/>';
       s+='<circle class="hit" '+at+' data-tip="'+esc(tip)+'" cx="'+px(i).toFixed(1)+
          '" cy="'+(H/2)+'" r="12"/>';
+      /* HT-18c (his note 9): a 3px dot behind a 12px circle at mid-height is a target you have to
+         aim at. The whole day COLUMN is the target now, top to bottom, and it carries the same
+         data-vgd, so the completion bullet, the rating bullet and the date all go to that day. */
+      var hw=Math.max(6, (n>1?(W-L-R-2*pad)/(n-1):24));
+      s+='<rect class="hitcol" '+at+' data-tip="'+esc(tip)+'" x="'+(px(i)-hw/2).toFixed(1)+
+         '" y="0" width="'+hw.toFixed(1)+'" height="'+H+'" fill="transparent"/>';
     });
     /* EVERY label, always — NEVER THINNED (R70.140). Two tspans in ONE <text>, so a per-day count
        counts days.
@@ -3756,19 +3762,30 @@ function earned(k){ return committed() - remaining(k); }
        Thinning is the tempting fix and it is the wrong one — the wire says every day stays labelled,
        so the labels turn instead. */
     var stepPx = n>1 ? (W-L-R-2*pad)/(n-1) : (W-L-R);
-    var rotate = !!opts.twoLine && stepPx < 40;
+    /* HT-18c (Cory 2026-09-07 15:05): "Fix the x axis values to be better, i do not like them
+       slanted like that. make them upright, fit them how you must."
+       NOTHING IS ROTATED ANY MORE. R70.140 said every day stays labelled and turned them 90 degrees
+       rather than thin them; the owner has now looked at that and rejected it, so the trade flips:
+       UPRIGHT always, and when upright labels cannot all fit they are THINNED on a stride — with
+       the first, the last and TODAY always kept, so the axis is never missing the day you are on.
+       The weekday line is the first thing dropped, because "12" locates a day and "Fri" does not.
+       AND THE LABELS ARE A CONTROL (his note 9): each carries the same `data-vgd` the dots do, so
+       clicking a date goes to that day. */
+    var LBL_MIN = 15;                                   /* px a two-digit upright label needs */
+    var stride  = stepPx >= LBL_MIN ? 1 : Math.ceil(LBL_MIN / Math.max(1, stepPx));
+    var twoLine = !!opts.twoLine && stepPx >= 26;        /* the weekday only when there is room */
+    var todayIx = -1;
+    pts.forEach(function(p,i){ if(p.key===today()) todayIx=i; });
     pts.forEach(function(p,i){
+      var keep = (stride===1) || (i%stride===0) || i===0 || i===n-1 || i===todayIx;
+      if(!keep) return;
       var x=px(i).toFixed(1);
-      if(rotate){
-        var y=H-B+10;                       /* the anchor sits just under the 0 gridline */
-        s+='<text class="xl xlrot" transform="rotate(-90 '+x+' '+y.toFixed(1)+')" x="'+x+
-           '" y="'+y.toFixed(1)+'" text-anchor="end">'+esc(p.x)+(p.x2?' '+esc(p.x2):'')+'</text>';
-      } else {
-        s+='<text class="xl" x="'+x+'" y="'+(H-(opts.twoLine?18:8))+'" text-anchor="middle">'+
-           '<tspan x="'+x+'">'+esc(p.x)+'</tspan>'+
-           (opts.twoLine?'<tspan class="xl2" x="'+x+'" dy="10">'+esc(p.x2||'')+'</tspan>':'')+
-           '</text>';
-      }
+      var at = p.key!=null ? ' '+opts.attr+'="'+p.key+'"' : '';
+      s+='<text class="xl'+(i===todayIx?' xl-today':'')+'" x="'+x+'" y="'+
+         (H-(twoLine?18:8))+'" text-anchor="middle"'+at+'>'+
+         '<tspan x="'+x+'">'+esc(p.x)+'</tspan>'+
+         (twoLine?'<tspan class="xl2" x="'+x+'" dy="10">'+esc(p.x2||'')+'</tspan>':'')+
+         '</text>';
     });
     svg.innerHTML=s;
     return pts.filter(function(p){ return p.c!=null||p.r!=null; }).length;
@@ -4894,10 +4911,38 @@ function earned(k){ return committed() - remaining(k); }
       x=(x==null?101:x); y=(y==null?101:y);
       return x-y || (label(a.name)<label(b.name)?-1:1);
     });
-    host.innerHTML='<table class="h17dt h18dt"><thead><tr><th>standard</th><th>30d</th>'+
+    host.innerHTML=circleDummy()+
+      '<table class="h17dt h18dt"><thead><tr><th>standard</th><th>30d</th>'+
       '<th>streak</th><th>missed</th><th>last done</th><th>usual</th></tr></thead><tbody>'+
       window.__HT17.habitRows(hs)+'</tbody></table>';
     return hs.length;
+  }
+
+  /* ---- HT-18c - THE CIRCLE AS TEST DUMMIES (Cory 2026-09-07, note 7) --------------------
+     CIRCLE-1 (Andrew, Dale, Justin) is chartered and NOT built (HTR-17, NOT_STARTED). He asked to
+     see the shared view before anyone real is in it, so these three are INVENTED, drawn from a
+     constant, and labelled TEST DATA on the surface so they can never be mistaken for a reading.
+
+     R47.3 HOLDS BY CONSTRUCTION, NOT BY CARE: the only column here is adherence. There is no
+     schema path from this table to a journal, a rating or a standards list, because there is no
+     schema at all - nothing is fetched, nothing is written, no invite is sent, and the strings
+     below never leave the page. `privacy_check.py` sees no new cross-user read because there is
+     none. When HTR-17 builds the real circle this function is what it replaces. */
+  var H18_DUMMIES=[{n:'Andrew',p:71,s:12},{n:'Dale',p:54,s:3},{n:'Justin',p:88,s:41}];
+  function circleDummy(){
+    var rf=window.__HT16.rampFill, rc=window.__HT16.rampClass;
+    var mine=adhAll(0,29);
+    var rows=H18_DUMMIES.map(function(d){
+      return '<tr><td class="n">'+esc(d.n)+'</td>'+
+        '<td class="p"><i style="background:'+rf(d.p)+'"></i>'+d.p+'%</td>'+
+        '<td class="num">'+d.s+'</td></tr>'; }).join('');
+    return '<div class="h18circ"><div class="h18circh">CIRCLE'+
+      '<span class="h18test">TEST DATA</span></div>'+
+      '<table class="h17dt h18dt"><thead><tr><th>who</th><th>30d</th><th>streak</th></tr></thead>'+
+      '<tbody><tr class="h18me"><td class="n">You</td>'+
+      '<td class="p"><i style="background:'+rf(mine.pct)+'"></i>'+
+      (mine.pct==null?'\u2014':mine.pct+'%')+'</td><td class="num">\u2014</td></tr>'+
+      rows+'</tbody></table></div>';
   }
   function setDrawer(open){
     var d=drawerEl(); if(!d) return;
@@ -4967,7 +5012,9 @@ function earned(k){ return committed() - remaining(k); }
      objective that serves the wire's actual intent - the biggest grid on the screen - is the
      EFFECTIVE cell after fitting, so that is what is maximised, ties still breaking toward more
      folds. Every candidate is printed as data-plan so the choice can be read rather than trusted. */
-  var YEARS=100, WEEKS=52, GAP=1, MINCELL=3, LEFT=16, TOP=2, FOLDGAP=14;
+  /* TOP was 2px because nothing was drawn above the grid. HT-18c puts the WEEK axis
+     there, so it needs a line's worth of headroom. */
+  var YEARS=100, WEEKS=52, GAP=1, MINCELL=3, LEFT=16, TOP=12, FOLDGAP=14;
 
   function foldPlan(availW, availH){
     var plans=[1,2,3].map(function(f){
@@ -5075,6 +5122,21 @@ function earned(k){ return committed() - remaining(k); }
       if(y%10===0)
         s+='<text class="wl" x="'+(x0-4)+'" y="'+(yy+cell)+'" text-anchor="end">'+y+'</text>';
     }
+    /* HT-18c (his note 5): "Life graph is missing x and y values - add them." The AGE axis (y) was
+       already down the left. The WEEK axis (x) had never been drawn at all, so the grid carried one
+       axis and read as a texture. Every ten weeks across the top, and the last one is 52 rather
+       than 50 so the row's end is labelled and not implied. */
+    for(var wx=0; wx<=WEEKS; wx+=10){
+      var wxx=(wx>=WEEKS? WEEKS : wx);
+      /* the last label is anchored END, not MIDDLE: centred on the grid's right edge it hung
+         5px past the svg and rendered as "5" (MEASURED: right 1807 against an svg right of 1802). */
+      var anch=(wxx===WEEKS?'end':'middle');
+      s+='<text class="wl wlx" x="'+(LEFT+wxx*P)+'" y="'+(TOP-3)+'" text-anchor="'+anch+'">'+
+         wxx+'</text>';
+      if(wx+10>WEEKS && wxx!==WEEKS)
+        s+='<text class="wl wlx" x="'+(LEFT+WEEKS*P)+'" y="'+(TOP-3)+
+           '" text-anchor="end">'+WEEKS+'</text>';
+    }
     /* the logged weeks, each its own cell on the ramp, each carrying its own tooltip */
     Object.keys(by).forEach(function(k){
       var wi=+k, yr=Math.floor(wi/WEEKS), wk=wi%WEEKS;
@@ -5136,6 +5198,26 @@ function earned(k){ return committed() - remaining(k); }
       clearTimeout(window.__HT18_T); window.__HT18_T=setTimeout(quad, 160); });
   }
   window.__HT18 = { quad:quad, quadrants:quadrants };
+
+  /* ---- HT-18c - THE DAY CLOSES ITSELF (Cory 2026-09-07, note 10) -----------------------
+     "Remove Close the day - the day closes when the day ends and it auto populates to the next
+     day." He then chose, when asked what the timestamp should be: the last habit you checked that
+     day - the only option that leaves the USUAL / on-time column meaning anything.
+
+     THIS CONTRADICTS HT-13 G2 IN WRITING AND THE CONTRADICTION IS REPORTED, NOT HIDDEN. saveDay's
+     own comment says "an autosave must never stamp a day as closed, or the column stops meaning
+     'you finished'". Under R70.16 that reasoning stands; the owner has overridden the ruling with
+     his eyes open, and the meaning of the column changes with it: closed_at now reads "when you
+     last touched this day", not "when you declared it done". Every check-off moves it forward, so
+     at rollover it holds the last one by itself - no scheduler, no synthetic midnight.
+     PAST DAYS STAY NULL. There is no per-check-off timestamp in the schema, so the last touch on a
+     day already gone is not recoverable; this fills forward only, and the receipt says so. */
+  var _saveDay=saveDay;
+  saveDay=function(opts){
+    opts=opts||{};
+    if(!advanced() && S.hasClosedAt) opts.close=true;
+    return _saveDay.call(null, opts);
+  };
 
   function boot(){ if(advanced()) return; if(!S.me) return; quad(); }
   if(document.readyState==='complete') setTimeout(boot,320);
