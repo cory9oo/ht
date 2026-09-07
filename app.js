@@ -4431,6 +4431,7 @@ function earned(k){ return committed() - remaining(k); }
     if(log) log.classList.add('h17-scroll');
     paintLife17();                      /* S3 · the transposed grid, over HT-16's portrait one */
     oneLineStrip();                     /* S3 · the insight strip sits on ONE line */
+    tagScorecard(); bindDrawer();       /* S5 · the scorecard row becomes the drawer's control */
     document.documentElement.setAttribute('data-ht17','1');
   }
 
@@ -4559,6 +4560,134 @@ function earned(k){ return committed() - remaining(k); }
     host.setAttribute('data-rows', LIFE_WEEKS);
     host.setAttribute('data-cell', cell);
     return true;
+  }
+
+
+  /* ---- S5 · GROUP DRAWER (R70.143 · R70.135) --------------------------------------------
+     The scorecard row is legible at a glance and exhaustive on tap. THIS IS WHERE THE RED FLAGS
+     WENT: HT-16 took the `⚑3` counters off the task row, and the same number lives here now, beside
+     the habit's name, where it can be read on purpose instead of noticed by accident. C6 is answered
+     by construction — nothing is lost, it is relocated to the surface that asked for it.
+
+     The drawer is the second of the only two things allowed to scroll internally (S1). */
+  function groupHabits(g){
+    return S.habits.filter(function(h){ return (h.group_name||'Other')===g; });
+  }
+  function lastDoneOn(h){
+    for(var i=0;i<400;i++){
+      var k=shift(today(),-i);
+      if(!S.byDate[k]) continue;
+      if(doneOn(h,k)) return i===0? 'today' : (i===1? 'yesterday' : i+' days ago');
+    }
+    return 'never';
+  }
+  function curStreak(h){
+    var n=0;
+    for(var i=0;i<400;i++){
+      var k=shift(today(),-i);
+      if(!loggedOn(k)) { if(i===0) continue; break; }
+      if(doneOn(h,k)) n++; else break;
+    }
+    return n;
+  }
+  function weekPcts(g,n){
+    var out=[];
+    for(var w=0;w<n;w++){
+      var a=window.__HT16.adherenceWindow(g, w*7, w*7+6);
+      out.push(a && a.opp ? a.pct : null);
+    }
+    return out;
+  }
+  function usualTime(h){
+    var m=window.__HT16.medianClose ? window.__HT16.medianClose(h.id) : null;
+    if(m==null) return '—';
+    var hh=Math.floor(m/60), mm=Math.round(m%60);
+    return (hh%24)+':'+String(mm).padStart(2,'0');
+  }
+
+  function drawerEl(){
+    var n=document.getElementById('h17Drawer');
+    if(n) return n;
+    n=document.createElement('div');
+    n.id='h17Drawer'; n.className='h17dr';
+    n.innerHTML='<div class="h17dbody" id="h17DrBody"></div>';
+    document.body.appendChild(n);
+    n.addEventListener('click',function(e){
+      if(e.target===n || e.target.closest('[data-drx]')) closeDrawer();
+    });
+    document.addEventListener('keydown',function(e){
+      if(e.key==='Escape') closeDrawer();
+    });
+    return n;
+  }
+  function closeDrawer(){
+    var n=document.getElementById('h17Drawer');
+    if(n) n.classList.remove('on');
+  }
+
+  function openDrawer(g){
+    var n=drawerEl();
+    var hs=groupHabits(g);
+    var cur=window.__HT16.adherenceWindow(g,0,29);
+    var prv=window.__HT16.adherenceWindow(g,30,59);
+    var ot=window.__HT16.onTime30 ? window.__HT16.onTime30(g) : null;
+    var wp=weekPcts(g,12).filter(function(v){ return v!=null; });
+    var best=wp.length? Math.max.apply(null,wp) : null;
+    var worst=wp.length? Math.min.apply(null,wp) : null;
+    var rf=window.__HT16.rampFill;
+
+    var rows=hs.map(function(h){
+      var p=adherence30(h.id);
+      var ms=missRun(h.id);
+      return '<tr data-h="'+h.id+'">'+
+        '<td class="n">'+esc(label(h.name))+'</td>'+
+        '<td class="p"><i style="background:'+rf(p)+'"></i>'+(p==null?'—':p+'%')+'</td>'+
+        '<td class="num">'+curStreak(h)+'</td>'+
+        '<td class="num'+(ms>=3?' bad':'')+'">'+(ms?('⚑'+ms):'0')+'</td>'+
+        '<td class="t">'+esc(lastDoneOn(h))+'</td>'+
+        '<td class="t">'+esc(usualTime(h))+'</td></tr>';
+    }).join('');
+
+    document.getElementById('h17DrBody').innerHTML=
+      '<div class="h17dh"><h3>'+esc(g)+'</h3><span style="flex:1"></span>'+
+        '<button class="tbtn" data-drx="1">Close</button></div>'+
+      '<div class="h17dg">'+
+        '<span><b>'+(cur.pct==null?'—':cur.pct+'%')+'</b> last 30 days</span>'+
+        '<span><b>'+cur.hit+'</b> of <b>'+cur.opp+'</b> scheduled completed</span>'+
+        '<span>on time <b>'+(ot==null?'—':ot+'%')+'</b></span>'+
+        '<span>prior 30 <b>'+(prv.pct==null?'—':prv.pct+'%')+'</b></span>'+
+        '<span>best week <b>'+(best==null?'—':best+'%')+'</b></span>'+
+        '<span>worst week <b>'+(worst==null?'—':worst+'%')+'</b></span>'+
+      '</div>'+
+      '<table class="h17dt"><thead><tr><th>standard</th><th>30d</th><th>streak</th>'+
+        '<th>missed</th><th>last done</th><th>usual</th></tr></thead>'+
+        '<tbody>'+rows+'</tbody></table>';
+    n.setAttribute('data-grp', g);
+    n.setAttribute('data-rows', hs.length);
+    n.classList.add('on');
+  }
+
+  function bindDrawer(){
+    var host=document.getElementById('vGroups');
+    if(!host || host.dataset.ht17) return;
+    host.dataset.ht17='1';
+    /* the scorecard rows become the control. HT-16 renders them as a table, so the row carries the
+       group and a tap anywhere on it opens the drawer. */
+    host.addEventListener('click',function(e){
+      var tr=e.target.closest('[data-grp]');
+      if(!tr) return;
+      openDrawer(tr.getAttribute('data-grp'));
+    });
+    host.classList.add('h17tap');
+  }
+  /* HT-16's scorecard does not tag its rows with the group, so tag them after every paint */
+  function tagScorecard(){
+    var host=document.getElementById('vGroups'); if(!host) return;
+    var rows=q('tbody tr, .h16row', host);
+    var names=window.__HT16.scorecardRows ? window.__HT16.scorecardRows().map(function(r){ return r.group; }) : [];
+    rows.forEach(function(tr,i){
+      if(names[i]!=null) tr.setAttribute('data-grp', names[i]);
+    });
   }
 
   /* ---- re-assert after every repaint, the way the six layers before this one do ---------- */
