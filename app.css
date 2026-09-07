@@ -801,3 +801,19 @@ html[data-simple] #vWeeks{ min-width:0; max-width:100% }
 
 /* the trends panel's wrapper outlived the chart R70.67 cut; it rendered as an empty box */
 html[data-simple] #vViews > .pan.flat:has(#vTrends){ display:none !important }
+
+
+/* ======================= HT-16 · S3 · THE TWO CHARTS (R70.94) ======================= */
+html[data-simple] .chart .ax{ stroke:var(--border); stroke-width:1 }
+html[data-simple] .chart .ax0{ stroke:var(--grey) }
+html[data-simple] .chart .ayl{ font:400 8.5px/1 var(--mono); fill:var(--muted) }
+html[data-simple] .chart .ax2{ font:400 8.5px/1 var(--mono); fill:var(--muted) }
+html[data-simple] .chart .xl{ font:400 8.5px/1 var(--mono); fill:var(--muted) }
+html[data-simple] .chart .xl2{ font:400 8px/1 var(--mono); fill:var(--grey) }
+/* the chart scrolls, the page never does: 28px a day on a phone so every label survives (R70.94) */
+html[data-simple] .h16scroll{ overflow-x:auto; overflow-y:hidden; -webkit-overflow-scrolling:touch;
+  max-width:100% }
+html[data-simple] .h16scroll > svg.chart{ max-width:none }
+html[data-simple] .gnav{ padding:2px 0 6px }
+html[data-simple] .gnav .mv{ padding:2px 6px; border:1px solid var(--border); color:var(--muted) }
+html[data-simple] .gnav .mv:hover{ color:var(--text); border-color:var(--grey) }

@@ -3624,12 +3624,155 @@ function earned(k){ return committed() - remaining(k); }
     }
   }
 
+  /* ---- S3 · THE TWO CHARTS (R70.94) -----------------------------------------------------
+     Amends R70.69/R70.70. HT-15's painters are local to HT-15's IIFE and unreachable by name from
+     here, so this layer owns the final drawing of `#vMonth` and `#vYear` -- the same nodes, the same
+     `data-vgd` / `data-vgy` / `circle.hit` / `data-tip` contract, so HT-15's own golden still reads
+     true, with HT-16's axes, per-day labels and ramp-coloured dots on top.
+
+     ONE LABEL PER DAY, NEVER THINNED. A thinned axis is why a month chart cannot answer "which
+     Tuesday did I drop", which is the only question it is for. The label is one <text> carrying two
+     tspans -- the day number over the weekday -- so a per-day count is a count of labels, and at
+     28px per day on a phone every one of them survives inside the chart's own scroller. The page
+     never scrolls sideways; the chart does. */
+  var DOW3=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+  var PHONE_DAY_PX = 28;
+
+  function monthKeys(y,m){
+    var out=[]; for(var i=1;i<=31;i++){ var d=new Date(y,m,i); if(d.getMonth()!==m) break; out.push(dk(d)); }
+    return out;
+  }
+  function tipOf(c,r){
+    return (c==null?'\u2014':Math.round(c)+'%')+' \u00b7 '+(r==null?'\u2014':r+'/10');
+  }
+
+  function h16Chart(svgId, pts, opts){
+    var svg=document.getElementById(svgId); if(!svg) return 0;
+    var host=svg.parentNode;
+    var H=opts.height||190, L=30, R=34, T=12, B=opts.twoLine?34:24;
+    var n=pts.length, W;
+    var narrow = opts.perX && window.innerWidth<=480;
+    if(narrow){
+      W = L + R + n*opts.perX;                               /* a full cell either end, so nothing clips */
+      svg.setAttribute('viewBox','0 0 '+W+' '+H);
+      svg.setAttribute('preserveAspectRatio','xMinYMin meet');
+      svg.setAttribute('width',W); svg.setAttribute('height',H);
+      svg.style.width=W+'px'; svg.style.height=H+'px';
+      if(host) host.classList.add('h16scroll');
+    } else {
+      if(host) host.classList.remove('h16scroll');
+      svg.removeAttribute('width'); svg.style.width='';
+      if(!svg.getClientRects().length) return 0;             /* a hidden surface measures 0 wide */
+      W = fitSvg(svgId,H);
+    }
+    var pad=opts.pad||0;
+    var px=function(i){ return n<2 ? L+(W-L-R)/2 : L+pad+i*(W-L-R-2*pad)/(n-1); };
+    var py=function(v){ return H-B-(v/100)*(H-T-B); };
+    var s='';
+    /* LEFT 0-100 in tens, a gridline every ten. RIGHT 1-10 by one, the rating in its own units. */
+    for(var v=0; v<=100; v+=10){
+      s+='<line class="ax'+(v===0?' ax0':'')+'" x1="'+L+'" y1="'+py(v).toFixed(1)+'" x2="'+(W-R)+
+         '" y2="'+py(v).toFixed(1)+'"/>'+
+         '<text class="ayl" x="'+(L-5)+'" y="'+(py(v)+3).toFixed(1)+'" text-anchor="end">'+v+'</text>';
+      if(v>0) s+='<text class="ax2" x="'+(W-R+5)+'" y="'+(py(v)+3).toFixed(1)+'">'+(v/10)+'</text>';
+    }
+    function runs(get){
+      var out=[], cur=[];
+      pts.forEach(function(p,i){ var val=get(p);
+        if(val==null){ if(cur.length){ out.push(cur); cur=[]; } return; }
+        cur.push([i,val]); });
+      if(cur.length) out.push(cur);
+      return out;
+    }
+    function draw(rs,cls){
+      return rs.map(function(r){
+        if(r.length===1) return '<circle class="'+cls+'-d" cx="'+px(r[0][0]).toFixed(1)+
+                                '" cy="'+py(r[0][1]).toFixed(1)+'" r="2"/>';
+        return '<path class="'+cls+'" d="'+r.map(function(pt,j){
+          return (j?'L':'M')+px(pt[0]).toFixed(1)+' '+py(pt[1]).toFixed(1); }).join(' ')+'"/>';
+      }).join('');
+    }
+    s+=draw(runs(function(p){ return p.c; }),'ln-c');
+    s+=draw(runs(function(p){ return p.r==null?null:p.r*10; }),'ln-r');
+    /* the dots, each behind a hit area no smaller than 24px: a 6px target on a phone is decoration.
+       A COMPLETION DOT IS FILLED WITH THAT DAY'S RAMP COLOUR, so the line and the grade agree. */
+    pts.forEach(function(p,i){
+      if(p.c==null && p.r==null) return;
+      var tip=tipOf(p.c,p.r), at=opts.attr+'="'+p.key+'"';
+      if(p.c!=null) s+='<circle class="dot dot-c '+rampClass(p.c)+'" '+at+' data-tip="'+esc(tip)+
+                       '" cx="'+px(i).toFixed(1)+'" cy="'+py(p.c).toFixed(1)+'" r="3.1"/>';
+      if(p.r!=null) s+='<circle class="dot dot-r" '+at+' data-tip="'+esc(tip)+'" cx="'+px(i).toFixed(1)+
+                       '" cy="'+py(p.r*10).toFixed(1)+'" r="2.4"/>';
+      s+='<circle class="hit" '+at+' data-tip="'+esc(tip)+'" cx="'+px(i).toFixed(1)+
+         '" cy="'+(H/2)+'" r="12"/>';
+    });
+    /* EVERY label, always. Two tspans in ONE <text>, so a per-day count counts days. */
+    pts.forEach(function(p,i){
+      var x=px(i).toFixed(1);
+      s+='<text class="xl" x="'+x+'" y="'+(H-(opts.twoLine?18:8))+'" text-anchor="middle">'+
+         '<tspan x="'+x+'">'+esc(p.x)+'</tspan>'+
+         (opts.twoLine?'<tspan class="xl2" x="'+x+'" dy="10">'+esc(p.x2||'')+'</tspan>':'')+
+         '</text>';
+    });
+    svg.innerHTML=s;
+    return pts.filter(function(p){ return p.c!=null||p.r!=null; }).length;
+  }
+
+  function monthPoints(){
+    var ym=S.calYM||(S.calYM=[dnum(today()).getFullYear(),dnum(today()).getMonth()]);
+    return monthKeys(ym[0],ym[1]).map(function(k,i){
+      return { x:String(i+1), x2:DOW3[dnum(k).getDay()], key:k, c:pctOn(k), r:ratingOf(k) };
+    });
+  }
+  function yearPoints(){
+    var yr=S.vYear||(S.vYear=dnum(today()).getFullYear()), out=[];
+    for(var m=0;m<12;m++){
+      var ks=monthKeys(yr,m);
+      var cs=ks.map(pctOn).filter(function(v){ return v!=null; });
+      var rs=ks.map(ratingOf).filter(function(v){ return v!=null; });
+      /* 0 LOGGED DAYS IS A GAP, NOT A ZERO. A zero reads as a month of total failure. */
+      out.push({ x:MO[m][0], x2:'', key:String(m),
+                 c: cs.length? Math.round(meanOf(cs)) : null,
+                 r: rs.length? Math.round(meanOf(rs)*10)/10 : null });
+    }
+    return out;
+  }
+
+  function paintMonth16(){
+    var pts=monthPoints();
+    h16Chart('vMonth', pts, { attr:'data-vgd', height:196, twoLine:true, pad:4, perX:PHONE_DAY_PX });
+    var ym=S.calYM, nav=document.getElementById('vMonthNav');
+    if(nav) nav.innerHTML='<button class="mv" data-vgm="-1">\u2039</button>'+
+      '<b>'+MO[ym[1]].toUpperCase()+' '+ym[0]+'</b>'+
+      '<button class="mv" data-vgm="1">\u203a</button>'+legend();
+    var got=pts.filter(function(p){ return p.c!=null; }).length;
+    var tip=document.getElementById('vMonthTip');
+    if(tip) tip.textContent = got? got+' logged' : 'nothing logged';
+    return pts;
+  }
+  function paintYear16(){
+    var pts=yearPoints();
+    h16Chart('vYear', pts, { attr:'data-vgy', height:196, twoLine:false, pad:2 });
+    var nav=document.getElementById('vYearNav');
+    if(nav) nav.innerHTML='<button class="mv" data-vgyn="-1">\u2039</button>'+
+      '<b>'+(S.vYear||dnum(today()).getFullYear())+'</b>'+
+      '<button class="mv" data-vgyn="1">\u203a</button>'+legend();
+    var got=pts.filter(function(p){ return p.c!=null; }).length;
+    var tip=document.getElementById('vYearTip');
+    if(tip) tip.textContent=got+' of 12 months logged';
+    return pts;
+  }
+  window.__HT16.monthPoints = monthPoints;
+  window.__HT16.yearPoints  = yearPoints;
+  window.__HT16.tipOf       = tipOf;
+
   /* HT16-INSERT */
 
   function repaint(){
     if(advanced()) return;
     if(!squareLayout()) return;
     bindPanels();
+    paintMonth16(); paintYear16();
   }
   function boot(){
     if(advanced()) return;
