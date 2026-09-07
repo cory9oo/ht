@@ -430,3 +430,76 @@ body.small #starterBlk{display:block}
 .pr .k{display:block;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink3);padding-bottom:6px}
 .pr .s{font-size:12px;color:var(--ink2)}
 body.small #predictBlk{display:block}
+
+
+/* ======================= HT-9a · THE SIMPLE VIEW (R70.16-R70.22, R70.41) =======================
+   Every rule here is scoped to html[data-simple]. With Advanced ON the attribute is absent and not one
+   of these rules applies, which is how the hidden instruments stay verified by the HT-6 suite. */
+
+/* the dark lock (R70.21b). html[data-simple] outranks :root and, being later than theme.css,
+   also outranks :root[data-skin="statement"] at equal specificity. */
+html[data-simple]{
+  --ground:#0A0A0B; --sheet:#0F1012; --sunk:#151619; --rule:#25272C; --rule2:#3A3D45;
+  --ink:#F2F3F5; --ink2:#9BA0A8; --ink3:#5F646D;
+  --accent:#FF3B41; --accent-ink:#0A0A0B; --accent-wash:#2A1113; --sel:#1A1C20;
+  --bad:#FF3B41; --good:#3DDC97;
+  --g0:#2A1416; --g1:#4A181C; --g2:#7A2126; --g3:#B22B31; --g4:#FF3B41; --g5:#FF8A8E;
+}
+
+/* chrome that is not the header (R70.22) */
+html[data-simple] #jump,
+html[data-simple] #tape,
+html[data-simple] #rail,
+html[data-simple] #skins,
+html[data-simple] #bView,
+html[data-simple] #bGuide,
+html[data-simple] #logC,
+html[data-simple] .tools,
+html[data-simple] .band{ display:none !important }
+
+/* outputs that sit INSIDE the input column, so a heading filter alone will not catch them:
+   the capacity score, the next move, the KPI band, the week, MCII, the starter prompt and the
+   call-on-tomorrow. MEASURED in rehearsal: #weekly and #predict rendered until this rule existed. */
+html[data-simple] #cap, html[data-simple] #capNext, html[data-simple] #kpi,
+html[data-simple] #weekly, html[data-simple] #mcii, html[data-simple] #starter,
+html[data-simple] #nextMove, html[data-simple] #predict, html[data-simple] #prY,
+html[data-simple] #prN, html[data-simple] #yearGrid, html[data-simple] #yearLab{ display:none !important }
+
+/* the row (R70.18): thumb-sized, and the per-row output strings go away WITHOUT leaving the DOM,
+   so the HT-6 assertions that read them in Advanced mode still find them. */
+html[data-simple] .li .mn,
+html[data-simple] .li .ad,
+html[data-simple] .li .gp,
+html[data-simple] .li .cue,
+html[data-simple] .li .back{ display:none !important }
+html[data-simple] .li{ min-height:56px; padding:8px 2px }
+html[data-simple] .li .bx{ width:28px; height:28px; border-width:2px }
+html[data-simple] .li.on .bx::after{ width:15px; height:9px; left:5px; top:7px;
+  border-left-width:2.5px; border-bottom-width:2.5px }
+html[data-simple] .li .nm{ font-size:15px }
+@media(min-width:1024px){ html[data-simple] .li{ min-height:44px } }
+
+/* group headers — the group name lives here now */
+/* the off switch. `element.hidden` is only a UA rule and any `display` in app.css outranks it —
+   MEASURED: #weeklyBlk carried hidden=true and still rendered a 59px heading. */
+html[data-simple] .ht9a-off{ display:none !important }
+/* the little right-hand annotations in the section heads are statistics (RATED 1 · 7D 4 · 30D 4.7,
+   3 OF 3 WRITTEN, 1 low · 10 high). Outputs do not belong above an input (R70.17). */
+html[data-simple] #jIn .sh .c{ display:none !important }
+
+html[data-simple] .grp{ font:500 9.5px/1 var(--mono); letter-spacing:.14em; text-transform:uppercase;
+  color:var(--ink3); padding:20px 0 6px; border-bottom:1px solid var(--rule2) }
+
+/* CLOSE THE DAY: last, and sticky. Never `fixed` — a fixed button leaves the flow and paints against
+   the viewport, which is how it once rendered in the middle of the journal. */
+html[data-simple] #tClose{ position:sticky; bottom:0; z-index:20; background:var(--ground);
+  padding:12px 0 calc(12px + env(safe-area-inset-bottom)); border-top:1px solid var(--rule2) }
+/* the bar is opaque and pinned, so the column needs room to scroll its last field clear of it.
+   MEASURED without this: at scroll 0 the button sat on top of RATE THE DAY and the last field could
+   never be scrolled above it. This is the standard bottom-bar pattern, and it is not optional. */
+html[data-simple] #jIn{ padding-bottom:78px }
+html[data-simple] #tClose .btn{ width:100% }
+
+/* header extras */
+html[data-simple] #hCount{ white-space:nowrap }
+html[data-simple] #hPrev, html[data-simple] #hNext{ padding:5px 9px }

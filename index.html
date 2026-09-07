@@ -6,11 +6,20 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <!-- This page owns its colours. Dark Reader honours this lock and steps aside. -->
 <meta name="darkreader-lock">
-<meta name="color-scheme" content="light">
-<meta name="theme-color" content="#F4F3EF">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#0A0A0B">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="HT">
 <meta name="mobile-web-app-capable" content="yes">
+<script>
+/* HT-9a — set data-simple BEFORE the stylesheets so the simple view never flashes the full sheet.
+   Advanced is per-device and OFF by default; ?advanced=1 forces the full app for the test harness. */
+try{
+  var _adv = window.__ADVANCED===true || localStorage.getItem('ht_advanced')==='1'
+             || /[?&]advanced=1/.test(location.search);
+  if(!_adv) document.documentElement.setAttribute('data-simple','1');
+}catch(e){ if(!/[?&]advanced=1/.test(location.search)) document.documentElement.setAttribute('data-simple','1'); }
+</script>
 <link rel="manifest" href="./manifest.webmanifest">
 <link rel="apple-touch-icon" href="./apple-touch-icon.png">
 <link rel="apple-touch-startup-image" href="./splash/splash-640x1136.png" media="(device-width:320px) and (device-height:568px) and (-webkit-device-pixel-ratio:2) and (orientation:portrait)">

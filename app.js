@@ -1809,13 +1809,179 @@ function earned(k){ return committed() - remaining(k); }
 
 /* ============================ boot ============================ */
 (async function boot(){
-  var s='statement'; try{ s=localStorage.getItem('st.skin')||'statement'; }catch(e){}
+  var s='carbon'; try{ s=localStorage.getItem('st.skin')||'carbon'; }catch(e){}   /* HT-9a R70.21b: dark is the default; the layer overrides a stored light preference */
   skin(s);
   if(!(await load())) return;
   wire(); paintAll();
   if('serviceWorker' in navigator){
     navigator.serviceWorker.register('./sw.js',{scope:'./'}).then(function(r){ r.update(); }).catch(function(){});
   }
+})();
+
+
+
+/* ======================= HT-9a · THE SIMPLE VIEW LAYER (R70.41) =======================
+   One block. It hides, reorders and labels; it computes nothing the app does not already compute, and
+   it deletes nothing. `advanced()` true -> every function here returns immediately.
+
+   Why a layer and not 26 guards inside the paints: the paints are what the HT-6 suite verifies. Editing
+   them puts the hidden instruments at risk to make them invisible, which is backwards. R70.16 says
+   hidden is not deleted; the cheapest way to honour that is to leave the code alone and change what the
+   page shows. */
+(function(){
+  var GRP_ORDER = ['MORNING','AFTERNOON','NIGHT','STANDARDS','WEEKLY','OTHER'];
+  var KEEP_HEADINGS = ['COMPLETION','RATE THE DAY','JOURNAL'];
+
+  function advanced(){
+    try{ if(localStorage.getItem('ht_advanced')==='1') return true; }catch(e){}
+    if(window.__ADVANCED===true) return true;
+    return /[?&]advanced=1/.test(location.search);
+  }
+  function q(s,r){ return Array.prototype.slice.call((r||document).querySelectorAll(s)); }
+
+  /* ---- 1 · the dark lock, through the app's own skin() so Advanced still shows it selected ---- */
+  function lockSkin(){
+    if(advanced()) return;
+    try{ if(localStorage.getItem('st.skin')!=='carbon') skin('carbon'); }catch(e){ skin('carbon'); }
+    if(document.documentElement.getAttribute('data-skin')!=='carbon') skin('carbon');
+  }
+
+  /* ---- 2 · structure: outputs out, inputs in order, CLOSE THE DAY last ---- */
+  function restructure(){
+    if(advanced() || document.documentElement.hasAttribute('data-ht9a')) return;
+    var colR = document.querySelector('.colR'); if(colR) colR.classList.add('ht9a-off');
+
+    var jIn = document.getElementById('jIn'); if(!jIn) return;
+    /* inside the input column, anything that is not one of the three input blocks is output */
+    q('.blk', jIn).forEach(function(b){
+      var h = b.querySelector('.sh h2');
+      var t = h ? h.textContent.replace(/\s+/g,' ').trim().toUpperCase() : '';
+      var keep = KEEP_HEADINGS.some(function(k){ return t.indexOf(k) >= 0; });
+      if(!keep) b.classList.add('ht9a-off');
+    });
+
+    /* BRAIN DUMP — the fifth field. No column exists yet (the migration is HT-9b), so it persists
+       per device and per date and the receipt says so. Nothing silently pretends to be saved. */
+    var pray = document.getElementById('iPrayer');
+    if(pray && !document.getElementById('iDump')){
+      var host = pray.closest('.pan') || pray.closest('.blk') || pray.parentNode.parentNode;
+      var lab = document.createElement('label');
+      lab.className = 'fld';
+      lab.innerHTML = '<span class="lab">Brain dump</span>' +
+                      '<textarea id="iDump" rows="3" placeholder="Everything in your head, out."></textarea>';
+      host.insertBefore(lab, host.firstChild);
+      var ta = lab.querySelector('#iDump'), t = null;
+      ta.addEventListener('input', function(){
+        clearTimeout(t);
+        t = setTimeout(function(){ try{ localStorage.setItem('ht_dump_'+S.date, ta.value); }catch(e){} }, 500);
+      });
+    }
+    /* COMPLETED — the existing `tasks` field, relabelled. The column does not move. */
+    var tasks = document.getElementById('iTasks');
+    if(tasks){
+      var tl = tasks.closest('.fld') && tasks.closest('.fld').querySelector('.lab');
+      if(tl) tl.textContent = 'Completed';
+    }
+    var pl = pray && pray.closest('.fld') && pray.closest('.fld').querySelector('.lab');
+    if(pl) pl.textContent = 'Prayer';
+
+    /* CLOSE THE DAY -> last child of the input column, sticky */
+    var bClose = document.getElementById('bClose');
+    if(bClose){
+      var wrap = document.getElementById('tClose');
+      if(!wrap){ wrap = document.createElement('div'); wrap.id = 'tClose'; }
+      wrap.appendChild(bClose);
+      jIn.appendChild(wrap);
+    }
+    document.documentElement.setAttribute('data-ht9a','1');
+  }
+
+  /* ---- 3 · header: HT · weekday date · done of total · < > · SETTINGS ---- */
+  function header(){
+    if(advanced()) return;
+    var r1 = document.querySelector('.mast .r1'); if(!r1) return;
+    var set = document.getElementById('bSet');
+    if(!document.getElementById('hCount')){
+      var c = document.createElement('span'); c.id='hCount'; c.className='sub num';
+      r1.insertBefore(c, set);
+      var p = document.createElement('button'); p.id='hPrev'; p.className='tbtn';
+      p.title='previous day'; p.textContent='\u2039';
+      var n = document.createElement('button'); n.id='hNext'; n.className='tbtn';
+      n.title='next day'; n.textContent='\u203a';
+      r1.insertBefore(p, set); r1.insertBefore(n, set);
+      p.onclick = function(){ goDay(shift(S.date,-1)); };
+      n.onclick = function(){ goDay(shift(S.date, 1)); };
+    }
+    try{
+      var ck = ckOf(S.date), dl = daily(), wk = weekly();
+      var done = dl.filter(function(h){ return ck[h.id]; }).length +
+                 wk.filter(function(h){ return weekDone(h.id, S.date); }).length;
+      document.getElementById('hCount').textContent = done + ' of ' + (dl.length + wk.length);
+    }catch(e){}
+  }
+
+  /* ---- 4 · group the rows under headers, in the fixed order ---- */
+  function group(){
+    if(advanced()) return;
+    var log = document.getElementById('log'); if(!log) return;
+    var rows = q('.li', log); if(!rows.length) return;
+    var buckets = {};
+    rows.forEach(function(r){
+      /* the group comes from habits.group_name, never from the row's .gp span: paintLog only emits
+         .gp in the full sheet, so reading the DOM put every standard in OTHER. MEASURED. */
+      var hid = r.getAttribute('data-h');
+      var h = S.habits.filter(function(x){ return x.id === hid; })[0];
+      var name = ((h && h.group_name) || 'Other').replace(/\s+/g,' ').trim().toUpperCase();
+      (buckets[name] = buckets[name] || []).push(r);
+    });
+    var order = GRP_ORDER.filter(function(g){ return buckets[g]; })
+      .concat(Object.keys(buckets).filter(function(g){ return GRP_ORDER.indexOf(g) < 0; }).sort());
+    var frag = document.createDocumentFragment();
+    order.forEach(function(g){
+      var h = document.createElement('div'); h.className = 'grp'; h.textContent = g;
+      frag.appendChild(h);
+      buckets[g].forEach(function(r){ frag.appendChild(r); });
+    });
+    log.innerHTML = '';
+    log.appendChild(frag);
+  }
+
+  /* ---- 5 · the Advanced toggle, inside Settings ---- */
+  function advToggle(){
+    var ov = document.querySelector('.ov.on .inner') || document.querySelector('.ov .inner');
+    if(!ov || document.getElementById('advWrap')) return;
+    var w = document.createElement('div'); w.id='advWrap'; w.className='pan';
+    w.style.marginTop='14px';
+    var on = advanced();
+    w.innerHTML = '<div class="lab">Advanced</div>' +
+      '<div class="note" style="margin:6px 0 9px">Everything the simple view hides — the instruments, ' +
+      'the statistics, the other themes and the sheet controls. Nothing was deleted; this shows it again.</div>' +
+      '<button class="btn" id="advBtn">' + (on ? 'Advanced is ON — turn it off' : 'Turn Advanced ON') + '</button>';
+    ov.appendChild(w);
+    document.getElementById('advBtn').onclick = function(){
+      try{ localStorage.setItem('ht_advanced', on ? '0' : '1'); }catch(e){}
+      location.reload();
+    };
+  }
+
+  /* ---- 6 · re-apply after the app repaints. The app calls these by name, so reassigning the
+              binding in this shared scope is enough; no observer, no polling. ---- */
+  function simplify(){ restructure(); group(); header(); }
+
+  var _log = paintLog;   paintLog  = function(){ _log.apply(null, arguments);  group(); header(); };
+  var _mast = paintMast; paintMast = function(){ _mast.apply(null, arguments);
+                                                  restructure(); header(); loadDump(); };
+  var _go = goDay;       goDay     = function(k){ _go.call(null, k); simplify(); loadDump(); };
+  var _os = openSettings; openSettings = function(){ _os.apply(null, arguments); setTimeout(advToggle, 60); };
+
+  function loadDump(){
+    var ta = document.getElementById('iDump'); if(!ta) return;
+    try{ ta.value = localStorage.getItem('ht_dump_' + S.date) || ''; }catch(e){}
+  }
+
+  function boot(){ lockSkin(); simplify(); loadDump(); }
+  if(document.readyState === 'complete') setTimeout(boot, 0);
+  else window.addEventListener('load', function(){ setTimeout(boot, 0); });
 })();
 
 })();
