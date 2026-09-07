@@ -1656,6 +1656,14 @@ html[data-simple] .li .bx, html[data-simple] .li .edp{ align-self:center }
   html[data-simple] #h18SabNote{ grid-column:1/-1; padding:14px 6px; font-size:13px;
     color:var(--ink2); line-height:1.5 }
   html[data-simple] #h18SabNote b{ color:var(--text) }
+  /* B4: the way back, and the closed pip that says so without locking anything */
+  html[data-simple] .h19today{ margin-left:auto; font:400 9px/1 var(--mono); letter-spacing:.1em;
+    text-transform:uppercase; color:var(--muted); background:none; border:1px solid var(--border);
+    padding:3px 8px; cursor:pointer }
+  html[data-simple] .h19today:hover{ color:var(--text); border-color:var(--grey) }
+  html[data-simple] .h19closed{ margin-left:auto; font:400 8px/1 var(--mono); letter-spacing:.1em;
+    color:var(--bg); background:var(--grey); padding:2px 5px }
+  html[data-simple] .h19closed + .h19today{ margin-left:8px }
 }
 
 

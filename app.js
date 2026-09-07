@@ -5558,7 +5558,39 @@ function earned(k){ return committed() - remaining(k); }
     var jh=document.querySelector('.colL #jIn > .blk:has(#iDump) > .sh h2');
     if(jh){
       if(!jh.dataset.h19) jh.dataset.h19 = jh.textContent;
-      jh.textContent = (on && sh) ? ('SABBATH \u00b7 ' + mdate(S.date)) : jh.dataset.h19;
+      /* B4: and on any other day it names THAT day. Clicking a date on the month chart
+         already moved the journal there and already saved edits against that date
+         (MEASURED: typing into Sep 1 writes day_private for 2026-09-01). What was
+         missing was any way to tell — the header said "Journal" whichever day you were
+         on — and any way back. */
+      jh.textContent = (on && sh) ? ('SABBATH · ' + mdate(S.date))
+                     : (S.date===today() ? jh.dataset.h19 : mdate(S.date));
+    }
+    var shRow=document.querySelector('.colL #jIn > .blk:has(#iDump) > .sh');
+    if(shRow){
+      var back=document.getElementById('h19Today');
+      if(S.date!==today()){
+        if(!back){
+          back=document.createElement('button');
+          back.id='h19Today'; back.type='button'; back.className='h19today';
+          back.setAttribute('data-h19today','1');
+          back.textContent='← today';
+          back.addEventListener('click', function(){ goDay(today()); });
+          shRow.appendChild(back);
+        }
+        back.hidden=false;
+        /* a closed day stays EDITABLE (Cory: "also be editable"); it only says that it is closed */
+        var drow=S.byDate[S.date], pip=document.getElementById('h19Closed');
+        if(drow && drow.closed_at){
+          if(!pip){ pip=document.createElement('span'); pip.id='h19Closed';
+                    pip.className='h19closed'; pip.textContent='CLOSED';
+                    shRow.insertBefore(pip, back); }
+          pip.hidden=false;
+        }else if(pip){ pip.hidden=true; }
+      }else{
+        if(back) back.hidden=true;
+        var pip2=document.getElementById('h19Closed'); if(pip2) pip2.hidden=true;
+      }
     }
     /* WITHOUT a Sabbath standard nothing changes but the note. daily() already falls through in
        that case, so the day keeps grading on all twenty-six — narrowing the list while the score
