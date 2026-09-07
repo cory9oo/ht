@@ -4336,6 +4336,10 @@ function earned(k){ return committed() - remaining(k); }
   var _pa=paintAll; paintAll=function(){ _pa.apply(null,arguments); boot(); };
   var _pl=paintLog; paintLog=function(){ _pl.apply(null,arguments);
                                          if(!advanced() && S.me) decorateTime(); };
+  /* goDay does NOT go through paintLog: HT-9a wraps it and calls its own group() directly, so a day
+     change rebuilt the list in group order and the anchor order was lost. MEASURED. */
+  var _gd=goDay;    goDay=function(k){ _gd.call(null,k);
+                                       if(!advanced() && S.me){ decorateTime(); repaint(); } };
   var _os=openSettings; openSettings=function(){ _os.apply(null,arguments);
                                                  setTimeout(function(){ aboutScorecard();
                                                                         tuckTargetAge(); },180); };
