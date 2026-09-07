@@ -3739,21 +3739,24 @@ function earned(k){ return committed() - remaining(k); }
     s+=draw(runs(function(p){ return p.r==null?null:p.r*10; }),'ln-r');
     /* the dots, each behind a hit area no smaller than 24px: a 6px target on a phone is decoration.
        A COMPLETION DOT IS FILLED WITH THAT DAY'S RAMP COLOUR, so the line and the grade agree. */
+    /* HT-18d (Cory note 6, "the completion dot needs to appear"). THE TARGETS GO FIRST.
+       They were painted AFTER the dots — a 12px `circle.hit` and a full-height `rect.hitcol` laid
+       straight over a 3.1px `circle.dot-c`. Transparent, so on a busy chart you never noticed; on
+       a chart with one or two logged days the dot is the only mark on it and it was underneath
+       both, which also swallowed its own hover. SVG has no z-index: paint order IS depth, so the
+       hit shapes are emitted first and the dots land on top of them. */
     pts.forEach(function(p,i){
       if(p.c==null && p.r==null) return;
       var tip=tipOf(p.c,p.r), at=opts.attr+'="'+p.key+'"';
-      if(p.c!=null) s+='<circle class="dot dot-c '+rampClass(p.c)+'" '+at+' data-tip="'+esc(tip)+
-                       '" cx="'+px(i).toFixed(1)+'" cy="'+py(p.c).toFixed(1)+'" r="3.1"/>';
-      if(p.r!=null) s+='<circle class="dot dot-r" '+at+' data-tip="'+esc(tip)+'" cx="'+px(i).toFixed(1)+
-                       '" cy="'+py(p.r*10).toFixed(1)+'" r="2.4"/>';
-      s+='<circle class="hit" '+at+' data-tip="'+esc(tip)+'" cx="'+px(i).toFixed(1)+
-         '" cy="'+(H/2)+'" r="12"/>';
-      /* HT-18c (his note 9): a 3px dot behind a 12px circle at mid-height is a target you have to
-         aim at. The whole day COLUMN is the target now, top to bottom, and it carries the same
-         data-vgd, so the completion bullet, the rating bullet and the date all go to that day. */
       var hw=Math.max(6, (n>1?(W-L-R-2*pad)/(n-1):24));
       s+='<rect class="hitcol" '+at+' data-tip="'+esc(tip)+'" x="'+(px(i)-hw/2).toFixed(1)+
          '" y="0" width="'+hw.toFixed(1)+'" height="'+H+'" fill="transparent"/>';
+      s+='<circle class="hit" '+at+' data-tip="'+esc(tip)+'" cx="'+px(i).toFixed(1)+
+         '" cy="'+(H/2)+'" r="12"/>';
+      if(p.c!=null) s+='<circle class="dot dot-c '+rampClass(p.c)+'" '+at+' data-tip="'+esc(tip)+
+                       '" cx="'+px(i).toFixed(1)+'" cy="'+py(p.c).toFixed(1)+'" r="3.4"/>';
+      if(p.r!=null) s+='<circle class="dot dot-r" '+at+' data-tip="'+esc(tip)+'" cx="'+px(i).toFixed(1)+
+                       '" cy="'+py(p.r*10).toFixed(1)+'" r="2.6"/>';
     });
     /* EVERY label, always — NEVER THINNED (R70.140). Two tspans in ONE <text>, so a per-day count
        counts days.
@@ -3771,18 +3774,51 @@ function earned(k){ return committed() - remaining(k); }
        The weekday line is the first thing dropped, because "12" locates a day and "Fri" does not.
        AND THE LABELS ARE A CONTROL (his note 9): each carries the same `data-vgd` the dots do, so
        clicking a date goes to that day. */
-    var LBL_MIN = 15;                                   /* px a two-digit upright label needs */
-    var stride  = stepPx >= LBL_MIN ? 1 : Math.ceil(LBL_MIN / Math.max(1, stepPx));
+    /* HT-18d (Cory note 5): the minimum comes from the WIDEST label this chart carries, not from
+       one constant for every chart. At ~5.7px a glyph in the mono face, "Jan" wants 24px and "7"
+       wants 12 — a single 15 crammed the YEAR into a smear and over-thinned the MONTH. */
+    var maxChars = pts.reduce(function(m,p){ return Math.max(m, String(p.x==null?'':p.x).length); }, 1);
+    /* SHRINK BEFORE THINNING. A constant 15px thinned the YEAR to 7 of 12 months, which is a worse
+       axis than twelve small ones - twelve is the whole set and every one of them is a place you
+       can click. So the type is sized to the space first (mono glyphs run ~0.6em wide, capped at
+       9.5px and floored at 7), and the stride only comes into play once 7px still will not fit -
+       which is the MONTH at 30 days in a narrow panel, and there thinning is the honest answer. */
+    /* the 3px of breathing room is part of what a label costs, so it comes off the space
+       BEFORE the type is sized — without it the year sized to 9.5px, then failed its own
+       fit test by 3px and thinned to seven months anyway. */
+    var fitPx = (stepPx - 3) / Math.max(1, maxChars * 0.62);
+    var fontPx, stride;
+    if(fitPx >= 7){                       /* they all fit at a readable size: show them all */
+      fontPx = Math.min(9.5, Math.floor(fitPx * 10) / 10); stride = 1;
+    }else{                                /* 7px is the floor; below it, thin */
+      fontPx = 7;
+      stride = Math.ceil((maxChars * 7 * 0.62 + 3) / Math.max(1, stepPx));
+    }
+    /* the two rounding steps used to disagree by a fraction of a pixel and thin the YEAR to seven
+       months when twelve fitted; deciding the stride from `fitPx` directly removes the argument. */
     var twoLine = !!opts.twoLine && stepPx >= 26;        /* the weekday only when there is room */
     var todayIx = -1;
     pts.forEach(function(p,i){ if(p.key===today()) todayIx=i; });
+    /* TODAY is always kept, and the strided label beside it gives way rather than colliding —
+       measured as one overlapping pair on the MONTH axis before this. */
+    var kept = {};
     pts.forEach(function(p,i){
-      var keep = (stride===1) || (i%stride===0) || i===0 || i===n-1 || i===todayIx;
-      if(!keep) return;
+      if((stride===1) || (i%stride===0) || i===0 || i===n-1) kept[i]=1;
+    });
+    if(stride>1){
+      /* the LAST label is kept unconditionally, so when the stride does not land on it the one
+         before it collides — measured as the single remaining overlapping pair on the MONTH axis
+         (28 against 29). Whichever label is kept for a reason other than the stride wins its space. */
+      if((n-1) % stride !== 0) delete kept[n-2];
+      if(todayIx>=0){ delete kept[todayIx-1]; delete kept[todayIx+1]; kept[todayIx]=1; }
+      kept[0]=1; kept[n-1]=1;
+    }
+    pts.forEach(function(p,i){
+      if(!kept[i]) return;
       var x=px(i).toFixed(1);
       var at = p.key!=null ? ' '+opts.attr+'="'+p.key+'"' : '';
       s+='<text class="xl'+(i===todayIx?' xl-today':'')+'" x="'+x+'" y="'+
-         (H-(twoLine?18:8))+'" text-anchor="middle"'+at+'>'+
+         (H-(twoLine?18:8))+'" text-anchor="middle" font-size="'+fontPx+'"'+at+'>'+
          '<tspan x="'+x+'">'+esc(p.x)+'</tspan>'+
          (twoLine?'<tspan class="xl2" x="'+x+'" dy="10">'+esc(p.x2||'')+'</tspan>':'')+
          '</text>';
@@ -4928,7 +4964,10 @@ function earned(k){ return committed() - remaining(k); }
      schema at all - nothing is fetched, nothing is written, no invite is sent, and the strings
      below never leave the page. `privacy_check.py` sees no new cross-user read because there is
      none. When HTR-17 builds the real circle this function is what it replaces. */
-  var H18_DUMMIES=[{n:'Andrew',p:71,s:12},{n:'Dale',p:54,s:3},{n:'Justin',p:88,s:41}];
+  /* p = 30-day adherence, t = today's completion, s = streak. Invented, constant, and labelled
+     TEST DATA wherever they are drawn (HT-18c note 7 · HT-18d note 3). */
+  var H18_DUMMIES=[{n:'Andrew',p:71,t:80,s:12},{n:'Dale',p:54,t:40,s:3},
+                   {n:'Justin',p:88,t:100,s:41}];
   function circleDummy(){
     var rf=window.__HT16.rampFill, rc=window.__HT16.rampClass;
     var mine=adhAll(0,29);
@@ -4943,6 +4982,56 @@ function earned(k){ return committed() - remaining(k); }
       '<td class="p"><i style="background:'+rf(mine.pct)+'"></i>'+
       (mine.pct==null?'\u2014':mine.pct+'%')+'</td><td class="num">\u2014</td></tr>'+
       rows+'</tbody></table></div>';
+  }
+
+  /* ---- HT-18d - THE GROUP BLOCK (Cory 2026-09-07 note 3) -------------------------------
+     "Adherence section should be called GROUP and it needs to be one metric per member ... and it
+     needs to be continuously showing in its own section above the life chart", then: "do 30 day
+     adherence and the day completion - no actual tasks shown but a percent".
+
+     So: two percentages per member, no task names, always visible. R47.3 is why that is the whole
+     row and not the start of one - a circle sees adherence-class data and nothing else, and there
+     is no schema path here to a journal, a rating or a standards list because nothing is fetched
+     at all. Andrew, Dale and Justin are still the seeded TEST DATA of HT-18c until HTR-17 builds
+     the real invite; YOUR row is real, computed from the same functions the drawer uses. */
+  function groupBlock(){
+    var ins=document.getElementById('h16Ins'); if(!ins) return false;
+    if(!window.__HT16 || !window.__HT16.rampFill) return false;
+    var g=document.getElementById('h18Group');
+    if(!g){
+      g=document.createElement('div'); g.id='h18Group';
+      /* BEFORE the LIFE heading, not after it. "its own section above the life chart" means the
+         heading belongs to the chart, so GROUP sitting under a LIFE title read as part of LIFE. */
+      ins.insertBefore(g, ins.firstChild);
+      g.addEventListener('click', function(e){
+        if(e.target.closest('[data-h18more]')) toggleDrawer();
+      });
+    }
+    var rf=window.__HT16.rampFill, rc=window.__HT16.rampClass;
+    var mine=adhAll(0,29);
+    var todayPct=(function(){ var r=S.byDate[today()]; return (r&&r.pct!=null)? Math.round(r.pct) : null; })();
+    function row(name, day, mo, me){
+      return '<tr'+(me?' class="h18me"':'')+'><td class="n">'+esc(name)+'</td>'+
+        '<td class="p"><i style="background:'+rf(day)+'"></i>'+
+          (day==null?'\u2014':day+'%')+'</td>'+
+        '<td class="p"><i style="background:'+rf(mo)+'"></i>'+
+          (mo==null?'\u2014':mo+'%')+'</td></tr>';
+    }
+    g.innerHTML='<div class="h18gh">GROUP<span class="h18test">TEST DATA</span>'+
+      '<span class="sp"></span><button class="h18more" data-h18more type="button">detail</button></div>'+
+      '<table class="h18gt"><thead><tr><th>member</th><th>today</th><th>30 days</th></tr></thead>'+
+      '<tbody>'+
+      row('You', todayPct, mine.pct, true)+
+      H18_DUMMIES.map(function(d){ return row(d.n, d.t, d.p, false); }).join('')+
+      '</tbody></table>';
+    /* THE DRAWER STARTS BELOW THIS BLOCK. `inset:0` on #h18Draw covered the very control that
+       opens it — the same defect HT-18b hit with the old one-line button, arriving again now that
+       the control is a block of variable height. A constant cannot express "below GROUP", so the
+       measurement is written to a custom property on every re-assert and the CSS reads it. */
+    var ib=ins.getBoundingClientRect(), gb=g.getBoundingClientRect();
+    if(ib.height) document.documentElement.style.setProperty(
+      '--h18drawtop', Math.max(0, Math.round(gb.bottom - ib.top)) + 'px');
+    return true;
   }
   function setDrawer(open){
     var d=drawerEl(); if(!d) return;
@@ -5096,7 +5185,9 @@ function earned(k){ return committed() - remaining(k); }
     for(var i=0;i<f;i++){
       var rowsIn=Math.min(rows, YEARS-i*rows);
       var bx=foldX(i)+LEFT, bw=WEEKS*P-GAP, bh=rowsIn*P-GAP;
-      bg+='<rect x="'+bx+'" y="'+TOP+'" width="'+bw+'" height="'+bh+'" fill="var(--surface)"/>';
+      /* --surface-2, not --surface: the panel behind it IS --surface, so the unlived weeks were
+         invisible and the grid had no body. This is the one line that makes it read as a grid. */
+      bg+='<rect x="'+bx+'" y="'+TOP+'" width="'+bw+'" height="'+bh+'" fill="var(--surface-2)"/>';
       pat+='<pattern id="wkcell18_'+i+'" x="'+bx+'" y="'+TOP+'" width="'+P+'" height="'+P+
            '" patternUnits="userSpaceOnUse">'+
            '<rect x="'+cell+'" y="0" width="'+GAP+'" height="'+P+'" fill="var(--bg)"/>'+
@@ -5126,17 +5217,16 @@ function earned(k){ return committed() - remaining(k); }
        already down the left. The WEEK axis (x) had never been drawn at all, so the grid carried one
        axis and read as a texture. Every ten weeks across the top, and the last one is 52 rather
        than 50 so the row's end is labelled and not implied. */
-    for(var wx=0; wx<=WEEKS; wx+=10){
-      var wxx=(wx>=WEEKS? WEEKS : wx);
-      /* the last label is anchored END, not MIDDLE: centred on the grid's right edge it hung
-         5px past the svg and rendered as "5" (MEASURED: right 1807 against an svg right of 1802). */
-      var anch=(wxx===WEEKS?'end':'middle');
-      s+='<text class="wl wlx" x="'+(LEFT+wxx*P)+'" y="'+(TOP-3)+'" text-anchor="'+anch+'">'+
-         wxx+'</text>';
-      if(wx+10>WEEKS && wxx!==WEEKS)
-        s+='<text class="wl wlx" x="'+(LEFT+WEEKS*P)+'" y="'+(TOP-3)+
-           '" text-anchor="end">'+WEEKS+'</text>';
+    /* every ten weeks, then 52 — and the decade STOPS at 40 because 50 and 52 are two cells apart
+       and rendered on top of each other ("5052" on the crop). The end of the row is labelled by 52,
+       which is the number that means something; 50 is a tick with nothing to say. */
+    for(var wx=0; wx<=WEEKS-10; wx+=10){
+      s+='<text class="wl wlx" x="'+(LEFT+wx*P)+'" y="'+(TOP-3)+'" text-anchor="middle">'+
+         wx+'</text>';
     }
+    /* anchored END: centred on the grid's right edge it hung past the svg and rendered as "5" */
+    s+='<text class="wl wlx" x="'+(LEFT+WEEKS*P)+'" y="'+(TOP-3)+'" text-anchor="end">'+
+       WEEKS+'</text>';
     /* the logged weeks, each its own cell on the ramp, each carrying its own tooltip */
     Object.keys(by).forEach(function(k){
       var wi=+k, yr=Math.floor(wi/WEEKS), wk=wi%WEEKS;
@@ -5185,7 +5275,8 @@ function earned(k){ return committed() - remaining(k); }
   /* ---- the re-assert, the way the seven layers before this one do ------------------------ */
   function quad(){
     if(advanced()) return;
-    if(desktop()){ quadrants(); journalBottom(); bindGrow(); unGrow(); chartsFit(); adhLine(); }
+    if(desktop()){ quadrants(); journalBottom(); bindGrow(); unGrow(); chartsFit(); adhLine();
+                   groupBlock(); }
     else { unquadrants(); unjournalBottom(); unAdh(); }
     paintLife18();          /* S6 - both modes: the phone gets the same shape at a fixed cell */
     document.documentElement.setAttribute('data-ht18','1');

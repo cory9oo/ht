@@ -1500,7 +1500,7 @@ html[data-simple] .li .bx, html[data-simple] .li .edp{ align-self:center }
   html[data-simple] #h18Adh .w{ display:none }
 
   /* (4) the x axis is upright now and never rotated — the rest of that note is in app.js */
-  html[data-simple] .chart text.xl{ font-size:9.5px; letter-spacing:0 }
+  html[data-simple] .chart text.xl{ letter-spacing:0 }
   html[data-simple] .chart text.xl-today tspan{ fill:var(--text); font-weight:600 }
   html[data-simple] .chart .hitcol{ cursor:pointer }
   html[data-simple] .chart text.xl[data-vgd]{ cursor:pointer }
@@ -1550,7 +1550,11 @@ html[data-simple] .li .bx, html[data-simple] .li .edp{ align-self:center }
     background:var(--surface-2) }
   html[data-simple] #h18Adh{ margin:0 -12px; padding:6px 12px 7px;
     border-bottom:1px solid var(--border); background:var(--surface-2); width:auto }
-  html[data-simple] #h18Draw{ inset:0 }
+  /* the drawer opens BELOW the GROUP block, never over it — #h18Group writes its own bottom edge
+     to --h18drawtop on every re-assert, because a block of variable height cannot be a constant. */
+  html[data-simple] #h18Draw{ top:var(--h18drawtop, 0px); left:0; right:0; bottom:0;
+    padding-top:10px }
+  html[data-simple] #h18Group{ position:relative; z-index:6; background:var(--surface) }
 }
 
 /* (8) "Allow minimal scrolling on the page, very small, just so it does not feel stuck."
@@ -1559,6 +1563,73 @@ html[data-simple] .li .bx, html[data-simple] .li .edp{ align-self:center }
    `golden_ht18` asserts the scroll is BOUNDED rather than absent, which is the honest test now. */
 @media (min-width:1024px){
   html[data-simple] body{ overflow-y:auto; padding-bottom:56px }
+}
+
+
+/* ======================= HT-18d · CORY'S THIRD REVIEW (2026-09-07 15:57 CDT) =================
+   Notes 1, 3, 4, 5, 6, 7. Note 2 (the journal doc) is blocked on a wall named in the receipt;
+   note 8 was "ask me questions" and three were asked and answered. */
+@media (min-width:1024px){
+
+  /* (1) "When check marked, the lines need to show grey."
+     It was never about the check state before: a habit WITH a link rendered as `a.nm` in --text
+     and one without rendered grey, so the list was striped by whether a standard happened to have
+     a URL. Done is grey and struck through; not-done is the bright one, because the not-done ones
+     are the list's actual job. */
+  html[data-simple] #h18Comp .li .nm,
+  html[data-simple] #h18Comp .li a.nm{ color:var(--text) }
+  html[data-simple] #h18Comp .li.on .nm,
+  html[data-simple] #h18Comp .li.on a.nm{ color:var(--muted) }
+  html[data-simple] #h18Comp .li.on a.nm{ text-decoration-color:var(--border) }
+  html[data-simple] #h18Comp .li.on .nm .lk{ color:var(--grey) }
+
+  /* (7) "The x next to the #10 for the daily rating needs to be removed." Hidden, not deleted —
+     the clear control is still there in Advanced, and this is the only way to unset a rating, so
+     the receipt says so rather than letting him find it. */
+  html[data-simple] #rate .clr{ display:none }
+
+  /* (3) THE GROUP BLOCK — its own section, above the life chart, always on. */
+  html[data-simple] #h18Group{ flex:0 0 auto; margin:0 -12px 0; padding:0 12px 9px;
+    border-bottom:1px solid var(--border) }
+  /* GROUP is the first thing in the panel now, so it carries the panel's own top bar */
+  html[data-simple] .grid > #h16Ins > #h18Group{ margin-top:0 }
+  html[data-simple] #h16Ins > .sh{ margin-top:0 }
+  html[data-simple] #h18Group .h18gh{ display:flex; align-items:center; gap:10px;
+    font:500 9.5px/1 var(--mono); letter-spacing:.16em; text-transform:uppercase;
+    color:var(--muted); padding:7px 0 7px }
+  html[data-simple] #h18Group .h18gh .sp{ flex:1 1 auto }
+  html[data-simple] #h18Group .h18more{ font:400 9px/1 var(--mono); letter-spacing:.1em;
+    color:var(--muted); background:none; border:1px solid var(--border); padding:3px 7px;
+    cursor:pointer; text-transform:uppercase }
+  html[data-simple] #h18Group .h18more:hover{ color:var(--text); border-color:var(--grey) }
+  html[data-simple] #h18Group .h18gt{ width:100%; border-collapse:collapse;
+    font:400 11.5px/1 var(--sans) }
+  html[data-simple] #h18Group .h18gt th{ text-align:left; font:500 8.5px/1 var(--mono);
+    letter-spacing:.12em; text-transform:uppercase; color:var(--muted); padding:0 0 5px }
+  html[data-simple] #h18Group .h18gt th:not(:first-child),
+  html[data-simple] #h18Group .h18gt td.p{ text-align:right }
+  html[data-simple] #h18Group .h18gt td{ padding:4px 0; color:var(--ink2);
+    border-top:1px solid var(--border) }
+  html[data-simple] #h18Group .h18gt td.n{ color:var(--ink) }
+  html[data-simple] #h18Group .h18gt td.p{ font:400 11.5px/1 var(--mono) }
+  html[data-simple] #h18Group .h18gt td.p i{ display:inline-block; width:7px; height:7px;
+    margin-right:6px; vertical-align:0 }
+  html[data-simple] #h18Group .h18gt tr.h18me td{ color:var(--text) }
+  html[data-simple] #h18Group .h18test{ font-size:8px; letter-spacing:.1em; color:var(--bg);
+    background:var(--grey); padding:2px 5px }
+  /* the old one-line ADHERENCE button is retired by the block that replaced it (R70.79) */
+  html[data-simple] #h18Adh{ display:none }
+
+  /* (4) THE LIFE GRID READS AS A GRID. The body is --surface-2 in the painter now; here the axes
+     stop being 8px of --muted on a dark panel, which is what "it has no x or y axis" was. */
+  html[data-simple] .wkg .wl{ font:400 9px/1 var(--mono); fill:var(--ink2) }
+  html[data-simple] .wkg .wlx{ font:400 9px/1 var(--mono); fill:var(--ink2) }
+  html[data-simple] #h16Ins > .sh{ margin-bottom:6px }
+
+  /* (5) the axis type, now that the stride is derived from the label rather than a constant */
+  /* the painter writes font-size per chart now, so the sheet must not fight it */
+  html[data-simple] .chart text.xl{ letter-spacing:.01em; fill:var(--ink2) }
+  html[data-simple] .chart text.xl2{ fill:var(--muted) }
 }
 
 /* S1d · PHONE (<1024) IS A SINGLE COLUMN IN HIS ORDER: JOURNAL · COMPLETION · MONTH · YEAR ·
