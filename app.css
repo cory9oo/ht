@@ -1632,6 +1632,41 @@ html[data-simple] .li .bx, html[data-simple] .li .edp{ align-self:center }
   html[data-simple] .chart text.xl2{ fill:var(--muted) }
 }
 
+
+/* ======================= HT-18e · CORY'S FOURTH REVIEW (2026-09-07 16:36 CDT) ================ */
+@media (min-width:1024px){
+  /* (1b · 3) the axis: a weekday letter under every day, and Saturday said quietly, because that
+     is the day the list becomes one box */
+  html[data-simple] .chart text.xl2{ fill:var(--muted) }
+  html[data-simple] .chart text.xl-sat{ fill:var(--ink2); font-weight:600 }
+
+  /* (4) SATURDAY IS ONE BOX, and it gets the room the other twenty-five gave back */
+  /* `[hidden]` is a UA rule and `.li{display:flex}` outranks it, so hiding a row by attribute
+     did nothing at all until this line existed (MEASURED: 25 rows carrying `hidden`, all 26
+     still on screen). */
+  html[data-simple] #h18Comp #log [hidden]{ display:none !important }
+  html[data-simple] #h18Comp #log.h18sab{ grid-template-columns:1fr }
+  html[data-simple] #h18Comp #log.h18sab .li{ min-height:56px; font-size:16px }
+  html[data-simple] #h18Comp #log.h18sab .li .nm{ font-size:16px }
+  html[data-simple] #h18Comp #log.h18sab .li .bxw{ flex:0 0 36px; width:36px; height:36px }
+  html[data-simple] #h18Comp #log.h18sab .li .bx{ width:28px; height:28px }
+  html[data-simple] #h18SabNote{ grid-column:1/-1; padding:14px 6px; font-size:13px;
+    color:var(--ink2); line-height:1.5 }
+  html[data-simple] #h18SabNote b{ color:var(--text) }
+}
+
+
+/* the journal-doc status pip and its settings block (HT-18e note 2) */
+html[data-simple] .h18jdoc{ margin-left:auto; font:400 9px/1 var(--mono); letter-spacing:.1em;
+  text-transform:uppercase; color:var(--muted) }
+html[data-simple] .h18jdoc-sent{ color:var(--green-bright) }
+html[data-simple] .h18jdoc-failed{ color:var(--red-bright) }
+.h18jset{ padding:12px 0 4px; border-top:1px solid var(--rule) }
+.h18jset .lab{ display:block; font:500 10px/1 var(--mono); letter-spacing:.12em;
+  text-transform:uppercase; color:var(--ink2); padding-bottom:7px }
+.h18jset input{ display:block; width:100%; margin-bottom:7px }
+.h18jhint{ font-size:11px; line-height:1.5; color:var(--ink2); padding-top:6px }
+
 /* S1d · PHONE (<1024) IS A SINGLE COLUMN IN HIS ORDER: JOURNAL · COMPLETION · MONTH · YEAR ·
    ADHERENCE+LIFE. That is the order HT-16 already ships, and the LAYER keeps it by construction —
    every DOM move in HT-18 is gated on desktop() and reverses on a resize down, so below 1024 the

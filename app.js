@@ -3788,15 +3788,30 @@ function earned(k){ return committed() - remaining(k); }
        fit test by 3px and thinned to seven months anyway. */
     var fitPx = (stepPx - 3) / Math.max(1, maxChars * 0.62);
     var fontPx, stride;
-    if(fitPx >= 7){                       /* they all fit at a readable size: show them all */
+    /* HT-18e (B): the floor was 7px and Cory's word for the result was "incredibly crunched and
+       thin". 7px is not a size a number is read at - it is a size a number is counted at. The floor
+       is 9 now and the stride carries the difference: fifteen dates you can read beat thirty you
+       cannot. */
+    /* 9 for a running scale like days-of-the-month, where the numbers interpolate and half of
+       them still tell you where you are; 8 for a small FIXED set like the twelve months, where
+       every label is a distinct place and dropping six of them loses half the axis. MEASURED:
+       at a 251px panel the year affords 8.3px, so 8 shows all twelve and 9 shows six. */
+    var FLOOR = (n <= 12) ? 7.5 : 9;
+    if(fitPx >= FLOOR){                   /* they all fit at a readable size: show them all */
       fontPx = Math.min(9.5, Math.floor(fitPx * 10) / 10); stride = 1;
-    }else{                                /* 7px is the floor; below it, thin */
-      fontPx = 7;
-      stride = Math.ceil((maxChars * 7 * 0.62 + 3) / Math.max(1, stepPx));
+    }else{
+      fontPx = FLOOR;
+      stride = Math.ceil((maxChars * FLOOR * 0.62 + 3) / Math.max(1, stepPx));
     }
     /* the two rounding steps used to disagree by a fraction of a pixel and thin the YEAR to seven
        months when twelve fitted; deciding the stride from `fitPx` directly removes the argument. */
-    var twoLine = !!opts.twoLine && stepPx >= 26;        /* the weekday only when there is room */
+    /* HT-18e (C, Cory note 3): "I want to see Monday through Sunday abbreviation somehow. And
+       maybe we can add in thirty days as well." Both, on two lines doing different jobs: the NUMBER
+       locates a date and is strided so it stays readable; the WEEKDAY is the rhythm of the week and
+       is drawn for EVERY day, because one letter costs ~5px and even 8px a day affords that. Three
+       letters where they fit, one where they do not - the rhythm survives either way. */
+    var twoLine = !!opts.twoLine;
+    var dowChars = stepPx >= 22 ? 3 : 1;
     var todayIx = -1;
     pts.forEach(function(p,i){ if(p.key===today()) todayIx=i; });
     /* TODAY is always kept, and the strided label beside it gives way rather than colliding —
@@ -3819,9 +3834,18 @@ function earned(k){ return committed() - remaining(k); }
       var at = p.key!=null ? ' '+opts.attr+'="'+p.key+'"' : '';
       s+='<text class="xl'+(i===todayIx?' xl-today':'')+'" x="'+x+'" y="'+
          (H-(twoLine?18:8))+'" text-anchor="middle" font-size="'+fontPx+'"'+at+'>'+
-         '<tspan x="'+x+'">'+esc(p.x)+'</tspan>'+
-         (twoLine?'<tspan class="xl2" x="'+x+'" dy="10">'+esc(p.x2||'')+'</tspan>':'')+
-         '</text>';
+         '<tspan x="'+x+'">'+esc(p.x)+'</tspan></text>';
+    });
+    /* the weekday line: EVERY day, its own smaller type, and Saturday marked because that is the
+       day the list becomes one box (note 4) */
+    if(twoLine) pts.forEach(function(p,i){
+      if(!p.x2) return;
+      var xx=px(i).toFixed(1);
+      var at2 = p.key!=null ? ' '+opts.attr+'="'+p.key+'"' : '';
+      var lab = dowChars===3 ? String(p.x2) : String(p.x2).charAt(0);
+      var sat = /^sat/i.test(String(p.x2));
+      s+='<text class="xl2'+(sat?' xl-sat':'')+'" x="'+xx+'" y="'+(H-6)+
+         '" text-anchor="middle" font-size="8"'+at2+'>'+esc(lab)+'</text>';
     });
     svg.innerHTML=s;
     return pts.filter(function(p){ return p.c!=null||p.r!=null; }).length;
@@ -5161,6 +5185,8 @@ function earned(k){ return committed() - remaining(k); }
        is on screen. So the phone is left to it (R70.79 — a replacement that is not an improvement
        is not a replacement), and the 546x1016 grid keeps golden_ht16's phone scroller green. */
     if(!desktop()) return false;
+    host.removeAttribute('data-h18');       /* re-set at the end, so a failed paint leaves
+                                               the stamp off and the observer tries again */
     var box=host.getBoundingClientRect();
     /* HT-18b (Cory, 2026-09-07): ONE GRAPH. The fold existed because a half-height quadrant could
        not hold 100 square rows; LIFE has a full-height column of its own now, so the cell comes
@@ -5262,6 +5288,7 @@ function earned(k){ return committed() - remaining(k); }
     host.innerHTML='<div class="wkscroll'+(desktop()?' h18fit':'')+'">'+
       '<svg class="wkg h18life" viewBox="0 0 '+W+' '+H+'" width="'+dW+'" height="'+dH+
       '" preserveAspectRatio="xMinYMin meet">'+pat+bg+s+ov+cur+'</svg></div>';
+    host.setAttribute('data-h18','1');      /* the stamp watchLife() looks for */
     host.setAttribute('data-lived', lived);
     host.setAttribute('data-cols', WEEKS);
     host.setAttribute('data-rows', YEARS);
@@ -5272,15 +5299,230 @@ function earned(k){ return committed() - remaining(k); }
     host.setAttribute('data-plan', plan.table);
     return true;
   }
+
+  /* ---- HT-18e (D) - SATURDAY IS ONE BOX (Cory 2026-09-07 note 4) ------------------------
+     "For every Saturday on this chart, I want it to be auto populated to only one checkbox and
+     just a check mark for Sabbath. I'll just check it every Sabbath that I did take the Sabbath."
+     Asked what that should do to the score, he chose: the Sabbath IS the day.
+
+     SO IT IS THE `daily()` SET THAT CHANGES, not the rendering. `saveDay` writes
+     `active_set = daily().map(id)` and `pctOf` grades against that same list, so narrowing daily()
+     on a Saturday makes the day grade 100 or 0 on one box and makes adherence count it as ONE
+     opportunity - which is what "the Sabbath is the whole day" means in the schema rather than
+     just on the screen. P4 still holds: active_set is written per day, so past Saturdays keep the
+     grade they already have and nothing is repriced.
+
+     IT KEYS OFF THE DAY BEING VIEWED, not off today, so walking back to a Saturday shows that
+     Saturday's Sabbath. DEC-055 is not touched: nothing is cut, the standards are all still there
+     on the other six days, and Advanced sees every one of them every day. */
+  function isSabbath(k){
+    var d=dnum(k||S.date); return !!d && !isNaN(d) && d.getDay()===6;
+  }
+  function sabbathHabit(){
+    for(var i=0;i<S.habits.length;i++)
+      if(/sabbath/i.test(S.habits[i].name||'')) return S.habits[i];
+    return null;
+  }
+  var _daily=daily;
+  daily=function(){
+    if(!advanced() && isSabbath(S.date)){
+      var sh=sabbathHabit();
+      if(sh) return [sh];
+    }
+    return _daily.apply(null, arguments);
+  };
+
+  /* the list is filtered after the paint rather than inside it, because paintLog belongs to the
+     base app and every layer here re-asserts over it instead of rewriting it. Idempotent: it reads
+     the DOM it is given and hides, never removes (R70.16). */
+  function sabbathList(){
+    var log=document.getElementById('log'); if(!log) return false;
+    var on = !advanced() && isSabbath(S.date);
+    var sh = on ? sabbathHabit() : null;
+    /* WITHOUT a Sabbath standard nothing changes but the note. daily() already falls through in
+       that case, so the day keeps grading on all twenty-six — narrowing the list while the score
+       still counted twenty-six would have written a 0% Saturday, which is the opposite of rest. */
+    var active = on && !!sh;
+    log.classList.toggle('h18sab', active);
+    q('#log .li').forEach(function(li){
+      var b=li.querySelector('[data-tog]');
+      var id=b?b.getAttribute('data-tog'):null;
+      li.hidden = !!(active && id!==sh.id);
+    });
+    q('#log .grp, #log .eadd, #log [data-add]').forEach(function(e){ e.hidden = active; });
+    /* no Sabbath standard yet: say so where the list was, rather than showing an empty box */
+    var note=document.getElementById('h18SabNote');
+    if(on && !sh){
+      if(!note){ note=document.createElement('div'); note.id='h18SabNote'; log.appendChild(note); }
+      note.hidden=false;
+      note.innerHTML='<b>Sabbath</b> - add a standard named "Sabbath" and Saturdays will show '+
+                     'only that box.';
+    }else if(note){ note.hidden=true; }
+    return true;
+  }
+
+  /* ---- HT-18e (B) - THE JOURNAL AUTO-UPLOADS TO THE DOC (Cory 2026-09-07 note 2) --------
+     "needs to auto upload to google journal ... no copy and pasting ... it needs to be a document
+     journal that we carry and can be editable. we set this up through apple script previously."
+
+     WHY IT IS AN APPS SCRIPT ENDPOINT AND NOT GOOGLE OAUTH IN THE APP. HT is a static page on
+     GitHub Pages with no server, so writing to Drive from here would mean shipping an OAuth client
+     and holding a refresh token for a Google account in a browser - a credential store this app has
+     no business having, for the single most private data it holds (R47.3, CC_STANDING §3). A Google
+     Apps Script bound to the doc and published "execute as me" already runs AS Cory with the doc's
+     own permission; the app only has to POST to it. It is the same shape as the AppleScript he had
+     before - a small automation of his own that owns the write - and it is portable to Obsidian
+     later because what crosses the wire is plain text, not a Google object.
+
+     THE URL IS A WRITE CAPABILITY AND IS NEVER COMMITTED (R35.5). It lives in localStorage on his
+     machine, set from Settings; the repo never sees it, and neither do I. The shared secret rides
+     in the body so a leaked URL alone cannot append to his journal.
+
+     NOTHING IS SENT UNTIL HE SETS IT. No endpoint, no request - the feature is inert by default. */
+  var JDOC_URL='ht_jdoc_url', JDOC_KEY='ht_jdoc_key';
+  function jdocGet(k){ try{ return localStorage.getItem(k)||''; }catch(e){ return ''; } }
+  function jdocSet(k,v){ try{ localStorage.setItem(k,v); }catch(e){} }
+
+  /* the format. Markdown, because that is what the doc has been and what Obsidian will want, and
+     because a heading per day is what makes the doc EDITABLE rather than a log to scroll. The
+     Apps Script replaces the block under a matching date heading, so re-saving a day corrects it
+     instead of appending a second copy. */
+  function jdocBody(){
+    var d=S.date, pv=S.priv||{};
+    var r=(pv.rating==null?'':String(pv.rating));
+    return { date:d,
+             rating:r,
+             dump:(pv.brain_dump||''),
+             tasks:(pv.tasks||''),
+             prayer:(pv.prayer||''),
+             pct:(function(){ var row=S.byDate[d]; return row&&row.pct!=null?Math.round(row.pct):null; })(),
+             key:jdocGet(JDOC_KEY) };
+  }
+  var _jdocT=null, _jdocLast='';
+  function jdocPush(force){
+    var url=jdocGet(JDOC_URL); if(!url) return;
+    var body=jdocBody();
+    var sig=JSON.stringify(body);
+    if(!force && sig===_jdocLast) return;            /* nothing changed since the last push */
+    clearTimeout(_jdocT);
+    _jdocT=setTimeout(function(){
+      _jdocLast=sig;
+      jdocMark('sending');
+      /* no-cors: an Apps Script Web App does not send CORS headers, so the response is opaque and
+         a 200 is indistinguishable from a 500 here. The status below therefore says SENT, never
+         SAVED - the doc itself is the confirmation, and claiming more than that would be a lie. */
+      fetch(url, { method:'POST', mode:'no-cors',
+                   headers:{'Content-Type':'text/plain;charset=utf-8'},
+                   body:JSON.stringify(body) })
+        .then(function(){ jdocMark('sent'); })
+        .catch(function(){ jdocMark('failed'); });
+    }, 1200);
+  }
+  function jdocMark(state){
+    var n=document.getElementById('h18JDoc');
+    if(!n){
+      var host=document.querySelector('.colL #jIn > .blk:has(#iDump) > .sh');
+      if(!host) return;
+      n=document.createElement('span'); n.id='h18JDoc'; n.className='h18jdoc';
+      host.appendChild(n);
+    }
+    n.className='h18jdoc h18jdoc-'+state;
+    n.textContent = state==='sending' ? 'doc · sending'
+                  : state==='sent'    ? 'doc · sent'
+                  : state==='failed'  ? 'doc · failed'
+                  : '';
+  }
+
+  /* every journal save goes to the doc as well as to the database */
+  var _savePriv=savePriv;
+  savePriv=function(){
+    var r=_savePriv.apply(null, arguments);
+    if(!advanced()) { try{ jdocPush(false); }catch(e){} }
+    return r;
+  };
+
+  /* Settings gains the two fields. Appended after the sheet renders, the way HT-16 appends its
+     scorecard note — the base app's markup is not rewritten. */
+  function jdocSettings(){
+    var save=document.getElementById('pSave'); if(!save) return;
+    var box=save.closest('.tools'); if(!box || document.getElementById('h18JUrl')) return;
+    var w=document.createElement('div');
+    w.className='h18jset';
+    w.innerHTML=
+      '<div class="lab">Journal document (Apps Script Web App)</div>'+
+      '<input id="h18JUrl" placeholder="https://script.google.com/macros/s/…/exec" '+
+        'value="'+esc(jdocGet(JDOC_URL))+'">'+
+      '<input id="h18JKey" placeholder="shared secret" value="'+esc(jdocGet(JDOC_KEY))+'">'+
+      '<div class="tools"><button class="btn" id="h18JSave" type="button">Save journal link</button>'+
+      '<button class="tbtn" id="h18JTest" type="button">Send today now</button></div>'+
+      '<div class="h18jhint">Nothing leaves this device until a URL is set here. The link is stored '+
+      'on this machine only — never in the repo.</div>';
+    box.parentNode.insertBefore(w, box);
+    document.getElementById('h18JSave').onclick=function(){
+      jdocSet(JDOC_URL, (document.getElementById('h18JUrl').value||'').trim());
+      jdocSet(JDOC_KEY, (document.getElementById('h18JKey').value||'').trim());
+      toast('journal link saved');
+    };
+    document.getElementById('h18JTest').onclick=function(){
+      if(!jdocGet(JDOC_URL)){ toast('set the URL first'); return; }
+      jdocPush(true); toast('sending today to the doc');
+    };
+  }
+  var _osJ=openSettings;
+  openSettings=function(){ _osJ.apply(null, arguments); setTimeout(jdocSettings, 120); };
   /* ---- the re-assert, the way the seven layers before this one do ------------------------ */
   function quad(){
     if(advanced()) return;
     if(desktop()){ quadrants(); journalBottom(); bindGrow(); unGrow(); chartsFit(); adhLine();
                    groupBlock(); }
     else { unquadrants(); unjournalBottom(); unAdh(); }
-    paintLife18();          /* S6 - both modes: the phone gets the same shape at a fixed cell */
+    paintLife18(); watchLife(); sabbathList(); watchLog();          /* S6 - both modes: the phone gets the same shape at a fixed cell */
     document.documentElement.setAttribute('data-ht18','1');
   }
+  /* ---- HT-18e (A) - THE LIFE GRID STOPS REVERTING (Cory 2026-09-07 note 1) --------------
+     "Every time I change the month, it populated the life chart back to the original issue view."
+     REPRODUCED: click the month nav and the week axis goes 6 labels -> 0. HT-16's own repaint()
+     runs on that click and calls paintWeeks16(), which rewrites #vWeeks with the HT-16 renderer -
+     and HT-18's quad() does not re-run, because the month nav never goes through paintAll or
+     paintLog. Wrapping the exported __HT16.repaint would not catch it either: HT-16's click
+     handler calls its LOCAL repaint, which no seam reaches.
+     So the guard is on the RESULT, not on the caller. paintLife18 stamps the host, and an observer
+     repaints whenever that stamp goes missing - which is exactly when something else has
+     overwritten the grid, whatever path it took. No loop: our own write leaves the stamp in place. */
+  /* the same lesson as watchLife, and it arrived the same way: sabbathList() ran, then paintLog
+     rebuilt #log's innerHTML underneath it and every `hidden` went with the old rows (MEASURED:
+     the h18sab class survived on the container, 0 rows carried `hidden`, and the note was gone).
+     Call order is not something a layer on top of a base app can rely on, so the filter watches
+     the result instead. Appending the note fires the observer once more and then settles, because
+     the second pass finds nothing left to change. */
+  function watchLog(){
+    var log=document.getElementById('log');
+    if(!log || log.__h18obs || !window.MutationObserver) return;
+    log.__h18obs=new MutationObserver(function(){
+      if(advanced()) return;
+      clearTimeout(log.__h18t);
+      log.__h18t=setTimeout(function(){ sabbathList(); }, 30);
+    });
+    log.__h18obs.observe(log, { childList:true, subtree:false });
+  }
+
+  function watchLife(){
+    var host=document.getElementById('vWeeks');
+    if(!host || host.__h18obs || !window.MutationObserver) return;
+    host.__h18obs=new MutationObserver(function(){
+      if(!desktop() || advanced()) return;
+      /* the test is the SVG, not an attribute. `data-h18` was the first attempt and it does not
+         work: paintWeeks16 replaces the host's CHILDREN and leaves its attributes alone, so the
+         stamp survived the overwrite and the observer skipped the one case it exists for
+         (MEASURED: week axis 6 -> 0 with the stamp still reading '1'). `svg.h18life` is a node our
+         renderer owns and theirs destroys, so its absence is the fact we actually need. */
+      if(host.querySelector('svg.h18life')) return;       /* our own paint; nothing to do */
+      clearTimeout(host.__h18t);
+      host.__h18t=setTimeout(function(){ paintLife18(); }, 40);
+    });
+    host.__h18obs.observe(host, { childList:true, subtree:false });
+  }
+
   var _pa=paintAll;  paintAll  = function(){ _pa.apply(null,arguments); quad(); };
   var _pl=paintLog;  paintLog  = function(){ _pl.apply(null,arguments); quad(); };
   if(!window.__HT18_RESIZE){
