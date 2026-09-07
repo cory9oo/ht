@@ -4951,11 +4951,170 @@ function earned(k){ return committed() - remaining(k); }
     home(document.getElementById('h16Score'));
     var a=document.getElementById('h18Adh'); if(a) a.hidden=true;
   }
+
+  /* ---- S6 - LIFE: YEARS DOWN, FROM ZERO, BIG (R70.188) ------------------------------------
+     Un-transposes R70.141: 52 week-columns across, 100 year-rows down, year 0 at the top.
+
+     THE ARITHMETIC, AND THE HONEST CEILING. The grid's box is roughly 767x342 at 1920 and 591x194
+     at 1280. One hundred square rows in ~194px is a 1px cell. Squareness, "years down" and "fills
+     the quadrant" cannot all hold in a landscape box unless the years are FOLDED, so the renderer
+     chooses the fold count by arithmetic and prints its work on the host.
+
+     ONE DEVIATION FROM THE WIRE'S foldPlan, AND IT IS NAMED. The wire breaks ties toward MORE
+     folds - "same cell, wider grid". MEASURED at 1280, all three folds clamp to MINCELL and none
+     of them FIT, so more folds is strictly worse: f=3 draws 700x138 into a 591-wide box (scaled to
+     0.84, an effective cell of 2.5) while f=2 draws 462x202 (scaled to 0.96, effective 2.9). The
+     objective that serves the wire's actual intent - the biggest grid on the screen - is the
+     EFFECTIVE cell after fitting, so that is what is maximised, ties still breaking toward more
+     folds. Every candidate is printed as data-plan so the choice can be read rather than trusted. */
+  var YEARS=100, WEEKS=52, GAP=1, MINCELL=3, LEFT=16, TOP=2, FOLDGAP=14;
+
+  function foldPlan(availW, availH){
+    var plans=[1,2,3].map(function(f){
+      var rows=Math.ceil(YEARS/f), cols=WEEKS*f;
+      var cw=Math.floor((availW - LEFT*f - FOLDGAP*(f-1)) / cols);
+      var ch=Math.floor(availH / rows);
+      var raw=Math.min(cw,ch) - GAP;
+      var cell=Math.max(MINCELL, raw);
+      var P=cell+GAP;
+      var W=f*(LEFT+WEEKS*P) + (f-1)*FOLDGAP, H=TOP+rows*P;
+      var scale=Math.min(1, availW/W, availH/H);
+      return { f:f, rows:rows, cols:cols, cell:cell, raw:raw, P:P, W:W, H:H,
+               fits:(W<=availW && H<=availH), scale:scale,
+               eff:Math.round(cell*scale*100)/100 };
+    });
+    var best=plans[0];
+    plans.forEach(function(p){
+      if(p.eff>best.eff || (p.eff===best.eff && p.f>best.f)) best=p; });
+    best.table=plans.map(function(p){
+      return 'f'+p.f+':cell '+p.cell+' '+p.W+'x'+p.H+
+             (p.fits?' fits':' scale '+p.scale.toFixed(2))+' eff '+p.eff+
+             (p===best?' <-WON':''); }).join(' | ');
+    return best;
+  }
+
+  function weeksLogged18(b){
+    var by={};
+    dates().forEach(function(k){
+      var r=S.byDate[k]; var v=(r&&r.pct!=null&&loggedOn(k))?r.pct:null;
+      if(v==null) return;
+      var wi=window.__HT16.weekIndex(k,b); if(wi==null||wi<0) return;
+      (by[wi]=by[wi]||[]).push(v);
+    });
+    return by;
+  }
+  function mean18(a){ return a.length? a.reduce(function(x,y){return x+y;},0)/a.length : null; }
+  function weekRange18(wi,b){
+    var st=new Date(b.getTime()+wi*6048e5), en=new Date(st.getTime()+6*864e5);
+    return dk(st)+' – '+dk(en);
+  }
+
+  function paintLife18(){
+    var host=document.getElementById('vWeeks'); if(!host) return false;
+    if(!window.__HT16 || !window.__HT16.weekIndex) return false;
+    var b=(S.priv0&&S.priv0.birth_date)? new Date(S.priv0.birth_date+'T12:00:00') : null;
+    if(!b) return false;             /* the no-birthdate path stays HT-16's; it is correct */
+
+    var nowWeek=window.__HT16.weekIndex(new Date(), b);
+    var by=weeksLogged18(b);
+    /* PHONE: HT-16's OWN renderer already draws exactly what R70.188 asks for — one fold, 52
+       across, 100 down, in the existing horizontal scroller — at a 9px cell rather than 4, and
+       MEASURED it is the paint that lands LAST on the phone: switching to the VIEWS tab runs
+       __HT16.repaint() after this layer, so a phone grid drawn here is overwritten a moment later
+       and leaves nothing behind but stale data- attributes from a renderer that did not draw what
+       is on screen. So the phone is left to it (R70.79 — a replacement that is not an improvement
+       is not a replacement), and the 546x1016 grid keeps golden_ht16's phone scroller green. */
+    if(!desktop()) return false;
+    var box=host.getBoundingClientRect();
+    var plan=foldPlan(Math.max(160, Math.round(box.width)),
+                      Math.max(60,  Math.round(box.height)));
+    var f=plan.f, rows=plan.rows, cell=plan.cell, P=plan.P;
+    var foldW=LEFT+WEEKS*P;
+    function foldX(i){ return i*(foldW+FOLDGAP); }
+
+    /* one background rect per FOLD and one <pattern> per fold for the cell edges: ~5,200 cells and
+       NOT 5,200 nodes, the technique HT-13 paid for when its first life grid rendered solid */
+    var bg='', pat='<defs>', ov='';
+    for(var i=0;i<f;i++){
+      var rowsIn=Math.min(rows, YEARS-i*rows);
+      var bx=foldX(i)+LEFT, bw=WEEKS*P-GAP, bh=rowsIn*P-GAP;
+      bg+='<rect x="'+bx+'" y="'+TOP+'" width="'+bw+'" height="'+bh+'" fill="var(--surface)"/>';
+      pat+='<pattern id="wkcell18_'+i+'" x="'+bx+'" y="'+TOP+'" width="'+P+'" height="'+P+
+           '" patternUnits="userSpaceOnUse">'+
+           '<rect x="'+cell+'" y="0" width="'+GAP+'" height="'+P+'" fill="var(--bg)"/>'+
+           '<rect x="0" y="'+cell+'" width="'+P+'" height="'+GAP+'" fill="var(--bg)"/></pattern>';
+      ov+='<rect x="'+bx+'" y="'+TOP+'" width="'+bw+'" height="'+bh+
+          '" fill="url(#wkcell18_'+i+')" pointer-events="none"/>';
+    }
+    pat+='</defs>';
+
+    var s='', lived=0;
+    /* ONE RECT PER YEAR ROW for the lived run - the runs are HORIZONTAL again.
+       Age labels every ten years DOWN THE LEFT of their own fold, never along the top. */
+    for(var y=0;y<YEARS;y++){
+      var fi=Math.floor(y/rows), ry=y%rows;
+      var x0=foldX(fi)+LEFT, yy=TOP+ry*P;
+      var st=y*WEEKS, en=st+WEEKS-1, livedTo=Math.min(en, nowWeek);
+      if(livedTo>=st){
+        var count=livedTo-st+1;
+        lived+=count;
+        s+='<rect class="lv" x="'+x0+'" y="'+yy+'" width="'+(count*P-GAP)+'" height="'+cell+
+           '" fill="var(--grey)" opacity=".6"/>';
+      }
+      if(y%10===0)
+        s+='<text class="wl" x="'+(x0-4)+'" y="'+(yy+cell)+'" text-anchor="end">'+y+'</text>';
+    }
+    /* the logged weeks, each its own cell on the ramp, each carrying its own tooltip */
+    Object.keys(by).forEach(function(k){
+      var wi=+k, yr=Math.floor(wi/WEEKS), wk=wi%WEEKS;
+      if(yr>=YEARS) return;
+      var fi2=Math.floor(yr/rows), ry2=yr%rows;
+      var pct=mean18(by[wi]);
+      var tip='week '+wi+' · '+weekRange18(wi,b)+' · '+
+              (pct==null?'—':Math.round(pct)+'%');
+      s+='<rect class="lw" x="'+(foldX(fi2)+LEFT+wk*P)+'" y="'+(TOP+ry2*P)+'" width="'+cell+
+         '" height="'+cell+'" fill="'+window.__HT16.rampFill(pct)+'" data-wk="'+wi+
+         '" data-tip="'+esc(tip)+'"><title>'+esc(tip)+'</title></rect>';
+    });
+
+    var cur='';
+    var cy=Math.floor(nowWeek/WEEKS), cwk=nowWeek%WEEKS;
+    if(cy<YEARS){
+      var cfi=Math.floor(cy/rows), cry=cy%rows, cx=foldX(cfi)+LEFT, cyy=TOP+cry*P;
+      /* the current-age row gets a SUBTLE RULE across it, not a label: his age is DATA, derived
+         from the birthdate, and it is never typed anywhere (R70.95) */
+      cur+='<rect class="cage" data-row="'+cy+'" x="'+cx+'" y="'+cyy+'" width="'+(WEEKS*P-GAP)+
+           '" height="'+cell+'" fill="none" stroke="var(--outline-today)" stroke-width="1"'+
+           ' opacity=".35"/>';
+      cur+='<rect class="cw" x="'+(cx+cwk*P-0.5)+'" y="'+(cyy-0.5)+'" width="'+(cell+1)+
+           '" height="'+(cell+1)+'" fill="none" stroke="var(--outline-today)"'+
+           ' stroke-width="1.5"/>';
+    }
+
+    var W=f*foldW+(f-1)*FOLDGAP, H=TOP+rows*P;
+    var dW=Math.floor(W*plan.scale), dH=Math.floor(H*plan.scale);
+    /* the phone keeps the BARE `.wkscroll` HT-17 used: `.natural` carries `svg{width:auto}`, which
+       overrides the width/height attributes the plan just computed and stretched a 276x502 grid to
+       546x1016 (MEASURED). Bare `.wkscroll` is `overflow-x:auto` and nothing else. */
+    host.innerHTML='<div class="wkscroll'+(desktop()?' h18fit':'')+'">'+
+      '<svg class="wkg h18life" viewBox="0 0 '+W+' '+H+'" width="'+dW+'" height="'+dH+
+      '" preserveAspectRatio="xMinYMin meet">'+pat+bg+s+ov+cur+'</svg></div>';
+    host.setAttribute('data-lived', lived);
+    host.setAttribute('data-cols', WEEKS);
+    host.setAttribute('data-rows', YEARS);
+    host.setAttribute('data-folds', f);
+    host.setAttribute('data-cell', cell);
+    host.setAttribute('data-scale', plan.scale.toFixed(3));
+    host.setAttribute('data-drawn', dW+'x'+dH);
+    host.setAttribute('data-plan', plan.table);
+    return true;
+  }
   /* ---- the re-assert, the way the seven layers before this one do ------------------------ */
   function quad(){
     if(advanced()) return;
     if(desktop()){ quadrants(); journalBottom(); bindGrow(); unGrow(); chartsFit(); adhLine(); }
     else { unquadrants(); unjournalBottom(); unAdh(); }
+    paintLife18();          /* S6 - both modes: the phone gets the same shape at a fixed cell */
     document.documentElement.setAttribute('data-ht18','1');
   }
   var _pa=paintAll;  paintAll  = function(){ _pa.apply(null,arguments); quad(); };

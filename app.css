@@ -1290,6 +1290,18 @@ html[data-simple] .li .bx, html[data-simple] .li .edp{ align-self:center }
     color:var(--muted); padding:8px 6px 6px; border-bottom:1px solid var(--border) }
 }
 
+
+/* S6 · LIFE — YEARS DOWN, FROM ZERO, FOLDED TO FIT (R70.188). The renderer sizes the SVG itself
+   (foldPlan already fitted it to the box and wrote the width/height attributes), so the CSS only
+   has to stop it overflowing and put it where the eye expects it. */
+@media (min-width:1024px){
+  html[data-simple] .wkscroll.h18fit{ overflow:hidden; display:flex; min-height:0;
+    align-items:flex-start; justify-content:center }
+  html[data-simple] .wkscroll.h18fit svg.h18life{ display:block; max-width:100%; max-height:100% }
+}
+/* the current-age rule: a line across the row, never a label — his age is DATA (R70.95) */
+.wkg .cage{ shape-rendering:geometricPrecision }
+
 /* S1d · PHONE (<1024) IS A SINGLE COLUMN IN HIS ORDER: JOURNAL · COMPLETION · MONTH · YEAR ·
    ADHERENCE+LIFE. That is the order HT-16 already ships, and the LAYER keeps it by construction —
    every DOM move in HT-18 is gated on desktop() and reverses on a resize down, so below 1024 the
