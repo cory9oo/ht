@@ -5776,115 +5776,18 @@ function earned(k){ return committed() - remaining(k); }
     return true;
   }
 
-  /* ---- HT-18e (B) - THE JOURNAL AUTO-UPLOADS TO THE DOC (Cory 2026-09-07 note 2) --------
-     "needs to auto upload to google journal ... no copy and pasting ... it needs to be a document
-     journal that we carry and can be editable. we set this up through apple script previously."
-
-     WHY IT IS AN APPS SCRIPT ENDPOINT AND NOT GOOGLE OAUTH IN THE APP. HT is a static page on
-     GitHub Pages with no server, so writing to Drive from here would mean shipping an OAuth client
-     and holding a refresh token for a Google account in a browser - a credential store this app has
-     no business having, for the single most private data it holds (R47.3, CC_STANDING §3). A Google
-     Apps Script bound to the doc and published "execute as me" already runs AS Cory with the doc's
-     own permission; the app only has to POST to it. It is the same shape as the AppleScript he had
-     before - a small automation of his own that owns the write - and it is portable to Obsidian
-     later because what crosses the wire is plain text, not a Google object.
-
-     THE URL IS A WRITE CAPABILITY AND IS NEVER COMMITTED (R35.5). It lives in localStorage on his
-     machine, set from Settings; the repo never sees it, and neither do I. The shared secret rides
-     in the body so a leaked URL alone cannot append to his journal.
-
-     NOTHING IS SENT UNTIL HE SETS IT. No endpoint, no request - the feature is inert by default. */
-  var JDOC_URL='ht_jdoc_url', JDOC_KEY='ht_jdoc_key';
-  function jdocGet(k){ try{ return localStorage.getItem(k)||''; }catch(e){ return ''; } }
-  function jdocSet(k,v){ try{ localStorage.setItem(k,v); }catch(e){} }
-
-  /* the format. Markdown, because that is what the doc has been and what Obsidian will want, and
-     because a heading per day is what makes the doc EDITABLE rather than a log to scroll. The
-     Apps Script replaces the block under a matching date heading, so re-saving a day corrects it
-     instead of appending a second copy. */
-  function jdocBody(){
-    var d=S.date, pv=S.priv||{};
-    var r=(pv.rating==null?'':String(pv.rating));
-    return { date:d,
-             rating:r,
-             dump:(pv.brain_dump||''),
-             tasks:(pv.tasks||''),
-             prayer:(pv.prayer||''),
-             pct:(function(){ var row=S.byDate[d]; return row&&row.pct!=null?Math.round(row.pct):null; })(),
-             key:jdocGet(JDOC_KEY) };
-  }
-  var _jdocT=null, _jdocLast='';
-  function jdocPush(force){
-    var url=jdocGet(JDOC_URL); if(!url) return;
-    var body=jdocBody();
-    var sig=JSON.stringify(body);
-    if(!force && sig===_jdocLast) return;            /* nothing changed since the last push */
-    clearTimeout(_jdocT);
-    _jdocT=setTimeout(function(){
-      _jdocLast=sig;
-      jdocMark('sending');
-      /* no-cors: an Apps Script Web App does not send CORS headers, so the response is opaque and
-         a 200 is indistinguishable from a 500 here. The status below therefore says SENT, never
-         SAVED - the doc itself is the confirmation, and claiming more than that would be a lie. */
-      fetch(url, { method:'POST', mode:'no-cors',
-                   headers:{'Content-Type':'text/plain;charset=utf-8'},
-                   body:JSON.stringify(body) })
-        .then(function(){ jdocMark('sent'); })
-        .catch(function(){ jdocMark('failed'); });
-    }, 1200);
-  }
-  function jdocMark(state){
-    var n=document.getElementById('h18JDoc');
-    if(!n){
-      var host=document.querySelector('.colL #jIn > .blk:has(#iDump) > .sh');
-      if(!host) return;
-      n=document.createElement('span'); n.id='h18JDoc'; n.className='h18jdoc';
-      host.appendChild(n);
-    }
-    n.className='h18jdoc h18jdoc-'+state;
-    n.textContent = state==='sending' ? 'doc · sending'
-                  : state==='sent'    ? 'doc · sent'
-                  : state==='failed'  ? 'doc · failed'
-                  : '';
-  }
-
-  /* every journal save goes to the doc as well as to the database */
-  var _savePriv=savePriv;
-  savePriv=function(){
-    var r=_savePriv.apply(null, arguments);
-    if(!advanced()) { try{ jdocPush(false); }catch(e){} }
-    return r;
-  };
-
-  /* Settings gains the two fields. Appended after the sheet renders, the way HT-16 appends its
-     scorecard note — the base app's markup is not rewritten. */
-  function jdocSettings(){
-    var save=document.getElementById('pSave'); if(!save) return;
-    var box=save.closest('.tools'); if(!box || document.getElementById('h18JUrl')) return;
-    var w=document.createElement('div');
-    w.className='h18jset';
-    w.innerHTML=
-      '<div class="lab">Journal document (Apps Script Web App)</div>'+
-      '<input id="h18JUrl" placeholder="https://script.google.com/macros/s/…/exec" '+
-        'value="'+esc(jdocGet(JDOC_URL))+'">'+
-      '<input id="h18JKey" placeholder="shared secret" value="'+esc(jdocGet(JDOC_KEY))+'">'+
-      '<div class="tools"><button class="btn" id="h18JSave" type="button">Save journal link</button>'+
-      '<button class="tbtn" id="h18JTest" type="button">Send today now</button></div>'+
-      '<div class="h18jhint">Nothing leaves this device until a URL is set here. The link is stored '+
-      'on this machine only — never in the repo.</div>';
-    box.parentNode.insertBefore(w, box);
-    document.getElementById('h18JSave').onclick=function(){
-      jdocSet(JDOC_URL, (document.getElementById('h18JUrl').value||'').trim());
-      jdocSet(JDOC_KEY, (document.getElementById('h18JKey').value||'').trim());
-      toast('journal link saved');
-    };
-    document.getElementById('h18JTest').onclick=function(){
-      if(!jdocGet(JDOC_URL)){ toast('set the URL first'); return; }
-      jdocPush(true); toast('sending today to the doc');
-    };
-  }
-  var _osJ=openSettings;
-  openSettings=function(){ _osJ.apply(null, arguments); setTimeout(jdocSettings, 120); };
+  /* ---- HT-20 P9 · THE DOC MIRROR RETIRES UNBUILT (R70.260 · R70.79 · DEC-037) ------------
+     The Apps Script journal mirror lived here: a Settings field for a Web App URL, a shared
+     secret, a no-cors POST of the day's journal, and a `DOC / SENT` pip beside the journal head.
+     IT NEVER WENT LIVE. Its live half was always blocked on one authorisation only Cory could
+     give (deploy the script, execute-as-me, authorize), and on 2026-09-07 17:45 he cancelled the
+     route: "I don't wanna set all that up... can we begin filing our journal to automatically
+     populate an Obsidian file?" One vault (R70.256) answers the same need with no endpoint, no
+     consent screen, no shared secret and no second home for the text.
+     So it is REMOVED rather than hidden — the code is in git history and the setup document is
+     archived (DEC-037); what is not here is a dead POST target and a pip that could go green for
+     a document nobody reads. D-HT-18e-1 is CLOSED, not owed. The Google Doc itself is untouched;
+     if Cory ever wants one it is a read-only export from the vault, never a second home. */
 
   /* ---- HT-19 B1 - THE RIGHT BLOCK (R70.233) ----------------------------------------------
      "Make the completions smaller so the journal and the charts get bigger." Measured before:

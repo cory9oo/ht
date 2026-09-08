@@ -1667,16 +1667,10 @@ html[data-simple] .li .bx, html[data-simple] .li .edp{ align-self:center }
 }
 
 
-/* the journal-doc status pip and its settings block (HT-18e note 2) */
-html[data-simple] .h18jdoc{ margin-left:auto; font:400 9px/1 var(--mono); letter-spacing:.1em;
-  text-transform:uppercase; color:var(--muted) }
-html[data-simple] .h18jdoc-sent{ color:var(--green-bright) }
-html[data-simple] .h18jdoc-failed{ color:var(--red-bright) }
-.h18jset{ padding:12px 0 4px; border-top:1px solid var(--rule) }
-.h18jset .lab{ display:block; font:500 10px/1 var(--mono); letter-spacing:.12em;
-  text-transform:uppercase; color:var(--ink2); padding-bottom:7px }
-.h18jset input{ display:block; width:100%; margin-bottom:7px }
-.h18jhint{ font-size:11px; line-height:1.5; color:var(--ink2); padding-top:6px }
+/* HT-20 P9: the journal-doc status pip and its settings block are GONE with the Doc mirror they
+   decorated (R70.260 / R70.79). Nothing renders them any more, so the rules go rather than sit
+   here waiting for a caller that was cancelled. Their selectors are in the HT-20 receipt and in
+   git history; a retired class left in the stylesheet is the one a later wire styles by mistake. */
 
 
 /* ======================= HT-19 B1 · THE LAYOUT (R70.233) =====================================
