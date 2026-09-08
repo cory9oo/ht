@@ -65,22 +65,27 @@ function fmtHM(m){ if(m==null) return '\u2014'; m=Math.max(0,Math.round(m));
 function toast(t){ var n=el('toast'); n.textContent=t; n.classList.add('on');
   clearTimeout(toast._t); toast._t=setTimeout(function(){ n.classList.remove('on'); },1500); }
 
-/* Habit names carry clock prefixes. The list is no longer ordered by time,
-   so the prefix is dead weight on every row — strip it for display only. */
-function label(n){
-  return String(n||'')
-    .replace(/^\s*\d{1,2}(:\d{2})?\s*(am|pm)?\s*(?:[-–—]\s*\d{1,2}(:\d{2})?\s*(am|pm)?)?\s*/i,'')
-    .replace(/\s+/g,' ').trim() || String(n||'');
-}
-/* Retained only for the "next up" marker — the clock still exists in the data. */
-function startMin(n){
-  var m=String(n||'').match(/^\s*(\d{1,2}):(\d{2})\s*(am|pm)?/i);
-  if(!m) return null;
-  var h=+m[1], mi=+m[2], ap=(m[3]||'').toLowerCase();
-  if(ap==='pm'&&h<12) h+=12; if(ap==='am'&&h===12) h=0;
-  if(!ap && h<5) h+=12;
-  return h*60+mi;
-}
+/* ---- HT-20 P1 · A NAME RENDERS VERBATIM (R70.265 · R70.79) -----------------------------
+   THIS REPLACES A HELPER THAT PARSED A CLOCK PREFIX OUT OF EVERY NAME, AND IT WAS RETIRED
+   BECAUSE OF A DATA LOSS THAT HAD ALREADY HAPPENED.
+
+   Its regex made both the `:mm` and the `am/pm` OPTIONAL, so a BARE leading one- or two-digit
+   number was read as a clock time too:
+
+       "3 jugs of water a day - 1.5 gal"   ->   "jugs of water a day - 1.5 gal"
+
+   Display-only would have been survivable. It was not display-only: the "Strip clock times"
+   button in the bulk standards editor wrote that output BACK INTO THE INPUT, and the next save
+   persisted it. One press and the quantity was gone from the database permanently. The
+   destructive path was the WRITE path, and it only had to run once.
+
+   So the helper is retired rather than narrowed, the button that fed it is removed with it, and
+   the companion that read a start time out of a name goes too — time has had its own column,
+   `time_anchor`, since HT-16 S6. Ordering and quantity are their own fields as well:
+   `sort_order`, `minutes`, `minutes_planned`. A name is a string and it prints as typed.
+   The retired names and the exact regex are in the HT-20 receipt; they are not kept here,
+   because a retired identifier left in the source is the thing a later wire grep-restores. */
+function nameOf(n){ return String(n==null?'':n); }
 function skin(s){
   if(SKINS.indexOf(s)<0) s='statement';
   document.documentElement.setAttribute('data-skin',s);
@@ -309,7 +314,8 @@ function nextId(){
   var best=null,bd=1e9;
   daily().forEach(function(h){
     if(ck[h.id]) return;
-    var s=startMin(h.name); if(s==null) return;
+    /* HT-20 P1: the clock comes from `time_anchor`, never from the name (R70.265). */
+    var s=minsOf(h.time_anchor); if(s==null) return;
     var d=Math.abs(s-m); if(s<=m+15 && d<bd){ bd=d; best=h.id; }
   });
   return best;
@@ -330,7 +336,7 @@ function paintLog(){
     var aa=adherence30(a.id), ba=adherence30(b.id);
     return (aa==null?101:aa)-(ba==null?101:ba); });
   if(S.sort==='heavy')  list.sort(function(a,b){ return (b.minutes||0)-(a.minutes||0); });
-  if(S.sort==='az')     list.sort(function(a,b){ return label(a.name).toLowerCase()<label(b.name).toLowerCase()?-1:1; });
+  if(S.sort==='az')     list.sort(function(a,b){ return nameOf(a.name).toLowerCase()<nameOf(b.name).toLowerCase()?-1:1; });
 
   el('log').className = 'log'+(list.length>16?' split':'');
   el('log').innerHTML = list.map(function(h){
@@ -342,7 +348,7 @@ function paintLog(){
        opens the editor and the editor never follows the link. Tab order is DOM order:
        checkbox -> link -> edit. The row is a <div> now, not a <button>: a <button> cannot legally
        contain the <a>, and nesting them is how a link and an edit come to share one hit box. */
-    var nmIn = esc(label(h.name)) +
+    var nmIn = esc(nameOf(h.name)) +
       ((S.hasCue && h.cue)?'<i class="cue">'+esc(h.cue)+'</i>':'');
     var LK = '<span class="lk"><svg viewBox="0 0 24 24"><path d="M10 13a5 5 0 007.5.5l3-3a5 5 0 00-7-7L11.5 5"/><path d="M14 11a5 5 0 00-7.5-.5l-3 3a5 5 0 007 7L12 19"/></svg></span>';
     var nm = h.link
@@ -350,7 +356,7 @@ function paintLog(){
       : '<span class="nm">'+nmIn+'</span>';
     return '<div class="li'+(on?' on':'')+(h.id===nx?' nx':'')+'" data-h="'+h.id+'">'+
       '<button class="bxw" type="button" data-tog="'+h.id+'" aria-pressed="'+(on?'true':'false')+
-        '" title="'+esc(label(h.name))+'"><span class="bx"></span></button>'+
+        '" title="'+esc(nameOf(h.name))+'"><span class="bx"></span></button>'+
       nm+
       /* HT-16 S7 · R70.104 — THE RED FLAG RENDERER IS DELETED. It printed a red flag glyph and a
          number to the right of a name whenever missRun(habit) >= 3, meaning "you have missed this
@@ -621,14 +627,14 @@ function paintNextMove(){
   var b=a[0], n=daily().length;
   var gain=Math.round(100/n);
   var tight = b.pct>=70;
-  el('nextMove').innerHTML='<div class="nm"><span class="big">'+esc(label(b.h.name))+'</span>'+
+  el('nextMove').innerHTML='<div class="nm"><span class="big">'+esc(nameOf(b.h.name))+'</span>'+
     'Held <b>'+b.pct+'%</b> over the last '+b.of+' logged days at a cost of '+
     (b.mins?('<b>'+b.mins+' minutes</b>'):'<b>no time at all</b>')+
     '. It is the cheapest ground left on the board — about <b>'+gain+
     ' points</b> of score per day, for '+(b.mins?b.mins+' minutes':'nothing')+'.'+
     (tight?' Nothing cheap is badly broken right now, so the next real gain has to come from something that costs time.':'')+
     '<div style="padding-top:8px;color:var(--ink2)">Runners-up: '+
-      a.slice(1,4).map(function(s){ return esc(label(s.h.name))+' ('+s.pct+'%)'; }).join(' · ')+
+      a.slice(1,4).map(function(s){ return esc(nameOf(s.h.name))+' ('+s.pct+'%)'; }).join(' · ')+
     '</div></div>';
 }
 
@@ -817,7 +823,7 @@ function paintPerHabit(){
   var a=stats().sort(function(x,y){ return (x.pct==null?101:x.pct)-(y.pct==null?101:y.pct); });
   el('perHabit').innerHTML='<div class="bars">'+a.map(function(s){
     var p=s.pct==null?0:s.pct;
-    return '<div class="br"><span class="n">'+esc(label(s.h.name))+'</span>'+
+    return '<div class="br"><span class="n">'+esc(nameOf(s.h.name))+'</span>'+
       '<span class="t"><i style="width:'+p+'%;background:'+dens(s.pct)+'"></i></span>'+
       '<span class="p" style="color:'+gtxt(s.pct)+'">'+(s.pct==null?'—':p+'%')+'</span></div>';
   }).join('')+'</div>';
@@ -838,7 +844,7 @@ function paintScatter(){
   a.forEach(function(p){
     s+='<circle cx="'+px(p.mins).toFixed(1)+'" cy="'+py(p.pct).toFixed(1)+'" r="'+
       (3+Math.min(4,p.mins/30)).toFixed(1)+'" fill="'+gcol(p.pct)+'" opacity=".78"><title>'+
-      esc(label(p.h.name))+' · '+p.mins+'m · '+p.pct+'%</title></circle>';
+      esc(nameOf(p.h.name))+' · '+p.mins+'m · '+p.pct+'%</title></circle>';
   });
   s+='<text x="'+(W-6)+'" y="'+(H-4)+'" text-anchor="end">minutes per day →</text>';
   el('scat').innerHTML=s;
@@ -857,7 +863,7 @@ function paintScatter(){
 function paintStreaks(){
   var a=stats().sort(function(x,y){ return y.cur-x.cur || y.best-x.best; }).slice(0,12);
   el('streaks').innerHTML='<table class="kv">'+a.map(function(s){
-    return '<tr><td class="k trunc">'+esc(label(s.h.name))+'</td><td class="v w" style="white-space:nowrap">'+
+    return '<tr><td class="k trunc">'+esc(nameOf(s.h.name))+'</td><td class="v w" style="white-space:nowrap">'+
       '<b style="color:'+(s.cur>0?'var(--accent)':'var(--ink3)')+'">'+s.cur+'</b>'+
       '<span style="color:var(--ink3)"> · '+s.best+'</span></td></tr>';
   }).join('')+'</table>';
@@ -998,7 +1004,6 @@ function openSettings(){
     '<div class="bud" id="bud"></div>'+
     '<div class="tools" style="padding:0 0 8px">'+
       '<button class="btn" id="edAdd">+ Add</button>'+
-      '<button class="btn" id="edStrip" title="Remove the 5:00 - 5:20 style prefixes">Strip clock times</button>'+
       '<span style="flex:1"></span>'+
       '<button class="btn pri" id="edSave">Save standards</button>'+
     '</div>'+
@@ -1048,13 +1053,6 @@ function openSettings(){
     };
     el('edAdd').onclick=add; el('edAdd2').onclick=add;
     el('edSave').onclick=saveStandards; el('edSave2').onclick=saveStandards;
-    el('edStrip').onclick=function(){
-      var n=0;
-      Array.prototype.forEach.call(list.querySelectorAll('.en'),function(inp){
-        var v=label(inp.value); if(v!==inp.value){ inp.value=v; n++; }
-      });
-      toast(n?('stripped '+n+' — now save'):'nothing to strip');
-    };
     el('pSave').onclick=saveProfile;
     el('xCsv').onclick=function(){ dl('ht-days.csv', csvDays()); };
     el('xCsvH').onclick=function(){ dl('ht-standards.csv', csvHabits()); };
@@ -1192,7 +1190,7 @@ function openCircle(){
 /* ---- exports ---- */
 function csvDays(){
   var ids=S.habits.map(function(h){return h.id;});
-  var head=['date','pct','grade','rating'].concat(S.habits.map(function(h){return '"'+label(h.name).replace(/"/g,'""')+'"';}));
+  var head=['date','pct','grade','rating'].concat(S.habits.map(function(h){return '"'+nameOf(h.name).replace(/"/g,'""')+'"';}));
   var out=[head.join(',')];
   dates().forEach(function(k){
     var r=S.byDate[k], ck=r.checked||{};
@@ -1204,7 +1202,7 @@ function csvDays(){
 function csvHabits(){
   var out=['name,group,cadence,minutes,adherence_30d,current_streak,longest_streak'];
   stats().forEach(function(s){
-    out.push('"'+label(s.h.name).replace(/"/g,'""')+'",'+(s.h.group_name||'')+','+
+    out.push('"'+nameOf(s.h.name).replace(/"/g,'""')+'",'+(s.h.group_name||'')+','+
       (s.h.cadence||'daily')+','+(s.h.minutes||0)+','+(s.pct==null?'':s.pct)+','+s.cur+','+s.best);
   });
   return out.join('\n');
@@ -1516,7 +1514,7 @@ function paintNextSmall(){
   if(!a.length){ n.innerHTML='<div class="empty">Log a few days and the next move appears here.</div>'; return; }
   var b=a[0];
   n.innerHTML='<div class="nms"><span class="k">Next move</span>'+
-    '<span class="v">'+esc(label(b.h.name))+'</span>'+
+    '<span class="v">'+esc(nameOf(b.h.name))+'</span>'+
     '<span class="s">'+b.pct+'% over '+b.of+' days · '+(b.mins?b.mins+' min':'no time')+'</span></div>';
 }
 
@@ -1680,7 +1678,7 @@ function paintWeekly(){
     (flags.length
       ? '<div class="flags"><span class="k">Off track — 3+ days running</span>'+
         flags.slice(0,6).map(function(f){
-          return '<div class="fl"><span>'+esc(label(f.h.name))+'</span><b>'+f.run+' days</b></div>'; }).join('')+
+          return '<div class="fl"><span>'+esc(nameOf(f.h.name))+'</span><b>'+f.run+' days</b></div>'; }).join('')+
         '<div class="s">Three consecutive misses is a structural flag, not a judgement — the standard '+
         'is either wrong, mis-cued, or genuinely dropped. Decide which at review.</div></div>'
       : '<div class="flags"><span class="k">Off track — 3+ days running</span>'+
@@ -1688,15 +1686,15 @@ function paintWeekly(){
     (function(){ var rt=returnsIn(weekWindow(0));
       return rt.length
         ? '<div class="flags"><span class="k">Came back this week</span>'+
-          rt.slice(0,6).map(function(r){ return '<div class="fl"><span>'+esc(label(r.h.name))+
+          rt.slice(0,6).map(function(r){ return '<div class="fl"><span>'+esc(nameOf(r.h.name))+
             '</span><b>'+r.n+'×</b></div>'; }).join('')+
           '<div class="s">Returning after a miss is the most strongly evidenced move in this whole '+
           'ledger — it beats never having missed, because nobody sustains never.</div></div>'
         : ''; })()+
     '<div class="wk2"><div><span class="k">Weakest</span>'+
-      st.slice(0,3).map(function(s){ return '<div class="fl"><span>'+esc(label(s.h.name))+'</span><b>'+s.pct+'%</b></div>'; }).join('')+
+      st.slice(0,3).map(function(s){ return '<div class="fl"><span>'+esc(nameOf(s.h.name))+'</span><b>'+s.pct+'%</b></div>'; }).join('')+
     '</div><div><span class="k">Strongest</span>'+
-      st.slice(-3).reverse().map(function(s){ return '<div class="fl"><span>'+esc(label(s.h.name))+'</span><b>'+s.pct+'%</b></div>'; }).join('')+
+      st.slice(-3).reverse().map(function(s){ return '<div class="fl"><span>'+esc(nameOf(s.h.name))+'</span><b>'+s.pct+'%</b></div>'; }).join('')+
     '</div></div>';
 }
 
@@ -2402,7 +2400,7 @@ function earned(k){ return committed() - remaining(k); }
 
   /* archive is `active=false` + `archived_at` — DEC-037: it leaves TODAY, it stays in every past day */
   async function archiveOne(h){
-    if(!confirm('Archive "'+label(h.name)+'"? It leaves TODAY and stays in every past day and export.')) return;
+    if(!confirm('Archive "'+nameOf(h.name)+'"? It leaves TODAY and stays in every past day and export.')) return;
     var res = await sb.from('habits')
       .update({ active:false, archived_at:new Date().toISOString() })
       .eq('id',h.id).eq('user_id',S.me.id);
@@ -2919,7 +2917,7 @@ function earned(k){ return committed() - remaining(k); }
           (doneOn(h,k)?on:off).push(v);
         });
         if(on.length<3||off.length<3) return;
-        rank.push({ n:label(h.name), lift:meanOf(on)-meanOf(off), on:on.length, off:off.length });
+        rank.push({ n:nameOf(h.name), lift:meanOf(on)-meanOf(off), on:on.length, off:off.length });
       });
       rank.sort(function(a,b){ return b.lift-a.lift; });
       if(!rank.length){
@@ -4264,7 +4262,7 @@ function earned(k){ return committed() - remaining(k); }
     S.habits.forEach(function(h){
       if((h.group_name||'Other')!==group) return;
       var a=adherence30(h.id); if(a==null) return;
-      if(out==null || a<out.pct) out={ name:label(h.name), pct:a };
+      if(out==null || a<out.pct) out={ name:nameOf(h.name), pct:a };
     });
     return out;
   }
@@ -4550,7 +4548,7 @@ function earned(k){ return committed() - remaining(k); }
   window.__HT16.state = function(){
     return { hasTime:!!S.hasTime, date:S.date, today:today(),
              habits:S.habits.map(function(h){
-               return { id:h.id, name:label(h.name), group:h.group_name||'Other',
+               return { id:h.id, name:nameOf(h.name), group:h.group_name||'Other',
                         cadence:h.cadence||'daily', minutes:h.minutes||0,
                         time_anchor:h.time_anchor==null?null:h.time_anchor,
                         minutes_planned:h.minutes_planned==null?null:h.minutes_planned,
@@ -4885,7 +4883,7 @@ function earned(k){ return committed() - remaining(k); }
       var p=adherence30(h.id);
       var ms=missRun(h.id);
       return '<tr data-h="'+h.id+'">'+
-        '<td class="n">'+esc(label(h.name))+'</td>'+
+        '<td class="n">'+esc(nameOf(h.name))+'</td>'+
         '<td class="p"><i style="background:'+rf(p)+'"></i>'+(p==null?'—':p+'%')+'</td>'+
         '<td class="num">'+curStreak(h)+'</td>'+
         '<td class="num'+(ms>=3?' bad':'')+'">'+(ms?('⚑'+ms):'0')+'</td>'+
@@ -5131,7 +5129,7 @@ function earned(k){ return committed() - remaining(k); }
     var hs=S.habits.slice().sort(function(a,b){
       var x=adherence30(a.id), y=adherence30(b.id);
       x=(x==null?101:x); y=(y==null?101:y);
-      return x-y || (label(a.name)<label(b.name)?-1:1);
+      return x-y || (nameOf(a.name)<nameOf(b.name)?-1:1);
     });
     host.innerHTML=circleDummy()+
       '<table class="h17dt h18dt"><thead><tr><th>standard</th><th>30d</th>'+
