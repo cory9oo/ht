@@ -3915,16 +3915,36 @@ function earned(k){ return committed() - remaining(k); }
        so all 31 fit, and the stride below stays only as the safety net for a panel that genuinely
        cannot hold them. 9 stays the floor for a chart with no second line to carry the rhythm. */
     var FLOOR = (n <= 12) ? 7 : (opts.twoLine ? 7 : 9);
-    /* the largest size at which the WIDEST real label fits its own column, measured. The stride
-       is reached only when even the floor will not fit - a panel too small for the set. */
+    /* the largest size at which the WIDEST real label fits its own column, measured. */
     fontPx = FLOOR; stride = 1;
     var sz, wAtFloor = labWidth(widest, FLOOR);
     for(sz = 9.5; sz >= FLOOR; sz -= 0.5){
       if(labWidth(widest, sz) + 2 <= stepPx){ fontPx = sz; break; }
     }
+    /* ---- HT-20 P3 · EVERY DAY GETS ITS NUMBER (R70.253) --------------------------------
+       THE ARITHMETIC ALREADY REFUSED THE SINGLE ROW, and it is written into `data-axis`:
+       at Cory's own 2133px window a 30-day month gives each label 10.97px of column and a
+       two-digit number renders 9.51px wide, which needs 11.51px with its 2px of air. It does
+       not fit at ANY supported width — 1280 gives 5.83px — so a smaller font was never the
+       answer. STAGGERING ODD AND EVEN ONTO TWO ROWS DOUBLES THE EFFECTIVE STEP: 21.94px at
+       2133, 20.90 at 1920, 11.66 at 1280, and the label needs 11.53. It fits at all three.
+
+       ORDER OF REMEDY, applied only as far as needed and every step measured:
+         1. stagger onto two rows      -> effective step x2
+         2. shrink the label to a 9px floor
+         3. drop the weekday letter     -> last resort, and first below 400px on the phone
+       THINNING IS NOT AN OPTION at any supported width. `stride` survives only as the floor of
+       last resort for a panel too narrow to hold the set even staggered — under 250px, where
+       there is no honest layout — and the axis records which remedy it took. */
+    var remedy = 'single';
     if(sz < FLOOR){
       fontPx = FLOOR;
-      stride = Math.ceil((wAtFloor + 2) / Math.max(1, stepPx));
+      if(opts.twoLine && (wAtFloor + 2) <= stepPx * 2){
+        remedy = 'stagger';                       /* 1 — every day keeps its number */
+      } else {
+        stride = Math.ceil((wAtFloor + 2) / Math.max(1, stepPx * (opts.twoLine ? 2 : 1)));
+        remedy = opts.twoLine ? 'stagger+stride' : 'stride';
+      }
     }
     if(probeEl && probeEl.parentNode) probeEl.parentNode.removeChild(probeEl);
     /* the axis states its own arithmetic. Invisible, three dozen bytes, and it is the difference
@@ -3933,7 +3953,8 @@ function earned(k){ return committed() - remaining(k); }
        make (B2 asked for the width to be MEASURED; this is where the measurement is kept). */
     try{ svg.setAttribute('data-axis', 'n='+n+' step='+stepPx.toFixed(2)+
       ' label="'+widest+'" w@'+FLOOR+'='+wAtFloor.toFixed(2)+
-      ' font='+fontPx+' stride='+stride); }catch(e){}
+      ' font='+fontPx+' stride='+stride+' remedy='+remedy+
+      ' effstep='+(stepPx*(remedy.indexOf('stagger')===0?2:1)).toFixed(2)); }catch(e){}
     /* the two rounding steps used to disagree by a fraction of a pixel and thin the YEAR to seven
        months when twelve fitted; deciding the stride from `fitPx` directly removes the argument. */
     /* HT-18e (C, Cory note 3): "I want to see Monday through Sunday abbreviation somehow. And
@@ -3959,12 +3980,18 @@ function earned(k){ return committed() - remaining(k); }
       if(todayIx>=0){ delete kept[todayIx-1]; delete kept[todayIx+1]; kept[todayIx]=1; }
       kept[0]=1; kept[n-1]=1;
     }
+    /* HT-20 P3: two rows when the remedy is a stagger — EVEN indices on the lower row (which is
+       where a single row already sat, so nothing moves for an axis that never needed this) and
+       ODD indices 10px above it. The band is already 52px deep for the two-line form, so the
+       upper row costs no height; the weekday letters keep their own line at H-6. */
+    var yLo = H-(twoLine?18:8), yHi = yLo-10, stag = (remedy.indexOf('stagger')===0);
     pts.forEach(function(p,i){
       if(!kept[i]) return;
       var x=px(i).toFixed(1);
       var at = p.key!=null ? ' '+opts.attr+'="'+p.key+'"' : '';
-      s+='<text class="xl'+(i===todayIx?' xl-today':'')+'" x="'+x+'" y="'+
-         (H-(twoLine?18:8))+'" text-anchor="middle" font-size="'+fontPx+'"'+at+'>'+
+      var y = (stag && (i%2)) ? yHi : yLo;
+      s+='<text class="xl'+(stag?(i%2?' xl-hi':' xl-lo'):'')+(i===todayIx?' xl-today':'')+
+         '" x="'+x+'" y="'+y+'" text-anchor="middle" font-size="'+fontPx+'"'+at+'>'+
          '<tspan x="'+x+'">'+esc(p.x)+'</tspan></text>';
     });
     /* ---- HT-19 B2 - THE DAY AXIS (R70.234) ---------------------------------------------
