@@ -112,12 +112,19 @@ function ckOf(k){ var r=S.byDate[k]; return (r&&r.checked)||{}; }
 function pctOf(ck,ids){ if(!ids||!ids.length) return 0; var n=0;
   for(var i=0;i<ids.length;i++) if(ck[ids[i]]) n++;
   return Math.round(n/ids.length*100); }
-function weekDone(hid,k){
-  var d=dnum(k), mon=new Date(d); mon.setDate(d.getDate()-((d.getDay()+6)%7));
+/* HT-20 P2 (R70.263): ONE traversal of the period, and it returns WHICH DAY rather than a
+   boolean, because unchecking a weekly has to reach the day the completion was actually logged
+   on. The most recent one wins — a period holds at most one completion, and if an older build
+   left two, the one a person is looking at is the last. `weekDone` is now a question this
+   answers, not a second walk of the same seven days. */
+function weekCheckDay(hid,k){
+  var d=dnum(k), mon=new Date(d), found=null;
+  mon.setDate(d.getDate()-((d.getDay()+6)%7));
   for(var i=0;i<7;i++){ var c=new Date(mon); c.setDate(mon.getDate()+i);
-    if(c>d) break; if(ckOf(dk(c))[hid]) return true; }
-  return false;
+    if(c>d) break; if(ckOf(dk(c))[hid]) found=dk(c); }
+  return found;
 }
+function weekDone(hid,k){ return weekCheckDay(hid,k)!=null; }
 function doneOn(h,k){ return h.cadence==='weekly' ? weekDone(h.id,k) : !!ckOf(k)[h.id]; }
 function rolling(n,upto){
   var end=upto||today(), a=[];
@@ -244,6 +251,24 @@ async function saveDay(opts){
     r.closed_at = row.closed_at;
   }
   var res = await sb.from('days').upsert(row,{ onConflict:'user_id,date' });
+  if(res.error) toast('not saved');
+  return res;
+}
+
+/* HT-20 P2: save a day that is NOT the one on screen — the only caller is unchecking a weekly
+   whose completion lives on an earlier day of the same period. It re-derives that day's grade
+   from THAT DAY'S OWN `active_set`, never from today's `daily()`: repricing a past day from a
+   later list is the thing `saveDay`'s active_set write exists to prevent (P4), and reaching back
+   into a past row is exactly where that rule would be broken by accident. */
+async function saveDayFor(k){
+  if(k===S.date) return saveDay();
+  var r=S.byDate[k]; if(!r || !S.me) return null;
+  var ids=(r.active_set && r.active_set.length) ? r.active_set
+                                               : daily().map(function(h){return h.id;});
+  r.pct = pctOf(r.checked||{}, ids);
+  var res = await sb.from('days').upsert(
+    { user_id:S.me.id, date:k, checked:r.checked||{}, active_set:ids, pct:r.pct },
+    { onConflict:'user_id,date' });
   if(res.error) toast('not saved');
   return res;
 }
@@ -402,10 +427,25 @@ function toggle(hid){
   var r=S.byDate[S.date] || (S.byDate[S.date]={date:S.date,checked:{},pct:0});
   r.checked = r.checked || {};
   if(h.cadence==='weekly'){
-    /* a weekly is credited on the day it is actually done */
+    /* ---- HT-20 P2 · A CHECK IS ALWAYS A TOGGLE (R70.263) ------------------------------
+       A weekly is still CREDITED on the day it is done. What changed is that it can be UNDONE
+       from any day in the same period. The old branch refused with "already done this week",
+       which made the box a one-way door: tick it on Monday by mistake and there was no screen
+       anywhere in the app that would untick it. A control that only goes one way is not a
+       checkbox.
+       So an uncheck reaches the day the completion actually lives on, clears it there, and saves
+       THAT day against ITS OWN active_set — never against today's list, which would reprice a
+       past grade. A re-check then lands on the CURRENT day, because that is when it was done;
+       history is not rewritten by hand. */
     if(r.checked[hid]) delete r.checked[hid];
-    else if(weekDone(hid,S.date)){ toast('already done this week'); return; }
-    else r.checked[hid]=true;
+    else {
+      var src=weekCheckDay(hid,S.date);
+      if(src){
+        var rr=S.byDate[src];
+        if(rr && rr.checked) delete rr.checked[hid];
+        saveDayFor(src);
+      } else r.checked[hid]=true;
+    }
   } else {
     if(r.checked[hid]) delete r.checked[hid]; else r.checked[hid]=true;
   }
