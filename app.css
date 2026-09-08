@@ -1742,3 +1742,18 @@ html[data-simple] .h18jdoc-failed{ color:var(--red-bright) }
   html[data-simple] #h18Charts{ display:flex; flex-direction:column }
   html[data-simple] #h18Comp{ display:block }
 }
+
+/* ======================= HT-20 · POLISH THE FOUR (2026-09-08) ================================
+   P4 · THE LIFE GRID FILLS ITS BOX (R70.254)
+   `.wkscroll` reserves 6px at the foot for a horizontal scrollbar. On the phone that is right —
+   the grid scrolls sideways there. On the desktop the same element is `.h18fit`, which is
+   `overflow:hidden`: there is no scrollbar, so the 6px is dead space with no job, and it was the
+   last of the gap between the grid and the bottom of its box (MEASURED: 6.09px at all three
+   desktop widths after the cell math was fixed). The phone rule is untouched. */
+html[data-simple] .wkscroll.h18fit{ padding-bottom:0 }
+/* P4 · and the box keeps its padding. The panel's own token was 12px left, 12px right, 10px
+   bottom — three sides, two values — so the grid could not sit the same distance from all three
+   edges it touches however well it was drawn. One value, and the four numbers in the receipt are
+   the same number. (The TOP gap is to the LIFE heading, not to the panel's edge: this panel has a
+   header, and the space above the grid belongs to it.) */
+html[data-simple] .grid > #h16Ins{ padding-bottom:12px }

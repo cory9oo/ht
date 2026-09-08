@@ -5421,15 +5421,40 @@ function earned(k){ return committed() - remaining(k); }
        and the height does not depend on the width, so writing --h19life here cannot start a
        feedback loop; the track settles on the first paint. */
     var availH=Math.max(80, Math.round(box.height));
+    var availW=Math.max(120, Math.round(box.width));
+    /* THE COLUMN'S WIDTH IS STILL DERIVED FROM THE HEIGHT, and it has to stay that way. It is the
+       track width Cory approved ("besides that, it looks really good"), and it is also what keeps
+       `--h19life` free of a feedback loop: height decides the track, the track decides the width,
+       and the width decides nothing. P4 changes what is DRAWN inside the box, never the box. */
     var cellOne=Math.max(MINCELL, Math.min(9, Math.floor(availH/YEARS) - GAP));
     var Pone=cellOne+GAP;
-    var plan={ f:1, rows:YEARS, cols:WEEKS, cell:cellOne, P:Pone,
-               W:LEFT+WEEKS*Pone, H:TOP+YEARS*Pone, fits:true, scale:1, eff:cellOne,
-               table:'one graph (Cory 2026-09-07): cell=min(9,floor('+availH+'/100)-1)='+cellOne+
-                     ' -> '+(LEFT+WEEKS*Pone)+'x'+(TOP+YEARS*Pone) };
     document.documentElement.style.setProperty('--h19life', (LEFT+WEEKS*Pone+26)+'px');
-    var f=plan.f, rows=plan.rows, cell=plan.cell, P=plan.P;
-    var foldW=LEFT+WEEKS*P;
+
+    /* ---- HT-20 P4 · THE LIFE GRID FILLS ITS BOX (R70.254) ----------------------------------
+       MEASURED at 2133: 61px of dead height and 6px of dead width inside the host; 72 and 19
+       against the panel. At 1280 it was worse in the other direction — 110px of dead WIDTH.
+       BOTH COME FROM THE SAME TWO DECISIONS: the cell was SQUARE and it was an INTEGER. A square
+       cell sized off the height cannot also fit the width of a box with a different aspect ratio,
+       and `floor(673.91/100)-1 = 5` throws away 0.74px on every one of a hundred rows before the
+       aspect ratio is even considered. 100 x 0.74 is the 61px, to the pixel.
+       SO THE CELL IS NEITHER SQUARE NOR WHOLE. Width and height are solved independently against
+       the box the layout actually gave, gutters reserved FIRST, and the remainder is zero by
+       construction rather than by luck:
+           cellW = (contentW - labelGutter  - 51*gap) / 52
+           cellH = (contentH - headerGutter - 99*gap) / 100
+       Sub-pixel rects are exactly what SVG is for; the 1px gap between cells is still a whole
+       pixel, so the grid reads as a grid and not as a blur. */
+    var cellW=Math.max(0.5, (availW - LEFT - (WEEKS-1)*GAP) / WEEKS);
+    var cellH=Math.max(0.5, (availH - TOP  - (YEARS-1)*GAP) / YEARS);
+    var PW=cellW+GAP, PH=cellH+GAP;
+    var plan={ f:1, rows:YEARS, cols:WEEKS, cell:cellW, cellW:cellW, cellH:cellH,
+               P:PW, fits:true, scale:1, eff:Math.min(cellW,cellH),
+               W:LEFT+WEEKS*PW-GAP, H:TOP+YEARS*PH-GAP,
+               table:'fills the box (HT-20 P4): '+availW+'x'+availH+' -> cellW=('+availW+'-'+LEFT+
+                     '-51)/52='+cellW.toFixed(2)+' cellH=('+availH+'-'+TOP+'-99)/100='+
+                     cellH.toFixed(2)+' · track --h19life='+(LEFT+WEEKS*Pone+26) };
+    var f=plan.f, rows=plan.rows, cell=cellW, P=PW;
+    var foldW=LEFT+WEEKS*PW-GAP;
     function foldX(i){ return i*(foldW+FOLDGAP); }
 
     /* one background rect per FOLD and one <pattern> per fold for the cell edges: ~5,200 cells and
@@ -5437,14 +5462,14 @@ function earned(k){ return committed() - remaining(k); }
     var bg='', pat='<defs>', ov='';
     for(var i=0;i<f;i++){
       var rowsIn=Math.min(rows, YEARS-i*rows);
-      var bx=foldX(i)+LEFT, bw=WEEKS*P-GAP, bh=rowsIn*P-GAP;
+      var bx=foldX(i)+LEFT, bw=WEEKS*PW-GAP, bh=rowsIn*PH-GAP;
       /* --surface-2, not --surface: the panel behind it IS --surface, so the unlived weeks were
          invisible and the grid had no body. This is the one line that makes it read as a grid. */
       bg+='<rect x="'+bx+'" y="'+TOP+'" width="'+bw+'" height="'+bh+'" fill="var(--surface-2)"/>';
-      pat+='<pattern id="wkcell18_'+i+'" x="'+bx+'" y="'+TOP+'" width="'+P+'" height="'+P+
+      pat+='<pattern id="wkcell18_'+i+'" x="'+bx+'" y="'+TOP+'" width="'+PW+'" height="'+PH+
            '" patternUnits="userSpaceOnUse">'+
-           '<rect x="'+cell+'" y="0" width="'+GAP+'" height="'+P+'" fill="var(--bg)"/>'+
-           '<rect x="0" y="'+cell+'" width="'+P+'" height="'+GAP+'" fill="var(--bg)"/></pattern>';
+           '<rect x="'+cellW+'" y="0" width="'+GAP+'" height="'+PH+'" fill="var(--bg)"/>'+
+           '<rect x="0" y="'+cellH+'" width="'+PW+'" height="'+GAP+'" fill="var(--bg)"/></pattern>';
       ov+='<rect x="'+bx+'" y="'+TOP+'" width="'+bw+'" height="'+bh+
           '" fill="url(#wkcell18_'+i+')" pointer-events="none"/>';
     }
@@ -5455,16 +5480,16 @@ function earned(k){ return committed() - remaining(k); }
        Age labels every ten years DOWN THE LEFT of their own fold, never along the top. */
     for(var y=0;y<YEARS;y++){
       var fi=Math.floor(y/rows), ry=y%rows;
-      var x0=foldX(fi)+LEFT, yy=TOP+ry*P;
+      var x0=foldX(fi)+LEFT, yy=TOP+ry*PH;
       var st=y*WEEKS, en=st+WEEKS-1, livedTo=Math.min(en, nowWeek);
       if(livedTo>=st){
         var count=livedTo-st+1;
         lived+=count;
-        s+='<rect class="lv" x="'+x0+'" y="'+yy+'" width="'+(count*P-GAP)+'" height="'+cell+
+        s+='<rect class="lv" x="'+x0+'" y="'+yy+'" width="'+(count*PW-GAP)+'" height="'+cellH+
            '" fill="var(--grey)" opacity=".6"/>';
       }
       if(y%10===0)
-        s+='<text class="wl" x="'+(x0-4)+'" y="'+(yy+cell)+'" text-anchor="end">'+y+'</text>';
+        s+='<text class="wl" x="'+(x0-4)+'" y="'+(yy+cellH)+'" text-anchor="end">'+y+'</text>';
     }
     /* HT-18c (his note 5): "Life graph is missing x and y values - add them." The AGE axis (y) was
        already down the left. The WEEK axis (x) had never been drawn at all, so the grid carried one
@@ -5474,11 +5499,11 @@ function earned(k){ return committed() - remaining(k); }
        and rendered on top of each other ("5052" on the crop). The end of the row is labelled by 52,
        which is the number that means something; 50 is a tick with nothing to say. */
     for(var wx=0; wx<=WEEKS-10; wx+=10){
-      s+='<text class="wl wlx" x="'+(LEFT+wx*P)+'" y="'+(TOP-3)+'" text-anchor="middle">'+
+      s+='<text class="wl wlx" x="'+(LEFT+wx*PW)+'" y="'+(TOP-3)+'" text-anchor="middle">'+
          wx+'</text>';
     }
     /* anchored END: centred on the grid's right edge it hung past the svg and rendered as "5" */
-    s+='<text class="wl wlx" x="'+(LEFT+WEEKS*P)+'" y="'+(TOP-3)+'" text-anchor="end">'+
+    s+='<text class="wl wlx" x="'+(LEFT+WEEKS*PW-GAP)+'" y="'+(TOP-3)+'" text-anchor="end">'+
        WEEKS+'</text>';
     /* the logged weeks, each its own cell on the ramp, each carrying its own tooltip */
     Object.keys(by).forEach(function(k){
@@ -5488,27 +5513,29 @@ function earned(k){ return committed() - remaining(k); }
       var pct=mean18(by[wi]);
       var tip='week '+wi+' · '+weekRange18(wi,b)+' · '+
               (pct==null?'—':Math.round(pct)+'%');
-      s+='<rect class="lw" x="'+(foldX(fi2)+LEFT+wk*P)+'" y="'+(TOP+ry2*P)+'" width="'+cell+
-         '" height="'+cell+'" fill="'+window.__HT16.rampFill(pct)+'" data-wk="'+wi+
+      s+='<rect class="lw" x="'+(foldX(fi2)+LEFT+wk*PW)+'" y="'+(TOP+ry2*PH)+'" width="'+cellW+
+         '" height="'+cellH+'" fill="'+window.__HT16.rampFill(pct)+'" data-wk="'+wi+
          '" data-tip="'+esc(tip)+'"><title>'+esc(tip)+'</title></rect>';
     });
 
     var cur='';
     var cy=Math.floor(nowWeek/WEEKS), cwk=nowWeek%WEEKS;
     if(cy<YEARS){
-      var cfi=Math.floor(cy/rows), cry=cy%rows, cx=foldX(cfi)+LEFT, cyy=TOP+cry*P;
+      var cfi=Math.floor(cy/rows), cry=cy%rows, cx=foldX(cfi)+LEFT, cyy=TOP+cry*PH;
       /* the current-age row gets a SUBTLE RULE across it, not a label: his age is DATA, derived
          from the birthdate, and it is never typed anywhere (R70.95) */
-      cur+='<rect class="cage" data-row="'+cy+'" x="'+cx+'" y="'+cyy+'" width="'+(WEEKS*P-GAP)+
-           '" height="'+cell+'" fill="none" stroke="var(--outline-today)" stroke-width="1"'+
+      cur+='<rect class="cage" data-row="'+cy+'" x="'+cx+'" y="'+cyy+'" width="'+(WEEKS*PW-GAP)+
+           '" height="'+cellH+'" fill="none" stroke="var(--outline-today)" stroke-width="1"'+
            ' opacity=".35"/>';
-      cur+='<rect class="cw" x="'+(cx+cwk*P-0.5)+'" y="'+(cyy-0.5)+'" width="'+(cell+1)+
-           '" height="'+(cell+1)+'" fill="none" stroke="var(--outline-today)"'+
+      cur+='<rect class="cw" x="'+(cx+cwk*PW-0.5)+'" y="'+(cyy-0.5)+'" width="'+(cellW+1)+
+           '" height="'+(cellH+1)+'" fill="none" stroke="var(--outline-today)"'+
            ' stroke-width="1.5"/>';
     }
 
-    var W=f*foldW+(f-1)*FOLDGAP, H=TOP+rows*P;
-    var dW=Math.floor(W*plan.scale), dH=Math.floor(H*plan.scale);
+    var W=f*foldW+(f-1)*FOLDGAP, H=TOP+rows*PH-GAP;
+    /* the drawn size IS the viewBox size, so preserveAspectRatio has nothing left to letterbox:
+       one user unit is one CSS pixel and the grid ends where the box ends. */
+    var dW=Math.round(W), dH=Math.round(H);
     /* the phone keeps the BARE `.wkscroll` HT-17 used: `.natural` carries `svg{width:auto}`, which
        overrides the width/height attributes the plan just computed and stretched a 276x502 grid to
        546x1016 (MEASURED). Bare `.wkscroll` is `overflow-x:auto` and nothing else. */
@@ -5520,7 +5547,11 @@ function earned(k){ return committed() - remaining(k); }
     host.setAttribute('data-cols', WEEKS);
     host.setAttribute('data-rows', YEARS);
     host.setAttribute('data-folds', f);
-    host.setAttribute('data-cell', cell);
+    /* P4 asks data-cell to record BOTH, and the axis-style audit trail is the honest place for
+       it: `6.74x6.29` says non-square out loud where a single number would hide it. */
+    host.setAttribute('data-cell', cellW.toFixed(2)+'x'+cellH.toFixed(2));
+    host.setAttribute('data-cellw', cellW.toFixed(2));
+    host.setAttribute('data-cellh', cellH.toFixed(2));
     host.setAttribute('data-scale', plan.scale.toFixed(3));
     host.setAttribute('data-drawn', dW+'x'+dH);
     host.setAttribute('data-plan', plan.table);
