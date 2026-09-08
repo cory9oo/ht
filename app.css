@@ -1757,3 +1757,37 @@ html[data-simple] .wkscroll.h18fit{ padding-bottom:0 }
    the same number. (The TOP gap is to the LIFE heading, not to the panel's edge: this panel has a
    header, and the space above the grid belongs to it.) */
 html[data-simple] .grid > #h16Ins{ padding-bottom:12px }
+
+/* --------------------------------------------------------------------------------------------
+   P5 · THE RULES BREATHE AND THE ROWS STOP SHOUTING (R70.255 + R70.262)
+   MEASURED BEFORE: a group rule was `padding:4px 0 0` — four pixels above the label and NOTHING
+   below it, so the first standard of a group sat on the rule; the row text ran at line-height
+   1.18 (15.93px on 13.5px), which clips descenders on a name with a `g` or a `y`; the
+   "+ ADD STANDARD TO x" control had zero top padding and hung off the row above it as a caption;
+   and every row carried a 1px-bordered 44x44 box around its pencil, which is what made a list of
+   plain sentences read as a grid of cells.
+   THE SEPARATOR IS ONE TOKEN NOW. The group rule drew its line in `--rule2` while the rows drew
+   theirs in `--rule` — two weights of the same idea, and the brighter of the two was on the
+   element that needs it least, because the LABEL already says where a group starts. (The measured
+   values of both tokens are in the HT-20 receipt; a literal hex does not belong in this file.)
+   Nothing here changes state colour: the dark-red and dark-green hints are untouched. -------- */
+html[data-simple] #h18Comp #log > .grp,
+html[data-simple] .grp{
+  padding:6px 0;                                   /* 6 above, 6 below — R70.255, measured */
+  border-bottom:1px solid var(--rule);             /* ONE separator token, shared with the rows */
+  color:var(--muted);                              /* the small-caps muted token */
+  line-height:1.35 }
+/* the row text gets room for its own descenders, and the box it sits in is tall enough already
+   (min-height 34px against a 28.9px line), so no row grows and no row count changes. */
+html[data-simple] #h18Comp .li .nm,
+html[data-simple] .li .nm{ line-height:1.35 }
+html[data-simple] #h18Comp .li .nm{ font-size:14px }
+/* the pencil keeps its 44x44 hit target and loses the border that drew a cell around it */
+html[data-simple] .li .edp{ border:0 }
+html[data-simple] .li .edp:hover{ border:0; color:var(--green-bright) }
+/* "+ ADD STANDARD TO x" is a row, with a row's padding, not a caption pinned under a rule */
+html[data-simple] #h18Comp #log > [data-add],
+html[data-simple] #h18Comp #log > .eadd{
+  padding:2px 6px; min-height:calc(var(--h19row) * 0.62);
+  display:flex; align-items:center;
+  border-bottom:1px solid var(--rule); color:var(--muted) }
