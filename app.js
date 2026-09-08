@@ -5515,34 +5515,94 @@ function earned(k){ return committed() - remaining(k); }
     return all.filter(function(h){ return !isSabbathGroup(h); });
   };
 
-  /* THE ROW. Idempotent, created once, and only when the rule above is already in force. If any
-     habit already matches /sabbath/i it is USED and nothing is created (PASTE 68). Whether it was
-     found or created is logged once and goes in the receipt. */
+  /* ---- HT-20 P1a · THE GUARD THAT WAS NOT A GUARD (R70.239) -----------------------------
+     MEASURED LIVE 2026-09-08: FIVE active rows named "Sabbath - rest and worship", four of them
+     created inside fifty-eight seconds. Four inserts in a minute is not a person clicking.
+
+     THE CAUSE IS ONE LINE, and it is `S.habits` being initialised to `[]`:
+
+         if(!S.hasClosedAt && !S.habits) return;      // meant "wait for the habits to load"
+
+     An empty ARRAY is truthy, so `!S.habits` is false on the first paint and on every paint after
+     it — the early return could never fire. And this ran from `quad()`, which runs on EVERY paint.
+     A paint that lands before the habits fetch resolves therefore read an empty list, found no
+     Sabbath row, and inserted one. Every load of the app added another, and because the rule
+     above narrows `daily()` to the SABBATH group on a Saturday, the day meant to be ONE box was
+     on its way to being graded out of five.
+
+     SO THE GUARD IS REBUILT ON THREE RULES, and all three are needed:
+       1. IT ASKS THE DATABASE AND AWAITS THE ANSWER. Reading a local array that a previous paint
+          populated is not a uniqueness check; it is a race with the network. The query also sees
+          INACTIVE rows, which `S.habits` never does — so an archived Sabbath row can no longer
+          cause a new one to be created.
+       2. IT RUNS ONCE PER SESSION, held by a promise, not by a flag set halfway through.
+       3. IT NEVER RUNS FROM A RENDER PATH. It is hung off `load()`, which happens once per
+          session by construction; `quad()` no longer calls it at all.
+     And it REPAIRS what the defect already did: more than one live Sabbath row means keep the
+     OLDEST by `created_at` and archive the rest — `active:false` + `archived_at`, the same shape
+     `archiveOne()` uses. Data is never deleted (DEC-037 · R70.79). */
   var SAB_NAME='Sabbath - rest and worship', SAB_GROUP='SABBATH';
+  var _sabRun=null;
   function ensureSabbath(){
-    if(advanced() || !S.me || window.__h18SabDone) return;
-    if(!S.hasClosedAt && !S.habits) return;
-    var found=sabbathHabit();
-    if(found){
-      window.__h18SabDone='found';
-      try{ console.log('HT-19 B3: Sabbath standard FOUND —', found.name); }catch(e){}
-      return;
+    if(advanced() || !S.me) return null;
+    if(_sabRun) return _sabRun;                    /* once per SESSION, never once per paint */
+    _sabRun = sabbathOnce().catch(function(e){
+      window.__h18SabDone='failed';
+      try{ console.log('HT-20 P1a: Sabbath check failed —', e && e.message); }catch(_){}
+      return 'failed';
+    });
+    return _sabRun;
+  }
+  async function sabbathOnce(){
+    var q = await sb.from('habits').select('id,name,active,created_at,sort_order')
+                    .eq('user_id', S.me.id);
+    if(q && q.error){
+      window.__h18SabDone='probe-failed';
+      try{ console.log('HT-20 P1a: Sabbath probe failed —', q.error.message); }catch(e){}
+      return 'probe-failed';
     }
-    window.__h18SabDone='creating';
+    var mine=(q && q.data || []).filter(function(r){ return /sabbath/i.test(r.name||''); });
+    var live=mine.filter(function(r){ return r.active!==false; });
+    /* oldest first. A row with no `created_at` sorts last rather than winning by accident. */
+    live.sort(function(a,b){
+      var x=String(a.created_at||'￿'), y=String(b.created_at||'￿');
+      return x<y?-1:(x>y?1:0); });
+
+    if(live.length>1){
+      var keep=live[0], extra=live.slice(1), stamp=new Date().toISOString(), failed=0;
+      for(var i=0;i<extra.length;i++){
+        var r = await sb.from('habits').update({ active:false, archived_at:stamp })
+                        .eq('id',extra[i].id).eq('user_id',S.me.id);
+        if(r && r.error) failed++;
+      }
+      window.__h18SabDone='deduped';
+      window.__h18SabKept=keep.id;
+      window.__h18SabArchived=extra.map(function(r){ return r.id; });
+      try{ console.log('HT-20 P1a: Sabbath rows deduped — kept', keep.id,
+                       '('+keep.created_at+'), archived', extra.length, 'failed', failed); }catch(e){}
+      if(!failed && typeof reload==='function') await reload();
+      return 'deduped';
+    }
+    if(live.length===1){
+      window.__h18SabDone='found';
+      try{ console.log('HT-20 P1a: Sabbath standard FOUND —', live[0].name); }catch(e){}
+      return 'found';
+    }
+
+    var orders=(q && q.data || []).map(function(x){ return x.sort_order||0; });
     var rec={ user_id:S.me.id, name:SAB_NAME, group_name:SAB_GROUP, cadence:'daily',
               minutes:0, active:true,
-              sort_order:(S.habits.length? Math.max.apply(null,
-                 S.habits.map(function(x){ return x.sort_order||0; }))+1 : 0) };
-    Promise.resolve(sb.from('habits').insert(rec)).then(function(res){
-      if(res && res.error){
-        window.__h18SabDone='failed';
-        try{ console.log('HT-19 B3: Sabbath standard NOT created —', res.error.message); }catch(e){}
-        return;
-      }
-      window.__h18SabDone='created';
-      try{ console.log('HT-19 B3: Sabbath standard CREATED —', SAB_NAME); }catch(e){}
-      if(typeof reload==='function') reload();
-    }).catch(function(){ window.__h18SabDone='failed'; });
+              sort_order:(orders.length? Math.max.apply(null, orders)+1 : 0) };
+    var res = await sb.from('habits').insert(rec);
+    if(res && res.error){
+      window.__h18SabDone='failed';
+      try{ console.log('HT-20 P1a: Sabbath standard NOT created —', res.error.message); }catch(e){}
+      return 'failed';
+    }
+    window.__h18SabDone='created';
+    try{ console.log('HT-20 P1a: Sabbath standard CREATED —', SAB_NAME); }catch(e){}
+    if(typeof reload==='function') await reload();
+    return 'created';
   }
 
   /* the list is filtered after the paint rather than inside it, because paintLog belongs to the
@@ -5754,7 +5814,9 @@ function earned(k){ return committed() - remaining(k); }
     if(desktop()){ quadrants(); rightBlock(); journalBottom(); bindGrow(); unGrow(); chartsFit();
                    adhLine(); groupBlock(); }
     else { unquadrants(); unRightBlock(); unjournalBottom(); unAdh(); }
-    paintLife18(); watchLife(); sabbathList(); watchLog(); ensureSabbath();          /* S6 - both modes: the phone gets the same shape at a fixed cell */
+    /* HT-20 P1a: `ensureSabbath()` USED TO BE CALLED HERE, and that is the whole defect — quad()
+       is a render path and runs on every paint. It is hung off load() below instead. */
+    paintLife18(); watchLife(); sabbathList(); watchLog();          /* S6 - both modes: the phone gets the same shape at a fixed cell */
     document.documentElement.setAttribute('data-ht18','1');
   }
   /* ---- HT-18e (A) - THE LIFE GRID STOPS REVERTING (Cory 2026-09-07 note 1) --------------
@@ -5803,6 +5865,14 @@ function earned(k){ return committed() - remaining(k); }
 
   var _pa=paintAll;  paintAll  = function(){ _pa.apply(null,arguments); quad(); };
   var _pl=paintLog;  paintLog  = function(){ _pl.apply(null,arguments); quad(); };
+  /* HT-20 P1a: THE SABBATH CHECK HANGS OFF `wire`, NOT OFF A PAINT.
+     `boot()` is `await load(); wire(); paintAll();` — so wire() runs EXACTLY ONCE per session,
+     after the habits have loaded and before anything has been painted, and a failed sign-in never
+     reaches it. That is the whole shape the check needs, and none of it is a render path.
+     (`load` itself cannot be wrapped here: boot()'s first `await load()` is already in flight
+     while this layer is still being parsed, so a wrapper on it would miss the one call that
+     matters. Signing in reloads the page, so a later session boots the same way.) */
+  var _wr=wire;      wire      = function(){ var r=_wr.apply(null,arguments); ensureSabbath(); return r; };
   if(!window.__HT18_RESIZE){
     window.__HT18_RESIZE=1;
     window.addEventListener('resize', function(){
