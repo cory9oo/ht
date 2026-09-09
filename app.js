@@ -6290,7 +6290,12 @@ function earned(k){ return committed() - remaining(k); }
        panel and therefore no DETAIL door at all — a page reachable at no width is a page that
        does not exist (R70.211). It renders into `#h16Ins`, which the phone shows under the VIEWS
        tab, so the door is where a phone user already looks for their charts. */
-    paintLife18(); watchLife(); sabbathList(); watchLog(); bindWeekPick(); groupBlock();          /* S6 - both modes: the phone gets the same shape at a fixed cell */
+    /* groupBlock() FIRST, and the order is load-bearing: it inserts the GROUP table into
+       `#h16Ins`, which changes how much room `#vWeeks` gets. Running it after paintLife18 sized
+       the grid to a 334px host that then became 380 — MEASURED live as 46px of dead width, the
+       exact thing P4 removed. The panel is settled before the grid is measured. */
+    groupBlock();
+    paintLife18(); watchLife(); sabbathList(); watchLog(); bindWeekPick();          /* S6 - both modes: the phone gets the same shape at a fixed cell */
     document.documentElement.setAttribute('data-ht18','1');
   }
   /* ---- HT-18e (A) - THE LIFE GRID STOPS REVERTING (Cory 2026-09-07 note 1) --------------
