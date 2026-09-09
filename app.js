@@ -2390,24 +2390,24 @@ function earned(k){ return committed() - remaining(k); }
     document.getElementById('ebody').innerHTML =
       '<div class="eh"><h3>'+(isNew?'New standard':'Edit standard')+'</h3>'+
         '<span style="flex:1"></span><button class="tbtn" data-ex="1">Close</button></div>'+
+      /* ---- HT-21 S5 · THE SHEET, TRIMMED (R70.289) --------------------------------------
+         EIGHT FIELDS, IN THIS ORDER, and the order is the acceptance:
+           Name · Group · Cadence · Planned time · Planned minutes · Link · Notes · Archive
+         WHAT WENT, AND WHERE IT WENT (R70.138 — hidden, never deleted):
+           · PLANNED WINDOW (`planned_start`/`planned_end`) is superseded by S2's planned time
+             plus planned minutes, which say the same thing with one input instead of two. Its
+             columns do not exist yet and now never need to; the field is not rendered.
+           · CUE ("after I __, I will __") is replaced by Notes. IT IS HIDDEN, NOT DELETED: the
+             row is gone from the sheet and `cue` IS NEVER WRITTEN while the input is absent, so
+             every standard that carries one keeps it. It moves into Notes on a FIRST EDIT the
+             person makes, never on a bulk pass and never silently — and it cannot move at all
+             until the `notes` column exists, which is why the offer only appears when it does. */
       fld('Name','<input id="eName" value="'+esc(h.name)+'" placeholder="standard" autocomplete="off">')+
       fld('Group','<select id="eGroup">'+groupsFor(grp).map(function(g){
           return '<option'+(g===grp?' selected':'')+'>'+esc(g)+'</option>'; }).join('')+'</select>')+
       fld('Cadence','<select id="eCad">'+
           '<option value="daily"'+(h.cadence!=='weekly'?' selected':'')+'>Daily</option>'+
           '<option value="weekly"'+(h.cadence==='weekly'?' selected':'')+'>Weekly</option></select>')+
-      (S.hasWindow ? '<div class="fld" id="eWinFld"><span class="lab">Planned window</span>'+
-          '<div class="win"><input id="eStart" type="time" value="'+esc(h.planned_start||'')+'">'+
-          '<span class="dash">–</span>'+
-          '<input id="eEnd" type="time" value="'+esc(h.planned_end||'')+'"></div></div>' : '')+
-      fld('Planned minutes','<input id="eMin" class="num" type="number" min="0" step="5" value="'+
-          (h.minutes||0)+'">')+
-      /* HT-16 S6 · R70.103 — when in the day, and how long. Both optional, both degrade with the
-         column. The suggestion under the anchor is the MEDIAN close time of this standard's last 30
-         check-offs; one tap adopts it, and it is never written without the tap. */
-      /* HT-21 S2: ONE minutes box, above. The second one lived here and Cory asked for it to go —
-         two minutes rows is one too many, and `planOf` reads the same number either way now.
-         `Time anchor` is called `Planned time`, which is what it has always meant. */
       (S.hasTime ? '<div class="fld" id="eTimeFld"><span class="lab">Planned time</span>'+
           '<div class="win"><input id="eAnchor" type="time" value="'+esc(hhmm(h.time_anchor)||'')+'">'+
           '</div>'+
@@ -2415,8 +2415,7 @@ function earned(k){ return committed() - remaining(k); }
              if(h.time_anchor || !h.id) return '';
              /* TWO suggestions, and NEITHER EVER TOUCHES THE NAME (R70.265 · R70.285).
                 One reads the clock he typed into the name; one reads when he actually does it.
-                Both fill `planned_at` on a tap and nothing else — the name is not edited, not
-                trimmed, and not re-saved. If he ignores them forever, nothing happens. */
+                Both fill `planned_at` on a tap and nothing else. */
              var out='';
              var fromName=(String(h.name||'').match(/(\d{1,2}):(\d{2})/)||null);
              if(fromName){
@@ -2430,27 +2429,37 @@ function earned(k){ return committed() - remaining(k); }
              return out;
            })()+
           '</div>' : '')+
+      fld('Planned minutes','<input id="eMin" class="num" type="number" min="0" step="5" value="'+
+          (h.minutes||0)+'">')+
       fld('Link','<input id="eLink" value="'+esc(h.link||'')+'" placeholder="https://…" '+
           'inputmode="url" autocomplete="off">')+
-      (S.hasNotes ? fld('Notes','<textarea id="eNotes" rows="3" placeholder="…">'+
-          esc(h.notes||'')+'</textarea>') : '')+
-      (S.hasCue ? fld('Cue','<input id="eCue" value="'+esc(h.cue||'')+'" '+
-          'placeholder="after I ___, I will ___">') : '')+
+      /* NOTES. When the column is missing the field is DISABLED WITH THE REASON ON IT — it never
+         says "saves later", because a sheet that offers a field it cannot save is lying about
+         what pressing Save will do (R70.289). */
+      (S.hasNotes
+        ? fld('Notes','<textarea id="eNotes" rows="3" placeholder="…">'+esc(h.notes||'')+'</textarea>'+
+            ((h.cue && String(h.cue).trim())
+              ? '<button class="btn h16adopt" id="eCueMove" data-c="'+esc(h.cue)+'">'+
+                'Move your cue into Notes?</button>' : ''))
+        : '<div class="fld"><span class="lab">Notes</span>'+
+          '<textarea rows="3" disabled placeholder="one migration away — see below"></textarea>'+
+          '</div>')+
       '<div class="etools">'+
         (isNew?'':'<button class="btn" id="eArch">Archive</button>')+
         '<span style="flex:1"></span>'+
         '<button class="btn" id="eCancel">Cancel</button>'+
         '<button class="btn pri" id="eSave">Save</button>'+
       '</div>'+
-      (S.hasTime ? '' :
-        '<div class="note enote">A time anchor and its planned minutes need one migration before '+
-        'they can be saved. Everything else on this sheet saves now.</div>')+
-      (S.hasWindow&&S.hasNotes ? '' :
+      /* ONE note, and it names exactly what is missing and what still works. */
+      ((S.hasTime && S.hasNotes) ? '' :
         '<div class="note enote">'+
-        (!S.hasWindow&&!S.hasNotes ? 'Planned window and notes need one migration before they can be saved.'
-         : !S.hasWindow ? 'The planned window needs one migration before it can be saved.'
-         : 'Notes need one migration before they can be saved.')+
-        ' Everything else on this sheet saves now.</div>');
+        (!S.hasTime && !S.hasNotes ? 'Planned time and notes are one migration away.'
+         : !S.hasTime ? 'Planned time is one migration away.'
+         : 'Notes are one migration away.')+
+        ' Everything else on this sheet saves in one action.'+
+        (h.cue && String(h.cue).trim()
+          ? ' Your cue is kept exactly as it is until Notes can hold it.' : '')+
+        '</div>');
 
     n.classList.add('on');
     if(isNew) setTimeout(function(){ var f=document.getElementById('eName'); if(f) f.focus(); },60);
@@ -2461,6 +2470,14 @@ function earned(k){ return committed() - remaining(k); }
     /* HT-21 S2 · BOTH suggestions fill `planned_at` and NOTHING ELSE. `eName` is never read
        here and never written — R70.285 ("don't rename my tasks") is satisfied by construction,
        not by care, and the wire's acceptance is a diff over `name` that must come back empty. */
+    /* S5: moving a cue into Notes is a TAP, never a bulk pass and never silent. It fills the
+       textarea and removes itself; the `cue` field is not cleared here — the save below simply
+       stops writing it once Notes carries the text. */
+    var cm=document.getElementById('eCueMove');
+    if(cm) cm.onclick=function(e){ e.preventDefault();
+      var t=document.getElementById('eNotes');
+      if(t){ var c=cm.getAttribute('data-c'); t.value = t.value ? (t.value+'\n'+c) : c; }
+      cm.parentNode.removeChild(cm); };
     ['eAdopt','eFromName'].forEach(function(id){
       var b=document.getElementById(id);
       if(!b) return;
@@ -2480,8 +2497,15 @@ function earned(k){ return committed() - remaining(k); }
     var rec={ user_id:S.me.id, name:name, group_name:str('eGroup'),
               cadence:str('eCad')==='weekly'?'weekly':'daily',
               minutes:num('eMin'), link:str('eLink')||null };
-    if(S.hasCue)    rec.cue = str('eCue');
-    if(S.hasWindow){ rec.planned_start = str('eStart')||null; rec.planned_end = str('eEnd')||null; }
+    /* S5 · THE ONE LINE THAT WOULD HAVE DESTROYED EVERY CUE. `str('eCue')` returns '' when the
+       input is not rendered, so writing it unconditionally would blank the field for every
+       standard on the next save — the same shape of defect as HT-20's Strip button, which also
+       wrote a helper's output back over real data. The cue is written only when the person can
+       see and edit it. */
+    var cueIn = document.getElementById('eCue');
+    if(S.hasCue && cueIn) rec.cue = str('eCue');
+    /* S5: the planned-window inputs are no longer rendered (superseded by planned time +
+       planned minutes), so nothing writes those columns. */
     if(S.hasNotes)   rec.notes = str('eNotes')||null;
     /* S2: one minutes box now. It writes BOTH `minutes` (what committed()/remaining() read)
        and `minutes_planned` (what planOf() prefers), so the two can never drift apart — which is
