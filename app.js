@@ -109,6 +109,26 @@ function skinSwatch(s){
 function daily(){ return S.habits.filter(function(h){ return h.cadence!=='weekly'; }); }
 function weekly(){ return S.habits.filter(function(h){ return h.cadence==='weekly'; }); }
 function ckOf(k){ var r=S.byDate[k]; return (r&&r.checked)||{}; }
+/* ---- HT-21 S2 · A DONE TIME, AND IT COSTS NO MIGRATION (R70.286) -------------------------
+   `days.checked` is a JSONB map and every reader in this file asks it ONE question: is this id
+   truthy (`if(ck[h.id])`, `!!ck[hid]`, `.filter(i => checked[i])`). Grep: not one `=== true`.
+   So the value can carry the CLOCK instead of a bare `true` and every existing caller keeps
+   working unchanged — `checked[id] = "08:34"` is as truthy as `checked[id] = true`.
+   That matters because `planned_start`/`planned_end`/`notes` are still missing and this section
+   would otherwise be blocked behind the same permission that blocked S1a. It is not: plan vs
+   actual ships today, on the columns that already exist.
+   THE CLOCK IS ONLY WRITTEN WHEN THE DAY IS TODAY. Ticking Monday's box on Wednesday records
+   THAT it was done, never a Wednesday clock time on a Monday row — a done time you did not do
+   is worse than no done time (R70.214). */
+function doneAt(k, hid){
+  var v=ckOf(k)[hid];
+  return (typeof v==='string' && /^\d{2}:\d{2}$/.test(v)) ? v : null;
+}
+function doneMin(k, hid){ return minsOf(doneAt(k, hid)); }
+function nowClock(){
+  var d=new Date();
+  return ('0'+d.getHours()).slice(-2)+':'+('0'+d.getMinutes()).slice(-2);
+}
 function pctOf(ck,ids){ if(!ids||!ids.length) return 0; var n=0;
   for(var i=0;i<ids.length;i++) if(ck[ids[i]]) n++;
   return Math.round(n/ids.length*100); }
@@ -353,7 +373,15 @@ function paintLog(){
   if(S.grp==='daily')  list=list.filter(function(h){ return h.cadence!=='weekly'; });
   if(S.grp==='weekly') list=list.filter(function(h){ return h.cadence==='weekly'; });
 
-  if(S.sort==='order')  list.sort(function(a,b){ return (a.sort_order||0)-(b.sort_order||0); });
+  /* HT-21 S2: inside a group, ascending by PLANNED TIME, and the unplanned sit at its foot.
+     His groups remain the organising principle (DEC-057) — the clock is a secondary sort within
+     one, never the thing the list is built from. Reported to SPEC as needing DEC-057 clarified. */
+  if(S.sort==='order')  list.sort(function(a,b){
+    var ax=minsOf(a.time_anchor), bx=minsOf(b.time_anchor);
+    if(ax==null && bx!=null) return 1;
+    if(bx==null && ax!=null) return -1;
+    if(ax!=null && bx!=null && ax!==bx) return ax-bx;
+    return (a.sort_order||0)-(b.sort_order||0); });
   if(S.sort==='undone') list.sort(function(a,b){
     var da=doneOn(a,S.date)?1:0, db=doneOn(b,S.date)?1:0;
     return da-db || (a.sort_order||0)-(b.sort_order||0); });
@@ -373,7 +401,15 @@ function paintLog(){
        opens the editor and the editor never follows the link. Tab order is DOM order:
        checkbox -> link -> edit. The row is a <div> now, not a <button>: a <button> cannot legally
        contain the <a>, and nesting them is how a link and an edit come to share one hit box. */
-    var nmIn = esc(nameOf(h.name)) +
+    /* HT-21 S2 · PLAN vs ACTUAL on the row itself.
+       `08:20 · Read the Bible` and, once checked, a muted `✓ 08:34` beside it. A standard with no
+       planned time renders NO time column at all — an empty column is a question the row cannot
+       answer, and a list of them reads as a fault. */
+    var pAt = hhmm(h.time_anchor);
+    var dAt = doneAt(S.date, h.id);
+    var nmIn = (pAt ? '<b class="pat">'+esc(pAt)+'</b>' : '') +
+      esc(nameOf(h.name)) +
+      (dAt ? '<i class="dat">\u2713 '+esc(dAt)+'</i>' : '') +
       ((S.hasCue && h.cue)?'<i class="cue">'+esc(h.cue)+'</i>':'');
     var LK = '<span class="lk"><svg viewBox="0 0 24 24"><path d="M10 13a5 5 0 007.5.5l3-3a5 5 0 00-7-7L11.5 5"/><path d="M14 11a5 5 0 00-7.5-.5l-3 3a5 5 0 007 7L12 19"/></svg></span>';
     var nm = h.link
@@ -444,11 +480,14 @@ function toggle(hid){
         var rr=S.byDate[src];
         if(rr && rr.checked) delete rr.checked[hid];
         saveDayFor(src);
-      } else r.checked[hid]=true;
+      } else r.checked[hid]=stamp();
     }
   } else {
-    if(r.checked[hid]) delete r.checked[hid]; else r.checked[hid]=true;
+    if(r.checked[hid]) delete r.checked[hid]; else r.checked[hid]=stamp();
   }
+  /* S2: the check carries its own clock when the day being logged IS today; unchecking deletes
+     the entry, which clears the done time with it. */
+  function stamp(){ return S.date===today() ? nowClock() : true; }
   queueSave(); paintMast(); paintLog(); paintRail(); paintRight();
 }
 
@@ -2361,15 +2400,29 @@ function earned(k){ return committed() - remaining(k); }
       /* HT-16 S6 · R70.103 — when in the day, and how long. Both optional, both degrade with the
          column. The suggestion under the anchor is the MEDIAN close time of this standard's last 30
          check-offs; one tap adopts it, and it is never written without the tap. */
-      (S.hasTime ? '<div class="fld" id="eTimeFld"><span class="lab">Time anchor \u00b7 optional</span>'+
+      /* HT-21 S2: ONE minutes box, above. The second one lived here and Cory asked for it to go —
+         two minutes rows is one too many, and `planOf` reads the same number either way now.
+         `Time anchor` is called `Planned time`, which is what it has always meant. */
+      (S.hasTime ? '<div class="fld" id="eTimeFld"><span class="lab">Planned time</span>'+
           '<div class="win"><input id="eAnchor" type="time" value="'+esc(hhmm(h.time_anchor)||'')+'">'+
-          '<input id="ePlan" class="num" type="number" min="0" step="5" placeholder="minutes" value="'+
-          (h.minutes_planned==null?'':h.minutes_planned)+'"></div>'+
+          '</div>'+
           (function(){
              if(h.time_anchor || !h.id) return '';
+             /* TWO suggestions, and NEITHER EVER TOUCHES THE NAME (R70.265 · R70.285).
+                One reads the clock he typed into the name; one reads when he actually does it.
+                Both fill `planned_at` on a tap and nothing else — the name is not edited, not
+                trimmed, and not re-saved. If he ignores them forever, nothing happens. */
+             var out='';
+             var fromName=(String(h.name||'').match(/(\d{1,2}):(\d{2})/)||null);
+             if(fromName){
+               var t=('0'+fromName[1]).slice(-2)+':'+fromName[2];
+               out+='<button class="btn h16adopt" id="eFromName" data-t="'+t+'">'+
+                    'Set planned time '+t+' from the name?</button>';
+             }
              var m = (window.__HT16 && window.__HT16.medianClose) ? window.__HT16.medianClose(h.id) : null;
-             return m? '<button class="btn h16adopt" id="eAdopt" data-t="'+m+'">usually done ~'+m+
-                       '</button>' : '';
+             if(m) out+='<button class="btn h16adopt" id="eAdopt" data-t="'+m+'">usually done ~'+m+
+                        '</button>';
+             return out;
            })()+
           '</div>' : '')+
       fld('Link','<input id="eLink" value="'+esc(h.link||'')+'" placeholder="https://…" '+
@@ -2400,11 +2453,17 @@ function earned(k){ return committed() - remaining(k); }
     document.getElementById('eSave').onclick=function(){ saveSheet(h,isNew); };
     var ar=document.getElementById('eArch');
     if(ar) ar.onclick=function(){ archiveOne(h); };
-    var ad=document.getElementById('eAdopt');
-    if(ad) ad.onclick=function(e){ e.preventDefault();
-      var f=document.getElementById('eAnchor');
-      if(f) f.value=ad.getAttribute('data-t');
-      ad.parentNode.removeChild(ad); };
+    /* HT-21 S2 · BOTH suggestions fill `planned_at` and NOTHING ELSE. `eName` is never read
+       here and never written — R70.285 ("don't rename my tasks") is satisfied by construction,
+       not by care, and the wire's acceptance is a diff over `name` that must come back empty. */
+    ['eAdopt','eFromName'].forEach(function(id){
+      var b=document.getElementById(id);
+      if(!b) return;
+      b.onclick=function(e){ e.preventDefault();
+        var f=document.getElementById('eAnchor');
+        if(f) f.value=b.getAttribute('data-t');
+        b.parentNode.removeChild(b); };
+    });
   }
 
   function num(id){ var n=document.getElementById(id); return n?(+n.value||0):0; }
@@ -2419,9 +2478,11 @@ function earned(k){ return committed() - remaining(k); }
     if(S.hasCue)    rec.cue = str('eCue');
     if(S.hasWindow){ rec.planned_start = str('eStart')||null; rec.planned_end = str('eEnd')||null; }
     if(S.hasNotes)   rec.notes = str('eNotes')||null;
+    /* S2: one minutes box now. It writes BOTH `minutes` (what committed()/remaining() read)
+       and `minutes_planned` (what planOf() prefers), so the two can never drift apart — which is
+       exactly what two separate inputs allowed. */
     if(S.hasTime){ rec.time_anchor = str('eAnchor')||null;
-                   var mp=document.getElementById('ePlan');
-                   rec.minutes_planned = (mp && String(mp.value||'').trim()!=='') ? (+mp.value||0) : null; }
+                   rec.minutes_planned = num('eMin') || null; }
     var res;
     if(isNew){
       /* a new row goes to the foot of its OWN group, not the foot of the list */
@@ -4485,7 +4546,13 @@ function earned(k){ return committed() - remaining(k); }
     timedHabits().forEach(function(h){
       if(filter && !filter(h)) return;
       if(h.cadence==='weekly'? !weekDone(h.id,k) : !ck[h.id]) return;
-      n++; if(cm<=endMin(h)) ok++;
+      n++;
+      /* S2: ON TIME is |done_at - planned_at| <= 15 min when the check carries a clock. Days
+         logged before S2 have no done time, so they keep the old day-close test rather than
+         being counted as misses — a rule change must not reprice a past day (P4). */
+      var da=doneMin(k,h.id), pa=anchorMin(h);
+      if(da!=null && pa!=null){ if(Math.abs(da-pa)<=15) ok++; }
+      else if(cm<=endMin(h)) ok++;
     });
     return n? { n:n, ok:ok, pct:Math.round(ok/n*100) } : null;
   }
@@ -4519,6 +4586,27 @@ function earned(k){ return committed() - remaining(k); }
     var m=Math.max(0, Math.round(min));
     return ('0'+Math.floor(m/60)).slice(-2)+':'+('0'+(m%60)).slice(-2);
   }
+  /* ---- HT-21 S2 · THE USUAL TIME IS NOW THE STANDARD'S OWN (R70.286) --------------------
+     `medianCloseMin` took the median of the DAY's close time across days this standard was
+     checked. That answers "when do you finish a day on which you did this", not "when do you do
+     this" — the same number for every standard on the same day. With a per-check `done_at` the
+     real question is answerable. Days logged before S2 carry no done time, so the old figure is
+     kept as the fallback and the two never disagree about a day they both have. */
+  function medianDoneMin(hid){
+    var vals=[];
+    for(var i=0;i<30;i++){
+      var k=shift(today(),-i);
+      var v=doneMin(k,hid); if(v!=null) vals.push(v);
+    }
+    if(!vals.length) return null;
+    vals.sort(function(a,b){ return a-b; });
+    var m=Math.floor(vals.length/2);
+    return vals.length%2 ? vals[m] : Math.round((vals[m-1]+vals[m])/2);
+  }
+  function driftMin(h){
+    var u=medianDoneMin(h.id), p=anchorMin(h);
+    return (u==null||p==null) ? null : u-p;
+  }
   function medianCloseMin(hid){
     var vals=[], k=today(), guard=0;
     while(guard++<400 && vals.length<30){
@@ -4534,7 +4622,11 @@ function earned(k){ return committed() - remaining(k); }
     return vals.length%2? vals[mid] : Math.round((vals[mid-1]+vals[mid])/2);
   }
   /* unchanged for its caller: the edit sheet at ~2287 wants "HH:MM" and always did */
-  function medianClose(hid){ return fmtClock(medianCloseMin(hid)); }
+  /* one name, and it prefers the standard's own done time over the day-close proxy */
+  function medianClose(hid){
+    var d=medianDoneMin(hid);
+    return fmtClock(d!=null ? d : medianCloseMin(hid));
+  }
 
   /* ---- the row prefix, the overdue tint, the ANYTIME block and the load line ---- */
   function nowMin(){ var d=new Date(); return d.getHours()*60+d.getMinutes(); }

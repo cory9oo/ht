@@ -1873,3 +1873,16 @@ html[data-simple] .h20wkd .d{ flex:0 0 34px; font:500 9px/1.35 var(--mono);
 html[data-simple] .h20wkd .k{ flex:1 1 auto; min-width:0 }
 html[data-simple] .h20wkd .p{ flex:0 0 auto; font:400 10.5px/1.35 var(--mono); color:var(--muted) }
 html[data-simple] .h20wkd .p i{ display:inline-block; width:8px; height:8px; margin-right:5px }
+
+/* ============================ HT-21 · TIME, DONE RIGHT (R70.286) =============================
+   S2 · PLAN vs ACTUAL ON THE ROW.
+   `08:20 · Read the Bible`, and once it is checked a muted `✓ 08:34` beside the name. The planned
+   time is a NARROW LEFT COLUMN on the name, not a separate grid column — a standard with no
+   planned time then renders no column at all rather than an empty cell, which is what the wire
+   asks for and also what stops a list of rules reading as a list of faults. */
+html[data-simple] .li .nm .pat{ display:inline-block; min-width:38px; margin-right:8px;
+  font:500 10.5px/1 var(--mono); letter-spacing:.04em; color:var(--muted);
+  font-variant-numeric:tabular-nums }
+html[data-simple] .li .nm .dat{ margin-left:8px; font:400 10px/1 var(--mono); font-style:normal;
+  color:var(--green-bright); opacity:.75; font-variant-numeric:tabular-nums }
+html[data-simple] .li.on .nm .pat{ opacity:.55 }
