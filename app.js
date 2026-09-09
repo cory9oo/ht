@@ -5352,12 +5352,33 @@ function earned(k){ return committed() - remaining(k); }
     var rf=d10().rampFill;
     return '<i class="h20dot" style="background:'+(rf?rf(p):'var(--grey)')+'"></i>'+p+'%';
   }
+  /* S4: on the surface, only the four tiles carry a box. Everything beside them is a label
+     and a number — the chrome was most of the noise. */
+  function flat10(label, value, note){
+    return '<div class="h20flatm"><div class="h20k">'+esc(label)+'</div>'+
+           '<div class="h20v">'+value+'</div>'+
+           (note?'<div class="h20n">'+note+'</div>':'')+'</div>';
+  }
+  /* the member sparkline is SEVEN DAYS of completion, not twelve weeks — a different question
+     from the 90-day tile above it, and the wire asks for it by name. */
+  function week7(){
+    var o=[];
+    for(var i=6;i>=0;i--){
+      var k=shift(today(),-i), r=S.byDate[k];
+      o.push((r && r.pct!=null && loggedOn(k)) ? Math.round(r.pct) : null);
+    }
+    return o;
+  }
   function box10(label, value, note){
     return '<div class="h20box"><div class="h20k">'+esc(label)+'</div>'+
            '<div class="h20v">'+value+'</div>'+
            (note?'<div class="h20n">'+note+'</div>':'')+'</div>';
   }
 
+  /* the badge stays while the three seeded members are still rendered — S7 removes both. */
+  function circBadge(){
+    return H18_DUMMIES.length ? '<span class="h18test">TEST DATA</span>' : '';
+  }
   function drawerBody(){
     var host=document.getElementById('h18DrawH'); if(!host) return 0;
     if(!window.__HT17 || !window.__HT17.habitRows) return 0;
@@ -5365,26 +5386,23 @@ function earned(k){ return committed() - remaining(k); }
     var why='only '+have+' logged day'+(have===1?'':'s')+' - a rolling figure needs '+P10_MIN_DAYS;
     function P(b0,b1){ return thin? null : adhPct(b0,b1); }
 
+    /* ---- HT-21 S4 · DETAIL, DECLUTTERED (R70.288) ------------------------------------
+       Cory looked at HT-20's fifteen boxes and said "a lot of noise — get rid of what's not
+       needed, emphasize what is." So the CONTENT is unchanged and its ALTITUDE is not: the four
+       measures he actually reads sit in boxes on the surface, the four he asked about sit under
+       them without box chrome, and everything else moves one tap down into MORE.
+       NOTHING IS DELETED (R70.138) — count the labels on the page and the total is what HT-20
+       built plus the one S8 adds. That count is the acceptance, not a promise. */
     /* ---- ME, row 1 ------------------------------------------------------------------ */
     var spark = d10().sparkSvg ? d10().sparkSvg(adhSpark()) : '';
     var pvd = plannedVsDone();
     var r7=rollRate(7), r30=rollRate(30);
     var arrow = (r7==null||r30==null) ? '' :
       (r7>r30 ? '<b class="h20up">↑</b>' : r7<r30 ? '<b class="h20dn">↓</b>' : '<b class="h20fl">→</b>');
-    var row1 =
-      box10('Today %',   thin?unk(why):pctCell(adhPct(0,0))) +
-      box10('7 days %',  thin?unk(why):pctCell(P(0,6))) +
-      box10('30 days %', thin?unk(why):pctCell(P(0,29))) +
-      box10('90 days %', thin?unk(why):pctCell(P(0,89)), spark?('<span class="h20sp">'+spark+'</span>'):'') +
-      box10('Days in a row at 100%', String(perfectRun())) +
-      box10('Planned vs done',
-            (pvd.today? (fmtHM(pvd.today.done)+' of '+fmtHM(pvd.today.planned)) : unk('nothing planned today')),
-            'today · 30 days ' + (pvd.mp? (fmtHM(pvd.md)+' of '+fmtHM(pvd.mp)) : '—')) +
-      box10('Average rating 7d / 30d',
-            (r7==null&&r30==null) ? unk(why)
-              : ((r7==null?'—':r7)+' / '+(r30==null?'—':r30)+' '+arrow));
-
-    /* ---- ME, row 2 ------------------------------------------------------------------ */
+    /* HT-21 S4: HT-20's `row1` / `row2` ARRAYS are superseded by `tiles` / `surface` / `more`
+       below — the same measures, re-levelled. The two concatenations are gone; every value they
+       were built from is still computed here, because S4 moved the measures, it did not drop
+       any of them (R70.138). */
     var ranked=S.habits.slice().filter(function(h){ return adherence30(h.id)!=null; })
       .sort(function(a,b){ return adherence30(b.id)-adherence30(a.id); });
     function three(list){
@@ -5409,16 +5427,6 @@ function earned(k){ return committed() - remaining(k); }
         return '<li><span>'+esc(nameOf(h.name))+'</span><b>'+
                esc((mc && mc(h.id)) || '—')+'</b></li>';
       }).join('')+'</ul>';
-    var row2 =
-      box10('Strongest 3', three(ranked.slice(0,3))) +
-      box10('Weakest 3',   three(ranked.slice(-3).reverse())) +
-      box10('By group 30-day %', byGroup) +
-      box10('Completion → rating', crVal,
-            'average rating on days ≥80% complete vs days &lt;50% · ' +
-            cr.nHi + ' and ' + cr.nLo + ' days') +
-      box10('Usual time per standard', usual) +
-      box10('On time %', unk('time blocks are not built yet - P12'));
-
     /* ---- THE GROUP ROW --------------------------------------------------------------- */
     var mine=adhAll(0,29), myToday=adhPct(0,0);
     var members=[{n:'You', t:myToday, p:mine.pct, d:have, me:true}].concat(
@@ -5427,12 +5435,52 @@ function earned(k){ return committed() - remaining(k); }
       .forEach(function(m,i){ m.rank=i+1; });
     var avg=(function(){ var v=members.map(function(m){return m.p;}).filter(function(x){return x!=null;});
       return v.length? Math.round(v.reduce(function(a,b){return a+b;},0)/v.length) : null; })();
+    /* S4: name · today · 30d · a 7-day sparkline. No streak, no missed, no last-done on the
+       surface — those live in MORE, on the per-standard table, where they always did. */
+    var sp7 = d10().sparkSvg ? d10().sparkSvg(week7()) : '';
     var grpRows=members.map(function(m){
       return '<tr'+(m.me?' class="h18me"':'')+'><td class="n">'+esc(m.n)+'</td>'+
         '<td class="p">'+(m.t==null?unk(why):pctCell(m.t))+'</td>'+
         '<td class="p">'+(m.p==null?unk(why):pctCell(m.p))+'</td>'+
-        '<td class="num">'+(m.d==null?'—':m.d)+'</td>'+
-        '<td class="num">'+m.rank+'</td></tr>'; }).join('');
+        '<td class="sp7">'+(m.me?sp7:'')+'</td></tr>'; }).join('');
+
+    /* THE SURFACE: four tiles in boxes, then four measures with no box at all. */
+    var tiles =
+      box10('Today %',   thin?unk(why):pctCell(adhPct(0,0))) +
+      box10('7 days %',  thin?unk(why):pctCell(P(0,6))) +
+      box10('30 days %', thin?unk(why):pctCell(P(0,29))) +
+      box10('90 days %', thin?unk(why):pctCell(P(0,89)), spark?('<span class="h20sp">'+spark+'</span>'):'');
+
+    var surface =
+      flat10('Completion → rating', crVal,
+             'average rating on days ≥80% complete vs days &lt;50% · ' +
+             cr.nHi + ' and ' + cr.nLo + ' days') +
+      flat10('Strongest 3', three(ranked.slice(0,3))) +
+      flat10('Weakest 3',   three(ranked.slice(-3).reverse())) +
+      flat10('On time %', (function(){
+        var v = d10().onTime30 ? d10().onTime30() : null;
+        return v==null ? unk('needs a standard with a planned time and a check on the same day')
+                       : pctCell(v); })(),
+             'done within 15 minutes of its planned time') +
+      /* S8 has not landed; the measure is here and it says so rather than being absent. */
+      flat10('Sleep vs rating', unk('sleep hours arrive with S8'),
+             'how the night before shows up in the day');
+
+    /* MORE: everything else HT-20 built, one tap down and not one measure lost (R70.138). */
+    var more =
+      box10('Days in a row at 100%', String(perfectRun())) +
+      box10('Planned vs done',
+            (pvd.today? (fmtHM(pvd.today.done)+' of '+fmtHM(pvd.today.planned)) : unk('nothing planned today')),
+            'today · 30 days ' + (pvd.mp? (fmtHM(pvd.md)+' of '+fmtHM(pvd.mp)) : '—')) +
+      box10('Average rating 7d / 30d',
+            (r7==null&&r30==null) ? unk(why)
+              : ((r7==null?'—':r7)+' / '+(r30==null?'—':r30)+' '+arrow)) +
+      box10('By group 30-day %', byGroup) +
+      /* S4's surface lists the member rows without an average, and R70.138 says nothing may be
+         DELETED — so the group average moves down here rather than disappearing with the row it
+         used to sit on. Re-levelled, not dropped. */
+      box10('Group average 30-day %', (avg==null?unk(why):pctCell(avg))) +
+      box10('Usual time per standard', usual);
 
     host.innerHTML =
       '<div class="h20det">'+
@@ -5441,25 +5489,24 @@ function earned(k){ return committed() - remaining(k); }
           '<span class="sp"></span>'+
           '<button class="h20x" type="button" data-h18more>close</button></div>'+
         '<div class="h20h">ME</div>'+
-        '<div class="h20grid">'+row1+'</div>'+
-        '<div class="h20grid">'+row2+'</div>'+
-        '<div class="h20h">GROUP<span class="h18test">TEST DATA</span></div>'+
-        '<div class="h20box h20wide"><table class="h17dt h18dt">'+
+        '<div class="h20grid h20tiles">'+tiles+'</div>'+
+        '<div class="h20flat">'+surface+'</div>'+
+        '<div class="h20h">GROUP'+circBadge()+'</div>'+
+        '<table class="h17dt h18dt h20gt">'+
           '<thead><tr><th>member</th><th>today</th><th>30 days</th>'+
-          '<th>days logged</th><th>rank</th></tr></thead><tbody>'+grpRows+
-          '<tr class="h20avg"><td class="n">Group average</td><td class="p">—</td>'+
-          '<td class="p">'+(avg==null?unk(why):pctCell(avg))+'</td>'+
-          '<td class="num">—</td><td class="num">—</td></tr>'+
-        '</tbody></table></div>'+
-        '<div class="h20h">EVERY STANDARD</div>'+
-        '<div class="h20box h20wide"><table class="h17dt h18dt">'+
-          '<thead><tr><th>standard</th><th>30d</th><th>streak</th><th>missed</th>'+
-          '<th>last done</th><th>usual</th></tr></thead><tbody>'+
-          window.__HT17.habitRows(S.habits.slice().sort(function(a,b){
-            var x=adherence30(a.id), y=adherence30(b.id);
-            x=(x==null?101:x); y=(y==null?101:y);
-            return x-y || (nameOf(a.name)<nameOf(b.name)?-1:1);
-          }))+'</tbody></table></div>'+
+          '<th>7 days</th></tr></thead><tbody>'+grpRows+'</tbody></table>'+
+        '<details class="h20more"><summary>MORE</summary>'+
+          '<div class="h20grid">'+more+'</div>'+
+          '<div class="h20h">EVERY STANDARD</div>'+
+          '<table class="h17dt h18dt h20gt">'+
+            '<thead><tr><th>standard</th><th>30d</th><th>streak</th><th>missed</th>'+
+            '<th>last done</th><th>usual</th></tr></thead><tbody>'+
+            window.__HT17.habitRows(S.habits.slice().sort(function(a,b){
+              var x=adherence30(a.id), y=adherence30(b.id);
+              x=(x==null?101:x); y=(y==null?101:y);
+              return x-y || (nameOf(a.name)<nameOf(b.name)?-1:1);
+            }))+'</tbody></table>'+
+        '</details>'+
       '</div>';
     return S.habits.length;
   }

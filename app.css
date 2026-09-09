@@ -1885,3 +1885,74 @@ html[data-simple] .li .nm .pat{ display:inline-block; min-width:38px; margin-rig
 html[data-simple] .li .nm .dat{ margin-left:8px; font:400 10px/1 var(--mono); font-style:normal;
   color:var(--green-bright); opacity:.75; font-variant-numeric:tabular-nums }
 html[data-simple] .li.on .nm .pat{ opacity:.55 }
+
+/* --------------------------------------------------------------------------------------------
+   S4 · DETAIL, DECLUTTERED (R70.288)
+   "A lot of noise — get rid of what's not needed, emphasize what is." Boxes ONLY around the four
+   tiles; the measures beside them are a label and a number with no chrome at all, which is what
+   most of the noise was. Everything else drops one level into MORE and nothing is deleted. */
+html[data-simple] .h20tiles{ grid-template-columns:repeat(auto-fill, minmax(150px, 1fr)) }
+html[data-simple] .h20flat{ display:grid; gap:8px 18px; min-width:0; padding:2px 0 4px;
+  grid-template-columns:repeat(auto-fill, minmax(210px, 1fr)) }
+html[data-simple] .h20flatm{ min-width:0 }
+html[data-simple] .h20gt{ width:100%; table-layout:fixed }
+html[data-simple] .h20gt td, html[data-simple] .h20gt th{ overflow-wrap:anywhere;
+  white-space:normal }
+html[data-simple] .h20gt .sp7{ width:84px }
+html[data-simple] .h20gt .sp7 svg{ display:block; width:100%; height:16px }
+html[data-simple] .h20more{ border-top:1px solid var(--rule); padding-top:8px }
+html[data-simple] .h20more > summary{ cursor:pointer; list-style:none;
+  font:500 9.5px/1.35 var(--mono); letter-spacing:.14em; text-transform:uppercase;
+  color:var(--muted); padding:6px 0 }
+html[data-simple] .h20more > summary::-webkit-details-marker{ display:none }
+html[data-simple] .h20more > summary::before{ content:'+ '; color:var(--muted) }
+html[data-simple] .h20more[open] > summary::before{ content:'– ' }
+html[data-simple] .h20more > summary:hover{ color:var(--text) }
+/* S4 · ONE TYPE SCALE, and it is four sizes, pinned inside the page rather than inherited from
+   nine different ancestors. MEASURED before this rule: 9 distinct font sizes in DETAIL (11.5 ·
+   12.5 · 15 · 13 · 8.5 · 9 · 10 · 9.5 · 8), which is what "a lot of noise" looks like in numbers.
+       9.5px  mono, small-caps — every label, heading and control
+       11px   mono — secondary text, notes, table cells
+       13px   sans — body: list rows and standard names
+       15px   sans — the four tile values, and nothing else                                    */
+/* the overrides carry `#h18Draw` because the rules they replace do: an id beats two classes
+   however late a stylesheet says otherwise, and the first attempt at this lost silently. */
+html[data-simple] #h18Draw .h20det .h20k,
+html[data-simple] #h18Draw .h20det .h20h,
+html[data-simple] #h18Draw .h20det .h20x,
+html[data-simple] #h18Draw .h20det .h18gh,
+html[data-simple] #h18Draw .h20det .h18test,
+html[data-simple] #h18Draw .h20more > summary{ font-size:9.5px }
+html[data-simple] #h18Draw .h20det .h20n,
+html[data-simple] #h18Draw .h20det .h20unk,
+html[data-simple] #h18Draw .h20det .h17dt th,
+html[data-simple] #h18Draw .h20det .h20list li b{ font-size:11px }
+html[data-simple] #h18Draw .h20det .h17dt,
+html[data-simple] #h18Draw .h20det .h17dt td,
+html[data-simple] #h18Draw .h20det .h17dt td *,
+html[data-simple] #h18Draw .h20det .h20list li,
+html[data-simple] #h18Draw .h20det .h20list li span{ font-size:13px }
+html[data-simple] #h18Draw .h20det .h20v{ font-size:15px }
+/* S4 · on a phone the four tiles go two-up, not three. At 375 an auto-fill of 150px gives three
+   columns of ~110px, which is narrower than the numbers in them. `.h20tiles` is declared after
+   the generic phone rule and would otherwise win it back, so it is named here explicitly. */
+@media (max-width:767px){
+  html[data-simple] .h20tiles{ grid-template-columns:repeat(2, minmax(0,1fr)) }
+  html[data-simple] .h20flat{ grid-template-columns:1fr }
+}
+/* S4 · and the SCORECARD inside the drawer has to fit too. MEASURED at 375 with the VIEWS tab
+   open: `table.h16sc` ran 12 -> 384px against a 375px viewport, so the PAGE scrolled sideways
+   even though the DETAIL page itself did not. It is HT-16's table, moved in here by HT-18, and
+   it never got the wrapping treatment the new tables did. `overflow-x` is still not the answer:
+   the columns wrap. */
+/* and it is NOT always inside #h18Draw: on a phone the scorecard sits in its own section, which
+   is why the first version of this rule matched nothing. Scoped to the width instead. */
+html[data-simple] #h18Draw .h16sc{ width:100%; table-layout:fixed }
+html[data-simple] #h18Draw .h16sc th,
+html[data-simple] #h18Draw .h16sc td{ overflow-wrap:anywhere; white-space:normal }
+@media (max-width:767px){
+  html[data-simple] .h16sc{ width:100%; table-layout:fixed }
+  html[data-simple] .h16sc th,
+  html[data-simple] .h16sc td{ overflow-wrap:anywhere; white-space:normal; padding-left:2px;
+    padding-right:2px }
+}
