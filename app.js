@@ -440,7 +440,16 @@ function paintLog(){
       '<span class="mn">'+(h.minutes?h.minutes+'m':'—')+'</span>'+
       '<span class="ad" style="color:'+gtxt(ad)+'">'+(ad==null?'—':ad+'%')+'</span>'+
       '</div>';
-  }).join('') || '<div class="empty">Nothing matches.</div>';
+  }).join('') || (
+    /* ---- HT-21 S9 · A FIRST RUN IS NOT A FAILED SEARCH -------------------------------
+       MEASURED in the onboarding audit at 375, 1280 and 1920: a brand-new account with zero
+       standards was told "Nothing matches." — the message for a search that found nothing —
+       and the "Start with these three" offer existed but was hidden by the simplification
+       rule. So the first thing HT ever said to a stranger was that their search had failed,
+       and there was no visible way forward. Two different empty states, two sentences. */
+    S.habits.length
+      ? '<div class="empty">Nothing matches.</div>'
+      : '<div class="empty">No standards yet — pick three below, or add your own in Settings.</div>');
 
   var ids=daily().map(function(x){return x.id;});
   var done=ids.filter(function(i){return ck[i];}).length;
@@ -1845,6 +1854,11 @@ var STARTER = [
 ];
 function paintStarter(){
   var n=el('starter'); if(!n) return;
+  /* S9: the simplified layout hides every output that sits in the input column, and `#starter`
+     was one of them — correct for somebody who HAS standards, wrong for somebody who has none,
+     which is the only person who ever sees this block. The root carries the state so the
+     stylesheet can make the one exception without loosening the rule. */
+  try{ document.documentElement.setAttribute('data-firstrun', S.habits.length ? '0' : '1'); }catch(e){}
   if(S.habits.length){ n.style.display='none'; n.innerHTML=''; return; }
   n.style.display='';
   n.innerHTML='<div class="st1"><span class="k">Start here</span>'+
@@ -6267,11 +6281,16 @@ function earned(k){ return committed() - remaining(k); }
   function quad(){
     if(advanced()) return;
     if(desktop()){ quadrants(); rightBlock(); journalBottom(); bindGrow(); unGrow(); chartsFit();
-                   adhLine(); groupBlock(); }
+                   adhLine(); }
     else { unquadrants(); unRightBlock(); unjournalBottom(); unAdh(); }
     /* HT-20 P1a: `ensureSabbath()` USED TO BE CALLED HERE, and that is the whole defect — quad()
        is a render path and runs on every paint. It is hung off load() below instead. */
-    paintLife18(); watchLife(); sabbathList(); watchLog(); bindWeekPick();          /* S6 - both modes: the phone gets the same shape at a fixed cell */
+    /* HT-21 S9: GROUP RUNS ON THE PHONE TOO, and that is a defect the audit found rather than a
+       feature. `groupBlock()` was in the desktop branch only, so on a phone there was no GROUP
+       panel and therefore no DETAIL door at all — a page reachable at no width is a page that
+       does not exist (R70.211). It renders into `#h16Ins`, which the phone shows under the VIEWS
+       tab, so the door is where a phone user already looks for their charts. */
+    paintLife18(); watchLife(); sabbathList(); watchLog(); bindWeekPick(); groupBlock();          /* S6 - both modes: the phone gets the same shape at a fixed cell */
     document.documentElement.setAttribute('data-ht18','1');
   }
   /* ---- HT-18e (A) - THE LIFE GRID STOPS REVERTING (Cory 2026-09-07 note 1) --------------

@@ -1955,3 +1955,24 @@ html[data-simple] #h18Draw .h16sc td{ overflow-wrap:anywhere; white-space:normal
 
 /* S7 · the empty state: one member is a fact, not a blank table. */
 html[data-simple] .h18none td{ color:var(--muted); font-style:normal; padding:8px 6px }
+
+/* --------------------------------------------------------------------------------------------
+   S9 · THE FIRST RUN (R70.290). The simplification rule above hides `#starter` with the rest of
+   the outputs that sit in the input column. That is right for somebody who has standards and
+   wrong for the only person who ever sees this block — somebody who has none. `data-firstrun`
+   is written by paintStarter from the habit count, so the exception is exactly as narrow as the
+   case it exists for, and the rule it overrides is left intact. */
+html[data-simple][data-firstrun="1"] #starterBlk,
+html[data-simple][data-firstrun="1"] #starter{ display:block !important }
+html[data-simple][data-firstrun="1"] #starter .st1{ padding:10px 0 }
+html[data-simple][data-firstrun="1"] #starter .k{ font:500 9.5px/1.35 var(--mono);
+  letter-spacing:.14em; text-transform:uppercase; color:var(--muted) }
+html[data-simple][data-firstrun="1"] #starter .s{ font-size:13px; line-height:1.45;
+  color:var(--ink); padding:6px 0 8px }
+html[data-simple][data-firstrun="1"] #starter .fl{ display:flex; justify-content:space-between;
+  font-size:13px; line-height:1.35; padding:4px 0; border-bottom:1px solid var(--rule) }
+/* S9 · and the button inside it. HT-9a hides `#jIn .tools` (R70.22) to strip the sort/group/find
+   controls from the input column — `#starterBlk` lives inside `#jIn`, so the one control a
+   brand-new account needs was hidden by a rule aimed at something else. MEASURED: the block
+   rendered 170px tall with its button at 0x0. Narrowed to the first-run case only. */
+html[data-simple][data-firstrun="1"] #starter .tools{ display:flex !important }
