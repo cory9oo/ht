@@ -5189,20 +5189,182 @@ function earned(k){ return committed() - remaining(k); }
     if(sc && sc.parentElement!==d){ mark(sc); d.insertBefore(sc, d.firstChild); }
     return d;
   }
+  /* ---- HT-20 P10 · DETAIL IS A PAGE OF BOXES (R70.261) --------------------------------
+     Cory's own words, and they are the whole specification: "I don't wanna scroll right or left"
+     and "I like how you have a box around them". So DETAIL is the same box the JOURNAL, THE MONTH,
+     THE YEAR and GROUP already are, laid on a grid that WRAPS - `overflow-x` is never the answer,
+     because a sideways scrollbar is a layout admitting it did not fit.
+
+     AND THE METRICS ARE RENAMED INTO WORDS HE USES. He said the old ones were ones he did not
+     understand. Every label below is written out in full ("Days in a row at 100%", not "streak"),
+     and every number comes from the SAME adherence source as the sparkline (R70.47/R70.49) rather
+     than from a second count that could drift from it.
+
+     UNKNOWN IS A VALUE, NOT A BLANK. Under seven days of history a rolling figure is noise, so it
+     prints `UNKNOWN` and says why on hover. A blank cell reads as zero, and zero is a claim. */
+  var P10_MIN_DAYS = 7;
+
+  function d10(){ return window.__HT16 || {}; }
+  function loggedDays10(){ return dates().filter(function(k){ return loggedOn(k); }); }
+
+  /* the same window function the surface line and the sparkline use */
+  function adhPct(b0,b1){ var a=adhAll(b0,b1); return a ? a.pct : null; }
+
+  /* consecutive days, most recent first, on which every scheduled standard was done */
+  function perfectRun(){
+    var n=0, k=today(), guard=0;
+    if(!loggedOn(k)) k=shift(k,-1);
+    while(guard++<400){
+      var r=S.byDate[k];
+      if(!r || !loggedOn(k) || r.pct==null) break;
+      if(Math.round(r.pct)<100) break;
+      n++; k=shift(k,-1);
+    }
+    return n;
+  }
+
+  /* planned vs done in MINUTES - today, and summed across the last 30 logged days */
+  function plannedVsDone(){
+    var ls=d10().loadSums, t=ls?ls(today()):null, p=0, dn=0;
+    for(var i=0;i<30;i++){
+      var k=shift(today(),-i); if(!loggedOn(k)) continue;
+      var v=ls?ls(k):null; if(!v) continue;
+      p+=v.planned; dn+=v.done;
+    }
+    return { today:t, mp:p, md:dn };
+  }
+
+  /* THE ONE NUMBER THAT CHANGES BEHAVIOUR: does finishing the day actually feel better?
+     Average rating on days >= 80% complete against days < 50%, both printed, and the gap. */
+  function completionVsRating(){
+    var hi=[], lo=[];
+    loggedDays10().forEach(function(k){
+      var r=S.byDate[k], v=ratingOf(k);
+      if(!r || r.pct==null || v==null) return;
+      if(r.pct>=80) hi.push(v); else if(r.pct<50) lo.push(v);
+    });
+    function mean(a){ return a.length? Math.round(a.reduce(function(x,y){return x+y;},0)/a.length*10)/10 : null; }
+    var h=mean(hi), l=mean(lo);
+    return { hi:h, lo:l, nHi:hi.length, nLo:lo.length,
+             gap:(h==null||l==null)?null:Math.round((h-l)*10)/10 };
+  }
+
+  function unk(title){ return '<span class="h20unk" title="'+esc(title||'')+'">UNKNOWN</span>'; }
+  function pctCell(p){
+    if(p==null) return unk('fewer than '+P10_MIN_DAYS+' days of history');
+    var rf=d10().rampFill;
+    return '<i class="h20dot" style="background:'+(rf?rf(p):'var(--grey)')+'"></i>'+p+'%';
+  }
+  function box10(label, value, note){
+    return '<div class="h20box"><div class="h20k">'+esc(label)+'</div>'+
+           '<div class="h20v">'+value+'</div>'+
+           (note?'<div class="h20n">'+note+'</div>':'')+'</div>';
+  }
+
   function drawerBody(){
     var host=document.getElementById('h18DrawH'); if(!host) return 0;
     if(!window.__HT17 || !window.__HT17.habitRows) return 0;
-    /* every habit, worst 30-day first — the DEEPEN half of R70.187 */
-    var hs=S.habits.slice().sort(function(a,b){
-      var x=adherence30(a.id), y=adherence30(b.id);
-      x=(x==null?101:x); y=(y==null?101:y);
-      return x-y || (nameOf(a.name)<nameOf(b.name)?-1:1);
-    });
-    host.innerHTML=circleDummy()+
-      '<table class="h17dt h18dt"><thead><tr><th>standard</th><th>30d</th>'+
-      '<th>streak</th><th>missed</th><th>last done</th><th>usual</th></tr></thead><tbody>'+
-      window.__HT17.habitRows(hs)+'</tbody></table>';
-    return hs.length;
+    var have=loggedDays10().length, thin=(have<P10_MIN_DAYS);
+    var why='only '+have+' logged day'+(have===1?'':'s')+' - a rolling figure needs '+P10_MIN_DAYS;
+    function P(b0,b1){ return thin? null : adhPct(b0,b1); }
+
+    /* ---- ME, row 1 ------------------------------------------------------------------ */
+    var spark = d10().sparkSvg ? d10().sparkSvg(adhSpark()) : '';
+    var pvd = plannedVsDone();
+    var r7=rollRate(7), r30=rollRate(30);
+    var arrow = (r7==null||r30==null) ? '' :
+      (r7>r30 ? '<b class="h20up">↑</b>' : r7<r30 ? '<b class="h20dn">↓</b>' : '<b class="h20fl">→</b>');
+    var row1 =
+      box10('Today %',   thin?unk(why):pctCell(adhPct(0,0))) +
+      box10('7 days %',  thin?unk(why):pctCell(P(0,6))) +
+      box10('30 days %', thin?unk(why):pctCell(P(0,29))) +
+      box10('90 days %', thin?unk(why):pctCell(P(0,89)), spark?('<span class="h20sp">'+spark+'</span>'):'') +
+      box10('Days in a row at 100%', String(perfectRun())) +
+      box10('Planned vs done',
+            (pvd.today? (fmtHM(pvd.today.done)+' of '+fmtHM(pvd.today.planned)) : unk('nothing planned today')),
+            'today · 30 days ' + (pvd.mp? (fmtHM(pvd.md)+' of '+fmtHM(pvd.mp)) : '—')) +
+      box10('Average rating 7d / 30d',
+            (r7==null&&r30==null) ? unk(why)
+              : ((r7==null?'—':r7)+' / '+(r30==null?'—':r30)+' '+arrow));
+
+    /* ---- ME, row 2 ------------------------------------------------------------------ */
+    var ranked=S.habits.slice().filter(function(h){ return adherence30(h.id)!=null; })
+      .sort(function(a,b){ return adherence30(b.id)-adherence30(a.id); });
+    function three(list){
+      if(!list.length) return unk(why);
+      return '<ul class="h20list">'+list.map(function(h){
+        return '<li><span>'+esc(nameOf(h.name))+'</span><b>'+adherence30(h.id)+'%</b></li>';
+      }).join('')+'</ul>';
+    }
+    var groups = d10().scorecardRows ? d10().scorecardRows().map(function(r){ return r.group; }) : [];
+    var byGroup = groups.length ? '<ul class="h20list">'+groups.map(function(g){
+        var a=d10().adherenceWindow(g,0,29);
+        return '<li><span>'+esc(g)+'</span><b>'+(a.pct==null?'—':a.pct+'%')+'</b></li>';
+      }).join('')+'</ul>' : unk(why);
+    var cr=completionVsRating();
+    var crVal = (cr.hi==null||cr.lo==null)
+      ? unk('needs logged days both above 80% and below 50%')
+      : (cr.hi+' vs '+cr.lo+' <b class="h20gap">'+(cr.gap>0?'+':'')+cr.gap+'</b>');
+    /* `usualTime` lives in the HT-17 closure and is not reachable from here; `medianClose` is
+       the seam HT-19 B0.1 exported for exactly this reason - one definition, two callers. */
+    var mc = d10().medianClose;
+    var usual = '<ul class="h20list">'+S.habits.slice(0,8).map(function(h){
+        return '<li><span>'+esc(nameOf(h.name))+'</span><b>'+
+               esc((mc && mc(h.id)) || '—')+'</b></li>';
+      }).join('')+'</ul>';
+    var row2 =
+      box10('Strongest 3', three(ranked.slice(0,3))) +
+      box10('Weakest 3',   three(ranked.slice(-3).reverse())) +
+      box10('By group 30-day %', byGroup) +
+      box10('Completion → rating', crVal,
+            'average rating on days ≥80% complete vs days &lt;50% · ' +
+            cr.nHi + ' and ' + cr.nLo + ' days') +
+      box10('Usual time per standard', usual) +
+      box10('On time %', unk('time blocks are not built yet - P12'));
+
+    /* ---- THE GROUP ROW --------------------------------------------------------------- */
+    var mine=adhAll(0,29), myToday=adhPct(0,0);
+    var members=[{n:'You', t:myToday, p:mine.pct, d:have, me:true}].concat(
+      H18_DUMMIES.map(function(x){ return {n:x.n, t:x.t, p:x.p, d:null, me:false}; }));
+    members.slice().sort(function(a,b){ return (b.p==null?-1:b.p)-(a.p==null?-1:a.p); })
+      .forEach(function(m,i){ m.rank=i+1; });
+    var avg=(function(){ var v=members.map(function(m){return m.p;}).filter(function(x){return x!=null;});
+      return v.length? Math.round(v.reduce(function(a,b){return a+b;},0)/v.length) : null; })();
+    var grpRows=members.map(function(m){
+      return '<tr'+(m.me?' class="h18me"':'')+'><td class="n">'+esc(m.n)+'</td>'+
+        '<td class="p">'+(m.t==null?unk(why):pctCell(m.t))+'</td>'+
+        '<td class="p">'+(m.p==null?unk(why):pctCell(m.p))+'</td>'+
+        '<td class="num">'+(m.d==null?'—':m.d)+'</td>'+
+        '<td class="num">'+m.rank+'</td></tr>'; }).join('');
+
+    host.innerHTML =
+      '<div class="h20det">'+
+        /* the DETAIL button is underneath this page now, so the page closes itself */
+        '<div class="h20h h20top">DETAIL'+
+          '<span class="sp"></span>'+
+          '<button class="h20x" type="button" data-h18more>close</button></div>'+
+        '<div class="h20h">ME</div>'+
+        '<div class="h20grid">'+row1+'</div>'+
+        '<div class="h20grid">'+row2+'</div>'+
+        '<div class="h20h">GROUP<span class="h18test">TEST DATA</span></div>'+
+        '<div class="h20box h20wide"><table class="h17dt h18dt">'+
+          '<thead><tr><th>member</th><th>today</th><th>30 days</th>'+
+          '<th>days logged</th><th>rank</th></tr></thead><tbody>'+grpRows+
+          '<tr class="h20avg"><td class="n">Group average</td><td class="p">—</td>'+
+          '<td class="p">'+(avg==null?unk(why):pctCell(avg))+'</td>'+
+          '<td class="num">—</td><td class="num">—</td></tr>'+
+        '</tbody></table></div>'+
+        '<div class="h20h">EVERY STANDARD</div>'+
+        '<div class="h20box h20wide"><table class="h17dt h18dt">'+
+          '<thead><tr><th>standard</th><th>30d</th><th>streak</th><th>missed</th>'+
+          '<th>last done</th><th>usual</th></tr></thead><tbody>'+
+          window.__HT17.habitRows(S.habits.slice().sort(function(a,b){
+            var x=adherence30(a.id), y=adherence30(b.id);
+            x=(x==null?101:x); y=(y==null?101:y);
+            return x-y || (nameOf(a.name)<nameOf(b.name)?-1:1);
+          }))+'</tbody></table></div>'+
+      '</div>';
+    return S.habits.length;
   }
 
   /* ---- HT-18c - THE CIRCLE AS TEST DUMMIES (Cory 2026-09-07, note 7) --------------------
@@ -5284,12 +5446,41 @@ function earned(k){ return committed() - remaining(k); }
       '--h18drawtop', Math.max(0, Math.round(gb.bottom - ib.top)) + 'px');
     return true;
   }
+  /* HT-20 P10: DETAIL fits the VIEWPORT at 1280+, not the 334px LIFE column it used to live in.
+     The panel is `position:relative`, so an `inset:0` child can never be wider than it — the page
+     is `position:fixed` above 1024px instead, over the app frame. Its box is MEASURED from the
+     frame and written to custom properties on every open and every resize, the same technique
+     `--h18drawtop` already uses, because a constant cannot express "as wide as the app". */
+  function drawerFrame(){
+    var d=document.getElementById('h18Draw'); if(!d || d.hidden) return;
+    var g=document.querySelector('.grid') || document.querySelector('.app');
+    if(!g) return;
+    var b=g.getBoundingClientRect(), r=document.documentElement.style;
+    /* IT STARTS BELOW THE GROUP BLOCK, and that is HT-18's rule, not a preference: `inset:0` once
+       covered the very control that opens the drawer, and a page you cannot close is the defect
+       that rule exists to prevent. So the page is as WIDE as the frame (what P10 asks for) and
+       starts under the door (what HT-18 asks for) — both, measured, neither traded away. */
+    var grp=document.getElementById('h18Group');
+    var top=b.top;
+    if(grp){ var gb=grp.getBoundingClientRect(); if(gb.height) top=Math.max(top, gb.bottom+8); }
+    r.setProperty('--h20dt', Math.max(0, Math.round(top)) + 'px');
+    r.setProperty('--h20dl', Math.max(0, Math.round(b.left)) + 'px');
+    r.setProperty('--h20dw', Math.round(b.width) + 'px');
+  }
   function setDrawer(open){
     var d=drawerEl(); if(!d) return;
     if(open) drawerBody();
     d.hidden=!open;
+    if(open) drawerFrame();
     var a=document.getElementById('h18Adh');
     if(a) a.setAttribute('aria-expanded', open?'true':'false');
+  }
+  if(!window.__HT20_DRAWRESIZE){
+    window.__HT20_DRAWRESIZE=1;
+    window.addEventListener('resize', function(){
+      clearTimeout(window.__HT20_DT);
+      window.__HT20_DT=setTimeout(drawerFrame, 120);
+    });
   }
   function toggleDrawer(){
     var d=document.getElementById('h18Draw');

@@ -1785,3 +1785,66 @@ html[data-simple] #h18Comp #log > .eadd{
   padding:2px 6px; min-height:calc(var(--h19row) * 0.62);
   display:flex; align-items:center;
   border-bottom:1px solid var(--rule); color:var(--muted) }
+
+/* --------------------------------------------------------------------------------------------
+   P10 · DETAIL IS A PAGE OF BOXES (R70.261)
+   "I don't wanna scroll right or left" and "I like how you have a box around them".
+   THE GRID WRAPS - it does not scroll. `auto-fill` with a minimum column means the boxes reflow
+   from six across to two across to one as the space narrows, and `scrollWidth == clientWidth` is
+   a consequence of the layout rather than something a rule has to police. The one place a table
+   is still the right shape (a member list, a standards list) sits in a FULL-WIDTH box and lets
+   its own cells wrap; `overflow-x` appears nowhere in this block, which is the point. ---------- */
+html[data-simple] .h20det{ display:flex; flex-direction:column; gap:10px; min-width:0 }
+html[data-simple] .h20h{ font:500 9.5px/1.35 var(--mono); letter-spacing:.14em;
+  text-transform:uppercase; color:var(--muted); padding:6px 0;
+  border-bottom:1px solid var(--rule); display:flex; align-items:center; gap:8px }
+html[data-simple] .h20grid{ display:grid; gap:8px; min-width:0;
+  grid-template-columns:repeat(auto-fill, minmax(190px, 1fr)) }
+html[data-simple] .h20box{ min-width:0; border:1px solid var(--rule);
+  background:var(--surface-2); padding:8px 10px }
+html[data-simple] .h20wide{ grid-column:1 / -1 }
+html[data-simple] .h20k{ font:500 8.5px/1.35 var(--mono); letter-spacing:.12em;
+  text-transform:uppercase; color:var(--muted) }
+html[data-simple] .h20v{ font-size:15px; line-height:1.35; color:var(--ink);
+  padding-top:4px; overflow-wrap:anywhere }
+html[data-simple] .h20n{ font:400 10px/1.4 var(--mono); color:var(--muted); padding-top:4px;
+  overflow-wrap:anywhere }
+html[data-simple] .h20dot{ display:inline-block; width:8px; height:8px; margin-right:5px }
+html[data-simple] .h20unk{ font:500 10px/1.35 var(--mono); letter-spacing:.1em; color:var(--muted) }
+html[data-simple] .h20sp svg{ display:block; width:100%; height:20px }
+html[data-simple] .h20list{ list-style:none; margin:0; padding:4px 0 0 }
+html[data-simple] .h20list li{ display:flex; gap:8px; align-items:baseline;
+  font-size:12.5px; line-height:1.35; padding:2px 0; border-bottom:1px solid var(--rule) }
+html[data-simple] .h20list li:last-child{ border-bottom:0 }
+html[data-simple] .h20list li span{ flex:1 1 auto; min-width:0; overflow-wrap:anywhere }
+html[data-simple] .h20list li b{ flex:0 0 auto; font-weight:500; color:var(--muted) }
+html[data-simple] .h20up{ color:var(--green-bright) }
+html[data-simple] .h20dn{ color:var(--red-bright) }
+html[data-simple] .h20fl,
+html[data-simple] .h20gap{ color:var(--muted) }
+html[data-simple] .h20det .h17dt{ width:100%; table-layout:fixed }
+html[data-simple] .h20det .h17dt td,
+html[data-simple] .h20det .h17dt th{ overflow-wrap:anywhere; white-space:normal }
+html[data-simple] .h20avg td{ border-top:1px solid var(--rule); color:var(--muted) }
+/* the phone stacks: one column, and the tables keep wrapping rather than scrolling */
+@media (max-width:767px){
+  html[data-simple] .h20grid{ grid-template-columns:1fr }
+}
+/* P10 · and the page is as wide as the app, not as wide as the LIFE column.
+   Above 1024px the drawer leaves its `position:relative` parent and sits over the frame, on a box
+   MEASURED into --h20dt/--h20dl/--h20dw by drawerFrame(). Below that it stays exactly where it
+   was — on the phone the panel IS the width of the screen, so nothing needed changing. */
+@media (min-width:1024px){
+  html[data-simple] #h18Draw{
+    position:fixed; inset:auto;
+    top:var(--h20dt, 96px); left:var(--h20dl, 24px); width:var(--h20dw, auto);
+    bottom:16px; padding:12px; z-index:40;
+    border:1px solid var(--border); background:var(--surface) }
+}
+html[data-simple] .h20top{ position:sticky; top:0; z-index:2; background:var(--surface);
+  border-bottom:1px solid var(--border) }
+html[data-simple] .h20top .sp{ flex:1 1 auto }
+html[data-simple] .h20x{ font:400 9px/1 var(--mono); letter-spacing:.1em; text-transform:uppercase;
+  color:var(--muted); background:none; border:1px solid var(--border); padding:4px 9px;
+  cursor:pointer }
+html[data-simple] .h20x:hover{ color:var(--text); border-color:var(--grey) }
