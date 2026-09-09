@@ -5399,10 +5399,6 @@ function earned(k){ return committed() - remaining(k); }
            (note?'<div class="h20n">'+note+'</div>':'')+'</div>';
   }
 
-  /* the badge stays while the three seeded members are still rendered — S7 removes both. */
-  function circBadge(){
-    return H18_DUMMIES.length ? '<span class="h18test">TEST DATA</span>' : '';
-  }
   function drawerBody(){
     var host=document.getElementById('h18DrawH'); if(!host) return 0;
     if(!window.__HT17 || !window.__HT17.habitRows) return 0;
@@ -5454,7 +5450,7 @@ function earned(k){ return committed() - remaining(k); }
     /* ---- THE GROUP ROW --------------------------------------------------------------- */
     var mine=adhAll(0,29), myToday=adhPct(0,0);
     var members=[{n:'You', t:myToday, p:mine.pct, d:have, me:true}].concat(
-      H18_DUMMIES.map(function(x){ return {n:x.n, t:x.t, p:x.p, d:null, me:false}; }));
+      circleRows().map(function(x){ return {n:x.n, t:x.t, p:x.p, d:null, me:false}; }));
     members.slice().sort(function(a,b){ return (b.p==null?-1:b.p)-(a.p==null?-1:a.p); })
       .forEach(function(m,i){ m.rank=i+1; });
     var avg=(function(){ var v=members.map(function(m){return m.p;}).filter(function(x){return x!=null;});
@@ -5515,10 +5511,14 @@ function earned(k){ return committed() - remaining(k); }
         '<div class="h20h">ME</div>'+
         '<div class="h20grid h20tiles">'+tiles+'</div>'+
         '<div class="h20flat">'+surface+'</div>'+
-        '<div class="h20h">GROUP'+circBadge()+'</div>'+
+        '<div class="h20h">GROUP</div>'+
         '<table class="h17dt h18dt h20gt">'+
           '<thead><tr><th>member</th><th>today</th><th>30 days</th>'+
-          '<th>7 days</th></tr></thead><tbody>'+grpRows+'</tbody></table>'+
+          '<th>7 days</th></tr></thead><tbody>'+grpRows+
+          (circleRows().length ? '' :
+            '<tr class="h18none"><td colspan="4">No members yet — '+
+            'share your join code to add one.</td></tr>')+
+          '</tbody></table>'+
         '<details class="h20more"><summary>MORE</summary>'+
           '<div class="h20grid">'+more+'</div>'+
           '<div class="h20h">EVERY STANDARD</div>'+
@@ -5535,34 +5535,62 @@ function earned(k){ return committed() - remaining(k); }
     return S.habits.length;
   }
 
-  /* ---- HT-18c - THE CIRCLE AS TEST DUMMIES (Cory 2026-09-07, note 7) --------------------
-     CIRCLE-1 (Andrew, Dale, Justin) is chartered and NOT built (HTR-17, NOT_STARTED). He asked to
-     see the shared view before anyone real is in it, so these three are INVENTED, drawn from a
-     constant, and labelled TEST DATA on the surface so they can never be mistaken for a reading.
+  /* ---- HT-21 S7 · REAL CIRCLE ONLY (R70.283) -------------------------------------------
+     HT-18c invented three members so Cory could see the shared view before anyone was in it, and
+     badged them on the surface so they could not read as a measurement. Honest for a screen only
+     he saw.
+     He is about to send the link to those three actual people — so the invented rows and the
+     badge LEAVE THE SHIPPED BUNDLE (R70.79). `circle_members` holds one row: him.
 
-     R47.3 HOLDS BY CONSTRUCTION, NOT BY CARE: the only column here is adherence. There is no
-     schema path from this table to a journal, a rating or a standards list, because there is no
-     schema at all - nothing is fetched, nothing is written, no invite is sent, and the strings
-     below never leave the page. `privacy_check.py` sees no new cross-user read because there is
-     none. When HTR-17 builds the real circle this function is what it replaces. */
-  /* p = 30-day adherence, t = today's completion, s = streak. Invented, constant, and labelled
-     TEST DATA wherever they are drawn (HT-18c note 7 · HT-18d note 3). */
-  var H18_DUMMIES=[{n:'Andrew',p:71,t:80,s:12},{n:'Dale',p:54,t:40,s:3},
-                   {n:'Justin',p:88,t:100,s:41}];
-  function circleDummy(){
-    var rf=window.__HT16.rampFill, rc=window.__HT16.rampClass;
-    var mine=adhAll(0,29);
-    var rows=H18_DUMMIES.map(function(d){
-      return '<tr><td class="n">'+esc(d.n)+'</td>'+
-        '<td class="p"><i style="background:'+rf(d.p)+'"></i>'+d.p+'%</td>'+
-        '<td class="num">'+d.s+'</td></tr>'; }).join('');
-    return '<div class="h18circ"><div class="h18circh">CIRCLE'+
-      '<span class="h18test">TEST DATA</span></div>'+
-      '<table class="h17dt h18dt"><thead><tr><th>who</th><th>30d</th><th>streak</th></tr></thead>'+
-      '<tbody><tr class="h18me"><td class="n">You</td>'+
-      '<td class="p"><i style="background:'+rf(mine.pct)+'"></i>'+
-      (mine.pct==null?'\u2014':mine.pct+'%')+'</td><td class="num">\u2014</td></tr>'+
-      rows+'</tbody></table></div>';
+     THE FIXTURE IS NOT DELETED, IT MOVES (R70.138). The four-member layout still has to be
+     testable, so the harness seeds a real circle through the mock (`__CIRCLE`) and the app reads
+     it through the same queries `paintCircle` already uses. The app now has no way to render a
+     person who does not exist, which is the only version of this that stays true.
+
+     R47.3 IS UNCHANGED AND STILL STRUCTURAL: the one query that crosses users is
+     `days.select('user_id,date,pct')` — adherence class only. Names come from `profiles`, which
+     is the row a member publishes about themselves. No journal, no rating, no standards list. */
+  var _circleOnce=null;
+  function circleMembers(){
+    if(_circleOnce) return _circleOnce;
+    if(!S.me) return null;
+    _circleOnce = (async function(){
+      try{
+        var mine=await sb.from('circle_members').select('circle_id').eq('user_id',S.me.id);
+        var ids=(mine.data||[]).map(function(r){ return r.circle_id; });
+        if(!ids.length) return [];
+        var mem=await sb.from('circle_members').select('circle_id,user_id').in('circle_id',ids);
+        var uids=(mem.data||[]).map(function(r){ return r.user_id; })
+                   .filter(function(u){ return u!==S.me.id; });
+        if(!uids.length) return [];
+        var pr=await sb.from('profiles').select('id,display_name,handle').in('id',uids);
+        var pm={}; (pr.data||[]).forEach(function(p){ pm[p.id]=p; });
+        /* the ONLY cross-user read in the app, and it stays adherence-class (R47.3) */
+        var od=await sb.from('days').select('user_id,date,pct')
+                       .in('user_id',uids).gte('date',shift(today(),-29));
+        var by={}; (od.data||[]).forEach(function(r){ (by[r.user_id]=by[r.user_id]||{})[r.date]=r.pct; });
+        return uids.map(function(u){
+          var d=by[u]||{}, p=pm[u]||{};
+          function mean(days){
+            var a=[]; for(var i=0;i<days;i++){ var v=d[shift(today(),-i)]; if(v!=null) a.push(v); }
+            return a.length? Math.round(a.reduce(function(x,y){return x+y;},0)/a.length) : null;
+          }
+          return { id:u, n:(p.display_name||p.handle||'member'),
+                   t:(d[today()]==null?null:Math.round(d[today()])), p:mean(30), days:d };
+        });
+      }catch(e){ return []; }
+    })();
+    return _circleOnce;
+  }
+  /* the loaded value, or [] until the promise settles — a paint never waits on the network */
+  var _circleRows=[];
+  function circleRows(){ return _circleRows; }
+  function loadCircle(){
+    var p=circleMembers();
+    if(p && p.then) p.then(function(rows){
+      _circleRows=rows||[];
+      if(_circleRows.length && typeof paintAll==='function') paintAll();
+    });
   }
 
   /* ---- HT-18d - THE GROUP BLOCK (Cory 2026-09-07 note 3) -------------------------------
@@ -5573,8 +5601,9 @@ function earned(k){ return committed() - remaining(k); }
      So: two percentages per member, no task names, always visible. R47.3 is why that is the whole
      row and not the start of one - a circle sees adherence-class data and nothing else, and there
      is no schema path here to a journal, a rating or a standards list because nothing is fetched
-     at all. Andrew, Dale and Justin are still the seeded TEST DATA of HT-18c until HTR-17 builds
-     the real invite; YOUR row is real, computed from the same functions the drawer uses. */
+     at all. HT-21 S7 removed HT-18c's seeded stand-ins and their badge: this panel now reads
+     `circle_members`, so a person without an account cannot appear on it. YOUR row is real and
+     computed from the same functions the drawer uses. */
   function groupBlock(){
     var ins=document.getElementById('h16Ins'); if(!ins) return false;
     if(!window.__HT16 || !window.__HT16.rampFill) return false;
@@ -5598,12 +5627,16 @@ function earned(k){ return committed() - remaining(k); }
         '<td class="p"><i style="background:'+rf(mo)+'"></i>'+
           (mo==null?'\u2014':mo+'%')+'</td></tr>';
     }
-    g.innerHTML='<div class="h18gh">GROUP<span class="h18test">TEST DATA</span>'+
+    /* S7: only people with an account. With one member it says so rather than inventing company. */
+    var others=circleRows();
+    g.innerHTML='<div class="h18gh">GROUP'+
       '<span class="sp"></span><button class="h18more" data-h18more type="button">detail</button></div>'+
       '<table class="h18gt"><thead><tr><th>member</th><th>today</th><th>30 days</th></tr></thead>'+
       '<tbody>'+
       row('You', todayPct, mine.pct, true)+
-      H18_DUMMIES.map(function(d){ return row(d.n, d.t, d.p, false); }).join('')+
+      others.map(function(d){ return row(d.n, d.t, d.p, false); }).join('')+
+      (others.length ? '' :
+        '<tr class="h18none"><td colspan="3">No members yet — share your join code to add one.</td></tr>')+
       '</tbody></table>';
     /* THE DRAWER STARTS BELOW THIS BLOCK. `inset:0` on #h18Draw covered the very control that
        opens it — the same defect HT-18b hit with the old one-line button, arriving again now that
@@ -6294,7 +6327,8 @@ function earned(k){ return committed() - remaining(k); }
      (`load` itself cannot be wrapped here: boot()'s first `await load()` is already in flight
      while this layer is still being parsed, so a wrapper on it would miss the one call that
      matters. Signing in reloads the page, so a later session boots the same way.) */
-  var _wr=wire;      wire      = function(){ var r=_wr.apply(null,arguments); ensureSabbath(); return r; };
+  var _wr=wire;      wire      = function(){ var r=_wr.apply(null,arguments);
+                                               ensureSabbath(); loadCircle(); return r; };
   if(!window.__HT18_RESIZE){
     window.__HT18_RESIZE=1;
     window.addEventListener('resize', function(){

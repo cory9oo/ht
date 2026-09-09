@@ -1512,13 +1512,12 @@ html[data-simple] .li .bx, html[data-simple] .li .edp{ align-self:center }
   /* (6) "remove the insights from the life graph, the clumped paragraph of words" */
   html[data-simple] #h16Ins #h16InsBody{ display:none }
 
-  /* (7) the circle, as test dummies — the surface says TEST DATA so it can never read as a number */
+  /* (7) the circle. HT-21 S7 removed the seeded stand-ins and the badge that marked them; what
+     is left styles the real member rows and the empty state shown when there is only one. */
   html[data-simple] #h18Draw .h18circ{ margin-bottom:14px }
   html[data-simple] #h18Draw .h18circh{ display:flex; align-items:center; gap:10px;
     font:500 9px/1 var(--mono); letter-spacing:.14em; text-transform:uppercase;
     color:var(--muted); padding:2px 0 6px }
-  html[data-simple] #h18Draw .h18test{ font-size:8px; letter-spacing:.1em; color:var(--bg);
-    background:var(--grey); padding:2px 5px }
   html[data-simple] #h18Draw .h18me td{ color:var(--text) }
 
   /* (10) CLOSE THE DAY is gone from the surface — the day closes on your last check-off now */
@@ -1614,8 +1613,6 @@ html[data-simple] .li .bx, html[data-simple] .li .edp{ align-self:center }
   html[data-simple] #h18Group .h18gt td.p i{ display:inline-block; width:7px; height:7px;
     margin-right:6px; vertical-align:0 }
   html[data-simple] #h18Group .h18gt tr.h18me td{ color:var(--text) }
-  html[data-simple] #h18Group .h18test{ font-size:8px; letter-spacing:.1em; color:var(--bg);
-    background:var(--grey); padding:2px 5px }
   /* the old one-line ADHERENCE button is retired by the block that replaced it (R70.79) */
   html[data-simple] #h18Adh{ display:none }
 
@@ -1921,7 +1918,6 @@ html[data-simple] #h18Draw .h20det .h20k,
 html[data-simple] #h18Draw .h20det .h20h,
 html[data-simple] #h18Draw .h20det .h20x,
 html[data-simple] #h18Draw .h20det .h18gh,
-html[data-simple] #h18Draw .h20det .h18test,
 html[data-simple] #h18Draw .h20more > summary{ font-size:9.5px }
 html[data-simple] #h18Draw .h20det .h20n,
 html[data-simple] #h18Draw .h20det .h20unk,
@@ -1956,3 +1952,6 @@ html[data-simple] #h18Draw .h16sc td{ overflow-wrap:anywhere; white-space:normal
   html[data-simple] .h16sc td{ overflow-wrap:anywhere; white-space:normal; padding-left:2px;
     padding-right:2px }
 }
+
+/* S7 · the empty state: one member is a fact, not a blank table. */
+html[data-simple] .h18none td{ color:var(--muted); font-style:normal; padding:8px 6px }
