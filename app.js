@@ -5749,6 +5749,68 @@ function earned(k){ return committed() - remaining(k); }
     return true;
   }
 
+  /* ---- HT-20 P8 · A WEEK OPENS ITS DAYS (closes HT-19 B4) -------------------------------
+     Every cell in the life grid already carried `data-wk` — its week index — and nothing listened
+     for a click on it. HT-19 B4 shipped the day axis as a control and left this half unbuilt, so
+     the one chart that covers a whole life was the one chart you could not navigate from.
+     A week is not a day, so it cannot simply `goDay`: it opens a PICKER of its seven days, each
+     with its weekday, its date and what that day scored, and the pick is what calls `goDay`.
+     Days that have not happened are listed but not clickable — a life grid runs to age 100, so
+     most weeks in it are future, and a future day is a fact about the calendar, not a defect. */
+  function wkPickClose(){
+    var n=document.getElementById('h20wk');
+    if(n && n.parentNode) n.parentNode.removeChild(n);
+  }
+  function openWeek(wi){
+    var ins=document.getElementById('h16Ins'); if(!ins) return false;
+    var bd=(S.priv0 && S.priv0.birth_date) ? new Date(S.priv0.birth_date+'T12:00:00') : null;
+    if(!bd || isNaN(bd)) return false;
+    wkPickClose();
+    var start=new Date(bd.getTime() + wi*6048e5);
+    var rows='', tk=today();
+    for(var i=0;i<7;i++){
+      var d=new Date(start.getTime() + i*864e5), k=dk(d);
+      var future = k>tk;
+      var r=S.byDate[k];
+      var pct=(r && r.pct!=null && loggedOn(k)) ? Math.round(r.pct) : null;
+      var rf=window.__HT16 && window.__HT16.rampFill;
+      rows += '<button class="h20wkd'+(future?' off':'')+(k===S.date?' on':'')+'" type="button"'+
+        (future?' disabled':' data-h20d="'+k+'"')+'>'+
+        /* `mdate` already reads "Mon Sep 7" — a second weekday span printed "MonMon Sep 7". */
+        '<span class="k">'+esc(mdate(k)||k)+'</span>'+
+        '<span class="p">'+(pct==null?(future?'—':'not logged')
+            :('<i style="background:'+(rf?rf(pct):'var(--grey)')+'"></i>'+pct+'%'))+'</span>'+
+        '</button>';
+    }
+    var n=document.createElement('div');
+    n.id='h20wk'; n.className='h20wk';
+    n.innerHTML='<div class="h20wkh">WEEK '+wi+'<span class="sp"></span>'+
+      '<button class="h20x" type="button" data-h20x>close</button></div>'+
+      '<div class="h20wkb">'+rows+'</div>';
+    ins.appendChild(n);
+    n.addEventListener('click', function(e){
+      if(e.target.closest('[data-h20x]')){ wkPickClose(); return; }
+      var b=e.target.closest('[data-h20d]'); if(!b) return;
+      var k=b.getAttribute('data-h20d');
+      wkPickClose();
+      goDay(k);
+      if(typeof phone==='function' && phone() && window.__HT13_TAB) window.__HT13_TAB('today');
+    });
+    return true;
+  }
+  function bindWeekPick(){
+    var host=document.getElementById('vWeeks');
+    if(!host || host.__h20pick) return false;
+    host.__h20pick=1;
+    /* delegated on the HOST, not on the cells: the grid is re-rendered on every repaint and a
+       listener bound to a cell dies with it. This is the same lesson watchLife() records. */
+    host.addEventListener('click', function(e){
+      var c=e.target.closest('[data-wk]'); if(!c) return;
+      openWeek(+c.getAttribute('data-wk'));
+    });
+    return true;
+  }
+
   /* ---- HT-18e (D) - SATURDAY IS ONE BOX (Cory 2026-09-07 note 4) ------------------------
      "For every Saturday on this chart, I want it to be auto populated to only one checkbox and
      just a check mark for Sabbath. I'll just check it every Sabbath that I did take the Sabbath."
@@ -6008,7 +6070,7 @@ function earned(k){ return committed() - remaining(k); }
     else { unquadrants(); unRightBlock(); unjournalBottom(); unAdh(); }
     /* HT-20 P1a: `ensureSabbath()` USED TO BE CALLED HERE, and that is the whole defect — quad()
        is a render path and runs on every paint. It is hung off load() below instead. */
-    paintLife18(); watchLife(); sabbathList(); watchLog();          /* S6 - both modes: the phone gets the same shape at a fixed cell */
+    paintLife18(); watchLife(); sabbathList(); watchLog(); bindWeekPick();          /* S6 - both modes: the phone gets the same shape at a fixed cell */
     document.documentElement.setAttribute('data-ht18','1');
   }
   /* ---- HT-18e (A) - THE LIFE GRID STOPS REVERTING (Cory 2026-09-07 note 1) --------------

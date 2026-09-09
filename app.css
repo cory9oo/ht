@@ -1848,3 +1848,28 @@ html[data-simple] .h20x{ font:400 9px/1 var(--mono); letter-spacing:.1em; text-t
   color:var(--muted); background:none; border:1px solid var(--border); padding:4px 9px;
   cursor:pointer }
 html[data-simple] .h20x:hover{ color:var(--text); border-color:var(--grey) }
+
+/* --------------------------------------------------------------------------------------------
+   P8 · A WEEK OPENS ITS DAYS (closes HT-19 B4)
+   The picker sits inside the LIFE panel, which is already `position:relative`, and covers the
+   grid rather than the page — a week is a small choice and it should not take the screen. */
+html[data-simple] .h20wk{ position:absolute; left:12px; right:12px; bottom:12px; z-index:30;
+  border:1px solid var(--border); background:var(--surface); padding:8px 10px 10px }
+html[data-simple] .h20wkh{ display:flex; align-items:center; gap:8px;
+  font:500 9px/1.35 var(--mono); letter-spacing:.14em; text-transform:uppercase;
+  color:var(--muted); padding-bottom:6px; border-bottom:1px solid var(--rule) }
+html[data-simple] .h20wkh .sp{ flex:1 1 auto }
+html[data-simple] .h20wkb{ display:flex; flex-direction:column }
+html[data-simple] .h20wkd{ display:flex; align-items:baseline; gap:8px; width:100%;
+  text-align:left; background:none; border:0; border-bottom:1px solid var(--rule);
+  color:var(--ink); font-size:12.5px; line-height:1.35; padding:6px 2px; cursor:pointer }
+html[data-simple] .h20wkd:last-child{ border-bottom:0 }
+html[data-simple] .h20wkd:hover{ background:var(--sel) }
+html[data-simple] .h20wkd.on{ box-shadow:inset 2px 0 0 var(--accent) }
+html[data-simple] .h20wkd.off{ color:var(--muted); cursor:default }
+html[data-simple] .h20wkd.off:hover{ background:none }
+html[data-simple] .h20wkd .d{ flex:0 0 34px; font:500 9px/1.35 var(--mono);
+  letter-spacing:.1em; text-transform:uppercase; color:var(--muted) }
+html[data-simple] .h20wkd .k{ flex:1 1 auto; min-width:0 }
+html[data-simple] .h20wkd .p{ flex:0 0 auto; font:400 10.5px/1.35 var(--mono); color:var(--muted) }
+html[data-simple] .h20wkd .p i{ display:inline-block; width:8px; height:8px; margin-right:5px }
