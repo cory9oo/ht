@@ -411,9 +411,16 @@ function paintLog(){
       esc(nameOf(h.name)) +
       (dAt ? '<i class="dat">\u2713 '+esc(dAt)+'</i>' : '') +
       ((S.hasCue && h.cue)?'<i class="cue">'+esc(h.cue)+'</i>':'');
-    var LK = '<span class="lk"><svg viewBox="0 0 24 24"><path d="M10 13a5 5 0 007.5.5l3-3a5 5 0 00-7-7L11.5 5"/><path d="M14 11a5 5 0 00-7.5-.5l-3 3a5 5 0 007 7L12 19"/></svg></span>';
+    /* ---- HT-21 S3 · LINKS WITHOUT NOISE (R70.287) ------------------------------------
+       Cory: "I still need links available but I do not like the icon next to the end of the
+       text." The chain glyph is GONE from the row — at rest and at every other time. What
+       replaces it is nothing at all until the pointer is on the name, and then a 2px dot.
+       THE ANCHOR STAYS, and that is the whole trick: a real <a href> is what gives long-press
+       on a phone and right-click on a desktop their native "open link" without this file
+       implementing a gesture, and it keeps the link reachable from the drawer and the sheet.
+       Only the ICON is removed (the wire is explicit that nothing else about links is). */
     var nm = h.link
-      ? '<a class="nm lnk" href="'+esc(h.link)+'" target="_blank" rel="noopener">'+nmIn+LK+'</a>'
+      ? '<a class="nm lnk" href="'+esc(h.link)+'" target="_blank" rel="noopener">'+nmIn+'</a>'
       : '<span class="nm">'+nmIn+'</span>';
     return '<div class="li'+(on?' on':'')+(h.id===nx?' nx':'')+'" data-h="'+h.id+'">'+
       '<button class="bxw" type="button" data-tog="'+h.id+'" aria-pressed="'+(on?'true':'false')+
@@ -1401,10 +1408,8 @@ function wire(){
     var b=e.target.closest('[data-h]'); if(!b) return;
     /* HT-16 R70.98: the name IS the link now. It navigates itself; it must never also toggle. */
     if(e.target.closest('a')) return;
-    if(e.target.closest('.lk')){
-      var h=S.habits.filter(function(x){return x.id===b.getAttribute('data-h');})[0];
-      if(h&&h.link){ window.open(h.link,'_blank','noopener'); return; }
-    }
+    /* HT-21 S3: the `.lk` branch that used to open the link from the icon is GONE with the icon
+       it served — nothing renders that class any more, and the anchor above already returns. */
     toggle(b.getAttribute('data-h'));
   });
 

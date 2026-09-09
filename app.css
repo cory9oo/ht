@@ -136,8 +136,6 @@ svg{display:block}
 .li .wk{font:500 8.5px/1 var(--mono);letter-spacing:.09em;color:var(--accent);flex:0 0 auto}
 .li .mn{font:400 10.5px/1 var(--mono);color:var(--ink3);flex:0 0 auto;min-width:34px;text-align:right}
 .li .ad{font:400 9.5px/1 var(--mono);flex:0 0 auto;min-width:30px;text-align:right}
-.li .lk{flex:0 0 auto;color:var(--ink3)}
-.li .lk svg{width:11px;height:11px;stroke:currentColor;stroke-width:2;fill:none}
 .li.nx{box-shadow:inset 2px 0 0 var(--accent)}
 .li.nx .nm{color:var(--ink)}
 
@@ -731,13 +729,15 @@ html[data-simple] .li .bx{ width:28px; height:28px; border-width:2px }
 html[data-simple] .li.on .bx::after{ width:15px; height:9px; left:5px; top:7px }
 html[data-simple] .li .nm{ flex:0 1 auto; min-width:0; white-space:nowrap;
   overflow:hidden; text-overflow:ellipsis }
-html[data-simple] .li a.nm{ color:var(--text); text-decoration:underline;
-  text-decoration-color:var(--border); text-underline-offset:3px }
-html[data-simple] .li a.nm:hover{ text-decoration-color:var(--muted) }
-html[data-simple] .li a.nm .lk{ display:inline-block; vertical-align:-1px; padding-left:5px;
-  color:var(--muted) }
-html[data-simple] .li a.nm .lk svg{ display:inline-block; width:11px; height:11px;
-  stroke:currentColor; stroke-width:2; fill:none }
+/* HT-21 S3 · a linked name is INDISTINGUISHABLE FROM ANY OTHER AT REST (R70.287). No glyph, no
+   underline, no colour of its own — the row reads as a sentence. On hover it grows a 2px dot at
+   the end of the text, which is the smallest thing that can say "there is something here". */
+html[data-simple] .li a.nm{ color:var(--ink); text-decoration:none }
+html[data-simple] .li a.nm::after{ content:''; display:inline-block; width:2px; height:2px;
+  margin-left:5px; vertical-align:middle; background:var(--muted); opacity:0 }
+html[data-simple] .li a.nm:hover::after,
+html[data-simple] .li a.nm:focus-visible::after{ opacity:1 }
+html[data-simple] .li a.nm:hover{ color:var(--text) }
 html[data-simple] .li .sp16{ flex:1 1 auto; min-width:8px; align-self:stretch }
 /* the pencil is a control, not a hover affordance: in flow, always present, 44x44 on every pointer */
 html[data-simple] .li .edp{ position:static; display:flex; flex:0 0 44px;
@@ -1581,7 +1581,6 @@ html[data-simple] .li .bx, html[data-simple] .li .edp{ align-self:center }
   html[data-simple] #h18Comp .li.on .nm,
   html[data-simple] #h18Comp .li.on a.nm{ color:var(--muted) }
   html[data-simple] #h18Comp .li.on a.nm{ text-decoration-color:var(--border) }
-  html[data-simple] #h18Comp .li.on .nm .lk{ color:var(--grey) }
 
   /* (7) "The x next to the #10 for the daily rating needs to be removed." Hidden, not deleted —
      the clear control is still there in Advanced, and this is the only way to unset a rating, so
