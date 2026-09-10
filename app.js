@@ -3012,16 +3012,15 @@ function earned(k){ return committed() - remaining(k); }
     if(!st) return;
     cancelPress();
     if(autoRaf){ cancelAnimationFrame(autoRaf); autoRaf=null; }
-    /* ---- HT-23 S2 · ONE SETTLING PASS, AND IT REMOVES A ONE-ROW OVERSHOOT ----------------
-       `moveDrag` places the row against the layout as it was DURING the move, and inserting the
-       row is itself what changes that layout — so on 1 drag in 20 the row came to rest one place
-       below where the finger actually was. Invisible on a mouse, and exactly the kind of
-       off-by-one that a test written to "look fine" never catches; `golden_ht23` S2e caught it
-       on the twentieth attempt at stating the acceptance exactly.
-       Running the SAME rule once more against the SETTLED layout is a fixed point: if the row is
-       already right, `moveDrag`'s own guard makes the insert a no-op; if it overshot, it comes
-       back one. The acceptance can then be exact, with no tolerance — which it could not be
-       while the answer depended on the instant you measured it. */
+    /* ---- HT-23 S2 · ONE SETTLING PASS, AND IT IS LOAD-BEARING ---------------------------
+       The last `pointermove` can arrive while the list is still reflowing from the insert it
+       caused, so the order committed on release could differ from the order on screen when the
+       finger left it. Running the same rule once against the settled layout closes that gap:
+       WHAT YOU SEE MID-DRAG IS WHAT THE DROP KEEPS.
+       This was nearly deleted as a no-op — and `golden_ht23` S2e went red the moment it was, on
+       the twenty-drag stability check. It stays, with the reason it actually earns rather than
+       the one it was first given. `moveDrag`'s own guard makes it free when nothing needs to
+       move. */
     if(st.dragging) moveDrag(lastY);
     var s=st; st=null;
     s.row.classList.remove('armed');

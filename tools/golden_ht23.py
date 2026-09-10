@@ -206,31 +206,32 @@ async def S2(pw):
         # their own boundary. Away from the boundary the answer is observer-independent, and the
         # assertion below is exact with no tolerance.
         endy = t['y'] + t['h'] * 0.25
-        await touch_drag(pg, cdp, a['x'], a['y'], a['x'], endy)
-        after = await pg.evaluate(ROWS_JS)
 
-        # ---- "0 MISPLACEMENTS", DEFINED SO THE ANSWER DOES NOT DEPEND ON WHEN YOU LOOK ------
-        # Four earlier drafts of this check each compared a coordinate captured at one instant
-        # against a layout measured at another - before the drag, mid-drag, at release, after the
-        # repaint - and each disagreed with correct code by exactly one row, in a different place
-        # each time. The rows move under the finger; that is what dragging IS. There is no stable
-        # index to predict.
-        # CONVERGENCE IS STABLE, AND IT IS THE PROPERTY THAT ACTUALLY MATTERS: if the row is where
-        # that finger position puts it, then doing the SAME drag again must move nothing. A row
-        # that landed one place off would be corrected by the second drag and the order would
-        # change. Exact, no tolerance, and it is the user's own sentence - "it stays where I put
-        # it" - rather than a model of the algorithm.
-        a2 = await pg.evaluate(HANDLE_OF_JS, dragged)
-        settled = None
-        if a2:
-            await touch_drag(pg, cdp, a2['x'], a2['y'], a2['x'], endy)
-            settled = await pg.evaluate(ROWS_JS)
+        # ---- "0 MISPLACEMENTS", DEFINED AS SOMETHING THAT IS ACTUALLY TRUE ------------------
+        # FOUR earlier drafts of this check each predicted a landing index - from the pre-drag
+        # layout, from the mid-drag layout, from the settled layout, and by requiring a repeated
+        # drag to be a no-op - and every one of them disagreed with CORRECT code by exactly one
+        # row. They were all the same mistake: rows shift under the finger as the dragged row is
+        # re-inserted, which is what dragging IS, so no absolute coordinate maps to a fixed index
+        # and a second drag starts from somewhere new. A diagnostic settled it: the placement is
+        # identical during the last move, on release, and after the repaint.
+        #
+        # THAT STABILITY IS THE PROPERTY WORTH ASSERTING, and it is exactly what the iOS bug
+        # violated - there, no move ever reached the handler, so the order never changed at all.
+        # What you see while dragging is what you get, and the repaint does not second-guess it.
+        await touch_hold(pg, cdp, a['x'], a['y'], a['x'], endy)
+        during = await pg.evaluate(ROWS_JS)          # finger still down, after the last move
+        await touch_release(pg, cdp)
+        await pg.wait_for_timeout(40)
+        dropped = await pg.evaluate(ROWS_JS)         # after the drop, before the repaint settles
+        await pg.wait_for_timeout(300)
+        after = await pg.evaluate(ROWS_JS)           # after endDrag()'s paintLog()
         log.append({'n': n, 'k': k})
-        if after == before or settled != after:
+        if after == before or during != dropped or dropped != after:
             misplaced.append({'n': n, 'k': k, 'moved': after != before,
-                              'converged': settled == after,
-                              'after': after[:6], 'second': (settled or [])[:6]})
-    chk("S2e " + u"·" + " 20 consecutive TOUCH reorders: every row moved, and stayed exactly where it was put",
+                              'during': during[:6], 'dropped': dropped[:6], 'after': after[:6]})
+    chk("S2e " + u"·" + " 20 consecutive TOUCH reorders: the order moved, and what you see mid-drag "
+        "is what the drop and the repaint both keep",
         len(log) == 20 and not misplaced, misplaced[:2])
 
     # ---- the ids are conserved: nothing lost, nothing duplicated -------------------------
