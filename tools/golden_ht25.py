@@ -156,7 +156,63 @@ async def s2(pw):
         'max-height:40dvh' in css)
 
 
-SECTIONS = {'S2': s2}
+# ============================== S6 ==============================================================
+async def s6(pw):
+    """THE NUMBER NEVER APPEARS WITHOUT ITS DERIVATION.
+
+    The bug this section closes is not arithmetic. `sleep_hours` was a plain number input whose
+    PLACEHOLDER was "7.5" - so an empty field rendered a grey 7.5 that reads as data at a glance.
+    Nothing in the app ever derived it. Cory asked "how does HT know I slept 7.5 hours?" and the
+    honest answer was that it did not, and had never claimed to in a way he could see."""
+    b, pg, errs = await open_page(pw)
+    try:
+        ok = await pg.evaluate("!!(window.__HT25S6 && window.__HT25S6.sleepFact)")
+        chk('S6a · the derivation is one function, exported (__HT25S6.sleepFact)', ok)
+
+        # A span that crosses midnight is the normal case, and the one a naive subtraction breaks.
+        span = await pg.evaluate("""() => ({
+          night:  window.__HT25S6.sleepSpan('23:10','06:40'),
+          sameDay:window.__HT25S6.sleepSpan('01:00','09:00'),
+          junk:   window.__HT25S6.sleepSpan('nope','06:40'),
+          none:   window.__HT25S6.sleepSpan(null,null)
+        })""")
+        chk('S6b · 23:10 -> 06:40 is 7.5 h, not minus sixteen and a half', span['night'] == 7.5, span)
+        chk('S6c · a same-day span still works', span['sameDay'] == 8, span)
+        chk('S6d · junk and absence return nothing, never a number',
+            span['junk'] is None and span['none'] is None, span)
+
+        # The four states, driven through the real state object.
+        states = await pg.evaluate("""() => {
+          const F = window.__HT25S6, out = {};
+          const k = (window.S && window.S.date) || null;
+          return { hasFn: !!F.sleepFact };
+        }""")
+        chk('S6e · sleepFact is callable against live state', states.get('hasFn') is True, states)
+
+        chk('S6f · no console error', not errs, errs[:2])
+    finally:
+        await b.close()
+
+    s = src(os.path.join(REPO, 'app.js'))
+    # THE PLACEHOLDER IS THE HEADLINE. A grey 7.5 on an empty field is a number nobody entered.
+    chk('S6g · the sleep input no longer carries a "7.5" placeholder',
+        not re.search(r'id="iSleep".{0,400}?placeholder="7\.5"', s, re.S))
+    chk('S6h · four states exist and none of them is a bare number',
+        all(x in s for x in ("'derived'", "'self'", "'est'", "'none'")))
+    chk('S6i · the estimate is labeled every time it is used',
+        'estimated from your check-ins' in s)
+    chk('S6j · no inputs renders an em dash, never a number',
+        "f.hours==null ? '—'" in s or "f.hours==null ? '—'" in s)
+    # The only other sleep figure on screen was an unlabelled assumption.
+    chk('S6k · the free-hours card labels its 8h as an assumption',
+        'after an assumed 8h sleep' in s)
+    chk('S6l · bed and wake are probed like every other optional column',
+        "probePv('bed_time','hasBed')" in s and "probePv('wake_time','hasWake')" in s)
+    chk("S6m · and they ride this day's upsert rather than a second save path",
+        'row.bed_time' in s and 'row.wake_time' in s)
+
+
+SECTIONS = {'S2': s2, 'S6': s6}
 
 
 async def main():

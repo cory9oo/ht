@@ -2118,3 +2118,14 @@ html[data-simple] #iDump, html[data-simple] #iTasks, html[data-simple] #iPrayer{
 /* iOS momentum, and it is not redundant: without it a bounded textarea on iOS scrolls one
    "page" per drag with no inertia, which reads as a stuck box rather than a scrolling one. */
 textarea{ -webkit-overflow-scrolling:touch }
+
+/* ---- HT-25 S6 · THE DERIVATION LINE ------------------------------------------------------
+   A number with no provenance is a number Cory does not trust, and he said so. This caption is
+   never optional: `paintSleepWhy()` renders it or hides the number. Three states, three weights -
+   a derived figure reads as fact, a self-reported one as his own entry, an estimate as muted and
+   clearly softer than either. */
+.swhy{ display:block; width:100%; margin-top:3px;
+  font:400 10.5px/1.25 var(--sans); color:var(--ink3) }
+.swhy.derived{ color:var(--muted) }
+.swhy.self{ color:var(--ink3) }
+.swhy.est{ color:var(--dim); font-style:italic }

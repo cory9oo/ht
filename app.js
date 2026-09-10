@@ -394,6 +394,11 @@ async function load(){
   await probePv('sleep_hours','hasSleep');
   await probePv('weight_lb','hasWeight');
   await probePv('tomorrow_one_thing','hasTomorrow');
+  /* HT-25 S5/S6: bed and wake. Probed like every other optional column, so a phone whose
+     migration has not run simply does not show the two fields - and the sleep line falls back
+     to `self-reported`, which is the honest label for a number Cory typed. */
+  await probePv('bed_time','hasBed');
+  await probePv('wake_time','hasWake');
 
   S.priv = S.privAll[S.date] || null;
   return true;
@@ -419,6 +424,8 @@ async function savePriv(){
      cannot fail the whole save and silently stop the journal persisting at all. */
   if(S.hasSleep)  row.sleep_hours = (p.sleep_hours==null||p.sleep_hours==='') ? null : +p.sleep_hours;
   if(S.hasWeight) row.weight_lb   = (p.weight_lb==null  ||p.weight_lb==='')   ? null : +p.weight_lb;
+  if(S.hasBed)    row.bed_time    = p.bed_time  || null;
+  if(S.hasWake)   row.wake_time   = p.wake_time || null;
   var res = await sb.from('day_private').upsert(row,{ onConflict:'user_id,date' });
   if(res.error) toast('note not saved'); else toast('saved');
   var n=0; ['brain_dump','tasks','prayer'].forEach(function(k){ if(p[k]) n++; });
@@ -727,12 +734,91 @@ function isSat(k){ return dnum(k).getDay()===6; }
 function i3f(id, lab, inner){
   return '<span class="i3f"><span class="lab">'+esc(lab)+'</span>'+inner+'</span>';
 }
+/* ---- HT-25 S6 · THE SLEEP NUMBER NEVER APPEARS WITHOUT ITS DERIVATION -------------------
+   Cory, 2026-09-10: "how does HT know I slept 7.5 hours? I'm not sure that's accurate."
+
+   THE ANSWER, FOUND BY READING THE CODE RATHER THAN GUESSING AT IT: it doesn't know. Nothing in
+   this file ever derived that number. `sleep_hours` was a plain <input type="number"> and 7.5 was
+   its PLACEHOLDER - so an empty field showed a greyed 7.5 that looks exactly like a value. The
+   honest formula was "whatever Cory typed, or nothing at all dressed as 7.5".
+
+   That is a VERIFY failure (every number on screen is traceable to its inputs, or it is labeled
+   estimated), so the fix is not a better formula - it is a derivation the number has to carry:
+
+     bed + wake present  -> DERIVED     "bed 23:10 -> up 06:40"      the app computed it
+     sleep typed only    -> SELF-REPORT "you entered this"           he computed it
+     neither, but the night/morning routines were checked off
+                         -> ESTIMATED   "estimated from your check-ins"   nobody computed it
+     nothing at all      -> no number.  An em dash. Never a placeholder that reads as data. */
+function hhmmMin(v){
+  if(typeof v!=='string') return null;
+  var m=/^(\d{1,2}):(\d{2})/.exec(v); if(!m) return null;
+  var h=+m[1], n=+m[2];
+  return (h>=0&&h<24&&n>=0&&n<60) ? h*60+n : null;
+}
+/* Bed is the night BEFORE the wake, so a bed time later in the clock than the wake time crosses
+   midnight and the span wraps. 23:10 -> 06:40 is 7h30m, not minus sixteen and a half hours. */
+function sleepSpan(bed, wake){
+  var b=hhmmMin(bed), w=hhmmMin(wake);
+  if(b==null||w==null) return null;
+  var mins = w - b; if(mins <= 0) mins += 1440;
+  return Math.round(mins/60*100)/100;
+}
+/* The one place that answers "what do we know about this night, and how do we know it".
+   Returns {hours, how, why} - never a bare number, which is the whole point of the section. */
+function sleepFact(k){
+  var p = (k===S.date ? S.priv : S.privAll[k]) || {};
+  var span = sleepSpan(p.bed_time, p.wake_time);
+  if(span!=null) return { hours:span, how:'derived',
+                          why:'bed '+p.bed_time.slice(0,5)+' → up '+p.wake_time.slice(0,5) };
+  if(p.sleep_hours!=null && p.sleep_hours!=='')
+    return { hours:+p.sleep_hours, how:'self', why:'you entered this' };
+  var est = sleepFromCheckins(k);
+  if(est!=null) return { hours:est.hours, how:'est', why:'estimated from your check-ins' };
+  return { hours:null, how:'none', why:'' };
+}
+/* THE FALLBACK, AND IT IS LABELED EVERY TIME IT IS USED. A night routine and a morning routine
+   that both carry a done-time bracket the night; that is an inference from behaviour, not a
+   measurement of sleep, so it never renders as a plain number. */
+function sleepFromCheckins(k){
+  var night=null, morn=null;
+  (S.habits||[]).forEach(function(h){
+    var n=String(h.name||'').toLowerCase();
+    var at=doneAt(k, h.id); if(!at) return;
+    if(/night|evening|bed/.test(n) && night==null) night=at;
+    if(/morning|wake|rise/.test(n) && morn==null)  morn=at;
+  });
+  var span = sleepSpan(night, morn);
+  return span==null ? null : { hours:span };
+}
+function paintSleepWhy(){
+  var n=el('sleepWhy'); if(!n) return;
+  var f=sleepFact(S.date);
+  n.className = 'swhy ' + f.how;
+  n.textContent = f.how==='none' ? '' : f.why;
+  n.hidden = f.how==='none';
+  var v=el('sleepVal'); if(v){ v.textContent = f.hours==null ? '—' : f.hours; }
+}
+window.__HT25S6 = { sleepSpan:sleepSpan, sleepFact:function(k){ return sleepFact(k); },
+                    hhmmMin:hhmmMin };
+
 function paintInputs3(){
   var a=el('in3a'); if(!a) return;
   var h='';
+  /* S5: bed and wake are ON by default, and they are what give S6 a real derivation. Two time
+     inputs on the line that already exists - not a fourth write surface (DEC-058). */
+  if(S.hasBed) h+=i3f('iBed','Bed',
+    '<input id="iBed" class="num" type="time" '+
+    'value="'+esc(S.priv&&S.priv.bed_time?String(S.priv.bed_time).slice(0,5):'')+'">');
+  if(S.hasWake) h+=i3f('iWake','Up',
+    '<input id="iWake" class="num" type="time" '+
+    'value="'+esc(S.priv&&S.priv.wake_time?String(S.priv.wake_time).slice(0,5):'')+'">');
   if(S.hasSleep) h+=i3f('iSleep','Slept',
+    /* NO PLACEHOLDER. It read "7.5" in grey on an empty field, which is indistinguishable from a
+       value at a glance and is most of why Cory doubted the number. An empty field now looks
+       empty. */
     '<input id="iSleep" class="num" type="number" min="0" max="24" step=".25" inputmode="decimal" '+
-    'value="'+esc(S.priv&&S.priv.sleep_hours!=null?S.priv.sleep_hours:'')+'" placeholder="7.5">');
+    'value="'+esc(S.priv&&S.priv.sleep_hours!=null?S.priv.sleep_hours:'')+'">');
   /* WEIGHT IS SATURDAY ONLY. On a Wednesday the field is absent rather than disabled; a Saturday
      he logs back to still shows its own number, because the rule belongs to the DAY on screen and
      not to today. */
@@ -751,7 +837,11 @@ function paintInputs3(){
       ' '+d.getDate()+', where it meets you at the top of that day’s list" '+
       'placeholder="one thing">');
   }
+  /* S6: the derivation rides the same line the number does, so there is no way to render one
+     without the other. It is the last child on purpose - a caption belongs under its number. */
+  if(h) h += '<span class="swhy" id="sleepWhy" hidden></span>';
   a.innerHTML=h; a.hidden=!h;
+  paintSleepWhy();
 }
 
 function toggle(hid){
@@ -1322,7 +1412,9 @@ function paintTLedger(){
     kv('Actually spent', fmt(spent)) +
     kv('Unspent', '<span style="color:var(--bad)">'+fmt(lost)+'</span>') +
     kv('Per day unspent', fmt(days?lost/days:0)) +
-    kv('Free hours left in a day', fmt(1440-com-480)+' <span style="color:var(--ink3)">after 8h sleep</span>') +
+    /* HT-25 S6: this 480 is an ASSUMPTION, not a measurement - the only other place a sleep
+       figure reaches the screen. VERIFY says label it, so it says "assumed", not "after". */
+    kv('Free hours left in a day', fmt(1440-com-480)+' <span style="color:var(--ink3)">after an assumed 8h sleep</span>') +
     '</table>';
 }
 
@@ -1711,7 +1803,9 @@ function wire(){
     var host=el('in3a'); if(!host) return;
     host.addEventListener('input',function(e){
       var n=e.target; if(!n||!n.id) return;
-      if(n.id==='iSleep'){  S.priv=S.priv||{}; S.priv.sleep_hours = n.value===''?null:+n.value; queuePriv(); }
+      if(n.id==='iSleep'){  S.priv=S.priv||{}; S.priv.sleep_hours = n.value===''?null:+n.value; queuePriv(); paintSleepWhy(); }
+      if(n.id==='iBed'){    S.priv=S.priv||{}; S.priv.bed_time  = n.value||null; queuePriv(); paintSleepWhy(); }
+      if(n.id==='iWake'){   S.priv=S.priv||{}; S.priv.wake_time = n.value||null; queuePriv(); paintSleepWhy(); }
       if(n.id==='iWeight'){ S.priv=S.priv||{}; S.priv.weight_lb   = n.value===''?null:+n.value; queuePriv(); }
       if(n.id==='iOne'){ queueTomorrow(n.value); }
     });
