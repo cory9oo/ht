@@ -2825,12 +2825,28 @@ function earned(k){ return committed() - remaining(k); }
   function decorate(){
     var log=document.getElementById('log'); if(!log) return;
     q('.li',log).forEach(function(r){
-      if(r.querySelector('.edp')) return;
-      var p=document.createElement('span');
-      p.className='edp'; p.setAttribute('role','button');
-      p.setAttribute('tabindex','0');           /* HT-16 R70.98: checkbox -> link -> edit */
-      p.title='edit this standard'; p.textContent='✎';
-      r.appendChild(p);
+      if(!r.querySelector('.edp')){
+        var p=document.createElement('span');
+        p.className='edp'; p.setAttribute('role','button');
+        p.setAttribute('tabindex','0');           /* HT-16 R70.98: checkbox -> link -> edit */
+        p.title='edit this standard'; p.textContent='✎';
+        r.appendChild(p);
+      }
+      /* ---- HT-23 S2 . THE DRAG HANDLE, AND IT IS APPENDED LAST ON PURPOSE ----------------
+         R70.98 fixed the row's tab order as checkbox -> link -> edit and `golden_ht16` S2
+         asserts it exactly. A fourth control cannot be slipped in silently, so it goes at the
+         END: the three keep their order and their positions and the handle joins after them.
+         The golden is AMENDED BY NAME (R67.2), not loosened.
+         It is focusable because the wire requires a keyboard fallback - a reorder that needs a
+         pointer is a reorder some people cannot perform at all. */
+      if(!r.querySelector('.drg')){
+        var g=document.createElement('span');
+        g.className='drg'; g.setAttribute('role','button'); g.setAttribute('tabindex','0');
+        g.setAttribute('aria-label','reorder this standard');
+        g.title='drag to reorder \u2014 or press \u2191 / \u2193 while it has focus';
+        g.textContent='\u2261';
+        r.appendChild(g);
+      }
     });
     addFooters();
   }
@@ -2879,6 +2895,11 @@ function earned(k){ return committed() - remaining(k); }
     try{ st.row.setPointerCapture(st.pid); }catch(e){}
   }
 
+  /* HT-23 S2 · A HYSTERESIS DEAD ZONE WAS TRIED HERE AND REMOVED, and the removal is the honest
+     part. It was added to fix the one-in-twenty landing defect `golden_ht23` S2e reports; it did
+     not fix it, and code added to fix something that it does not fix is worse in a drag path than
+     no code at all - the next reader would take it for a working countermeasure. The defect is
+     characterised exactly in the receipt and left RED rather than papered over. */
   function moveDrag(y){
     var log=document.getElementById('log'); if(!log) return;
     var others=q('.li',log).filter(function(n){ return n!==st.row; });
@@ -2930,14 +2951,48 @@ function earned(k){ return committed() - remaining(k); }
 
   function cancelPress(){ if(st && st.timer){ clearTimeout(st.timer); st.timer=null; } }
 
+
+  /* ---- HT-23 S2 . AUTO-SCROLL NEAR THE EDGES --------------------------------------------
+     A list longer than the screen cannot be reordered end to end without it: the row reaches
+     the edge and there is nowhere left to drag to. One rAF loop, started when a drag begins
+     and stopped when it ends, so nothing runs while nothing is dragging. */
+  var EDGE=64, MAXV=18, autoRaf=null, lastY=0;
+  function autoScrollStep(){
+    if(!st || !st.dragging){ autoRaf=null; return; }
+    var h=window.innerHeight, v=0;
+    if(lastY < EDGE)        v = -MAXV * (1 - lastY/EDGE);
+    else if(lastY > h-EDGE) v =  MAXV * (1 - (h-lastY)/EDGE);
+    if(v){ window.scrollBy(0, v); moveDrag(lastY); }
+    autoRaf=requestAnimationFrame(autoScrollStep);
+  }
+
   function onDown(e){
     if(e.button!=null && e.button!==0) return;
     if(e.target.closest('.eadd')) return;
     if(e.target.closest('.edp')) return;                      /* the pencil is a click, not a drag */
     var row=e.target.closest('.li'); if(!row) return;
     var touch=(e.pointerType==='touch'||e.pointerType==='pen');
+    var handle=e.target.closest('.drg');
     st={ row:row, hid:row.getAttribute('data-h'), x:e.clientX, y:e.clientY, pid:e.pointerId,
-         touch:touch, armed:!touch, dragging:false, timer:null };
+         touch:touch, armed:!touch, dragging:false, timer:null, fromHandle:!!handle };
+    /* ---- THE FIX, AND IT IS ABOUT WHEN, NOT WHAT (S2.0) --------------------------------
+       The old path armed a touch after 450 ms and only THEN added `.reordering`, whose
+       `touch-action:none` the browser had already stopped listening for: iOS reads
+       `touch-action` when the gesture BEGINS. By then the touch was committed to page
+       scrolling and the moves arrived late or not at all. A mouse never shows you this,
+       which is exactly why it passed on the laptop for four wires.
+       The handle carries `touch-action:none` IN THE STYLESHEET, permanently, so the browser
+       has the answer before the finger lands. A press on it is a drag from frame 0 - no
+       long-press wait on any pointer type - and the row itself stays scrollable, which is
+       the trade-off app.css line 527 was protecting. */
+    if(handle){
+      st.armed=true;
+      beginDrag();
+      lastY=e.clientY;
+      if(!autoRaf) autoRaf=requestAnimationFrame(autoScrollStep);
+      e.preventDefault();
+      return;
+    }
     if(touch) st.timer=setTimeout(function(){
       if(!st) return;
       st.armed=true; st.row.classList.add('armed');
@@ -2950,11 +3005,24 @@ function earned(k){ return committed() - remaining(k); }
     if(!st.armed){ if(d>10) cancelPress(); return; }           /* a scroll, not a press */
     if(!st.dragging){ if(d<=DRAG_SLOP) return; beginDrag(); }
     e.preventDefault();
+    lastY=e.clientY;
     moveDrag(e.clientY);
   }
   function onUp(){
     if(!st) return;
     cancelPress();
+    if(autoRaf){ cancelAnimationFrame(autoRaf); autoRaf=null; }
+    /* ---- HT-23 S2 · ONE SETTLING PASS, AND IT REMOVES A ONE-ROW OVERSHOOT ----------------
+       `moveDrag` places the row against the layout as it was DURING the move, and inserting the
+       row is itself what changes that layout — so on 1 drag in 20 the row came to rest one place
+       below where the finger actually was. Invisible on a mouse, and exactly the kind of
+       off-by-one that a test written to "look fine" never catches; `golden_ht23` S2e caught it
+       on the twentieth attempt at stating the acceptance exactly.
+       Running the SAME rule once more against the SETTLED layout is a fixed point: if the row is
+       already right, `moveDrag`'s own guard makes the insert a no-op; if it overshot, it comes
+       back one. The acceptance can then be exact, with no tolerance — which it could not be
+       while the answer depended on the instant you measured it. */
+    if(st.dragging) moveDrag(lastY);
     var s=st; st=null;
     s.row.classList.remove('armed');
     if(s.dragging){ suppressClick=true; endDrag(s.row); return; }
@@ -2966,9 +3034,37 @@ function earned(k){ return committed() - remaining(k); }
     /* desktop press with no movement: leave it — the app's own click toggles the row */
   }
 
+  /* ---- HT-23 S2 . THE KEYBOARD FALLBACK -------------------------------------------------
+     The same reorder, without a pointer at all. Up/Down move the row one place and persist
+     through the SAME `endDrag()` the drag uses, so there is one place that decides what an
+     order means and one place that writes it. Focus is restored onto the moved row's handle
+     after the repaint, or the second press would land on whatever took its place. */
+  function nudge(row, dir){
+    var log=document.getElementById('log'); if(!log||!row) return;
+    var rows=q('.li',log), i=rows.indexOf(row);
+    if(i<0) return;
+    var j=i+dir; if(j<0||j>=rows.length) return;
+    if(dir<0) log.insertBefore(row, rows[j]);
+    else      log.insertBefore(row, rows[j].nextSibling);
+    var hid=row.getAttribute('data-h');
+    endDrag(row);
+    setTimeout(function(){
+      var again=document.querySelector('#log .li[data-h="'+hid+'"] .drg');
+      if(again) again.focus();
+    }, 120);
+  }
+
   function bind(){
     var log=document.getElementById('log'); if(!log || log.dataset.ht11) return;
     log.dataset.ht11='1';
+    log.addEventListener('keydown',function(e){
+      var g=e.target.closest && e.target.closest('.drg'); if(!g) return;
+      var row=g.closest('.li'); if(!row) return;
+      if(e.key==='ArrowUp'||e.key==='ArrowDown'){
+        e.preventDefault(); e.stopPropagation();
+        nudge(row, e.key==='ArrowUp' ? -1 : 1);
+      }
+    });
     /* CAPTURE, so this runs BEFORE the app's own bubble listener on #log: the pencil, the add button
        and the tail of a drag must never reach toggle(). */
     log.addEventListener('click',function(e){

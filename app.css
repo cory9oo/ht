@@ -524,6 +524,29 @@ html[data-simple] #whyFld{ display:none !important }   /* the field goes; the co
   .li .edp:hover{color:var(--accent);border-color:var(--accent)}
 }
 
+/* ---- HT-23 S2 . THE DRAG HANDLE OWNS THE GESTURE FROM THE FIRST FRAME -------------------
+   `touch-action` is read by the browser when a gesture BEGINS, not when a class is added
+   later. `.log.reordering` below is applied AFTER the long-press arms, by which time iOS has
+   already committed the touch to page scrolling - so the drag never received its moves on a
+   phone and always worked on a mouse. The comment on the next line states the trade-off that
+   caused it, and it was a correct trade-off: putting `touch-action:none` on the row would kill
+   page scrolling from a row.
+   So the HANDLE carries it, permanently and in the stylesheet. The row stays scrollable, the
+   handle never scrolls the page, and the browser knows which is which before the finger lands.
+   `.log.reordering` STAYS: once a drag is running it still stops the rows eating the gesture,
+   and it is now belt-and-braces rather than the mechanism. */
+html[data-simple] .li .drg{ flex:0 0 44px; width:44px; height:44px;
+  display:flex; align-items:center; justify-content:center;
+  touch-action:none; -webkit-user-select:none; user-select:none; -webkit-touch-callout:none;
+  cursor:grab; color:var(--muted); font-size:15px; line-height:1;
+  border:1px solid transparent; border-radius:2px; background:none }
+html[data-simple] .li .drg:hover{ color:var(--green-bright); border-color:var(--green-bright) }
+html[data-simple] .li .drg:focus-visible{ outline:none; color:var(--green-bright);
+  border-color:var(--green-bright) }
+html[data-simple] .li .drg:active{ cursor:grabbing }
+html[data-simple] .li.dragging .drg{ cursor:grabbing }
+.li .drg{ touch-action:none; -webkit-user-select:none; user-select:none }
+
 /* the drag. `touch-action:none` only while reordering — otherwise the row would eat page scrolling. */
 .li.armed{background:var(--sel);box-shadow:inset 2px 0 0 var(--accent)}
 .li.dragging{opacity:.65;background:var(--sel)}
