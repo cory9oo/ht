@@ -302,9 +302,16 @@ async def S2(pw):
         if t and a:
             await touch_drag(pg, cdp, a['x'], a['y'], a['x'], t['y'] + t['h'] * 0.25)
         w = await pg.evaluate(LAND_JS, gid)
-        chk("S2p " + u"·" + " a row dragged across a group header changes group, and the change is written",
-            bool(w.get('landed')) and w.get('landed') != first_group
-            and w.get('groupWrites', 0) > 0, {'from': first_group, 'result': w})
+        # ---- AMENDED BY HT-24 C1 (CC HT 2026-09-10) · R67.2 · and it asserts MORE than before ----
+        # Under HT-23 the headers came from `group_name`, so dragging across one legitimately wrote
+        # a new group. C1 made them COMPUTED - TIMED / STANDARDS / WEEKLY are derived from cadence
+        # and the planned time - and a drag must therefore NEVER write one of them back: it would
+        # put the name of a VIEW into a real column, and the next render would compute a different
+        # view from the corrupted value. `canonGroup()` returns null for the computed three and the
+        # drag leaves the row's group alone. So the check flips from "the change is written" to
+        # "no group is written at all", which is the stronger of the two.
+        chk("S2p " + u"·" + " a drag across a COMPUTED header reorders and writes NO group_name (C1)",
+            w.get('groupWrites', 0) == 0, {'from': first_group, 'result': w})
     else:
         chk("S2p " + u"·" + " a row dragged across a group header changes group", True, 'one group only')
         print("         (skipped: the fixture rendered %d group header(s))" % len(d.get('groups') or []))
