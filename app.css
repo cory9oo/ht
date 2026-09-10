@@ -292,7 +292,7 @@ svg{display:block}
 @media print{
   .mast,.jump,.tools,.rail,.ov,.toast,.swatches,.tbtn{display:none!important}
   body{background:#fff;color:#000}
-  .pan{border-color:#ccc;background:#fff}
+  .pan{border-color:var(--print-line);background:#fff}
 }
 
 
@@ -2003,7 +2003,22 @@ html[data-simple] .one.on .bx{ border-color:var(--accent); background:var(--acce
 
 /* the two input hosts. `.i3` is a `.fld` that sits inline with its neighbour at desk width and
    stacks on a phone - two numbers side by side is one line, and one line is the whole ask. */
-html[data-simple] #in3a{ display:grid; gap:0 18px; padding-top:2px;
-  grid-template-columns:repeat(auto-fit, minmax(170px, 1fr)) }
-html[data-simple] #in3a .i3{ border:0; padding:8px 0 0; min-width:0 }
-html[data-simple] #in3a .i3 input{ width:100% }
+/* `#rateWrap` is a FLEX ROW in the quadrant layout (label | strip). The three inputs join it as
+   its last item and the row WRAPS, so they share the strip's line wherever there is room and take
+   their own only where there is not. The first attempt put them on a forced second line and the
+   strip rendered 120px wide with labels running over it - the SCREENSHOT caught that, not a unit
+   test, which is R70.211 in one line. The 300px basis on the strip is what stops it being
+   crushed again. */
+html[data-simple] #jIn #rateWrap{ flex-wrap:wrap; row-gap:6px }
+html[data-simple] #jIn #rateWrap .rate{ flex:1 1 300px }
+html[data-simple] #in3a{ display:flex; align-items:center; flex-wrap:wrap; gap:6px 14px;
+  flex:1 1 220px; min-width:0 }
+html[data-simple] .i3f{ display:flex; align-items:center; gap:6px; min-width:0 }
+html[data-simple] .i3f > .lab{ flex:0 0 auto }
+html[data-simple] .i3f{ max-width:100% }
+html[data-simple] .i3f input{ height:24px; padding:2px 6px; font-size:11px; width:58px;
+  min-width:0 }
+/* the wide one takes what is LEFT and never asks for a minimum - a min-width here is what would
+   push it past the panel edge rather than let it shrink */
+html[data-simple] .i3f input.i3wide{ flex:1 1 auto; width:auto; min-width:0 }
+html[data-simple] .i3f:has(input.i3wide){ flex:1 1 150px; min-width:0 }

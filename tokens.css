@@ -1,0 +1,223 @@
+/* ==========================================================================
+   HT-22 S2 · tokens.css — THE ONE ADDRESS FOR EVERY COLOUR IN THIS APP (R70.282)
+
+   Cory named eleven colours. They are declared ONCE, here, and nothing else in
+   the bundle carries a literal one: `_reconcile/ht_batch22/lint_tokens.py` fails
+   the wire on any raw hex outside this file, with the print sheet's `#fff`/`#000`
+   allow-listed BY NAME because those two are correct and a lint that forces a
+   wrong change to satisfy a count is worse than no lint.
+
+   THIS FILE ABSORBS `theme.css` WHOLE. Two colour files is two addresses, which
+   is the thing S2 exists to remove; the four instrument skins are here unchanged,
+   below the palette, and the old file is archived (DEC-037), never deleted.
+
+       ground   #0A0C10     panel  #10131A     panel-2 #141821    line  #1C212B
+       text     #D6DCE6     muted  #7C8798     dim     #4F5866
+       red      #D9483B     green  #3FBF7F     amber   #D9A441    today #5EA4FF
+
+   TEXT IS #D6DCE6 AND NEVER #FFF. The wire says it twice, so the lint says it too.
+   RED IS STATE ONLY — it is `--bad` and the overdue tint, and it is not decoration.
+   No gradients. No glow except a 1px accent on the active quadrant. 1px lines,
+   2px radius, an 8px grid, one type scale — those live in app.css, which reads
+   every colour it needs from the names below.
+   ========================================================================== */
+
+/* ---------------------------------------------------------------------------
+   1 · THE PALETTE. `--ht-*` is the source; nothing outside this file uses these
+   names. They are held apart from `--ground` / `--green` on purpose: those two
+   are ALSO skin names, and a source value that a skin can overwrite is not a
+   source value.
+   --------------------------------------------------------------------------- */
+:root{
+  --ht-ground:#0A0C10;
+  --ht-panel:#10131A;
+  --ht-panel-2:#141821;
+  --ht-line:#1C212B;
+  --ht-text:#D6DCE6;
+  --ht-muted:#7C8798;
+  --ht-dim:#4F5866;
+  --ht-red:#D9483B;
+  --ht-green:#3FBF7F;
+  --ht-amber:#D9A441;
+  --ht-today:#5EA4FF;
+
+  /* THE RAMP — red → amber → green, mixed from those same three tokens against
+     the ground. Written out rather than `color-mix()`d: a colour function that a
+     browser does not implement fails at computed-value time and takes the whole
+     declaration with it, and the ramp is what every percent on every screen is
+     drawn with. Derivation, so the next wire can re-mix them rather than guess:
+       ramp-0  70% red   + 30% ground     ramp-3  65% green + 35% ground
+       ramp-1  red                        ramp-4  green
+       ramp-2  amber                                                            */
+  --ht-ramp-0:#9B362E;
+  --ht-ramp-1:#D9483B;
+  --ht-ramp-2:#D9A441;
+  --ht-ramp-3:#2C8058;
+  --ht-ramp-4:#3FBF7F;
+
+  /* today / active, at the 60% the wire asks for. rgba, not a hex, because the
+     translucency is the point — it sits OVER whatever it is marking. */
+  --ht-today-60:rgba(94,164,255,.6);
+
+  /* THE PRINT SHEET's one non-allow-listed colour. Paper is white and ink is
+     black by name in app.css; the rule between them is this, and it is here so
+     that "every colour has one address" stays literally true. */
+  --print-line:#CCCCCC;
+
+  /* metrics and faces — moved from theme.css unchanged */
+  --mono:"IBM Plex Mono",ui-monospace,"SF Mono",Menlo,monospace;
+  --sans:"Inter",-apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif;
+  --row:32px;
+  --gut:18px;
+}
+
+/* ---------------------------------------------------------------------------
+   2 · THE NAMES THE APP ALREADY USES, re-pointed at the palette. Declared at
+   `:root` (not under `[data-simple]`) because that is where HT-16's Seed A
+   declared them and app.css reads them at every level — moving them down a
+   selector would leave `var(--text)` unresolved outside the simple view.
+   NOT ONE COMPONENT RULE CHANGED to land this palette. That is the whole point
+   of a mapping, and it is why `golden_ht6` can still be 17/17 either side of it.
+   --------------------------------------------------------------------------- */
+:root{
+  --bg:var(--ht-ground);
+  --surface:var(--ht-panel);
+  --surface-2:var(--ht-panel-2);
+  --border:var(--ht-line);
+  --text:var(--ht-text);
+  --muted:var(--ht-muted);
+  --grey:var(--ht-dim);
+  --red:var(--ht-ramp-0);
+  --red-bright:var(--ht-red);
+  --green:var(--ht-green);
+  --green-bright:var(--ht-green);
+  --amber:var(--ht-amber);
+  --today:var(--ht-today);
+
+  --ramp-0:var(--ht-ramp-0);
+  --ramp-1:var(--ht-ramp-1);
+  --ramp-2:var(--ht-ramp-2);
+  --ramp-3:var(--ht-ramp-3);
+  --ramp-4:var(--ht-ramp-4);
+
+  /* the two chart lines: completion is the headline series and reads as ink,
+     rating carries the one positive hue. Unchanged from HT-16 by intent. */
+  --line-completion:var(--text);
+  --line-rating:var(--ht-green);
+  /* HT-22 S2: today stops being drawn in text-white. It is the one "active"
+     mark the wire gives a colour to, and it is that colour at 60%. */
+  --outline-today:var(--ht-today-60);
+}
+
+/* ==========================================================================
+   3 · THE FOUR INSTRUMENT SKINS — moved from theme.css, values unchanged.
+   No glass. No blur. No glow. No gradients. No rounded cards. Hairlines and
+   whitespace do all the structuring. One accent. Only the grade ramp carries hue.
+   ========================================================================== */
+
+/* ---------- STATEMENT (default) — an institutional document ---------- */
+:root,
+:root[data-skin="statement"]{
+  --ground:#F4F3EF;
+  --sheet:#FCFCFA;
+  --sunk:#EDECE6;
+  --rule:#DBD9D1;
+  --rule2:#C2BFB4;
+  --ink:#14161A;
+  --ink2:#5C6068;
+  --ink3:#93979F;
+  --accent:#B0161C;
+  --accent-ink:#FFFFFF;
+  --accent-wash:#F7E3E3;
+  --sel:#E9E7DF;
+  --bad:#B0161C; --good:#1B6B4A;
+  --g0:#E7DCDA; --g1:#DCC0BD; --g2:#CE9B98; --g3:#C0716F; --g4:#B0161C; --g5:#7C0F14;
+}
+
+/* ---------- CARBON — near-black, white ink, one red ---------- */
+:root[data-skin="carbon"]{
+  --ground:#0A0A0B;
+  --sheet:#0F1012;
+  --sunk:#151619;
+  --rule:#25272C;
+  --rule2:#3A3D45;
+  --ink:#F2F3F5;
+  --ink2:#9BA0A8;
+  --ink3:#5F646D;
+  --accent:#FF3B41;
+  --accent-ink:#0A0A0B;
+  --accent-wash:#2A1113;
+  --sel:#1A1C20;
+  --bad:#FF3B41; --good:#3DDC97;
+  --g0:#2A1416; --g1:#4A181C; --g2:#7A2126; --g3:#B22B31; --g4:#FF3B41; --g5:#FF8A8E;
+}
+
+/* ---------- TERMINAL — black, phosphor amber ---------- */
+:root[data-skin="terminal"]{
+  --ground:#050505;
+  --sheet:#0A0A08;
+  --sunk:#101009;
+  --rule:#232112;
+  --rule2:#3A3517;
+  --ink:#F5C542;
+  --ink2:#A8863A;
+  --ink3:#6B5628;
+  --accent:#FF7A18;
+  --accent-ink:#050505;
+  --accent-wash:#2A1608;
+  --sel:#171509;
+  --bad:#FF4A2B; --good:#8FE04A;
+  --g0:#2A1D06; --g1:#4A320A; --g2:#7A5210; --g3:#B07518; --g4:#FF7A18; --g5:#FFB65E;
+}
+
+/* ---------- BLUEPRINT — deep navy, cyan ---------- */
+:root[data-skin="blueprint"]{
+  --ground:#070C14;
+  --sheet:#0B1220;
+  --sunk:#0F1929;
+  --rule:#1B2942;
+  --rule2:#2A3D5C;
+  --ink:#E6EDF7;
+  --ink2:#8FA3BF;
+  --ink3:#5A6C87;
+  --accent:#28D3F0;
+  --accent-ink:#04121A;
+  --accent-wash:#0B2C36;
+  --sel:#132133;
+  --bad:#FF5470; --good:#3DE0B0;
+  --g0:#0E2C34; --g1:#12414E; --g2:#175A6C; --g3:#1C7E96; --g4:#28D3F0; --g5:#8AEBFA;
+}
+
+/* ==========================================================================
+   4 · THE MAPPING (R-THEME) — the shipped instrument.
+   Every earlier layer's token is re-pointed at the palette, so five layers of
+   components inherit it without one of them being edited. `--g1 … --g5` carry
+   the ramp in the order the ramp is defined, which is why `gfill()` and every
+   `var(--gN)` already in the tree resolve to a ramp token.
+   Unlogged is `--surface` and never a ramp colour — an unlogged day must not
+   read as a bad day.
+   ========================================================================== */
+:root[data-simple]{
+  --ground:var(--ht-ground);
+  --panel:var(--ht-panel);
+  --panel-2:var(--ht-panel-2);
+  --line:var(--ht-line);
+  --dim:var(--ht-dim);
+  --accent-red:var(--ht-red);
+
+  --sheet:var(--ht-panel);
+  --sunk:var(--ht-panel-2);
+  --rule:var(--ht-line);
+  --rule2:var(--ht-dim);
+  --ink:var(--ht-text);
+  --ink2:var(--ht-muted);
+  --ink3:var(--ht-dim);
+  --accent:var(--ht-green);          /* a check-off is a positive signal; red is reserved for state */
+  --accent-ink:var(--ht-ground);
+  --accent-wash:var(--ht-panel-2);
+  --sel:var(--ht-panel-2);
+  --bad:var(--ht-red);
+  --good:var(--ht-green);
+  --g0:var(--ht-ramp-0); --g1:var(--ht-ramp-0); --g2:var(--ht-ramp-1);
+  --g3:var(--ht-ramp-2); --g4:var(--ht-ramp-3); --g5:var(--ht-ramp-4);
+}

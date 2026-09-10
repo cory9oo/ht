@@ -606,26 +606,38 @@ function paintJournalInputs(){
    completion, rating, journal") says a fourth write surface must be argued against the rule
    first: this is that argument, and the contradiction is reported to SPEC in the receipt. */
 function isSat(k){ return dnum(k).getDay()===6; }
+/* Each field is a micro-label and a small box on ONE line, and the line is the rating's own
+   header line. THE HEIGHT IS THE POINT: stacked as full `.fld` rows these three cost the journal
+   quadrant 60px at 1280x720, and HT-18's grow() takes every one of them off the BRAIN DUMP -
+   measured 122px -> 62px. Trading half of one of the three sacred inputs (DEC-058) for a place
+   to type a sleep number is not a trade, so they ride a line that was already on the screen. */
+function i3f(id, lab, inner){
+  return '<span class="i3f"><span class="lab">'+esc(lab)+'</span>'+inner+'</span>';
+}
 function paintInputs3(){
   var a=el('in3a'); if(!a) return;
   var h='';
-  if(S.hasSleep) h+='<label class="fld i3"><span class="lab">Hours slept last night</span>'+
+  if(S.hasSleep) h+=i3f('iSleep','Slept',
     '<input id="iSleep" class="num" type="number" min="0" max="24" step=".25" inputmode="decimal" '+
-    'value="'+esc(S.priv&&S.priv.sleep_hours!=null?S.priv.sleep_hours:'')+'" placeholder="7.5"></label>';
-  if(S.hasTomorrow){
-    var k=shift(S.date,1), d=dnum(k);
-    h+='<label class="fld i3"><span class="lab">Tomorrow\u2019s one thing '+'·'+' '+
-      WD[d.getDay()]+' '+MO[d.getMonth()]+' '+d.getDate()+'</span>'+
-      '<input id="iOne" value="'+esc(oneThingOf(k)||'')+'" autocomplete="off" '+
-      'placeholder="it meets you at the top of that day\u2019s list"></label>';
-  }
+    'value="'+esc(S.priv&&S.priv.sleep_hours!=null?S.priv.sleep_hours:'')+'" placeholder="7.5">');
   /* WEIGHT IS SATURDAY ONLY. On a Wednesday the field is absent rather than disabled; a Saturday
      he logs back to still shows its own number, because the rule belongs to the DAY on screen and
      not to today. */
-  if(S.hasWeight && isSat(S.date))
-    h+='<label class="fld i3"><span class="lab">Weight (lb) '+'·'+' Saturday</span>'+
-      '<input id="iWeight" class="num" type="number" min="0" step=".1" inputmode="decimal" '+
-      'value="'+esc(S.priv&&S.priv.weight_lb!=null?S.priv.weight_lb:'')+'" placeholder="\u2014"></label>';
+  if(S.hasWeight && isSat(S.date)) h+=i3f('iWeight','Weight',
+    '<input id="iWeight" class="num" type="number" min="0" step=".1" inputmode="decimal" '+
+    'value="'+esc(S.priv&&S.priv.weight_lb!=null?S.priv.weight_lb:'')+'" placeholder="lb">');
+  if(S.hasTomorrow){
+    var k=shift(S.date,1), d=dnum(k);
+    /* THE LABEL IS ONE WORD AND THE PLACEHOLDER IS TWO. "Tomorrow's one thing" plus a sentence
+       of placeholder rendered as "meets you at the top of Fr" - a hint clipped mid-word is worse
+       than no hint. The sentence lives in `title`, where it costs no width. Caught in the 1920
+       shot, not in the suite (R70.211). */
+    h+=i3f('iOne','Tomorrow',
+      '<input id="iOne" class="i3wide" value="'+esc(oneThingOf(k)||'')+'" autocomplete="off" '+
+      'title="tomorrow’s one thing — saved onto '+WD[d.getDay()]+' '+MO[d.getMonth()]+
+      ' '+d.getDate()+', where it meets you at the top of that day’s list" '+
+      'placeholder="one thing">');
+  }
   a.innerHTML=h; a.hidden=!h;
 }
 
@@ -2446,6 +2458,28 @@ function earned(k){ return committed() - remaining(k); }
     }
     var why = document.getElementById('iWhy');
     if(why){ var f = why.closest('.fld'); if(f) f.id = 'whyFld'; }
+    /* ---- HT-22 S1 · THE THREE INPUTS TRAVEL WITH THE RATING (R70.211) ------------------
+       THE SHOT IS WHY THIS EXISTS. `#in3a` was marked up inside the "Rate the day" .blk, and
+       this function EMPTIES that block and marks it `ht9a-off` once the rating strip has moved
+       out of it. The fields were in the DOM, the golden found them by id and passed - and they
+       were invisible at every width in the view Cory actually runs. A field he cannot see is a
+       field that does not exist (R70.211), and only the screenshot said so.
+       So they follow the strip: rating, then sleep / tomorrow / Saturday weight, then the three
+       journals. That IS "in the journal header at RATE THE DAY time", which is where the wire
+       put them. */
+    /* THE THREE INPUTS JOIN THE RATING'S OWN ROW, as its last flex item.
+       `#rateWrap` is `label | strip` on one line in the quadrant layout, and it now wraps: at
+       1920 the three fields sit beside the strip and cost the journal NOTHING; at 1280 they take
+       a second line and cost it ~30px. That asymmetry is deliberate. Every pixel inside this
+       quadrant comes off the BRAIN DUMP - HT-18's grow() hands it whatever is left - and the
+       dump is one of the three inputs DEC-058 protects. Measured, 1280x720:
+           stacked as three `.fld` rows   dump 122 -> 62
+           on a forced second line        dump 122 -> 80
+           wrapping only when it must     dump 122 -> 108   <- this
+       and at 1920 the dump does not move at all. */
+    var in3 = document.getElementById('in3a');
+    var rw  = document.getElementById('rateWrap');
+    if(in3 && rw && in3.parentNode !== rw) rw.appendChild(in3);
     /* the emptied "Rate the day" block, and the journal head, renamed */
     var blks = Array.prototype.slice.call(document.querySelectorAll('#jIn .blk'));
     blks.forEach(function(b){
