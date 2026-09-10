@@ -501,8 +501,17 @@ html[data-simple] #hPrev, html[data-simple] #hNext{ padding:5px 9px }
 /* the brain dump is the "why" now, so it is the big one */
 html[data-simple] #iDump{ min-height:150px }
 @media(min-width:1024px){ html[data-simple] #iDump{ min-height:230px } }
+/* HT-25 S2 · A BOX THAT GROWS MUST ALSO BE ABLE TO SCROLL.
+   This read `overflow:hidden` from HT-10 until 2026-09-10, and paired with an auto-grow that had
+   NO CEILING it produced Cory's report: "if I do a long brain dump I'm not able to scroll down —
+   I'd have to delete spaces to see it." Two different failures wearing one symptom:
+     PHONE   the inline height from grow() runs past the viewport, so the box is taller than the
+             screen and `overflow:hidden` means the BOX cannot scroll either.
+     DESKTOP unGrow() clears that inline height, the flex column (or the :focus clamp below) bounds
+             the box, and `overflow:hidden` then CLIPS everything past the bound with no way in.
+   `auto` is the whole fix on this side; `growTo()` in app.js caps the height so it is reachable. */
 html[data-simple] #iDump, html[data-simple] #iTasks, html[data-simple] #iPrayer{
-  overflow:hidden; resize:none }                    /* they auto-grow; the handle would lie */
+  overflow-y:auto; resize:none }                    /* they auto-grow; the handle would lie */
 html[data-simple] #rateWrap{ padding-bottom:10px; border-bottom:1px solid var(--rule) }
 html[data-simple] #whyFld{ display:none !important }   /* the field goes; the column stays (DEC-037) */
 
@@ -2075,3 +2084,37 @@ html[data-simple] .iosx{ flex:0 0 32px; width:32px; height:32px; padding:0; curs
   font-size:16px; line-height:1; color:var(--ink3); background:none;
   border:1px solid var(--rule); border-radius:2px }
 html[data-simple] .iosx:hover{ color:var(--ink); border-color:var(--rule2) }
+
+/* ======================= HT-25 S2 · EVERY MULTI-LINE BOX SCROLLS ======================= */
+/* THE CLASS, NOT THE INSTANCE. Cory reported it on the brain dump; it was true of every textarea
+   in the app that auto-grows or is height-bounded. One rule, applied by selector, so the next box
+   somebody adds inherits the fix instead of the bug. */
+textarea{ overflow-y:auto }
+
+/* The three journal boxes and the edit sheet's notes get a ceiling in CSS as well as in JS, so a
+   box is bounded even on a paint that happens before `growTo()` has run once. 40vh on phone is
+   Cory's rule of thumb made literal: the box never eats more than the top half of the screen with
+   the keyboard up. `dvh` (not `vh`) because iOS Safari's `vh` is the UNSHRUNK viewport — with the
+   keyboard open a `40vh` box is far taller than 40% of what you can actually see, which is the
+   double-scroll trap this section exists to remove. `dvh` falls back to `vh` where unsupported. */
+.fld textarea{ max-height:40vh; max-height:40dvh }
+html[data-simple] #iDump, html[data-simple] #iTasks, html[data-simple] #iPrayer{
+  max-height:40vh; max-height:40dvh }
+@media(min-width:1024px){
+  /* On desktop the panel owns the height: the flex column bounds #iDump and the :focus clamp
+     bounds the two in #h18Btm. The ceiling comes off so it cannot fight them — `auto` above is
+     what makes the bounded box reachable. */
+  html[data-simple] #iDump, html[data-simple] #iTasks, html[data-simple] #iPrayer{
+    max-height:none }
+  html[data-simple] #h18Btm textarea{ overflow-y:auto }
+  /* A visible scrollbar on desktop. On a dark skin the default is invisible against the sunk
+     panel, which reads as "there is nothing more" — the exact wrong signal for a clipped box. */
+  html[data-simple] textarea{ scrollbar-width:thin;
+    scrollbar-color:var(--rule) transparent }
+  html[data-simple] textarea::-webkit-scrollbar{ width:8px }
+  html[data-simple] textarea::-webkit-scrollbar-thumb{ background:var(--rule) }
+  html[data-simple] textarea::-webkit-scrollbar-track{ background:transparent }
+}
+/* iOS momentum, and it is not redundant: without it a bounded textarea on iOS scrolls one
+   "page" per drag with no inertia, which reads as a stuck box rather than a scrolling one. */
+textarea{ -webkit-overflow-scrolling:touch }

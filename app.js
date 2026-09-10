@@ -188,6 +188,68 @@ function bucketOf(h){
 window.__HT24 = { isWeekly:isWeekly, dowOf:dowOf, dueOn:dueOn, bucketOf:bucketOf,
                   goDay:function(k){ return goDay(k); }, daily:function(){ return daily(); },
                   today:function(){ return today(); } };
+
+/* ---- HT-25 S2 · EVERY MULTI-LINE BOX GROWS TO A CEILING, THEN SCROLLS -------------------
+   THE CLASS, NOT THE INSTANCE. Cory reported this on the brain dump. It was true of every
+   textarea in the app, because two separate mechanisms each produced an unreachable overflow:
+     the PHONE grew the box past the viewport with no ceiling (`grow()`), and
+     the DESKTOP bounded it (flex column, or the `:focus` clamp on #h18Btm) and then CLIPPED,
+   both under a stylesheet that said `overflow:hidden`. So the rule lives in ONE function that
+   every box goes through, and the stylesheet says `overflow-y:auto`.
+
+   THE CEILING IS MEASURED FROM THE VISUAL VIEWPORT, NOT `innerHeight`. With the iOS keyboard up,
+   `window.innerHeight` is still the UNSHRUNK height — sizing to 40% of it puts the bottom of the
+   box behind the keyboard, which is the same invisible-overflow bug one layer out. `visualViewport`
+   is the only API that reports what is actually on screen. */
+function growCeil(){
+  var vh = (window.visualViewport && window.visualViewport.height) || window.innerHeight || 640;
+  /* Desktop lets CSS own the height (the panel and the focus clamp bound it); the ceiling there
+     would only fight them, so it is effectively off. */
+  if(window.innerWidth >= 1024) return 1e6;
+  return Math.max(96, Math.round(vh * 0.40));
+}
+function growTo(t){
+  if(!t) return;
+  t.style.height = 'auto';
+  var want = t.scrollHeight + 2, ceil = growCeil(), h = Math.min(want, ceil);
+  t.style.height = h + 'px';
+  /* Only claim a scrollbar when there is something to scroll to. An `auto` box that always
+     reports overflow shows a permanent inert scrollbar on desktop, which is its own small lie. */
+  t.style.overflowY = (want > ceil + 1) ? 'auto' : '';
+}
+/* THE CARET FOLLOWS THE TYPING. Once a box scrolls internally, typing at the bottom of a long
+   entry can leave the caret below the fold — the box scrolls, but not to where you are. There is
+   no cross-browser "scroll caret into view" for a textarea, so this uses the one property that
+   does report it: after the browser has laid the value out, `scrollTop` is clamped such that
+   pushing it to the bottom when the caret is at the end is correct, and otherwise the browser has
+   already kept the caret visible for us. Deliberately conservative: it only acts when the caret
+   is at the very end, which is where 99% of typing happens and the only case the browser gets
+   wrong for a programmatically-resized box. */
+function caretIntoView(t){
+  if(!t || t.selectionStart == null) return;
+  if(t.selectionStart !== t.value.length) return;
+  t.scrollTop = t.scrollHeight;
+}
+/* ONE delegated listener for the whole document, so a textarea added later inherits the behaviour
+   instead of needing its own binding — the failure mode that made this a per-instance patch in the
+   first place. Capture phase, because HT-10's own `input` handler calls grow() and we want the
+   ceiling applied whichever order they run in. */
+document.addEventListener('input', function(e){
+  var t = e && e.target;
+  if(!t || String(t.tagName||'').toLowerCase() !== 'textarea') return;
+  growTo(t); caretIntoView(t);
+}, true);
+/* The keyboard opening changes the ceiling, so every bounded box is re-measured when it does.
+   `visualViewport.resize` is what fires on iOS for a keyboard; `window.resize` covers the rest. */
+function regrowAll(){
+  var ns = document.querySelectorAll('textarea');
+  for(var i=0;i<ns.length;i++) if(ns[i].style.height) growTo(ns[i]);
+}
+if(window.visualViewport) window.visualViewport.addEventListener('resize', regrowAll);
+window.addEventListener('resize', regrowAll);
+
+window.__HT25 = { growTo:growTo, growCeil:growCeil, caretIntoView:caretIntoView,
+                  regrowAll:regrowAll };
 /* DUE TODAY and not weekly. This is what the day's percentage is computed against, and
    `saveDay()` snapshots it into `active_set` on every save - so a day already logged keeps the
    set it was graded on and NO PAST DAY IS EVER REPRICED (P4). That mechanism already shipped;
@@ -2500,7 +2562,13 @@ function earned(k){ return committed() - remaining(k); }
     if(window.__ADVANCED===true) return true;
     return /[?&]advanced=1/.test(location.search);
   }
-  function grow(t){ if(!t) return; t.style.height='auto'; t.style.height=(t.scrollHeight+2)+'px'; }
+  /* HT-25 S2 · grow() GAINS A CEILING, and that is the whole bug.
+     Until 2026-09-10 this was `height = scrollHeight + 2` with no bound, against a stylesheet that
+     said `overflow:hidden`. A box that only ever gets taller and can never scroll is one Cory
+     reported exactly: "if I do a long brain dump I'm not able to scroll down — I'd have to delete
+     spaces to see it." Past the ceiling the box stops growing and starts SCROLLING; below it,
+     nothing about the old behaviour changes. `growTo` is the one home for the rule (window.__HT25). */
+  function grow(t){ if(!t) return; window.__HT25.growTo(t); }
 
   /* ---- 1 · one section: rating moves in above the three journals, "why" leaves ---- */
   function journalise(){
