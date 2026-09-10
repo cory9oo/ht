@@ -500,7 +500,108 @@ async def C1(pw):
     await b.close()
 
 
-SECTIONS = {'S2': S2, 'C1': C1}
+async def C6(pw):
+    """HT-24 C6 - the way in, and the install hint that names the real obstacle."""
+    print("\nC6 " + u"·" + " the way in, and the install hint that names the real obstacle")
+
+    IOS_UA = ('Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 '
+              '(KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1')
+    CHROME_IOS_UA = IOS_UA.replace('Safari/604.1', 'CriOS/126.0 Mobile/15E148 Safari/604.1')
+
+    async def openWith(ua=None, standalone=False, dismissed=False, w=390, h=844):
+        b = await pw.chromium.launch()
+        ctx = await b.new_context(viewport={'width': w, 'height': h}, has_touch=True,
+                                  is_mobile=True, user_agent=ua)
+        pg = await ctx.new_page()
+        errs = []
+        pg.on('pageerror', lambda e: errs.append(str(e)))
+        if standalone:
+            # the installed app: `display-mode: standalone` and Apple's own flag
+            await pg.add_init_script("""Object.defineProperty(navigator,'standalone',{value:true});
+              const _mm = window.matchMedia;
+              window.matchMedia = (q) => q.indexOf('standalone') >= 0
+                ? {matches:true, media:q, addListener(){}, removeListener(){},
+                   addEventListener(){}, removeEventListener(){}}
+                : _mm(q);""")
+        if dismissed:
+            await pg.add_init_script("try{localStorage.setItem('ht_ios_hint_dismissed','1')}catch(e){}")
+        await pg.goto(BASE)
+        await pg.wait_for_timeout(3400)
+        return b, pg, errs
+
+    # ---- iOS Safari, not installed: the hint shows and it names Safari -------------------
+    b, pg, errs = await openWith(IOS_UA)
+    d = await pg.evaluate("""() => { const n = document.getElementById('iosHint');
+      return { shown: !!n, text: n ? n.textContent.replace(/\\s+/g,' ').trim() : null,
+               atTop: n ? document.body.firstChild === n : null,
+               dismissable: !!(n && n.querySelector('[data-iosx]')) }; }""")
+    chk("C6a " + u"·" + " on iOS Safari, not installed: the hint is shown, at the top, dismissible",
+        d.get('shown') and d.get('atTop') and d.get('dismissable'), d)
+    chk("C6b " + u"·" + " and it names the ACTUAL obstacle - open it in Safari first",
+        'Safari' in (d.get('text') or '') and 'Add to Home Screen' in (d.get('text') or ''),
+        d.get('text'))
+    # dismissing it sticks
+    d2 = await pg.evaluate("""async () => { document.querySelector('#iosHint [data-iosx]').click();
+      await new Promise(r=>setTimeout(r,150));
+      return { gone: !document.getElementById('iosHint'),
+               remembered: localStorage.getItem('ht_ios_hint_dismissed') === '1' }; }""")
+    chk("C6c " + u"·" + " dismissing it removes it and remembers", d2.get('gone') and d2.get('remembered'), d2)
+    chk("C6d " + u"·" + " zero page errors with the hint in", not errs, errs[:3])
+    await b.close()
+
+    # ---- INSIDE THE INSTALLED APP: never -------------------------------------------------
+    b, pg, errs = await openWith(IOS_UA, standalone=True)
+    d = await pg.evaluate("() => ({ shown: !!document.getElementById('iosHint') })")
+    chk("C6e " + u"·" + " NEVER inside the installed app - a banner telling you to install what you are in",
+        not d.get('shown'), d)
+    await b.close()
+
+    # ---- already dismissed: stays gone ---------------------------------------------------
+    b, pg, errs = await openWith(IOS_UA, dismissed=True)
+    d = await pg.evaluate("() => ({ shown: !!document.getElementById('iosHint') })")
+    chk("C6f " + u"·" + " once dismissed it does not come back", not d.get('shown'), d)
+    await b.close()
+
+    # ---- desktop: never ------------------------------------------------------------------
+    b, pg, errs = await openWith(None, w=1280, h=900)
+    d = await pg.evaluate("() => ({ shown: !!document.getElementById('iosHint') })")
+    chk("C6g " + u"·" + " and never on a desktop, where there is nothing to add to a home screen",
+        not d.get('shown'), d)
+    await b.close()
+
+    # ---- Chrome on iOS is Safari's engine and still has no Add to Home Screen ------------
+    b, pg, errs = await openWith(CHROME_IOS_UA)
+    d = await pg.evaluate("""() => { const H = window.__HT24_C6;
+      return { ios: H.isIOS(), realSafari: H.isRealSafari(), shown: !!document.getElementById('iosHint') }; }""")
+    chk("C6h " + u"·" + " Chrome-on-iOS is detected as iOS but NOT as Safari - the hint is what it needs",
+        d.get('ios') and not d.get('realSafari') and d.get('shown'), d)
+    await b.close()
+
+    # ---- the join link, and ?join= on arrival --------------------------------------------
+    b, pg, errs = await openWith(IOS_UA)
+    d = await pg.evaluate("""() => { const J = window.__HT24_JOIN;
+      const link = J.link('ABC123'), msg = J.message('ABC123');
+      return { link, msg, hasCode: link.indexOf('join=ABC123') > 0,
+               msgLines: msg.split('\\n').length, saysSafari: /Safari/.test(msg) }; }""")
+    chk("C6i " + u"·" + " the join link carries the code and the message is three lines",
+        d.get('hasCode') and d.get('msgLines') == 3 and d.get('saysSafari'), d)
+    await b.close()
+
+    # arriving on ?join= stores the code and cleans the URL so a refresh cannot re-apply it
+    b2 = await pw.chromium.launch()
+    ctx = await b2.new_context(viewport={'width': 390, 'height': 844}, has_touch=True,
+                               is_mobile=True, user_agent=IOS_UA)
+    pg2 = await ctx.new_page()
+    await pg2.goto(BASE + '?join=ZZZ999')
+    await pg2.wait_for_timeout(3400)
+    d = await pg2.evaluate("""() => ({ stored: localStorage.getItem('ht_join_code'),
+                                        url: location.search })""")
+    chk("C6j " + u"·" + " arriving on a join link stores the code and cleans the URL",
+        d.get('stored') == 'ZZZ999' and 'join=' not in (d.get('url') or ''), d)
+    await b2.close()
+
+
+SECTIONS = {'S2': S2, 'C1': C1, 'C6': C6}
 
 
 async def main(only):

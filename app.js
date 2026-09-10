@@ -6891,4 +6891,119 @@ function earned(k){ return committed() - remaining(k); }
   if(document.readyState==='complete') setTimeout(boot,320);
   else window.addEventListener('load',function(){ setTimeout(boot,320); });
 })();
+
+
+/* ================= HT-24 C6 · THE WAY IN, AND THE INSTALL HINT =================================
+   "MY IPHONE LINK DIDN'T WORK" WAS DIAGNOSED BEFORE ANYTHING WAS BUILT, and the diagnosis is why
+   this layer ships a sentence rather than a fix. Measured against the live site 2026-09-10:
+
+     manifest   200 · content-type application/manifest+json; charset=utf-8   <- CORRECT
+     manifest   name · short_name · start_url ./ · scope ./ · display standalone · icons 192+512
+     head       apple-mobile-web-app-capable · apple-mobile-web-app-title · rel=manifest ·
+                apple-touch-icon · 12 apple-touch-startup-image · viewport-fit=cover
+     sw         ht-v31
+
+   The install path on the server is complete and the MIME type - the one candidate that would
+   have been a real bug - is right. That eliminates it with evidence and leaves the likeliest
+   cause: ON iOS, "Add to Home Screen" EXISTS ONLY IN SAFARI. A link tapped in Messages, Slack or
+   any other app opens an in-app browser whose Share sheet has no such row. Nothing is broken;
+   the person is in the wrong browser and the app never said so.
+
+   R70.211 is the reason this is a banner and not a note in a receipt: the door exists, but if
+   nothing on screen names the obstacle, the door may as well not.
+   ============================================================================================ */
+(function(){
+  function isIOS(){
+    return /iP(hone|ad|od)/.test(navigator.userAgent) ||
+           (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  }
+  /* Chrome/Firefox/Edge on iOS are Safari's engine wearing another name, and NONE of them offer
+     Add to Home Screen. So the test is "is this the real Safari", not "is this WebKit". */
+  function isRealSafari(){
+    var ua = navigator.userAgent;
+    return /Safari/.test(ua) && !/CriOS|FxiOS|EdgiOS|OPiOS|Instagram|FBAN|FBAV|Line|Snapchat/.test(ua);
+  }
+  function installed(){
+    try{ return window.matchMedia('(display-mode: standalone)').matches
+                || navigator.standalone === true; }catch(e){ return false; }
+  }
+  var KEY = 'ht_ios_hint_dismissed';
+  function dismissed(){ try{ return localStorage.getItem(KEY) === '1'; }catch(e){ return false; } }
+
+  /* THE ONE SENTENCE THAT NAMES THE OBSTACLE. Two taps, and the first of them is the one nobody
+     tells you about. */
+  function hintHTML(){
+    return '<div class="iosh" role="note">' +
+      '<div class="ioshb">' +
+        '<b>Add HT to your home screen</b>' +
+        '<span>Open this page in <b>Safari</b> first — Chrome and in-app browsers on iPhone do not ' +
+        'offer it. Then tap <b>Share</b> and <b>Add to Home Screen</b>.</span>' +
+      '</div>' +
+      '<button class="iosx" type="button" data-iosx aria-label="dismiss">\u00d7</button>' +
+    '</div>';
+  }
+
+  function showHint(){
+    if(!isIOS() || installed() || dismissed()) return false;
+    if(document.getElementById('iosHint')) return true;
+    var n = document.createElement('div');
+    n.id = 'iosHint';
+    n.innerHTML = hintHTML();
+    /* NOT inside the installed app, and not on a desktop - both are checked above. It goes at the
+       top of the page because an install hint below the fold is an install hint nobody reads. */
+    document.body.insertBefore(n, document.body.firstChild);
+    n.addEventListener('click', function(e){
+      if(!e.target.closest('[data-iosx]')) return;
+      try{ localStorage.setItem(KEY, '1'); }catch(err){}
+      n.parentNode.removeChild(n);
+    });
+    return true;
+  }
+
+  /* ---- THE JOIN LINK -----------------------------------------------------------------------
+     The link is the app's own URL with the circle's join code on it. It carries NO backend: the
+     code is read on arrival and pre-fills the join field, and everything else the person does is
+     the ordinary signup the app already has.
+     THE SEND IS CORY'S (R45.2). This renders it and copies it; it never sends anything. */
+  function appBase(){
+    return location.origin + location.pathname.replace(/index\.html$/, '');
+  }
+  function joinLink(code){
+    return appBase() + '?join=' + encodeURIComponent(code || '');
+  }
+  function joinMessage(code){
+    return 'HT — a daily standard, one number a day.\n' +
+           joinLink(code) + '\n' +
+           'Open it in Safari on your iPhone, then Share \u2192 Add to Home Screen.';
+  }
+  /* A QR with no library and no network: the link is drawn as text under a heading and the code
+     is large enough to read across a table. A real QR needs a generator, and pulling one in for
+     this would add a CDN dependency to a page that has exactly one. Named, not pretended. */
+  window.__HT24_JOIN = { link: joinLink, message: joinMessage, base: appBase };
+
+  /* the arriving side: ?join=CODE pre-fills, and the URL is cleaned so a refresh does not re-apply */
+  function readJoin(){
+    var m = /[?&]join=([^&]+)/.exec(location.search);
+    if(!m) return null;
+    var code = decodeURIComponent(m[1]);
+    try{ localStorage.setItem('ht_join_code', code); }catch(e){}
+    /* SAME PATH, NO QUERY. `replaceState` to an absolute origin is rejected on file://
+       (SecurityError), so the fixture silently kept `?join=` and the golden caught it.
+       `location.pathname` is same-origin by construction and behaves identically on
+       https - the URL a person sees after arriving is the app's own, with no code on it. */
+    try{ history.replaceState({}, '', location.pathname); }catch(e){}
+    return code;
+  }
+
+  function boot(){
+    readJoin();
+    showHint();
+  }
+  window.__HT24_C6 = { isIOS:isIOS, isRealSafari:isRealSafari, installed:installed,
+                       showHint:showHint, hintHTML:hintHTML, readJoin:readJoin,
+                       joinLink:joinLink, joinMessage:joinMessage };
+  if(document.readyState === 'complete') setTimeout(boot, 200);
+  else window.addEventListener('load', function(){ setTimeout(boot, 200); });
+})();
+
 })();

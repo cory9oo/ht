@@ -2059,3 +2059,19 @@ html[data-simple] .dowb{ flex:1 1 0; min-width:40px; height:34px; padding:0;
 html[data-simple] .dowb:hover{ color:var(--ink); border-color:var(--rule2) }
 html[data-simple] .dowb.on{ color:var(--accent-ink); background:var(--accent);
   border-color:var(--accent) }
+
+/* --------------------------------------------------------------------------------------------
+   HT-24 C6 · THE iOS INSTALL HINT
+   One line, dismissible, and it never appears inside the installed app - a banner telling you to
+   install an app you are already inside is the kind of thing that teaches people to ignore
+   banners. Colours are tokens; the lint stays green. */
+html[data-simple] #iosHint{ position:relative; z-index:40 }
+html[data-simple] .iosh{ display:flex; align-items:flex-start; gap:10px;
+  padding:10px 12px; background:var(--surface-2); border-bottom:1px solid var(--rule) }
+html[data-simple] .ioshb{ display:flex; flex-direction:column; gap:3px; min-width:0; flex:1 1 auto }
+html[data-simple] .ioshb b{ font-size:12.5px; color:var(--ink) }
+html[data-simple] .ioshb span{ font-size:12px; line-height:1.45; color:var(--ink2) }
+html[data-simple] .iosx{ flex:0 0 32px; width:32px; height:32px; padding:0; cursor:pointer;
+  font-size:16px; line-height:1; color:var(--ink3); background:none;
+  border:1px solid var(--rule); border-radius:2px }
+html[data-simple] .iosx:hover{ color:var(--ink); border-color:var(--rule2) }
