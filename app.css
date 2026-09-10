@@ -2129,3 +2129,25 @@ textarea{ -webkit-overflow-scrolling:touch }
 .swhy.derived{ color:var(--muted) }
 .swhy.self{ color:var(--ink3) }
 .swhy.est{ color:var(--dim); font-style:italic }
+
+/* ---- HT-25 S4 · THE FIVE COMPLETION STATES, ONE PALETTE -----------------------------------
+   Every colour below comes from tokens.css (S4), where each one is recorded with its measured
+   contrast against both grounds. The states are exhaustive and mutually exclusive: a row is
+   exactly one of todo / done / done-late / skipped / not-due. */
+.li .nm{ color:var(--st-todo) }
+.li.on .nm{ color:var(--st-done) }
+.li.skip .nm{ color:var(--st-skip) }
+.li.notdue .nm{ color:var(--st-notdue) }
+/* S3's delta rides the same palette, so "late" means one colour everywhere in the app. */
+.li .dat{ color:var(--st-done) }
+.li .dat.late{ color:var(--st-late) }
+.li .dat.ontime{ color:var(--st-done) }
+/* A late row's NAME stays `done` — it was done. Only the clock says it was late, which is the
+   whole point of keeping lateness out of the score. */
+
+/* HT-25 S3 · THE DELTA MUST NOT CHANGE THE ROW'S HEIGHT.
+   `golden_ht23` S2e asserts that what you see mid-drag is what the drop keeps, and it went red
+   the moment the done-time gained ` +14m`: a longer chip wraps the name on a 390px phone, the row
+   grows, and every landing index computed from row geometry shifts by one. The clock and its
+   delta are one unbreakable chip; the NAME still wraps, which is Cory's rule and is untouched. */
+.li .dat{ white-space:nowrap }

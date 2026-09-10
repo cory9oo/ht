@@ -178,7 +178,11 @@ function dueOn(h, k){
    `dow:` item simply is not in the list on a day it is not due. */
 function bucketOf(h){
   if(isWeekly(h)) return 'WEEKLY';
-  return (winStartMin(h) != null) ? 'TIMED' : 'STANDARDS';
+  /* HT-25 S3: the middle bucket is ANYTIME, which is Cory's word for it ("some standards have
+     no time"). This is a LABEL change, not a data change - `bucketOf` was already computed and
+     never stored. `STANDARDS` survives untouched in GRP_LEGACY, where it is a real group_name
+     people still carry on their rows (R70.138: hidden, never removed). */
+  return (winStartMin(h) != null) ? 'TIMED' : 'ANYTIME';
 }
 /* THE SEAM (HT-16/17/21's convention: `window.__HT16`, `__HT17`, `__BLOCKS`, `__CIRCLE`).
    `goDay` and the grammar live inside this sealed closure, so a headless test cannot reach them
@@ -188,6 +192,59 @@ function bucketOf(h){
 window.__HT24 = { isWeekly:isWeekly, dowOf:dowOf, dueOn:dueOn, bucketOf:bucketOf,
                   goDay:function(k){ return goDay(k); }, daily:function(){ return daily(); },
                   today:function(){ return today(); } };
+
+/* ---- HT-25 S3 · ON TIME OR LATE, AND IT CHANGES NOTHING BUT THE LABEL --------------------
+   A TIMED standard already showed `08:20 · Read the Bible · ✓ 08:34` (HT-21 S2). What it never
+   said is whether 08:34 was on time, which is the only thing the two numbers together are for.
+
+   LATENESS IS A LABEL, NEVER A SCORE. `pctOf`, `doneOn`, `weekDone` and the streak all ask the
+   SAME question of `days.checked` — is this id truthy — and a clock string is truthy whatever it
+   says. So a late completion cannot move a percentage or break a streak by construction, not by
+   a rule somebody has to remember. The golden asserts it rather than trusting the reading.
+
+   THE DELTA IS COMPUTED AGAINST THE DAY THE STANDARD WAS DUE, which is the day whose row is on
+   screen — never against "now". Ticking Monday's box on Wednesday already refuses to write a
+   Wednesday clock onto a Monday row (HT-21 S2), so there is no path here that compares two
+   different days' clocks. A standard finished after midnight is late by however many minutes past
+   its own day's target it was, which is what a person means by late. */
+var LATE_GRACE = 0;              /* on time means on time; the grace lives in the target itself */
+function lateMin(h, k){
+  var t = winStartMin(h), d = doneMin(k, h.id);
+  return (t == null || d == null) ? null : d - t;
+}
+function lateCls(h, k){ return clsOfSpan(lateMin(h, k)); }
+function lateTxt(h, k){ return txtOfSpan(lateMin(h, k)); }
+/* ON-TIME % — a SEPARATE stat, hidden by default (R70.138), because it answers a different
+   question from adherence and blending the two would make a 100%-adherent week look worse. */
+function onTimePct(days){
+  var hit = 0, n = 0;
+  (days || []).forEach(function(k){
+    (S.habits || []).forEach(function(h){
+      if(winStartMin(h) == null || !dueOn(h, k)) return;
+      var m = lateMin(h, k); if(m == null) return;
+      n++; if(m <= LATE_GRACE) hit++;
+    });
+  });
+  return n ? Math.round(hit / n * 100) : null;
+}
+/* THE SEAM (HT-16/17/21/24's convention). `S` lives inside this sealed closure, so a headless
+   test cannot reach it — HT-24 recorded exactly this trap and its first C1 draft passed against a
+   page that had never moved. So the seam exposes the PURE comparison (`spanMin`), which is what
+   the delta actually is, plus a read-only handle on the state for the one check that has to score
+   a real day. Exported deliberately, and used by the golden only. */
+function spanMin(targetHHMM, doneHHMM){
+  var t=minsOf(targetHHMM), d=minsOf(doneHHMM);
+  return (t==null||d==null) ? null : d-t;
+}
+function clsOfSpan(m){ return m==null ? '' : (m > LATE_GRACE ? ' late' : ' ontime'); }
+function txtOfSpan(m){
+  if(m==null) return '';
+  if(m > LATE_GRACE) return '  +'+m+'m';
+  return m===0 ? '  on time' : '  '+m+'m';
+}
+window.__HT25S3 = { lateMin:lateMin, lateCls:lateCls, lateTxt:lateTxt, onTimePct:onTimePct,
+                    spanMin:spanMin, clsOfSpan:clsOfSpan, txtOfSpan:txtOfSpan,
+                    state:function(){ return S; } };
 
 /* ---- HT-25 S2 · EVERY MULTI-LINE BOX GROWS TO A CEILING, THEN SCROLLS -------------------
    THE CLASS, NOT THE INSTANCE. Cory reported this on the brain dump. It was true of every
@@ -651,7 +708,7 @@ function paintLog(){
     var dAt = doneAt(S.date, h.id);
     var nmIn = (pAt ? '<b class="pat">'+esc(pAt)+'</b>' : '') +
       esc(nameOf(h.name)) +
-      (dAt ? '<i class="dat">\u2713 '+esc(dAt)+'</i>' : '') +
+      (dAt ? '<i class="dat'+lateCls(h,S.date)+'">\u2713 '+esc(dAt)+esc(lateTxt(h,S.date))+'</i>' : '') +
       ((S.hasCue && h.cue)?'<i class="cue">'+esc(h.cue)+'</i>':'');
     /* ---- HT-21 S3 · LINKS WITHOUT NOISE (R70.287) ------------------------------------
        Cory: "I still need links available but I do not like the icon next to the end of the
@@ -2466,7 +2523,30 @@ function earned(k){ return committed() - remaining(k); }
   if(!(await load())) return;
   wire(); paintAll();
   if('serviceWorker' in navigator){
-    navigator.serviceWorker.register('./sw.js',{scope:'./'}).then(function(r){ r.update(); }).catch(function(){});
+    navigator.serviceWorker.register('./sw.js',{scope:'./'}).then(function(r){
+      r.update();
+      /* HT-25 S7 · "UPDATE AVAILABLE - TAP TO RELOAD".
+         The cache version bump is what makes a phone FETCH the new build; it is not what makes
+         the phone SHOW it. An installed PWA that is already open keeps the old page until it is
+         closed, and Cory's is open all day - which is why "I pushed it" and "he can see it" have
+         been two different facts in five wires. The new worker calls skipWaiting(), so the moment
+         one is installed the app is one reload away; this is the one line that says so.
+         A toast, not an auto-reload: reloading under someone who is mid-brain-dump would throw
+         away what they were typing. */
+      r.addEventListener('updatefound', function(){
+        var w = r.installing; if(!w) return;
+        w.addEventListener('statechange', function(){
+          if(w.state === 'installed' && navigator.serviceWorker.controller){
+            var n = el('toast'); if(!n) return;
+            n.textContent = 'update available — tap to reload';
+            n.classList.add('on');
+            n.style.cursor = 'pointer';
+            n.onclick = function(){ location.reload(); };
+            clearTimeout(toast._t);          /* it stays up until it is tapped or the app reopens */
+          }
+        });
+      });
+    }).catch(function(){});
   }
 })();
 
@@ -2486,7 +2566,7 @@ function earned(k){ return committed() - remaining(k); }
      names on their rows and `groupsFor()` still offers them in the sheet - hidden, never deleted
      (R70.138). DEC-057 still stands: the list is not grouped BY the clock, it is grouped by
      whether a standard HAS one, and the clock only sorts inside TIMED. */
-  var GRP_ORDER = ['TIMED','STANDARDS','WEEKLY'];
+  var GRP_ORDER = ['TIMED','ANYTIME','WEEKLY'];        /* HT-25 S3: Cory's three words, in his order */
   var GRP_LEGACY = ['MORNING','AFTERNOON','NIGHT','STANDARDS','WEEKLY','OTHER'];
   var KEEP_HEADINGS = ['COMPLETION','RATE THE DAY','JOURNAL'];
 
@@ -2590,9 +2670,9 @@ function earned(k){ return committed() - remaining(k); }
       var hid = r.getAttribute('data-h');
       var h = S.habits.filter(function(x){ return x.id === hid; })[0];
       /* HT-24 C1: the bucket is COMPUTED from cadence and the planned time, not read from
-         `group_name`. A row with no matching habit falls to STANDARDS rather than inventing a
+         `group_name`. A row with no matching habit falls to ANYTIME rather than inventing a
          group of its own. */
-      var name = h ? bucketOf(h) : 'STANDARDS';
+      var name = h ? bucketOf(h) : 'ANYTIME';
       (buckets[name] = buckets[name] || []).push(r);
     });
     var order = GRP_ORDER.filter(function(g){ return buckets[g]; })
@@ -2824,7 +2904,7 @@ function earned(k){ return committed() - remaining(k); }
        else. Changing cadence or time is the sheet's job.
        STANDARDS and WEEKLY are also legacy group names, so the check is on the COMPUTED set,
        not on the string alone - and it runs first. */
-    if(['TIMED','STANDARDS','WEEKLY'].indexOf(t.toUpperCase()) >= 0
+    if(['TIMED','ANYTIME','STANDARDS','WEEKLY'].indexOf(t.toUpperCase()) >= 0
        && document.documentElement.hasAttribute('data-ht9a')) return null;
     var hit=GROUPS.filter(function(g){ return g.toUpperCase()===t.toUpperCase(); })[0];
     if(hit) return hit;

@@ -87,6 +87,27 @@ async def touch_release(pg, cdp):
     await cdp.send('Input.dispatchTouchEvent', {'type': 'touchEnd', 'touchPoints': []})
     await pg.wait_for_timeout(160)
 
+async def settled(pg, js, quiet_ms=120, cap_ms=1500):
+    """Read `js` once the page has stopped changing it.
+
+    HT-25. The two fixed sleeps this replaces (40ms then 300ms) were a bet on how long a repaint
+    takes, and on a loaded laptop the bet loses about one run in three - the read lands on the far
+    side of `endDrag()`'s `paintLog()` and the check compares two different layouts. Polling until
+    two consecutive reads agree asserts the same thing without the bet: `dropped` is whatever the
+    drop produced once it stopped producing, and `after` is the same read again, which is exactly
+    what "the repaint does not second-guess the drop" means."""
+    prev = await pg.evaluate(js)
+    waited = 0
+    while waited < cap_ms:
+        await pg.wait_for_timeout(quiet_ms)
+        waited += quiet_ms
+        cur = await pg.evaluate(js)
+        if cur == prev:
+            return cur
+        prev = cur
+    return prev
+
+
 
 async def touch_drag(pg, cdp, x0, y0, x1, y1, steps=14):
     await touch_hold(pg, cdp, x0, y0, x1, y1, steps)
@@ -219,13 +240,29 @@ async def S2(pw):
         # THAT STABILITY IS THE PROPERTY WORTH ASSERTING, and it is exactly what the iOS bug
         # violated - there, no move ever reached the handler, so the order never changed at all.
         # What you see while dragging is what you get, and the repaint does not second-guess it.
+        # HT-25: THE 40ms AND THE 300ms WERE A RACE, AND IT REDDENED THIS CHECK AT RANDOM.
+        # Measured 2026-09-10 on the UNCHANGED build at HT-24's own merge commit: S2e failed on
+        # roughly one run in three, with `dropped` one position further along than `during` -
+        # i.e. the read at +40ms sometimes landed AFTER endDrag()'s repaint rather than before it,
+        # and the test then compared two different layouts and called the difference a defect.
+        # A merge gate that fails one run in three is a gate people learn to re-run instead of
+        # read (the same lesson as the master-brain worktree gate, 2026-09-10).
+        #
+        # THE ASSERTION IS UNCHANGED - during == dropped == after, and the order moved. Only the
+        # READS become deterministic: instead of guessing at a duration, wait until the DOM stops
+        # changing, which is the condition the fixed sleeps were standing in for.
         await touch_hold(pg, cdp, a['x'], a['y'], a['x'], endy)
-        during = await pg.evaluate(ROWS_JS)          # finger still down, after the last move
+        # THIS READ IS DELIBERATELY NOT SETTLED, and that was measured, not assumed. Polling here
+        # too was tried on 2026-09-10 and made things WORSE - 3 of 3 green with `settled()` on the
+        # two reads below only, 0 of 2 once this one polled as well. The reason is that `during`
+        # means "what is on screen at the instant the finger stops", and waiting for quiet lets the
+        # app's own settling pass (HT-23 S2, load-bearing) run on past that instant, so the read
+        # stops describing the thing the assertion is about. Reverted, and recorded here so the
+        # next person does not re-try it.
+        during = await pg.evaluate(ROWS_JS)          # finger still down, at the last move
         await touch_release(pg, cdp)
-        await pg.wait_for_timeout(40)
-        dropped = await pg.evaluate(ROWS_JS)         # after the drop, before the repaint settles
-        await pg.wait_for_timeout(300)
-        after = await pg.evaluate(ROWS_JS)           # after endDrag()'s paintLog()
+        dropped = await settled(pg, ROWS_JS)         # the drop, once it has stopped moving
+        after = await settled(pg, ROWS_JS)           # and again after endDrag()'s paintLog()
         log.append({'n': n, 'k': k})
         if after == before or during != dropped or dropped != after:
             misplaced.append({'n': n, 'k': k, 'moved': after != before,
@@ -444,8 +481,14 @@ async def C1(pw):
     # ---- THE THREE GROUPS ------------------------------------------------------------
     heads = await pg.evaluate("""() => [...document.getElementById('log').children]
         .filter(k => k.classList.contains('grp')).map(k => k.textContent.trim())""")
-    chk("C1f " + u"·" + " the list is grouped into TIMED / STANDARDS / WEEKLY and nothing else",
-        heads and all(h in ('TIMED', 'STANDARDS', 'WEEKLY') for h in heads), heads)
+    # AMENDED BY NAME, HT-25 S3 (R67.2, the same way HT-24 amended S2p). The middle bucket is
+    # ANYTIME now - Cory's own word for "some standards have no time". `bucketOf` was already
+    # computed and never stored, so this is a label change and the property C1f asserts is
+    # unchanged: the list has exactly these three headers and no others. The legacy group_name
+    # `STANDARDS` still exists on real rows and is still offered in the sheet (R70.138), which is
+    # why the tuple below is not simply renamed - it is the COMPUTED set that narrowed.
+    chk("C1f " + u"·" + " the list is grouped into TIMED / ANYTIME / WEEKLY and nothing else",
+        heads and all(h in ('TIMED', 'ANYTIME', 'WEEKLY') for h in heads), heads)
     chk("C1g " + u"·" + " there is NO Sabbath section", not any('SABBATH' in h for h in (heads or [])),
         heads)
 

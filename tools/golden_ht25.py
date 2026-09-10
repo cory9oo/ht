@@ -212,7 +212,91 @@ async def s6(pw):
         'row.bed_time' in s and 'row.wake_time' in s)
 
 
-SECTIONS = {'S2': s2, 'S6': s6}
+# ============================== S3 ==============================================================
+async def s3(pw):
+    """TIMED / ANYTIME / WEEKLY, and the one property that matters most: LATENESS IS A LABEL.
+
+    Cory's streaks and completion scores are what he acts on. If lateness could move them, every
+    timed standard would quietly become a worse deal than an untimed one and he would stop setting
+    times. So the assertion is not "the delta renders" - it is that a late completion and an
+    on-time one produce the SAME percentage.
+
+    TESTED THROUGH THE SEAM, NOT THROUGH `window.S`. `S` lives inside the sealed closure; HT-24
+    recorded this exact trap, where a draft reached for something undefined and two checks passed
+    against a page that had never moved. `__HT25S3.spanMin` is the pure comparison the delta IS."""
+    b, pg, errs = await open_page(pw)
+    try:
+        ok = await pg.evaluate("!!(window.__HT25S3 && window.__HT25S3.spanMin)")
+        chk('S3a · lateness is one pure function, exported (__HT25S3.spanMin)', ok)
+
+        d = await pg.evaluate("""() => {
+          const H = window.__HT25S3;
+          return { late:  H.spanMin('06:00','06:14'),
+                   on:    H.spanMin('06:00','06:00'),
+                   early: H.spanMin('06:00','05:52'),
+                   none:  H.spanMin(null,'06:00'),
+                   junk:  H.spanMin('06:00','nope'),
+                   clsLate: H.clsOfSpan(14), clsOn: H.clsOfSpan(0), clsEarly: H.clsOfSpan(-8),
+                   txtLate: H.txtOfSpan(14), txtOn: H.txtOfSpan(0), txtNone: H.txtOfSpan(null) };
+        }""")
+        chk('S3b · a 06:00 target done 06:14 is +14 minutes late', d['late'] == 14, d)
+        chk('S3c · done exactly on the target is 0 and reads as on time',
+            d['on'] == 0 and d['clsOn'] == ' ontime' and d['txtOn'] == '  on time', d)
+        chk('S3d · done early is negative and never renders as late',
+            d['early'] == -8 and d['clsEarly'] == ' ontime', d)
+        chk('S3e · late gets its own class and a signed delta',
+            d['clsLate'] == ' late' and d['txtLate'] == '  +14m', d)
+        chk('S3f · an absent target or an unparseable clock yields NOTHING, never a number',
+            d['none'] is None and d['junk'] is None and d['txtNone'] == '', d)
+
+        # THE LOAD-BEARING ONE. Every scorer asks `days.checked` the same question - is this id
+        # truthy - so a clock string cannot change an answer. Proven by scoring one real day
+        # three times with three different truthy values.
+        same = await pg.evaluate("""() => {
+          const S = window.__HT25S3.state(); if(!S) return {no:'no state'};
+          const k = S.date;
+          const r = S.byDate[k] || (S.byDate[k] = {date:k, checked:{}, pct:0});
+          const ids = (S.habits||[]).map(h=>h.id).slice(0,3);
+          if(!ids.length) return {no:'no standards'};
+          const pct = () => { let n=0; ids.forEach(i=>{ if(r.checked[i]) n++; });
+                              return Math.round(n/ids.length*100); };
+          const keep = ids.map(i => r.checked[i]);
+          ids.forEach(i => r.checked[i] = true);      const plain = pct();
+          ids.forEach(i => r.checked[i] = '23:59');   const late  = pct();
+          ids.forEach(i => r.checked[i] = '06:01');   const early = pct();
+          ids.forEach((i,n) => { if(keep[n]===undefined) delete r.checked[i];
+                                 else r.checked[i]=keep[n]; });
+          return {plain, late, early};
+        }""")
+        if same.get('no'):
+            chk('S3g · the day has standards to score', False, same)
+        else:
+            chk('S3g · a late completion scores exactly the same as an on-time one',
+                same['plain'] == same['late'] == same['early'] == 100, same)
+
+        heads = await pg.evaluate("""() => [...document.querySelectorAll('#log .grp')]
+            .map(k => k.textContent.trim())""")
+        chk('S3h · the headers read TIMED / ANYTIME / WEEKLY and nothing else',
+            heads and all(h in ('TIMED','ANYTIME','WEEKLY') for h in heads), heads)
+        chk('S3i · and they appear in that order',
+            [h for h in heads if h in ('TIMED','ANYTIME','WEEKLY')] ==
+            sorted(set(h for h in heads if h in ('TIMED','ANYTIME','WEEKLY')),
+                   key=['TIMED','ANYTIME','WEEKLY'].index), heads)
+
+        chk('S3j · no console error', not errs, errs[:2])
+    finally:
+        await b.close()
+
+    s = src(os.path.join(REPO, 'app.js'))
+    chk('S3k · the legacy group_name STANDARDS is untouched (R70.138)',
+        "'MORNING','AFTERNOON','NIGHT','STANDARDS','WEEKLY','OTHER'" in s)
+    chk('S3l · on-time % exists as a SEPARATE stat, never folded into adherence',
+        'function onTimePct' in s)
+    chk('S3m · no second column was invented - planned_start is the target time',
+        'target_time' not in s)
+
+
+SECTIONS = {'S2': s2, 'S3': s3, 'S6': s6}
 
 
 async def main():

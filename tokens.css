@@ -221,3 +221,38 @@
   --g0:var(--ht-ramp-0); --g1:var(--ht-ramp-0); --g2:var(--ht-ramp-1);
   --g3:var(--ht-ramp-2); --g4:var(--ht-ramp-3); --g5:var(--ht-ramp-4);
 }
+
+/* ---------------------------------------------------------------------------
+   5 · HT-25 S4 · THE FIVE COMPLETION STATES. Cory: "revamp the coloring for the
+   words for the task completions."
+
+   ONE COLOUR PER STATE, FIVE STATES, AND EVERY ONE OF THEM MEASURED. The floor
+   is 4.5:1 against BOTH grounds this text sits on (--ht-ground #0A0C10 and
+   --ht-panel #10131A); `tools/contrast_ht25.py` recomputes it and the golden
+   fails the wire if any state drops below. Measured 2026-09-10:
+
+       todo      #D6DCE6   14.20 / 13.48    the normal text weight
+       done      #7FB79A    8.52 /  8.09    CALM. --ht-green (#3FBF7F) is the
+                                            bright one and reads as a klaxon on
+                                            black; this is the same hue, quieted
+       done-late #D4A85C    8.91 /  8.46    amber, unmistakably not `done`
+       skipped   #7C8798    5.38 /  5.11    muted - a choice, not a failure
+       not-due   #78818F    4.97 /  4.72    dimmest that still passes
+
+   `--ht-dim` (#4F5866) IS NOT USABLE AS TEXT and this is where that is written
+   down: it measures 2.72:1 on the ground, well under the floor. It stays for
+   rules and hairlines, where contrast law does not apply.
+   --------------------------------------------------------------------------- */
+:root{
+  --ht-st-todo:#D6DCE6;
+  --ht-st-done:#7FB79A;
+  --ht-st-late:#D4A85C;
+  --ht-st-skip:#7C8798;
+  --ht-st-notdue:#78818F;
+
+  --st-todo:var(--ht-st-todo);
+  --st-done:var(--ht-st-done);
+  --st-late:var(--ht-st-late);
+  --st-skip:var(--ht-st-skip);
+  --st-notdue:var(--ht-st-notdue);
+}
