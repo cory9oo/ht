@@ -1976,3 +1976,34 @@ html[data-simple][data-firstrun="1"] #starter .fl{ display:flex; justify-content
    brand-new account needs was hidden by a rule aimed at something else. MEASURED: the block
    rendered 170px tall with its button at 0x0. Narrowed to the first-run case only. */
 html[data-simple][data-firstrun="1"] #starter .tools{ display:flex !important }
+
+/* --------------------------------------------------------------------------------------------
+   HT-22 S1 · THE THREE INPUTS AND THE ONE THING (R70.284)
+   Nothing new in the vocabulary: the one-thing row reuses the task row's checkbox, its done
+   stamp and its accent, because it IS a completion and a second visual language for one would
+   say it is a different kind of thing. The two input hosts reuse `.fld` / `.lab` exactly as
+   the journal fields do - these ride inputs 2 and 3, they do not open a fourth surface.
+   Colours are named tokens only; S2 moves the token block itself into `tokens.css`. */
+html[data-simple] #oneThing{ padding:0 0 10px }
+html[data-simple] .one{ display:flex; align-items:center; gap:0;
+  border:1px solid var(--rule); border-left:2px solid var(--accent);
+  border-radius:2px; padding:2px 10px 2px 2px; min-height:44px }
+html[data-simple] .one .bxw{ flex:0 0 44px; width:44px; height:44px; padding:0;
+  display:flex; align-items:center; justify-content:center; background:none; border:0;
+  cursor:pointer }
+html[data-simple] .one .onek{ font:500 9.5px/1 var(--mono); letter-spacing:.12em;
+  color:var(--muted); margin-right:10px; white-space:nowrap }
+html[data-simple] .one .onev{ font-size:14px; color:var(--ink); min-width:0;
+  overflow-wrap:anywhere }
+html[data-simple] .one .dat{ margin-left:8px; font:400 10px/1 var(--mono); font-style:normal;
+  color:var(--green-bright); opacity:.75; font-variant-numeric:tabular-nums;
+  white-space:nowrap }
+html[data-simple] .one.on .onev{ color:var(--ink3) }
+html[data-simple] .one.on .bx{ border-color:var(--accent); background:var(--accent) }
+
+/* the two input hosts. `.i3` is a `.fld` that sits inline with its neighbour at desk width and
+   stacks on a phone - two numbers side by side is one line, and one line is the whole ask. */
+html[data-simple] #in3a{ display:grid; gap:0 18px; padding-top:2px;
+  grid-template-columns:repeat(auto-fit, minmax(170px, 1fr)) }
+html[data-simple] #in3a .i3{ border:0; padding:8px 0 0; min-width:0 }
+html[data-simple] #in3a .i3 input{ width:100% }

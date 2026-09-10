@@ -97,6 +97,9 @@ try{
             <input class="find" id="find" placeholder="filter…" autocomplete="off">
             <button class="tbtn" id="bAllOff" title="Clear every mark on this day">Clear</button>
           </div>
+          <!-- HT-22 S1: tomorrow's one thing, on the day it was written FOR. Hidden until
+               that day has one, so a day without one loses no vertical space to an empty row. -->
+          <div id="oneThing" hidden></div>
           <div class="log" id="log"></div>
           <div class="tools" style="padding-top:12px">
             <button class="btn pri" id="bClose" style="flex:1">Close the day</button>
@@ -136,6 +139,14 @@ try{
               <span class="lab">Why was it that number?</span>
               <textarea id="iWhy" rows="2" placeholder="Because…"></textarea>
             </label>
+            <!-- HT-22 S1: sleep, tomorrow's one thing and the Saturday weight ride INPUT 2 -
+                 ONE host, one row. They were briefly two hosts, and the second one spent 77px of
+                 the journal quadrant's height budget: HT-10's grow() then sized the brain dump to
+                 52px inside a 64px label and the box overflowed (golden_ht18 S2a). The measure
+                 caught it in the same run that made it. Rendered by paintInputs3() from the probe,
+                 never marked up here - a field whose column is absent must not exist on the screen
+                 at all (HT-21 S5). -->
+            <div id="in3a" hidden></div>
           </div>
         </div>
 
@@ -248,6 +259,13 @@ try{
         <div class="blk">
           <div class="sh"><h2>Rating against completion</h2><span class="ln"></span><span class="c">the honest question</span></div>
           <div class="pan"><svg class="chart scatter" id="rScat"></svg><div class="note" id="rScatN" style="padding-top:8px"></div></div>
+        </div>
+
+        <!-- HT-22 S1: the point is that he SEES the relationship, so it is plotted, not
+             stated. The DETAIL line carries the two averages; this carries the shape. -->
+        <div class="blk">
+          <div class="sh"><h2>Sleep against rating</h2><span class="ln"></span><span class="c" id="sSlpC">the night before</span></div>
+          <div class="pan"><svg class="chart scatter" id="sSlp"></svg><div class="note" id="sSlpN" style="padding-top:8px"></div></div>
         </div>
 
         <div class="blk">

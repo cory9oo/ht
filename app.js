@@ -62,6 +62,44 @@ function minsOf(t){ var v=hhmm(t); if(!v) return null;
   return (+v.slice(0,2))*60 + (+v.slice(3,5)); }
 function fmtHM(m){ if(m==null) return '\u2014'; m=Math.max(0,Math.round(m));
   var h=Math.floor(m/60), r=m%60; return h? (h+'h'+(r?' '+r+'m':'')) : (r+'m'); }
+/* ---- HT-22 S1 . THE PLANNED WINDOW, AND IT HAS ONE ADDRESS (R70.284 - CONSOLIDATE) -------
+   The 2026-09-09 migration added `planned_start` / `planned_end`. `time_anchor` and
+   `minutes_planned` are what every row has actually carried since HT-16. THEY SAY THE SAME
+   THING, and the failure mode of two columns that say the same thing is that they disagree -
+   which is why HT-21 S2 collapsed two minutes inputs into one write. So ONE function answers
+   "when is this planned", and the row, the sort, on-time, DETAIL and the vault note all ask
+   it. Persisted value first, derived value second, null last: all 36 rows are NULL across the
+   three new columns today, and a build that needs them filled in order to render is a build
+   that breaks for him before he has opened a single sheet.
+   NOTHING HERE WRITES. Deriving on read is what stops a stale `planned_start` from outranking
+   the anchor he can see and edit; the write happens once, in the sheet, from that same anchor.
+
+   `fmtClock` IS HOISTED HERE FROM THE HT-16 CLOSURE, unchanged. HT-19 B0.1 named the rule this
+   obeys: one computation, one name, one definition. It had one caller there and has four now
+   across two closures, so it moves up rather than being copied - a second identical body is
+   the exact shape that produced `NaN:NaN` in six receipts. */
+function fmtClock(min){
+  if(min==null) return null;
+  var m=Math.max(0, Math.round(min));
+  return ('0'+Math.floor(m/60)).slice(-2)+':'+('0'+(m%60)).slice(-2);
+}
+function planMins(h){
+  if(!h) return null;
+  if(h.minutes_planned!=null && h.minutes_planned!=='') return +h.minutes_planned;
+  return h.minutes? +h.minutes : null;      /* the price stands in until a slot length is set */
+}
+function winStart(h){ return h ? (hhmm(h.planned_start) || hhmm(h.time_anchor)) : null; }
+function winStartMin(h){ return minsOf(winStart(h)); }
+function winEndMin(h){
+  var a=winStartMin(h); if(a==null) return null;
+  var e=minsOf(h && h.planned_end);
+  return (e!=null && e>=a) ? e : a + (planMins(h)||0);
+}
+function winEnd(h){ return fmtClock(winEndMin(h)); }
+/* A RULE is a standard with no planned time, and it renders NO time column - never an empty
+   one. An empty column is a question the row cannot answer, and a column of them reads as a
+   fault in the app rather than an absence in the data. */
+function isRule(h){ return winStartMin(h)==null; }
 function toast(t){ var n=el('toast'); n.textContent=t; n.classList.add('on');
   clearTimeout(toast._t); toast._t=setTimeout(function(){ n.classList.remove('on'); },1500); }
 
@@ -225,6 +263,28 @@ async function load(){
     }
   }
   S.privAll = {}; (pv.data||[]).forEach(function(r){ S.privAll[r.date]=r; });
+
+  /* ---- HT-22 S1 . THE THREE INPUTS THE MIGRATION UNBLOCKED (R70.284) --------------------
+     `sleep_hours`, `weight_lb` and `tomorrow_one_thing` landed on 2026-09-09. This build still
+     has to run against a database that does not have them - the degrade-cleanly contract that
+     `cue`, `predict`, `brain_dump`, `closed_at` and `target_age` all already carry.
+     ONE PROBE EACH, NOT ONE PROBE FOR THREE, and HT-21 S5 is why: a probe that asks for three
+     columns and is refused because ONE of them is absent reports "no columns" and hides two
+     fields that exist and would save. Three statements are cheap; a hidden field that works
+     is not. */
+  async function probePv(col, flag){
+    var r3 = await sb.from('day_private').select('date,'+col).eq('user_id',uid);
+    S[flag] = !r3.error;
+    if(r3.error) return;
+    (r3.data||[]).forEach(function(row){
+      var t = S.privAll[row.date] || (S.privAll[row.date]={ date:row.date, user_id:uid });
+      t[col] = row[col];
+    });
+  }
+  await probePv('sleep_hours','hasSleep');
+  await probePv('weight_lb','hasWeight');
+  await probePv('tomorrow_one_thing','hasTomorrow');
+
   S.priv = S.privAll[S.date] || null;
   return true;
 }
@@ -238,15 +298,73 @@ async function savePriv(){
   var p = S.priv || (S.priv={});
   p.date=S.date; p.user_id=S.me.id;
   S.privAll[S.date]=p;
-  var res = await sb.from('day_private').upsert({
+  var row = {
     user_id:S.me.id, date:S.date,
     rating:(p.rating==null?null:p.rating), why:p.why||'', tasks:p.tasks||'', prayer:p.prayer||''
   , brain_dump:(S.hasDump ? (p.brain_dump||'') : undefined)
-  },{ onConflict:'user_id,date' });
+  };
+  /* HT-22 S1: sleep and weight are measures OF THIS DAY, so they ride THIS day's upsert and no
+     second save path is created for them. The key is left OUT of the payload entirely when the
+     column is absent - the shape `brain_dump` already uses, and the reason one missing column
+     cannot fail the whole save and silently stop the journal persisting at all. */
+  if(S.hasSleep)  row.sleep_hours = (p.sleep_hours==null||p.sleep_hours==='') ? null : +p.sleep_hours;
+  if(S.hasWeight) row.weight_lb   = (p.weight_lb==null  ||p.weight_lb==='')   ? null : +p.weight_lb;
+  var res = await sb.from('day_private').upsert(row,{ onConflict:'user_id,date' });
   if(res.error) toast('note not saved'); else toast('saved');
   var n=0; ['brain_dump','tasks','prayer'].forEach(function(k){ if(p[k]) n++; });
   el('jrnC').textContent = n? n+' of 3 written · autosaves' : 'saves as you type';
-  paintRating(); paintRChart(); paintRScat(); paintRByMo(); paintJournal(); paintCal();
+  paintRating(); paintRChart(); paintRScat(); paintRSleep(); paintRByMo(); paintJournal(); paintCal();
+}
+/* ---- HT-22 S1 . TOMORROW'S ONE THING IS WRITTEN ONTO TOMORROW ---------------------------
+   Storing it on today's row and reading it back with a +1 offset works exactly until he writes
+   it at 00:05, or logs a day back from Wednesday - and then two clocks disagree about which day
+   "tomorrow" meant. The row it belongs to is the row it is written to, and that day reads only
+   its own. The upsert names ONE column, so PostgREST's ON CONFLICT sets only that column and a
+   rating already sitting on tomorrow's row cannot be blanked by it. */
+var tmT=null;
+function queueTomorrow(v){ S.oneDraft = v; clearTimeout(tmT); tmT=setTimeout(saveTomorrow,700); }
+async function saveTomorrow(){
+  if(!S.hasTomorrow || !S.me) return null;
+  var k=shift(S.date,1), v=String(S.oneDraft==null?'':S.oneDraft).trim();
+  var res = await sb.from('day_private').upsert(
+    { user_id:S.me.id, date:k, tomorrow_one_thing:(v||null) }, { onConflict:'user_id,date' });
+  if(res && res.error){ toast('tomorrow not saved'); return res; }
+  var t = S.privAll[k] || (S.privAll[k]={ date:k, user_id:S.me.id });
+  t.tomorrow_one_thing = v||null;
+  toast('saved');
+  return res;
+}
+/* THE ONE THING IS A COMPLETION, so it is stored where every completion on a day is stored.
+   `days.checked` is JSONB and every reader asks it one question - is this truthy (HT-21 S2) -
+   so the reserved key `__one` carries its own clock exactly as a standard does. IT CANNOT MOVE
+   A GRADE: `pct` is computed only over `active_set` / `daily()` ids and `__one` is in neither.
+   That is the acceptance, not the claim - `golden_ht22` checks it and asserts pct is unchanged
+   to the point. The `__` prefix cannot collide with a habit id (uuid live, `hN` in the
+   fixture), so nothing joining checked keys to standards can ever see a phantom. */
+var ONE_KEY='__one';
+function oneThingOf(k){ var p=S.privAll[k]; var v=p&&p.tomorrow_one_thing;
+  return (v==null||String(v).trim()==='') ? null : String(v).trim(); }
+function oneDone(k){ return !!ckOf(k)[ONE_KEY]; }
+function toggleOne(){
+  var r=S.byDate[S.date] || (S.byDate[S.date]={date:S.date,checked:{},pct:0});
+  r.checked=r.checked||{};
+  if(r.checked[ONE_KEY]) delete r.checked[ONE_KEY];
+  else r.checked[ONE_KEY] = (S.date===today() ? nowClock() : true);
+  queueSave(); paintOneThing();
+}
+function paintOneThing(){
+  var host=el('oneThing'); if(!host) return;
+  var t=oneThingOf(S.date);
+  if(!t){ host.innerHTML=''; host.hidden=true; return; }
+  host.hidden=false;
+  var on=oneDone(S.date), at=doneAt(S.date,ONE_KEY);
+  host.innerHTML='<div class="one'+(on?' on':'')+'">'+
+    '<button class="bxw" type="button" data-one="1" aria-pressed="'+(on?'true':'false')+
+      '" title="the one thing"><span class="bx"></span></button>'+
+    '<span class="onek">ONE THING</span>'+
+    '<span class="onev">'+esc(t)+'</span>'+
+    (at?'<i class="dat">\u2713 '+esc(at)+'</i>':'')+
+    '</div>';
 }
 function ratingOf(k){ var p=S.privAll[k]; var v=p&&p.rating; return (v==null||v==='')?null:+v; }
 function rollRate(n,upto){
@@ -377,7 +495,11 @@ function paintLog(){
      His groups remain the organising principle (DEC-057) — the clock is a secondary sort within
      one, never the thing the list is built from. Reported to SPEC as needing DEC-057 clarified. */
   if(S.sort==='order')  list.sort(function(a,b){
-    var ax=minsOf(a.time_anchor), bx=minsOf(b.time_anchor);
+    /* HT-22 S1: ascending by `planned_start` (the window's own start), unplanned at the foot.
+       DEC-057 as amended 2026-09-10 - his GROUPS are the organising principle and the clock is
+       a secondary sort INSIDE one, on his own request. The 9a layer re-parents these rows under
+       their group headers after this sort runs, so ordering here is ordering within a group. */
+    var ax=winStartMin(a), bx=winStartMin(b);
     if(ax==null && bx!=null) return 1;
     if(bx==null && ax!=null) return -1;
     if(ax!=null && bx!=null && ax!==bx) return ax-bx;
@@ -405,7 +527,7 @@ function paintLog(){
        `08:20 · Read the Bible` and, once checked, a muted `✓ 08:34` beside it. A standard with no
        planned time renders NO time column at all — an empty column is a question the row cannot
        answer, and a list of them reads as a fault. */
-    var pAt = hhmm(h.time_anchor);
+    var pAt = winStart(h);
     var dAt = doneAt(S.date, h.id);
     var nmIn = (pAt ? '<b class="pat">'+esc(pAt)+'</b>' : '') +
       esc(nameOf(h.name)) +
@@ -451,6 +573,7 @@ function paintLog(){
       ? '<div class="empty">Nothing matches.</div>'
       : '<div class="empty">No standards yet — pick three below, or add your own in Settings.</div>');
 
+  paintOneThing();
   var ids=daily().map(function(x){return x.id;});
   var done=ids.filter(function(i){return ck[i];}).length;
   el('logC').textContent = done+' / '+ids.length+' · '+fmt(earned(S.date))+' earned';
@@ -472,6 +595,38 @@ function paintJournalInputs(){
   el('iPrayer').value = (S.priv&&S.priv.prayer)||'';
   var n=0; ['why','tasks','prayer'].forEach(function(k){ if(S.priv&&S.priv[k]) n++; });
   el('jrnC').textContent = n? n+' of 3 written · autosaves' : 'saves as you type';
+  paintInputs3();
+}
+/* ---- HT-22 S1 · THE THREE INPUTS ARE RENDERED, NOT MARKED UP ---------------------------
+   They live in two hosts that the paint fills, for the reason HT-21 S5 gave for the Notes
+   field: a sheet that shows a box it cannot save is lying about what typing into it does. A
+   column that is absent means the field is NOT RENDERED - not rendered-and-greyed, which is a
+   question the day cannot answer sitting on the screen all day.
+   They ride inputs 2 and 3 rather than opening a fourth surface. DEC-058 ("three inputs -
+   completion, rating, journal") says a fourth write surface must be argued against the rule
+   first: this is that argument, and the contradiction is reported to SPEC in the receipt. */
+function isSat(k){ return dnum(k).getDay()===6; }
+function paintInputs3(){
+  var a=el('in3a'); if(!a) return;
+  var h='';
+  if(S.hasSleep) h+='<label class="fld i3"><span class="lab">Hours slept last night</span>'+
+    '<input id="iSleep" class="num" type="number" min="0" max="24" step=".25" inputmode="decimal" '+
+    'value="'+esc(S.priv&&S.priv.sleep_hours!=null?S.priv.sleep_hours:'')+'" placeholder="7.5"></label>';
+  if(S.hasTomorrow){
+    var k=shift(S.date,1), d=dnum(k);
+    h+='<label class="fld i3"><span class="lab">Tomorrow\u2019s one thing '+'·'+' '+
+      WD[d.getDay()]+' '+MO[d.getMonth()]+' '+d.getDate()+'</span>'+
+      '<input id="iOne" value="'+esc(oneThingOf(k)||'')+'" autocomplete="off" '+
+      'placeholder="it meets you at the top of that day\u2019s list"></label>';
+  }
+  /* WEIGHT IS SATURDAY ONLY. On a Wednesday the field is absent rather than disabled; a Saturday
+     he logs back to still shows its own number, because the rule belongs to the DAY on screen and
+     not to today. */
+  if(S.hasWeight && isSat(S.date))
+    h+='<label class="fld i3"><span class="lab">Weight (lb) '+'·'+' Saturday</span>'+
+      '<input id="iWeight" class="num" type="number" min="0" step=".1" inputmode="decimal" '+
+      'value="'+esc(S.priv&&S.priv.weight_lb!=null?S.priv.weight_lb:'')+'" placeholder="\u2014"></label>';
+  a.innerHTML=h; a.hidden=!h;
 }
 
 function toggle(hid){
@@ -560,7 +715,7 @@ function gtxt(p){ return p==null?'var(--ink3)':(p<50?'var(--bad)':(p>=90?'var(--
 function paintRight(){
   paintSankey(); paintHeat(); paintCal(); paintChart(); paintMomo(); paintDow();
   paintByMo(); paintByYear(); paintGdist();
-  paintRChart(); paintRScat(); paintRByMo(); paintJournal();
+  paintRChart(); paintRScat(); paintRSleep(); paintRByMo(); paintJournal();
   paintPerHabit(); paintScatter(); paintStreaks(); paintGroups(); paintNextMove();
   paintTLedger(); paintLife();
 }
@@ -654,6 +809,51 @@ function paintRScat(){
     (r>=0.35 ? '. Hitting the standard does make the day feel better; the routine is earning its cost.'
      : r<=-0.35 ? '. Higher completion goes with <b>worse</b> days. The list is buying compliance at the price of the day — worth looking at what you are grinding through.'
      : '. Completion and how the day felt are close to independent. Either the list is not touching what actually makes a day good, or something outside it is driving the mood.');
+}
+/* ---- HT-22 S1 · SLEEP AGAINST RATING (R70.284) -----------------------------------
+   Same shape as `paintRScat`, a different question: not "does hitting the standard make the day
+   feel better" but "does the night before". It refuses to draw on fewer than three nights and
+   says so, and it never invents an axis it could not measure (HT-19 B0.2) - `fitSvg` returning
+   null means do not draw, not draw at 340. */
+function paintRSleep(){
+  var host=el('sSlp'); if(!host) return;
+  var H=136, W=fitSvg('sSlp',H), X=[], Y=[];
+  if(W==null) return;
+  dates().forEach(function(k){
+    var pv=S.privAll[k], sl=pv&&pv.sleep_hours, v=ratingOf(k);
+    if(sl!=null && sl!=='' && v!=null){ X.push(+sl); Y.push(v); }
+  });
+  var note=el('sSlpN');
+  if(X.length<3){
+    host.innerHTML='<text x="6" y="20">Log a few nights of sleep and this fills in.</text>';
+    if(note) note.innerHTML='Once three days carry both hours slept and a rating, this answers '+
+      'one question: <b>does the night before show up in the day?</b>';
+    return;
+  }
+  var lo=Math.min.apply(null,X), hi=Math.max.apply(null,X);
+  if(hi-lo<0.5){ lo=lo-0.5; hi=hi+0.5; }
+  var px=function(v){ return 30+((v-lo)/(hi-lo))*(W-44); }, py=function(v){ return H-20-(v/10)*(H-36); };
+  var g='';
+  [0,5,10].forEach(function(v){ g+='<line class="ax" x1="26" y1="'+py(v)+'" x2="'+(W-6)+'" y2="'+py(v)+'"/>'+
+    '<text x="22" y="'+(py(v)+3)+'" text-anchor="end">'+v+'</text>'; });
+  for(var i=0;i<X.length;i++)
+    g+='<circle cx="'+px(X[i]).toFixed(1)+'" cy="'+py(Y[i]).toFixed(1)+'" r="4" '+
+       'fill="var(--accent)" opacity=".7"><title>'+X[i]+'h '+'·'+' rated '+Y[i]+'</title></circle>';
+  var r=pearson(X,Y);
+  if(r!=null){
+    var ma=X.reduce(function(a,b){return a+b;},0)/X.length, mb=Y.reduce(function(a,b){return a+b;},0)/Y.length;
+    var nu=0, de=0; for(var j=0;j<X.length;j++){ nu+=(X[j]-ma)*(Y[j]-mb); de+=(X[j]-ma)*(X[j]-ma); }
+    if(de){ var sl2=nu/de, ic=mb-sl2*ma;
+      g+='<line x1="'+px(lo)+'" y1="'+py(clamp(sl2*lo+ic,0,10))+'" x2="'+px(hi)+'" y2="'+
+         py(clamp(sl2*hi+ic,0,10))+'" stroke="var(--accent)" stroke-width="1.5" stroke-dasharray="4 3"/>'; }
+  }
+  g+='<text x="'+(W-6)+'" y="'+(H-4)+'" text-anchor="end">hours slept \u2192</text>';
+  host.innerHTML=g;
+  if(note) note.innerHTML = (r==null) ? '' :
+    'Across <b>'+X.length+'</b> nights the correlation is <b>r = '+r.toFixed(2)+'</b>'+
+    (r>=0.35 ? ' \u2014 sleep is showing up in how the day feels.'
+     : r<=-0.35 ? ' \u2014 more sleep goes with worse days, which is worth a second look before it is believed.'
+     : ' \u2014 close to independent so far. Either the range of nights is too narrow to see it, or something else is driving the day.');
 }
 function monthly(fn){
   var sum=new Array(12).fill(0), n=new Array(12).fill(0);
@@ -1378,6 +1578,23 @@ function wire(){
     paintRating(); queuePriv();
   });
   /* input 3 — journal */
+  /* HT-22 S1: the three inputs and the one-thing row are REPLACED on every paint, so their
+     events are delegated to the hosts that survive one. Binding to the node itself works right
+     up to the first repaint - the exact class of defect HT-21 S9's audit invented three of by
+     holding a node across a repaint that replaced it. */
+  (function(){
+    var host=el('in3a'); if(!host) return;
+    host.addEventListener('input',function(e){
+      var n=e.target; if(!n||!n.id) return;
+      if(n.id==='iSleep'){  S.priv=S.priv||{}; S.priv.sleep_hours = n.value===''?null:+n.value; queuePriv(); }
+      if(n.id==='iWeight'){ S.priv=S.priv||{}; S.priv.weight_lb   = n.value===''?null:+n.value; queuePriv(); }
+      if(n.id==='iOne'){ queueTomorrow(n.value); }
+    });
+  })();
+  var oneH=el('oneThing');
+  if(oneH) oneH.addEventListener('click',function(e){
+    if(e.target.closest('[data-one]')) toggleOne(); });
+
   [['iWhy','why'],['iTasks','tasks'],['iPrayer','prayer']].forEach(function(p){
     var n=el(p[0]);
     n.addEventListener('input',function(){
@@ -2455,7 +2672,10 @@ function earned(k){ return committed() - remaining(k); }
             ((h.cue && String(h.cue).trim())
               ? '<button class="btn h16adopt" id="eCueMove" data-c="'+esc(h.cue)+'">'+
                 'Move your cue into Notes?</button>' : ''))
-        : '<div class="fld"><span class="lab">Notes</span>'+
+        : /* HT-22 S1: this branch is now unreachable against Cory's database - `notes` landed
+             2026-09-09 - and it STAYS, because the contract is that the same build runs before
+             and after a migration and `__NO_NOTES` still exercises it in the harness. */
+          '<div class="fld"><span class="lab">Notes</span>'+
           '<textarea rows="3" disabled placeholder="one migration away — see below"></textarea>'+
           '</div>')+
       '<div class="etools">'+
@@ -2526,6 +2746,19 @@ function earned(k){ return committed() - remaining(k); }
        exactly what two separate inputs allowed. */
     if(S.hasTime){ rec.time_anchor = str('eAnchor')||null;
                    rec.minutes_planned = num('eMin') || null; }
+    /* ---- HT-22 S1 · THE WINDOW IS WRITTEN FROM THE ANCHOR, IN THE SAME ACTION -------
+       Same reasoning as S2's one minutes box writing both `minutes` and `minutes_planned`: two
+       columns that mean one thing must never be able to disagree, and the only way to guarantee
+       that is to give them ONE source and ONE moment. `planned_start` is the anchor; `planned_end`
+       is the anchor plus the planned minutes. CLEARING THE ANCHOR CLEARS THE WINDOW WITH IT - a
+       window with no start is a row that sorts by a time nobody set, and that is how a list
+       reorders itself under him for no reason he can see. */
+    if(S.hasWindow){
+      var an = S.hasTime ? (str('eAnchor')||null) : (hhmm(h.time_anchor)||null);
+      var mp = num('eMin') || 0;
+      rec.planned_start = an;
+      rec.planned_end   = an ? fmtClock(minsOf(an)+mp) : null;
+    }
     var res;
     if(isNew){
       /* a new row goes to the foot of its OWN group, not the foot of the list */
@@ -4538,18 +4771,15 @@ function earned(k){ return committed() - remaining(k); }
 
      Cory's 9/6 "no time next to tasks" is superseded by his 9/7 R70.103 prefix. Said here so a
      later wire does not read the older ruling and strip it back out. */
-  function anchorOf(h){ return hhmm(h && h.time_anchor); }
-  function planOf(h){
-    if(!h) return null;
-    if(h.minutes_planned!=null && h.minutes_planned!=='') return +h.minutes_planned;
-    return h.minutes? +h.minutes : null;      /* the price stands in until a slot length is set */
-  }
-  function anchorMin(h){ return minsOf(h && h.time_anchor); }
-  function endMin(h){
-    var a=anchorMin(h); if(a==null) return null;
-    return a + (planOf(h)||0);
-  }
-  function timedHabits(){ return S.habits.filter(function(h){ return anchorMin(h)!=null; }); }
+  /* HT-22 S1 (CONSOLIDATE): these four were the only definition of "when is this planned"
+     until the migration gave the columns a home. They now DELEGATE to the top-level window
+     helpers so there is exactly one answer for the row, the sort, on-time and the vault note.
+     The exported names are kept - `window.__HT16.planOf` has callers outside this closure. */
+  function anchorOf(h){ return winStart(h); }
+  function planOf(h){ return planMins(h); }
+  function anchorMin(h){ return winStartMin(h); }
+  function endMin(h){ return winEndMin(h); }
+  function timedHabits(){ return S.habits.filter(function(h){ return !isRule(h); }); }
 
   /* TODAY SORTS BY ANCHOR; everything unanchored falls to an ANYTIME block at the bottom in the
      order it already had. Only when at least one standard carries an anchor -- otherwise the list
@@ -4624,11 +4854,8 @@ function earned(k){ return committed() - remaining(k); }
      line ("Planned 5h 7m"). A second `fmtHM` declared in this closure would shadow it and break
      that line - the identical class of defect this section exists to remove. `hhmm()` is not it
      either: its contract is string -> string. Contradiction reported; the name is `fmtClock`. */
-  function fmtClock(min){
-    if(min==null) return null;
-    var m=Math.max(0, Math.round(min));
-    return ('0'+Math.floor(m/60)).slice(-2)+':'+('0'+(m%60)).slice(-2);
-  }
+  /* `fmtClock` is HOISTED to the top of this file by HT-22 S1 and deleted here: one
+     computation, one name, one definition (HT-19 B0.1). The callers below are unchanged. */
   /* ---- HT-21 S2 · THE USUAL TIME IS NOW THE STANDARD'S OWN (R70.286) --------------------
      `medianCloseMin` took the median of the DAY's close time across days this standard was
      checked. That answers "when do you finish a day on which you did this", not "when do you do
@@ -5385,6 +5612,47 @@ function earned(k){ return committed() - remaining(k); }
   }
 
   function unk(title){ return '<span class="h20unk" title="'+esc(title||'')+'">UNKNOWN</span>'; }
+  /* ---- HT-22 S1 · the three inputs, computed where they are read --------------------
+     THE POINT OF THE SLEEP LINE IS THAT HE SEES THE RELATIONSHIP, not that he is told one. So
+     it prints both averages and the gap between them rather than a verdict, and it refuses to
+     print anything at all until there are nights on BOTH sides of seven hours - a "gap" against
+     an empty half is a number with nothing on the other end of it. */
+  function sleepNights(){
+    var o=[]; dates().forEach(function(k){
+      var pv=S.privAll[k], sl=pv&&pv.sleep_hours, v=ratingOf(k);
+      if(sl!=null && sl!=='' && v!=null) o.push([+sl, v]); });
+    return o;
+  }
+  function sleepVsRating(){
+    var o=sleepNights();
+    if(!o.length) return unk('no night has both hours slept and a rating yet');
+    var hi=o.filter(function(x){ return x[0]>=7; }), lo=o.filter(function(x){ return x[0]<7; });
+    if(!hi.length || !lo.length)
+      return unk('needs nights on both sides of 7 hours - '+hi.length+' long, '+lo.length+' short');
+    function avg(a){ return Math.round(a.reduce(function(t,x){ return t+x[1]; },0)/a.length*10)/10; }
+    var a=avg(hi), b=avg(lo), g=Math.round((a-b)*10)/10;
+    return a+' vs '+b+' <b class="h20gap">'+(g>0?'+':'')+g+'</b>';
+  }
+  function weightRows(){
+    var o=[]; dates().forEach(function(k){
+      var pv=S.privAll[k];
+      if(pv && pv.weight_lb!=null && pv.weight_lb!=='') o.push([k, +pv.weight_lb]); });
+    return o;
+  }
+  function weightLine(){
+    var o=weightRows();
+    if(!o.length) return unk('no Saturday weight recorded yet');
+    var last=o[o.length-1][1];
+    if(o.length===1) return last+' lb';
+    var d=Math.round((last-o[o.length-2][1])*10)/10;
+    return last+' lb <b class="h20gap">'+(d>0?'+':'')+d+'</b>';
+  }
+  function oneThingLine(){
+    var set=0, kept=0;
+    dates().forEach(function(k){ if(oneThingOf(k)==null) return; set++; if(oneDone(k)) kept++; });
+    if(!set) return unk('nothing set for a tomorrow yet');
+    return kept+' of '+set;
+  }
   function pctCell(p){
     if(p==null) return unk('fewer than '+P10_MIN_DAYS+' days of history');
     var rf=d10().rampFill;
@@ -5496,9 +5764,15 @@ function earned(k){ return committed() - remaining(k); }
         return v==null ? unk('needs a standard with a planned time and a check on the same day')
                        : pctCell(v); })(),
              'done within 15 minutes of its planned time') +
-      /* S8 has not landed; the measure is here and it says so rather than being absent. */
-      flat10('Sleep vs rating', unk('sleep hours arrive with S8'),
-             'how the night before shows up in the day');
+      /* ---- HT-22 S1 · THE THREE INPUTS, AS OUTPUTS (R70.284) --------------------------
+         HT-21 left this line reading "sleep hours arrive with S8". They have arrived, so it
+         carries the answer it was holding a place for, and the two new measures sit beside it.
+         Each says UNKNOWN WITH ITS REASON until it has enough to say anything - never blank,
+         and never a zero that reads as a measurement (R70.147 direction is acceptance). */
+      flat10('Sleep vs rating', sleepVsRating(),
+             'average rating after 7h+ nights vs shorter ones') +
+      flat10('Weight', weightLine(), 'Saturday only') +
+      flat10('The one thing', oneThingLine(), 'kept, of the ones you set the night before');
 
     /* MORE: everything else HT-20 built, one tap down and not one measure lost (R70.138). */
     var more =
