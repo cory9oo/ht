@@ -144,8 +144,56 @@ function skinSwatch(s){
 }
 
 /* ============================ selectors ============================ */
-function daily(){ return S.habits.filter(function(h){ return h.cadence!=='weekly'; }); }
-function weekly(){ return S.habits.filter(function(h){ return h.cadence==='weekly'; }); }
+/* ---- HT-24 C1 . THE CADENCE GRAMMAR, EXTENDED RATHER THAN A NEW COLUMN --------------------
+     cadence ::= 'daily' | 'weekly' | 'dow:' d(,d)*        d = 0(Sun) .. 6(Sat)
+   `cadence` already exists and is already free text; `days_of_week` does not exist anywhere in
+   this file (grep: 0). Adding a column would cost a live migration in Cory's browser for a
+   server-side query pattern this app does not have - it pulls one user's 36 rows and filters
+   client-side. A delimited set in a text column is the classic anti-pattern ONLY when it is
+   queried server-side, and this one never is.
+
+   EVERY EXISTING CALL SITE COMPARED AGAINST THE STRING 'weekly'. That means `dow:6` fell through
+   as "not weekly", i.e. as DAILY - a Sabbath on a Tuesday. So the comparison gets a name, and
+   `dueOn()` is the only thing that answers "is this standard due on this date". The receipt
+   carries a verdict for every one of the 29 sites. */
+function isWeekly(h){ return !!h && h.cadence === 'weekly'; }
+function dowOf(h){
+  var c = h && h.cadence;
+  if(typeof c !== 'string' || c.slice(0,4) !== 'dow:') return null;
+  var d = c.slice(4).split(',').map(function(x){ return parseInt(String(x).trim(), 10); })
+           .filter(function(n){ return n >= 0 && n <= 6; });
+  return d.length ? d : null;
+}
+/* IS THIS STANDARD DUE ON THIS DAY? A weekly answers for its own period elsewhere (weekDone);
+   a `dow:` item is due only on its days; anything else is daily and always due. */
+function dueOn(h, k){
+  if(!h) return false;
+  if(isWeekly(h)) return true;
+  var d = dowOf(h);
+  if(!d) return true;
+  return d.indexOf(dnum(k || S.date).getDay()) >= 0;
+}
+/* THE THREE GROUPS (C1). Computed, never stored: TIMED is a daily item that carries a clock,
+   STANDARDS is a daily item without one, WEEKLY is a weekly. There is NO SABBATH SECTION - a
+   `dow:` item simply is not in the list on a day it is not due. */
+function bucketOf(h){
+  if(isWeekly(h)) return 'WEEKLY';
+  return (winStartMin(h) != null) ? 'TIMED' : 'STANDARDS';
+}
+/* THE SEAM (HT-16/17/21's convention: `window.__HT16`, `__HT17`, `__BLOCKS`, `__CIRCLE`).
+   `goDay` and the grammar live inside this sealed closure, so a headless test cannot reach them
+   and the FIRST version of `golden_ht23` C1 called `window.goDay` - which is undefined, so the
+   navigation never happened and two checks passed against a page that had not moved. A vacuous
+   green is worse than a red. Exported deliberately, read-only, and used by the golden only. */
+window.__HT24 = { isWeekly:isWeekly, dowOf:dowOf, dueOn:dueOn, bucketOf:bucketOf,
+                  goDay:function(k){ return goDay(k); }, daily:function(){ return daily(); },
+                  today:function(){ return today(); } };
+/* DUE TODAY and not weekly. This is what the day's percentage is computed against, and
+   `saveDay()` snapshots it into `active_set` on every save - so a day already logged keeps the
+   set it was graded on and NO PAST DAY IS EVER REPRICED (P4). That mechanism already shipped;
+   this only changes what goes into it today. */
+function daily(){ return S.habits.filter(function(h){ return !isWeekly(h) && dueOn(h, S.date); }); }
+function weekly(){ return S.habits.filter(isWeekly); }
 function ckOf(k){ var r=S.byDate[k]; return (r&&r.checked)||{}; }
 /* ---- HT-21 S2 · A DONE TIME, AND IT COSTS NO MIGRATION (R70.286) -------------------------
    `days.checked` is a JSONB map and every reader in this file asks it ONE question: is this id
@@ -183,7 +231,7 @@ function weekCheckDay(hid,k){
   return found;
 }
 function weekDone(hid,k){ return weekCheckDay(hid,k)!=null; }
-function doneOn(h,k){ return h.cadence==='weekly' ? weekDone(h.id,k) : !!ckOf(k)[h.id]; }
+function doneOn(h,k){ return isWeekly(h) ? weekDone(h.id,k) : !!ckOf(k)[h.id]; }
 function rolling(n,upto){
   var end=upto||today(), a=[];
   for(var i=n-1;i>=0;i--){ var k=shift(end,-i), r=S.byDate[k];
@@ -488,8 +536,11 @@ function paintLog(){
   var list=S.habits.slice();
 
   if(q) list=list.filter(function(h){ return (h.name+' '+(h.group_name||'')).toLowerCase().indexOf(q)>=0; });
-  if(S.grp==='daily')  list=list.filter(function(h){ return h.cadence!=='weekly'; });
-  if(S.grp==='weekly') list=list.filter(function(h){ return h.cadence==='weekly'; });
+  if(S.grp==='daily')  list=list.filter(function(h){ return !isWeekly(h); });
+  if(S.grp==='weekly') list=list.filter(isWeekly);
+  /* HT-24 C1: a `dow:` standard is ABSENT on a day it is not due - not greyed, not "already
+     done". Absent. A weekly keeps its own period machinery and is never filtered here. */
+  list = list.filter(function(h){ return isWeekly(h) || dueOn(h, S.date); });
 
   /* HT-21 S2: inside a group, ascending by PLANNED TIME, and the unplanned sit at its foot.
      His groups remain the organising principle (DEC-057) — the clock is a secondary sort within
@@ -557,7 +608,7 @@ function paintLog(){
          and missed this one, which is why an unexplained red marker survived into the simple view
          for four wires. After this the only red on a task row is S6's overdue tint. */
       (returnedOn(h,S.date)?'<span class="back" title="back after a miss — the return is the win">↩</span>':'')+
-      (h.cadence==='weekly'?'<span class="wk">WEEKLY</span>':'')+
+      (isWeekly(h)?'<span class="wk">WEEKLY</span>':'')+
       '<span class="sp16"></span>'+
       '<span class="mn">'+(h.minutes?h.minutes+'m':'—')+'</span>'+
       '<span class="ad" style="color:'+gtxt(ad)+'">'+(ad==null?'—':ad+'%')+'</span>'+
@@ -2274,7 +2325,13 @@ function earned(k){ return committed() - remaining(k); }
    hidden is not deleted; the cheapest way to honour that is to leave the code alone and change what the
    page shows. */
 (function(){
-  var GRP_ORDER = ['MORNING','AFTERNOON','NIGHT','STANDARDS','WEEKLY','OTHER'];
+  /* HT-24 C1: THREE GROUPS, COMPUTED. `bucketOf()` decides; `group_name` is no longer what the
+     list is built from. The old order is kept below it because a person may still carry those
+     names on their rows and `groupsFor()` still offers them in the sheet - hidden, never deleted
+     (R70.138). DEC-057 still stands: the list is not grouped BY the clock, it is grouped by
+     whether a standard HAS one, and the clock only sorts inside TIMED. */
+  var GRP_ORDER = ['TIMED','STANDARDS','WEEKLY'];
+  var GRP_LEGACY = ['MORNING','AFTERNOON','NIGHT','STANDARDS','WEEKLY','OTHER'];
   var KEEP_HEADINGS = ['COMPLETION','RATE THE DAY','JOURNAL'];
 
   function advanced(){
@@ -2376,7 +2433,10 @@ function earned(k){ return committed() - remaining(k); }
          .gp in the full sheet, so reading the DOM put every standard in OTHER. MEASURED. */
       var hid = r.getAttribute('data-h');
       var h = S.habits.filter(function(x){ return x.id === hid; })[0];
-      var name = ((h && h.group_name) || 'Other').replace(/\s+/g,' ').trim().toUpperCase();
+      /* HT-24 C1: the bucket is COMPUTED from cadence and the planned time, not read from
+         `group_name`. A row with no matching habit falls to STANDARDS rather than inventing a
+         group of its own. */
+      var name = h ? bucketOf(h) : 'STANDARDS';
       (buckets[name] = buckets[name] || []).push(r);
     });
     var order = GRP_ORDER.filter(function(g){ return buckets[g]; })
@@ -2593,6 +2653,17 @@ function earned(k){ return committed() - remaining(k); }
      null means "this header matches no group I know" -> the drag leaves that row's group alone. */
   function canonGroup(txt){
     var t=String(txt||'').replace(/\s+/g,' ').trim();
+    /* ---- HT-24 C1 . A COMPUTED HEADER IS NOT A GROUP NAME -----------------------------
+       TIMED / STANDARDS / WEEKLY are computed from cadence and the planned time (bucketOf).
+       Returning one of them here would make a drag across a header write `group_name='TIMED'`
+       into the database - a real value overwritten by the name of a view. `null` is already the
+       "this header matches no group I know" answer and the drag then leaves the row's group
+       alone, which is exactly right: under three computed groups, a drag reorders and nothing
+       else. Changing cadence or time is the sheet's job.
+       STANDARDS and WEEKLY are also legacy group names, so the check is on the COMPUTED set,
+       not on the string alone - and it runs first. */
+    if(['TIMED','STANDARDS','WEEKLY'].indexOf(t.toUpperCase()) >= 0
+       && document.documentElement.hasAttribute('data-ht9a')) return null;
     var hit=GROUPS.filter(function(g){ return g.toUpperCase()===t.toUpperCase(); })[0];
     if(hit) return hit;
     return S.habits.map(function(h){ return h.group_name; })
@@ -2670,9 +2741,22 @@ function earned(k){ return committed() - remaining(k); }
       fld('Name','<input id="eName" value="'+esc(h.name)+'" placeholder="standard" autocomplete="off">')+
       fld('Group','<select id="eGroup">'+groupsFor(grp).map(function(g){
           return '<option'+(g===grp?' selected':'')+'>'+esc(g)+'</option>'; }).join('')+'</select>')+
-      fld('Cadence','<select id="eCad">'+
-          '<option value="daily"'+(h.cadence!=='weekly'?' selected':'')+'>Daily</option>'+
-          '<option value="weekly"'+(h.cadence==='weekly'?' selected':'')+'>Weekly</option></select>')+
+      /* HT-24 C1: three cadences now, and the third carries a day picker that is only shown
+         when it is chosen. `dow:` is stored as the grammar, never as a second column. */
+      (function(){
+        var dw = dowOf(h), cad = isWeekly(h) ? 'weekly' : (dw ? 'dow' : 'daily');
+        return fld('Cadence','<select id="eCad">'+
+            '<option value="daily"'+(cad==='daily'?' selected':'')+'>Daily</option>'+
+            '<option value="dow"'+(cad==='dow'?' selected':'')+'>Certain days</option>'+
+            '<option value="weekly"'+(cad==='weekly'?' selected':'')+'>Weekly</option></select>')+
+          '<div class="fld dowf" id="eDowFld"'+(cad==='dow'?'':' hidden')+'>'+
+            '<span class="lab">Which days</span><div class="dow" id="eDow">'+
+            ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].map(function(nm,i){
+              var on = dw ? dw.indexOf(i)>=0 : false;
+              return '<button type="button" class="dowb'+(on?' on':'')+'" data-d="'+i+'" '+
+                     'aria-pressed="'+(on?'true':'false')+'">'+nm+'</button>';
+            }).join('')+'</div></div>';
+      })()+
       (S.hasTime ? '<div class="fld" id="eTimeFld"><span class="lab">Planned time</span>'+
           '<div class="win"><input id="eAnchor" type="time" value="'+esc(hhmm(h.time_anchor)||'')+'">'+
           '</div>'+
@@ -2741,6 +2825,16 @@ function earned(k){ return committed() - remaining(k); }
     /* S5: moving a cue into Notes is a TAP, never a bulk pass and never silent. It fills the
        textarea and removes itself; the `cue` field is not cleared here — the save below simply
        stops writing it once Notes carries the text. */
+    /* HT-24 C1: the day picker shows only for "Certain days", and each day toggles. */
+    var cad=document.getElementById('eCad'), dowFld=document.getElementById('eDowFld');
+    if(cad && dowFld) cad.onchange=function(){ dowFld.hidden = (cad.value!=='dow'); };
+    var dowBox=document.getElementById('eDow');
+    if(dowBox) dowBox.onclick=function(e){
+      var b=e.target.closest('.dowb'); if(!b) return;
+      e.preventDefault();
+      var on=b.classList.toggle('on');
+      b.setAttribute('aria-pressed', on?'true':'false');
+    };
     var cm=document.getElementById('eCueMove');
     if(cm) cm.onclick=function(e){ e.preventDefault();
       var t=document.getElementById('eNotes');
@@ -2763,7 +2857,17 @@ function earned(k){ return committed() - remaining(k); }
     var name=str('eName');
     if(!name){ toast('a standard needs a name'); return; }
     var rec={ user_id:S.me.id, name:name, group_name:str('eGroup'),
-              cadence:str('eCad')==='weekly'?'weekly':'daily',
+              cadence:(function(){
+                var v=str('eCad');
+                if(v==='weekly') return 'weekly';
+                if(v!=='dow') return 'daily';
+                var on=q('.dowb.on', document.getElementById('eDow')||document)
+                        .map(function(b){ return +b.getAttribute('data-d'); }).sort();
+                /* NO DAYS PICKED IS NOT A CADENCE. It would render a standard that is due on no
+                   day at all and can never be completed, so it degrades to daily rather than
+                   writing `dow:` with nothing after it. */
+                return on.length ? ('dow:'+on.join(',')) : 'daily';
+              })(),
               minutes:num('eMin'), link:str('eLink')||null };
     /* S5 · THE ONE LINE THAT WOULD HAVE DESTROYED EVERY CUE. `str('eCue')` returns '' when the
        input is not rendered, so writing it unconditionally would blank the field for every

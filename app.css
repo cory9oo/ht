@@ -2045,3 +2045,17 @@ html[data-simple] .i3f input{ height:24px; padding:2px 6px; font-size:11px; widt
    push it past the panel edge rather than let it shrink */
 html[data-simple] .i3f input.i3wide{ flex:1 1 auto; width:auto; min-width:0 }
 html[data-simple] .i3f:has(input.i3wide){ flex:1 1 150px; min-width:0 }
+
+/* --------------------------------------------------------------------------------------------
+   HT-24 C1 · THE DAYS-OF-WEEK PICKER
+   Seven 44px targets on one line at every width - a day is a tap, never a dropdown inside a
+   dropdown. It reuses the sheet's own button vocabulary; nothing new is introduced for it. */
+html[data-simple] .dowf{ border:0; padding:10px 0 0 }
+html[data-simple] .dow{ display:flex; gap:4px; flex-wrap:wrap }
+html[data-simple] .dowb{ flex:1 1 0; min-width:40px; height:34px; padding:0;
+  font:500 10px/1 var(--mono); letter-spacing:.06em; text-transform:uppercase;
+  color:var(--muted); background:none; border:1px solid var(--rule); border-radius:2px;
+  cursor:pointer }
+html[data-simple] .dowb:hover{ color:var(--ink); border-color:var(--rule2) }
+html[data-simple] .dowb.on{ color:var(--accent-ink); background:var(--accent);
+  border-color:var(--accent) }

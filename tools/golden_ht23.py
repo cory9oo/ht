@@ -369,7 +369,138 @@ async def S2(pw):
     await b.close()
 
 
-SECTIONS = {'S2': S2}
+async def C1(pw):
+    """HT-24 C1 - three groups, and the Sabbath exists only on Saturdays."""
+    print("\nC1 " + u"·" + " three groups, and the Sabbath exists only on Saturdays")
+    b, pg, errs = await open_page(pw, 1280, 900, flags={'__DOW': True}, touch=False)
+
+    # ---- the grammar itself, through the seam, and NOT vacuously ----------------------
+    d = await pg.evaluate("""() => {
+      const H = window.__HT24;
+      if(!H) return {noSeam:true};
+      const P = (c) => H.dowOf({cadence:c});
+      return { noSeam:false,
+        sat:      P('dow:6'),          two:  P('dow:1,3'),
+        spaces:   P('dow: 1 , 3 '),    all:  P('dow:0,1,2,3,4,5,6'),
+        plain:    P('daily'),          wk:   P('weekly'),
+        empty:    P('dow:'),           junk: P('dow:9,x,-1'),
+        weeklyIsWeekly: H.isWeekly({cadence:'weekly'}),
+        dowIsNotWeekly: H.isWeekly({cadence:'dow:6'}) }; }""")
+    chk("C1a0 " + u"·" + " the test seam is present - without it this whole section passes vacuously",
+        not d.get('noSeam'), d)
+    chk("C1a1 " + u"·" + " dow: parses one day, several days, and tolerates spaces",
+        d.get('sat') == [6] and d.get('two') == [1, 3] and d.get('spaces') == [1, 3], d)
+    chk("C1a2 " + u"·" + " 'daily' and 'weekly' are not dow:, and dow: is not weekly",
+        d.get('plain') is None and d.get('wk') is None
+        and d.get('weeklyIsWeekly') and not d.get('dowIsNotWeekly'), d)
+    chk("C1a3 " + u"·" + " an empty or junk day list yields NO cadence rather than a broken one",
+        d.get('empty') is None and d.get('junk') is None, d)
+
+    # the fixture's own rows tell us the grammar reached the data
+    rows = await pg.evaluate("""() => (window.__MOCK_DB.habits||[])
+        .map(h => ({id: h.id, cadence: h.cadence}))""")
+    sab = [r for r in rows if r['cadence'] == 'dow:6']
+    two = [r for r in rows if r['cadence'] == 'dow:1,3']
+    chk("C1a " + u"·" + " the fixture carries a dow: standard for the section to be measured on",
+        len(sab) == 1 and len(two) == 1, rows[:4])
+
+    # ---- SATURDAY vs TUESDAY, through the app's own day navigation --------------------
+    # goDay() sets S.date and repaints, and `dueOn` reads S.date - so this exercises the real
+    # path rather than a stubbed clock.
+    # THROUGH THE SEAM. The first draft called `window.goDay`, which does not exist - the page
+    # never moved and two checks below passed against today's list instead of Saturday's.
+    NAV = """(k) => { window.__HT24.goDay(k);
+      return new Promise(r => setTimeout(() => r(
+        [...document.querySelectorAll('#log .li')]
+          .filter(x => !x.hidden)
+          .map(x => x.getAttribute('data-h'))), 600)); }"""
+    # 2026-09-12 is a Saturday; 2026-09-15 a Tuesday. Asserted, not assumed.
+    days = await pg.evaluate("""() => ({ sat: new Date('2026-09-12T12:00:00').getDay(),
+                                          tue: new Date('2026-09-15T12:00:00').getDay() })""")
+    chk("C1b " + u"·" + " the two dates under test really are a Saturday and a Tuesday",
+        days['sat'] == 6 and days['tue'] == 2, days)
+
+    on_sat = await pg.evaluate(NAV, '2026-09-12')
+    on_tue = await pg.evaluate(NAV, '2026-09-15')
+    sid = sab[0]['id'] if sab else None
+    chk("C1c " + u"·" + " the Sabbath standard IS on the list on a Saturday", sid in (on_sat or []),
+        {'id': sid, 'sat': (on_sat or [])[:6]})
+    chk("C1d " + u"·" + " and is ABSENT on a Tuesday - not greyed, not 'already done': absent",
+        sid not in (on_tue or []), {'id': sid, 'tue': (on_tue or [])[:6]})
+
+    tid = two[0]['id'] if two else None
+    on_mon = await pg.evaluate(NAV, '2026-09-14')          # Monday
+    chk("C1e " + u"·" + " a two-day cadence (dow:1,3) appears on Monday and not on Saturday",
+        tid in (on_mon or []) and tid not in (on_sat or []),
+        {'id': tid, 'mon': tid in (on_mon or []), 'sat': tid in (on_sat or [])})
+
+    # ---- THE THREE GROUPS ------------------------------------------------------------
+    heads = await pg.evaluate("""() => [...document.getElementById('log').children]
+        .filter(k => k.classList.contains('grp')).map(k => k.textContent.trim())""")
+    chk("C1f " + u"·" + " the list is grouped into TIMED / STANDARDS / WEEKLY and nothing else",
+        heads and all(h in ('TIMED', 'STANDARDS', 'WEEKLY') for h in heads), heads)
+    chk("C1g " + u"·" + " there is NO Sabbath section", not any('SABBATH' in h for h in (heads or [])),
+        heads)
+
+    # ---- the day's % is computed against what was DUE that day ------------------------
+    d = await pg.evaluate("""() => {
+      const ids = window.__HT24.daily().map(h => h.id);
+      return { dailyIds: ids.length, ids,
+               allNonWeekly: (window.__MOCK_DB.habits||[])
+                 .filter(h => h.cadence !== 'weekly').length }; }""")
+    chk("C1h " + u"·" + " daily() is the DUE set, not every non-weekly standard (P4 snapshots it)",
+        0 < d['dailyIds'] < d['allNonWeekly'], d)
+
+    chk("C1i " + u"·" + " zero page errors with the grammar in", not errs, errs[:3])
+    await b.close()
+
+    # ---- the editor writes the grammar, and refuses to write an empty one -------------
+    b, pg, errs = await open_page(pw, 1280, 900, flags={'__DOW': True}, touch=False)
+    d = await pg.evaluate("""async () => {
+      const row = document.querySelector('#log .li');
+      row.querySelector('.edp').dispatchEvent(new MouseEvent('click',{bubbles:true}));
+      await new Promise(r=>setTimeout(r,600));
+      const sel = document.getElementById('eCad');
+      if(!sel) return {err:'no cadence select'};
+      const opts = [...sel.options].map(o=>o.value);
+      sel.value='dow'; sel.dispatchEvent(new Event('change',{bubbles:true}));
+      await new Promise(r=>setTimeout(r,200));
+      const fld = document.getElementById('eDowFld');
+      const shown = fld && !fld.hidden;
+      // pick Saturday
+      const satBtn = document.querySelector('#eDow .dowb[data-d="6"]');
+      satBtn.click();
+      window.__UPDATES=[];
+      document.getElementById('eSave').click();
+      await new Promise(r=>setTimeout(r,800));
+      const ups=(window.__UPDATES||[]).filter(u=>u[0]==='habits').map(u=>u[1]);
+      return { opts, shown, wrote: ups.length ? ups[ups.length-1].cadence : null }; }""")
+    chk("C1j " + u"·" + " the sheet offers Daily / Certain days / Weekly",
+        d.get('opts') == ['daily', 'dow', 'weekly'], d)
+    chk("C1k " + u"·" + " choosing 'Certain days' reveals the day picker", d.get('shown'), d)
+    chk("C1l " + u"·" + " and picking Saturday writes cadence 'dow:6'", d.get('wrote') == 'dow:6', d)
+    await b.close()
+
+    # ---- no days picked is not a cadence ----------------------------------------------
+    b, pg, errs = await open_page(pw, 1280, 900, flags={'__DOW': True}, touch=False)
+    d = await pg.evaluate("""async () => {
+      const row = document.querySelector('#log .li');
+      row.querySelector('.edp').dispatchEvent(new MouseEvent('click',{bubbles:true}));
+      await new Promise(r=>setTimeout(r,600));
+      const sel = document.getElementById('eCad');
+      sel.value='dow'; sel.dispatchEvent(new Event('change',{bubbles:true}));
+      await new Promise(r=>setTimeout(r,200));
+      window.__UPDATES=[];
+      document.getElementById('eSave').click();          // no day chosen
+      await new Promise(r=>setTimeout(r,800));
+      const ups=(window.__UPDATES||[]).filter(u=>u[0]==='habits').map(u=>u[1]);
+      return { wrote: ups.length ? ups[ups.length-1].cadence : null }; }""")
+    chk("C1m " + u"·" + "'Certain days' with NO day chosen degrades to daily - never a standard due on no day",
+        d.get('wrote') == 'daily', d)
+    await b.close()
+
+
+SECTIONS = {'S2': S2, 'C1': C1}
 
 
 async def main(only):
