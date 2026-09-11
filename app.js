@@ -545,7 +545,10 @@ function toggleOne(){
 }
 function paintOneThing(){
   var host=el('oneThing'); if(!host) return;
-  var t=oneThingOf(S.date);
+  /* HT-26 S1: tomorrow's one thing is one of the hidden inputs, so its banner reads nothing either -
+     in production the column is never loaded (PVCOLS omits it, the probe is off); this makes it so on
+     any data source, including the harness mock that returns every column. */
+  var t=FIVE_INPUTS_ONLY ? null : oneThingOf(S.date);
   if(!t){ host.innerHTML=''; host.hidden=true; return; }
   host.hidden=false;
   var on=oneDone(S.date), at=doneAt(S.date,ONE_KEY);

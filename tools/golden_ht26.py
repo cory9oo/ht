@@ -60,7 +60,7 @@ def src(p):
     return io.open(p, encoding='utf-8', errors='replace').read()
 
 
-async def open_page(pw, w=390, h=844, touch=True):
+async def open_page(pw, w=390, h=844, touch=True, flags=None):
     b = await pw.chromium.launch()
     ctx = await b.new_context(viewport={'width': w, 'height': h}, has_touch=touch, is_mobile=touch,
                               device_scale_factor=2 if touch else 1)
@@ -69,6 +69,8 @@ async def open_page(pw, w=390, h=844, touch=True):
     pg.on('pageerror', lambda e: errs.append(str(e)))
     pg.on('console', lambda m: errs.append('console:' + m.text)
           if m.type == 'error' and 'net::' not in m.text else None)
+    if flags:
+        await pg.add_init_script("; ".join("window.%s=%s" % (k, json.dumps(v)) for k, v in flags.items()))
     await pg.goto(BASE)
     await pg.wait_for_timeout(3300)
     return b, pg, errs
@@ -191,6 +193,20 @@ async def s1(pw):
         and not os.path.exists(os.path.join(RECONCILE, 'ht_stage', '117', 'migration_117.sql')), arch)
     chk('S1k · no console error on the phone or the desktop', not phone_errs and not desk_errs,
         (phone_errs + desk_errs)[:2])
+
+    # THE HARDEST CASE: the harness mock returns EVERY column whatever is selected, and __INPUTS3 seeds
+    # sleep, the Saturday weight and tomorrow's one thing (the seed shots.py uses). The data is right
+    # there - and still nothing may read it: no one-thing banner, no removed input, no sleep text.
+    b, pg, errs = await open_page(pw, 390, 844, flags={'__INPUTS3': True, '__BIGSET': True})
+    try:
+        seeded = await pg.evaluate("""(ids) => { const o=document.getElementById('oneThing');
+            return { oneThing: !!o && o.checkVisibility(), ids: ids.filter(i => document.getElementById(i)) }; }""",
+            REMOVED_IDS)
+        st = await sleep_texts(pg)
+        chk('S1l · with every removed column SEEDED, nothing reads them: no one-thing banner, no removed input, no sleep text',
+            not seeded['oneThing'] and not seeded['ids'] and not st and not errs, {**seeded, 'sleep': st, 'errs': errs[:1]})
+    finally:
+        await b.close()
 
 
 # ============================== S2 ==============================================================

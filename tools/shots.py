@@ -83,5 +83,7 @@ def fixture_dir(estate):
 
 
 ap.add_argument('--dir', default=fixture_dir(_ESTATE))
-ap.add_argument('--out', default='shots')
+# R70.345: the estate's shots/ moved to _machine/shots; a bare 'shots' would now land in the container root
+ap.add_argument('--out', default=(os.path.join('_machine', 'shots')
+                                  if os.path.isdir(os.path.join(_ESTATE, '_machine', 'shots')) else 'shots'))
 asyncio.run(main(ap.parse_args()))
