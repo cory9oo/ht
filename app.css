@@ -2155,3 +2155,46 @@ textarea{ -webkit-overflow-scrolling:touch }
 /* HT-26 S1 - the sleep chart is hidden, never removed (R70.138). [hidden] is a UA rule any later
    display rule would outrank, so the hide is stated where it cannot be outranked. */
 #sSlpBlk[hidden]{ display:none !important }
+
+/* ======================= HT-26 S2 · C5 the TODAY strip + INSIGHTS five · C3a the journal ======================= */
+.tstrip{ display:flex; align-items:baseline; gap:6px 10px; flex-wrap:wrap; width:100%; margin:0 0 8px;
+  padding:7px 2px; background:none; border:0; border-bottom:1px solid var(--rule); color:var(--ink);
+  font:inherit; text-align:left; cursor:pointer }
+.tstrip .k{ font:500 9px/1 var(--mono); letter-spacing:.12em; text-transform:uppercase; color:var(--ink3) }
+.tstrip b{ font:600 15px/1 var(--mono); margin-right:6px }
+.tstrip .go{ margin-left:auto; font:500 10px/1 var(--mono); letter-spacing:.08em; color:var(--accent) }
+.c5rows{ display:grid; gap:2px; margin-top:6px }
+.c5r{ display:flex; align-items:baseline; gap:8px; padding:3px 0; border-bottom:1px solid var(--rule) }
+.c5r .n{ flex:1; min-width:0; font-size:12px; line-height:1.3; color:var(--ink) }
+.c5r .v{ font:500 11px/1 var(--mono); color:var(--ink) }
+.c5r i{ font-style:normal; width:12px; text-align:center; font:600 12px/1 var(--mono) }
+.c5r i.up{ color:var(--good) } .c5r i.dn{ color:var(--bad) } .c5r i.fl{ color:var(--ink3) }
+.c5r .you{ font:500 9px/1 var(--mono); letter-spacing:.1em; text-transform:uppercase; color:var(--ink3) }
+.c5priv{ margin:8px 0 2px; font-size:11px; color:var(--ink3) }
+.c5more summary{ cursor:pointer; font:500 10px/1 var(--mono); letter-spacing:.12em; text-transform:uppercase;
+  color:var(--ink3); padding:8px 0 }
+.vjbar{ display:flex; gap:8px; align-items:center; margin:4px 0 8px }
+.vjbar input{ flex:1; min-width:0; font:inherit; font-size:13px; padding:6px 8px; background:var(--sunk);
+  color:var(--ink); border:1px solid var(--rule); border-radius:2px }
+.vje{ padding:8px 0; border-bottom:1px solid var(--rule) }
+.vje .h{ display:flex; gap:10px; align-items:baseline; font-size:12px }
+.vje .h s{ text-decoration:none; font:500 11px/1 var(--mono); color:var(--ink3) }
+.vje .h span{ margin-left:auto; font:500 11px/1 var(--mono); color:var(--ink3) }
+.vje p{ margin:4px 0 0; font-size:12.5px; line-height:1.45; white-space:pre-wrap; overflow-wrap:anywhere }
+.vje p .lab{ display:block; font:500 9px/1 var(--mono); letter-spacing:.12em; text-transform:uppercase;
+  color:var(--ink3); margin-bottom:2px }
+/* HT-26 S2 panels: like #h16Ins - off the phone's Today tab (R70.17: no output above an input), on its
+   Views tab, and placed on the desktop's twelve-column grid under the weeks. */
+html[data-simple] #h26Ins, html[data-simple] #h26Jrn{ display:none }
+html[data-simple][data-vtab="views"] #h26Ins, html[data-simple][data-vtab="views"] #h26Jrn{ display:block }
+/* the desktop's quadrants are full and measured (golden_ht18): there the two panels live in the
+   app's overlay, opened from the masthead strip, and never take a row of the grid */
+#ov #h26Ins, #ov #h26Jrn{ display:block !important; margin-bottom:14px }
+@media(min-width:1024px){
+  .mast .tstrip{ display:inline-flex; flex-wrap:nowrap; width:auto; margin:0 0 0 14px; padding:0;
+    border:0; gap:0 7px; line-height:1; white-space:nowrap }
+  .mast .tstrip b{ font-size:12px; margin-right:4px }
+  .mast .tstrip .go{ margin-left:4px }
+}
+/* MORE holds HT-13's own #vInsights node (moved, never copied); inside an OPENED More it may show */
+html[data-simple] #c5More[open] #vInsights, html[data-simple] #c5More[open] #vDow{ display:block !important }

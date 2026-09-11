@@ -1524,6 +1524,7 @@ async function paintCircle(){
     var od=await sb.from('days').select('user_id,date,pct').in('user_id',uids).gte('date',shift(today(),-13));
     var by={}; (od.data||[]).forEach(function(r){ (by[r.user_id]=by[r.user_id]||{})[r.date]=r.pct; });
     S.circle=(cs.data||[])[0]||null;
+    S.circleView=null;                    /* HT-26 C5: Insights reads THIS - completion % only, no new query */
 
     var h='';
     (cs.data||[]).forEach(function(c){
@@ -1533,6 +1534,10 @@ async function paintCircle(){
         for(var i=6;i>=0;i--){ var v=d[shift(today(),-i)]; if(v!=null) a.push(v); }
         return { u:m.user_id, avg:a.length?Math.round(a.reduce(function(x,y){return x+y;},0)/a.length):null, d:d };
       }).sort(function(x,y){ return (y.avg||-1)-(x.avg||-1); });
+      if(!S.circleView){ var gs=rank.filter(function(r){ return r.avg!=null; });
+        S.circleView={ name:c.name, group:gs.length?Math.round(gs.reduce(function(t,r){ return t+r.avg; },0)/gs.length):null,
+          rows:rank.map(function(r){ var p=pm[r.u]||{};
+            return { name:p.display_name||p.handle||'member', avg:r.avg, you:r.u===S.me.id }; }) }; }
       h+='<div class="sh" style="padding-top:0"><h2>'+esc(c.name)+'</h2><span class="ln"></span><span class="c">code '+esc(c.join_code||'')+'</span></div>';
       h+=rank.map(function(r,i){
         var p=pm[r.u]||{}, nm=p.display_name||p.handle||'member';
@@ -7275,6 +7280,277 @@ function earned(k){ return committed() - remaining(k); }
                        joinLink:joinLink, joinMessage:joinMessage };
   if(document.readyState === 'complete') setTimeout(boot, 200);
   else window.addEventListener('load', function(){ setTimeout(boot, 200); });
+})();
+
+/* ======================= HT-26 S2 · HT-24's C3a (THE JOURNAL) AND C5 (INSIGHTS) =======================
+   C3a - EVERY USER GETS THEIR OWN JOURNAL: every past day, searchable, and a Markdown export - no
+   setup, no Obsidian. It reads only the signed-in user's own S.privAll (their session, their rows),
+   so it needs no lane credential. Until now the only past-entries view was the full sheet's #jArc:
+   fourteen days, no search, no export, no brain dump - and hidden in simple mode on every screen
+   (measured 2026-09-10: checkVisibility() false on phone Today, phone Views and desktop).
+   C5 - TODAY carries a three-number strip (today % · 7-day % · streak) and a tap opens INSIGHTS, which
+   shows EXACTLY FIVE, all derived - none of them is an input: per-standard 30-day % with its trend,
+   AT RISK (missed on 3+ logged days running), best / worst weekday, rating vs completion, and the
+   circle compare. HT-13's three cards are not lost: they move into MORE (hidden, never removed -
+   R70.138). THE PRIVACY LINE STAYS ON SCREEN, and the circle compare reads only what paintCircle()
+   already fetched - `days.select('user_id,date,pct')` stays the ONE query that crosses users. */
+(function(){
+  var DOWL=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+  function pctOn(k){ var r=S.byDate[k]; return (r && r.pct!=null && loggedOn(k)) ? r.pct : null; }
+  function mean(a){ return a.length ? a.reduce(function(x,y){ return x+y; },0)/a.length : null; }
+  function lastDays(n, from){ var out=[], e=from||today(); for(var i=0;i<n;i++) out.push(shift(e,-i)); return out; }
+  function arrow(d){ return d==null ? '<i class="fl" title="no earlier 30 days to compare">·</i>'
+    : d>=5 ? '<i class="up" title="up '+d+' points on the 30 days before">↑</i>'
+    : d<=-5 ? '<i class="dn" title="down '+(-d)+' points on the 30 days before">↓</i>'
+    : '<i class="fl" title="within 5 points of the 30 days before">→</i>'; }
+  function isDaily(h){ return !(typeof isWeekly==='function' && isWeekly(h)); }
+  function due(h,k){ return typeof dueOn==='function' ? dueOn(h,k) : true; }
+
+  /* ---- the numbers - every one derived from what TODAY already stores ----------------------- */
+  function stdPct(h, days){
+    var on=0, n=0;
+    days.forEach(function(k){ if(k>today() || !loggedOn(k) || !due(h,k)) return; n++; if(doneOn(h,k)) on++; });
+    return n ? Math.round(on/n*100) : null;
+  }
+  function streak(){                           /* days in a row at 100%; today joins only once complete */
+    var k=today(), n=0;
+    if(pctOn(k)!==100) k=shift(k,-1);
+    for(var i=0;i<1000 && pctOn(k)===100;i++){ n++; k=shift(k,-1); }
+    return n;
+  }
+  function stripNums(){
+    var t=pctOn(today());
+    var w=lastDays(7).map(pctOn).filter(function(v){ return v!=null; });
+    return { today:t, week:w.length?Math.round(mean(w)):null, streak:streak() };
+  }
+  function perStandard(){
+    var cur=lastDays(30), prev=lastDays(30, shift(today(),-30));
+    return S.habits.filter(isDaily).map(function(h){
+      var a=stdPct(h,cur), b=stdPct(h,prev);
+      return { n:nameOf(h.name), pct:a, d:(a==null||b==null)?null:a-b };
+    }).filter(function(r){ return r.pct!=null; })
+      .sort(function(x,y){ return x.pct-y.pct; });
+  }
+  function atRisk(){                           /* the KEEPCUT signal: missed on each of the last 3+ days it was due */
+    var logged=lastDays(60).filter(function(k){ return loggedOn(k); });
+    var out=[];
+    S.habits.filter(isDaily).forEach(function(h){
+      var run=0;
+      for(var i=0;i<logged.length;i++){
+        if(!due(h,logged[i])) continue;
+        if(doneOn(h,logged[i])) break;
+        run++;
+      }
+      if(run>=3) out.push({ n:nameOf(h.name), run:run });
+    });
+    return out.sort(function(a,b){ return b.run-a.run; });
+  }
+  function weekdays(){
+    var buckets=[[],[],[],[],[],[],[]];
+    lastDays(84).forEach(function(k){ var p=pctOn(k); if(p!=null) buckets[dnum(k).getDay()].push(p); });
+    var m=buckets.map(function(a){ return a.length>=2 ? Math.round(mean(a)) : null; });
+    var best=null, worst=null;
+    m.forEach(function(v,i){ if(v==null) return;
+      if(best==null || v>m[best]) best=i; if(worst==null || v<m[worst]) worst=i; });
+    return { m:m, best:best, worst:worst };
+  }
+  function ratingVsCompletion(){
+    var hi=[], lo=[];
+    lastDays(90).forEach(function(k){ var p=pctOn(k), r=ratingOf(k); if(p==null || r==null) return;
+      (p>=80?hi:lo).push(r); });
+    return { hi:hi.length?Math.round(mean(hi)*10)/10:null, lo:lo.length?Math.round(mean(lo)*10)/10:null,
+             nh:hi.length, nl:lo.length };
+  }
+
+  /* ---- C5 · the strip on TODAY ---------------------------------------------------------------- */
+  /* WHERE THE STRIP SITS, AND WHY IT MOVES. HT-18's desktop is a measured full-height quadrant layout
+     (golden_ht18: quadrant heights, gutters, the brain dump's floor) - a row added to its left column
+     broke 22 of those checks in the first cut of this layer. So at 1024px and up the strip rides the
+     masthead's existing row, beside the date, and adds no height to anything. On the phone it closes
+     TODAY's column - after the inputs, never above them (R70.17: no output above an input). */
+  function placeStrip(b){
+    if(window.innerWidth>=1024){
+      var d=el('mDate'); if(!d || !d.parentNode) return false;
+      if(d.nextSibling!==b) d.parentNode.insertBefore(b, d.nextSibling);
+      return true;
+    }
+    var col=document.querySelector('.colL'); if(!col) return false;
+    if(col.lastChild!==b) col.appendChild(b);
+    return true;
+  }
+  function paintStrip(){
+    var b=el('tStrip');
+    if(!b){
+      b=document.createElement('button'); b.id='tStrip'; b.type='button'; b.className='tstrip';
+      b.setAttribute('aria-label','open Insights');
+      b.addEventListener('click', openInsights);
+    }
+    if(!placeStrip(b)) return;
+    var s=stripNums();
+    b.innerHTML='<span class="k">Today</span><b>'+(s.today==null?'—':s.today+'%')+'</b>'+
+      '<span class="k">7 days</span><b>'+(s.week==null?'—':s.week+'%')+'</b>'+
+      '<span class="k">Streak</span><b>'+s.streak+'</b><span class="go">Insights ›</span>';
+  }
+  /* PHONE: Insights and the Journal are panels on the Views tab. DESKTOP: the quadrants are full, so they
+     open in the app's own overlay - the panel NODES are moved in (HT-13's #vInsights rides inside
+     More), and moved back to the grid before anything else rewrites the overlay or when it closes. */
+  function openInsights(){
+    paintFive(); paintJ();
+    if(window.innerWidth<1024){
+      if(window.__HT13_TAB) window.__HT13_TAB('views');
+      setTimeout(function(){ var n=el('h26Ins'); if(n) n.scrollIntoView({block:'start'}); }, 80);
+      return;
+    }
+    openOv('Insights and journal', '<div id="h26Ov"></div>', function(){
+      var h=el('h26Ov'); if(!h) return;
+      ['h26Ins','h26Jrn'].forEach(function(id){ var n=el(id); if(n) h.appendChild(n); });
+    });
+  }
+  function restorePanels(){
+    var grid=document.querySelector('.grid'); if(!grid) return;
+    ['h26Ins','h26Jrn'].forEach(function(id){ var n=el(id); if(n && n.parentNode!==grid) grid.appendChild(n); });
+  }
+  var _oo=openOv; openOv=function(){ restorePanels(); return _oo.apply(null, arguments); };
+  function guardOverlay(){
+    var ov=el('ov'); if(!ov || ov.__h26obs || !window.MutationObserver) return;
+    ov.__h26obs=new MutationObserver(function(){ if(!ov.classList.contains('on')) restorePanels(); });
+    ov.__h26obs.observe(ov, { attributes:true, attributeFilter:['class'] });
+  }
+  /* TWO PANELS OF THEIR OWN, beside HT-16's. HT-13's #vViews survives only as a holder of hidden
+     instruments in simple mode (app.css says so) and #vInsights is display:none on every layout - the
+     first cut of this layer drew into them and measured invisible on the desktop. So Insights and the
+     Journal are grid children like #h16Ins: shown on the phone's Views tab, placed on the desktop grid. */
+  function ensurePanel(id, title, cap, body){
+    var n=el(id); if(n) return n;
+    var grid=document.querySelector('.grid'); if(!grid) return null;
+    n=document.createElement('div'); n.id=id; n.className='h16p h26p';
+    n.innerHTML='<div class="sh"><h2>'+title+'</h2><span class="ln"></span><span class="c" id="'+cap+'"></span></div>'+body;
+    grid.appendChild(n);
+    return n;
+  }
+
+  /* ---- C5 · INSIGHTS, EXACTLY FIVE -------------------------------------------------------------- */
+  function card(id, t, line, body){
+    return '<div class="vins c5" data-c5="'+id+'"><div class="lab">'+t+'</div><div class="vline">'+line+'</div>'+(body||'')+'</div>';
+  }
+  function five(){
+    var out=[];
+    var ps=perStandard();
+    out.push(card('std', 'Each standard · 30 days',
+      ps.length ? 'Weakest first. The arrow compares with the 30 days before.' : 'Log a few days and every standard gets its own number here.',
+      ps.length ? '<div class="c5rows">'+ps.map(function(r){
+        return '<div class="c5r"><span class="n">'+esc(r.n)+'</span><span class="v num">'+r.pct+'%</span>'+arrow(r.d)+'</div>';
+      }).join('')+'</div>' : ''));
+    var ar=atRisk();
+    out.push(card('risk', 'At risk',
+      ar.length ? '<b>'+ar.length+' standard'+(ar.length===1?'':'s')+'</b> missed on 3 or more logged days running.'
+                : 'Nothing is at risk: no standard has been missed on 3 logged days in a row.',
+      ar.length ? '<div class="c5rows">'+ar.map(function(r){
+        return '<div class="c5r"><span class="n">'+esc(r.n)+'</span><span class="v num">'+r.run+' days</span></div>';
+      }).join('')+'</div>' : ''));
+    var wd=weekdays();
+    out.push(card('dow', 'Best and worst weekday',
+      wd.best==null ? 'A weekday needs to come round a couple of times before it has a number.'
+        : '<b>'+DOWL[wd.best]+'s</b> are strongest ('+wd.m[wd.best]+'%), <b>'+DOWL[wd.worst]+'s</b> weakest ('+wd.m[wd.worst]+'%) - last 12 weeks.'));
+    var rc=ratingVsCompletion();
+    out.push(card('rate', 'Rating against completion',
+      (rc.hi==null || rc.lo==null) ? 'Needs rated days on both sides of 80% complete before it can compare.'
+        : 'Days 80%+ complete rate <b>'+rc.hi+'</b>; the rest rate <b>'+rc.lo+'</b> ('+rc.nh+' and '+rc.nl+' days, last 90). '+
+          '<i>Association only - it does not say which way round it runs.</i>'));
+    var cv=S.circleView;
+    out.push(card('circle', 'Your circle',
+      (!cv || !cv.rows || !cv.rows.length) ? 'No circle yet. When you have one, this compares completion % only.'
+        : 'Last 7 days, completion % only. Group '+(cv.group==null?'—':cv.group+'%')+'.',
+      (cv && cv.rows && cv.rows.length) ? '<div class="c5rows">'+cv.rows.map(function(r){
+        return '<div class="c5r"><span class="n">'+esc(r.name)+(r.you?' <span class="you">you</span>':'')+'</span><span class="v num">'+(r.avg==null?'—':r.avg+'%')+'</span></div>';
+      }).join('')+'</div>' : ''));
+    return out;
+  }
+  function paintFive(){
+    var p=ensurePanel('h26Ins', 'Insights', 'h26InsC',
+      '<div id="c5Five"></div>'+
+      '<div class="c5priv">Private: journals, ratings and your list are never shown to anyone. A circle sees completion % only.</div>'+
+      '<details id="c5More" class="c5more"><summary>More</summary></details>');
+    if(!p) return;
+    el('c5Five').innerHTML=five().join('');
+    el('h26InsC').textContent='five';
+    /* MORE: HT-13's three cards are not copied (a copy would duplicate #vDow) - their own node is MOVED
+       in, once, and insights() keeps drawing into it by id. Hidden until opened; never removed. */
+    var legacy=el('vInsights'), more=el('c5More');
+    if(legacy && more && legacy.parentNode!==more) more.appendChild(legacy);
+  }
+
+  /* ---- C3a · THE JOURNAL ---------------------------------------------------------------------- */
+  var FIELDS=[['why','Why'],['tasks','Completed'],['brain_dump','Brain dump'],['prayer','Prayer']];
+  function entries(q){
+    q=(q||'').trim().toLowerCase();
+    return Object.keys(S.privAll).filter(function(k){
+      var p=S.privAll[k]; if(!p) return false;
+      var txt=FIELDS.map(function(f){ return p[f[0]]||''; }).join('\n');
+      if(!txt.trim()) return false;
+      return !q || txt.toLowerCase().indexOf(q)>=0;
+    }).sort().reverse();
+  }
+  function journalMd(q){
+    var ks=entries(q), lines=['# Journal - exported '+today(), ''];
+    lines.push(ks.length+' entr'+(ks.length===1?'y':'ies')+((q||'').trim()?' matching "'+q.trim()+'"':'')+'.', '');
+    ks.forEach(function(k){
+      var p=S.privAll[k], d=dnum(k), r=S.byDate[k];
+      lines.push('## '+k+' · '+WD[d.getDay()]+(p.rating!=null?' · rated '+p.rating+'/10':'')+
+                 (r&&r.pct!=null?' · '+r.pct+'% complete':''), '');
+      FIELDS.forEach(function(f){ var v=(p[f[0]]||'').trim(); if(v) lines.push('**'+f[1]+':**', '', v, ''); });
+    });
+    return lines.join('\n');
+  }
+  function ensureJournal(){
+    if(el('vJournal')) return true;
+    var p=ensurePanel('h26Jrn', 'Journal', 'vJournalC',
+      '<div class="vjbar"><input id="vJFind" type="search" placeholder="Search your journal" autocomplete="off" '+
+        'aria-label="search your journal"><button id="vJExport" type="button" class="tbtn">Export .md</button></div>'+
+      '<div id="vJournal"></div>');
+    if(!p) return false;
+    el('vJFind').addEventListener('input', paintJ);
+    el('vJExport').addEventListener('click', function(){
+      var md=journalMd(el('vJFind').value), a=document.createElement('a');
+      a.href=URL.createObjectURL(new Blob([md], {type:'text/markdown'}));
+      a.download='ht-journal-'+today()+'.md'; document.body.appendChild(a); a.click();
+      setTimeout(function(){ URL.revokeObjectURL(a.href); a.remove(); }, 1500);
+    });
+    return true;
+  }
+  var SHOW=30;
+  function paintJ(){
+    if(!ensureJournal()) return;
+    var q=el('vJFind').value, ks=entries(q), host=el('vJournal');
+    el('vJournalC').textContent = ks.length+' entr'+(ks.length===1?'y':'ies')+(q.trim()?' found':'');
+    if(!ks.length){
+      host.innerHTML='<div class="empty">'+(q.trim()?'Nothing matches that.':'Nothing written yet. What you write on TODAY lands here, every day of it.')+'</div>';
+      return;
+    }
+    host.innerHTML=ks.slice(0,SHOW).map(function(k){
+      var p=S.privAll[k], d=dnum(k), r=S.byDate[k];
+      return '<div class="vje" data-jd="'+k+'"><div class="h"><b>'+WD[d.getDay()]+' '+MO[d.getMonth()]+' '+d.getDate()+
+        (d.getFullYear()!==dnum(today()).getFullYear()?' '+d.getFullYear():'')+'</b>'+
+        (p.rating!=null?'<s>'+p.rating+'/10</s>':'')+'<span>'+(r&&r.pct!=null?r.pct+'%':'')+'</span></div>'+
+        FIELDS.map(function(f){ var v=(p[f[0]]||'').trim();
+          return v ? '<p><span class="lab">'+f[1]+'</span>'+esc(v)+'</p>' : ''; }).join('')+'</div>';
+    }).join('')+(ks.length>SHOW?'<div class="empty">'+(ks.length-SHOW)+' more - search to narrow, or export them all.</div>':'');
+  }
+
+  function boot26(){
+    if(!S.me || !document.querySelector('.grid')) return;
+    guardOverlay(); paintStrip(); paintFive(); paintJ();
+  }
+  var rsT=null;
+  window.addEventListener('resize', function(){ clearTimeout(rsT);
+    rsT=setTimeout(function(){ var b=el('tStrip'); if(b) placeStrip(b); }, 150); });
+  window.__HT26 = { md:journalMd, entries:function(q){ return entries(q).length; }, strip:stripNums,
+                    five:function(){ return five().length; }, repaint:boot26 };
+
+  var _pa=paintAll;     paintAll=function(){ _pa.apply(null,arguments); boot26(); };
+  var _pj=paintJournal; paintJournal=function(){ _pj.apply(null,arguments); if(S.me){ paintJ(); paintStrip(); } };
+  if(document.readyState==='complete') setTimeout(boot26, 450);
+  else window.addEventListener('load', function(){ setTimeout(boot26, 450); });
 })();
 
 })();

@@ -193,7 +193,110 @@ async def s1(pw):
         (phone_errs + desk_errs)[:2])
 
 
-SECTIONS = {'S1': s1}
+# ============================== S2 ==============================================================
+FIVE_TITLES = ['Each standard · 30 days', 'At risk', 'Best and worst weekday', 'Rating against completion',
+               'Your circle']
+
+
+async def s2(pw):
+    """HT-24's C3a and C5, BUILT - 117 recorded them as "need nothing, not reached", which is not a
+    state a spec can close on (PASTE 119).
+
+    C5: TODAY's three-number strip (today % · 7-day % · streak) opens INSIGHTS, which shows EXACTLY FIVE
+    derived views; HT-13's three cards live on under MORE (R70.138); the privacy line stays on screen;
+    and the payload - not the render - carries no private field: the one cross-user query is unchanged.
+    C3a: every past day the user wrote, searchable, exportable as Markdown, on the Views tab and the
+    desktop's right column - for every user, with no setup."""
+    import subprocess
+    b, pg, errs = await open_page(pw, 390, 844)
+    try:
+        strip = await pg.evaluate("""() => { const s=document.getElementById('tStrip');
+            return s ? { vis: s.checkVisibility(), text: s.innerText, nums: window.__HT26.strip() } : null; }""")
+        chk('S2a · TODAY carries the three-number strip: today %, 7-day %, streak',
+            strip and strip['vis'] and all(w in strip['text'].upper() for w in ('TODAY', '7 DAYS', 'STREAK')), strip)
+        await pg.click('#tStrip')
+        await pg.wait_for_timeout(700)
+        st = await pg.evaluate("""() => { const f=document.getElementById('c5Five'), m=document.getElementById('c5More');
+            return { tab: document.documentElement.getAttribute('data-vtab'), fiveVis: !!f && f.checkVisibility(),
+              titles: [...document.querySelectorAll('#c5Five > .vins > .lab')].map(e => e.textContent),
+              more: document.querySelectorAll('#c5More #vInsights .vins').length, moreOpen: m ? m.open : null,
+              priv: (document.querySelector('.c5priv') || {}).innerText || '' }; }""")
+        chk('S2b · a tap on the strip opens Insights (the Views tab, on the phone)', st['tab'] == 'views' and st['fiveVis'], st)
+        chk('S2c · Insights shows EXACTLY FIVE, in the order the spec names', st['titles'] == FIVE_TITLES, st['titles'])
+        chk("S2d · HT-13's three cards live on under More, closed - hidden, never removed", st['more'] == 3
+            and st['moreOpen'] is False, {'more': st['more'], 'open': st['moreOpen']})
+        chk('S2e · the privacy line is on screen', 'never shown to anyone' in st['priv']
+            and 'completion % only' in st['priv'], st['priv'])
+
+        j = await pg.evaluate("""() => { const v=document.getElementById('vJournal');
+            return { vis: !!v && v.checkVisibility(), n: document.querySelectorAll('#vJournal .vje').length,
+                     total: window.__HT26.entries(''), find: !!document.getElementById('vJFind'),
+                     exp: !!document.getElementById('vJExport'),
+                     dump: document.querySelectorAll('#vJournal .vje .lab').length }; }""")
+        chk('S2f · the journal is on the Views tab, with search and export', j['vis'] and j['find'] and j['exp']
+            and j['n'] > 0, j)
+        chk('S2g · it holds every day written (up to 30 on screen, the rest one search or export away)',
+            j['n'] == min(j['total'], 30), j)
+        words = await pg.evaluate("""() => { const e=[...document.querySelectorAll('#vJournal .vje p')].pop();
+            return e ? (e.innerText.match(/[A-Za-z0-9]{2,}/g) || []) : []; }""")
+        pick, want = None, None
+        for w in sorted(set(words), key=len, reverse=True):
+            n = await pg.evaluate("(w) => window.__HT26.entries(w)", w)
+            if 0 < n < j['total']:
+                pick, want = w, n
+                break
+        if pick:
+            await pg.fill('#vJFind', pick)
+            await pg.wait_for_timeout(300)
+            got = await pg.evaluate("() => document.querySelectorAll('#vJournal .vje').length")
+        chk('S2h · search narrows the journal to exactly the days that contain the word',
+            pick is not None and got == min(want, 30), {'word': pick, 'want': want, 'got': got if pick else None})
+        md = await pg.evaluate("() => window.__HT26.md('')")
+        chk('S2i · the Markdown export carries every entry, dated, with its labelled fields',
+            md.count('\n## ') == j['total'] and '**Why:**' in md and md.startswith('# Journal'),
+            {'entries': md.count('\n## '), 'total': j['total']})
+        phone_errs = list(errs)
+    finally:
+        await b.close()
+
+    b, pg, errs = await open_page(pw, 1280, 800, touch=False)
+    try:
+        # the desktop's quadrants are full (golden_ht18), so the strip rides the masthead and the two
+        # panels open in the app's overlay - then go back to the grid, intact, when it closes
+        d0 = await pg.evaluate("""() => { const s=document.getElementById('tStrip');
+            return { strip: !!s && s.checkVisibility(), inMast: !!s && !!s.closest('.mast') }; }""")
+        await pg.click('#tStrip')
+        await pg.wait_for_timeout(500)
+        d = await pg.evaluate("""() => { const v = id => { const e=document.getElementById(id); return !!e && e.checkVisibility(); };
+            return { ov: document.getElementById('ov').classList.contains('on'), five: [...document.querySelectorAll('#c5Five > .vins')].filter(e => e.checkVisibility()).length,
+                     journal: v('vJournal'), find: v('vJFind') }; }""")
+        await pg.click('#ov [data-x]')
+        await pg.wait_for_timeout(400)
+        d2 = await pg.evaluate("""() => { const g=document.querySelector('.grid');
+            return { back: ['h26Ins','h26Jrn'].every(i => document.getElementById(i) && document.getElementById(i).parentNode === g),
+                     hidden: !document.getElementById('h26Ins').checkVisibility(),
+                     legacy: !!document.querySelector('#c5More #vInsights') }; }""")
+        chk('S2j · desktop: the strip rides the masthead, and a click shows the five and the journal',
+            d0['strip'] and d0['inMast'] and d['ov'] and d['five'] == 5 and d['journal'] and d['find'], {**d0, **d})
+        chk("S2j2 · closing puts both panels back in the grid, off the quadrants, with HT-13's node inside More",
+            d2['back'] and d2['hidden'] and d2['legacy'], d2)
+        desk_errs = list(errs)
+    finally:
+        await b.close()
+
+    s = src(os.path.join(REPO, 'app.js'))
+    cross = re.findall(r"from\('days'\)\.select\('([^']*)'\)\.in\('user_id'", s)
+    chk('S2k · ONE query crosses users and its payload is user_id, date, pct - zero private fields',
+        cross == ['user_id,date,pct'], cross)
+    pc = os.path.join(RECONCILE, 'ht_batch5', 'privacy_check.py')
+    r = subprocess.run([sys.executable, pc, '--repo', REPO], capture_output=True, text=True, encoding='utf-8', errors='replace')
+    chk('S2l · privacy_check.py passes on this tree', r.returncode == 0 and 'VERDICT: PASS' in r.stdout,
+        (r.stdout + r.stderr)[-300:])
+    chk('S2m · no console error on the phone or the desktop', not phone_errs and not desk_errs,
+        (phone_errs + desk_errs)[:2])
+
+
+SECTIONS = {'S1': s1, 'S2': s2}
 
 
 async def main():
