@@ -1,7 +1,11 @@
 # CLAUDE.md — `ht` (HT · Habit Tracker, the self-ledger)
 
 **Read `..\life-taxonomy\DOCTRINE_INDEX.md` before the first substantive tool call (D13.1).**
+**Query first (R70.326):** run `python C:\Users\fugie\BEV\tools\query.py "<terms>"` before opening any
+container note; open a note only after a query names it; never read a drawer by listing it.
 This file is repo-operational law per D10 and carries the mount countermeasure per ISS-036/ISS-037.
+*Since R70.345 (2026-09-10) this repo lives at `C:\Users\fugie\BEV\_machine\standard`; the relative
+`..\` paths below still land in the machinery beside it.*
 
 ## THE MOUNT — do this first, every session, no exceptions
 
@@ -50,8 +54,9 @@ mirrored into this repo. Cite it by name; never copy it here.
 |---|---|
 | **DEC-055** | **No cut.** All standards stay active. Do not propose trimming the list. |
 | **DEC-056** | **No tier.** `habits.tier` is a dead field — present in schema, ignored by the app. |
-| **DEC-057** | **Time is not an organising principle.** Never group or order the list by clock. |
-| **DEC-058** | **Three inputs — completion, rating, journal. Everything else is derived output.** Any proposed fourth write surface must be argued against this rule first. |
+| **DEC-171** | **Five inputs, and TIMED is a section** — supersedes DEC-057 and DEC-058 (2026-09-10, Cory's 117 words and his 15:15 ruling). The day takes exactly five inputs: check-offs · the 1–10 rating with its why · the brain dump · completed · prayer — and **no new input of any kind**. Sleep, bed, wake, the Saturday weight and tomorrow's one thing sit behind `FIVE_INPUTS_ONLY` in `app.js` (hidden, never removed — R70.138): nothing probes, reads, writes or renders their columns, and `golden_ht26` S1 fails the moment a sixth input renders. Timed standards group under **TIMED, then ANYTIME, then WEEKLY**; lateness is a label and never moves a score (`golden_ht25` S3). |
+| ~~DEC-057~~ | SUPERSEDED by DEC-171 — it said never group or order the list by clock. Do not re-apply it. |
+| ~~DEC-058~~ | SUPERSEDED by DEC-171 — it said three inputs. Do not re-apply it. |
 | **DEC-059** | Percentage renders as a continuous density ramp of the accent. Grade letters yes; grade colours no. |
 | **DEC-060** | `<meta name="darkreader-lock">` ships permanently. Removing it silently re-breaks desktop. |
 | **DEC-061** | **One commit per change**, via Composio, md5-verified per chunk. Two commits seconds apart cancel a running Pages deploy. |
@@ -84,7 +89,8 @@ fields. The standards LIST is not shareable either: when people know their list 
 fewer and safer standards, which cancels the whole point of the circle.
 
 Today exactly one query crosses users — `days.select('user_id,date,pct')` in `paintCircle()`. Keep
-it that way. **`_reconcile/ht_batch5/privacy_check.py` enforces this mechanically and must pass in
+it that way. (HT-26's Insights compare reads `S.circleView`, which `paintCircle()` fills from that same
+query — completion % only; `golden_ht26` S2k fails if a second cross-user select appears.) **`_reconcile/ht_batch5/privacy_check.py` enforces this mechanically and must pass in
 every HT wire**; it fails loud on an unscoped `day_private` read, a cross-user `habits` read, or any
 cross-user column outside `{user_id,date,pct}`.
 
