@@ -2151,3 +2151,7 @@ textarea{ -webkit-overflow-scrolling:touch }
    grows, and every landing index computed from row geometry shifts by one. The clock and its
    delta are one unbreakable chip; the NAME still wraps, which is Cory's rule and is untouched. */
 .li .dat{ white-space:nowrap }
+
+/* HT-26 S1 - the sleep chart is hidden, never removed (R70.138). [hidden] is a UA rule any later
+   display rule would outrank, so the hide is stated where it cannot be outranked. */
+#sSlpBlk[hidden]{ display:none !important }

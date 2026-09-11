@@ -42,7 +42,16 @@ def find_estate(start):
 
 
 ESTATE = find_estate(REPO)
-BASE = 'file://' + os.path.join(ESTATE, 'ht3', 'index.html').replace(os.sep, '/')
+def fixture_dir(estate):
+    """The headless fixture. R70.345 (2026-09-10) moved it with the machinery to <BEV>/_machine/ht3;
+    the old <BEV>/ht3 is the fallback, so this runs in either layout."""
+    for d in (os.path.join(estate, '_machine', 'ht3'), os.path.join(estate, 'ht3')):
+        if os.path.isdir(d):
+            return d
+    return os.path.join(estate, '_machine', 'ht3')
+
+
+BASE = 'file://' + os.path.join(fixture_dir(ESTATE), 'index.html').replace(os.sep, '/')
 
 RES = []
 def chk(name, ok, got=""):
@@ -203,9 +212,12 @@ async def s6(pw):
         'estimated from your check-ins' in s)
     chk('S6j · no inputs renders an em dash, never a number',
         "f.hours==null ? '—'" in s or "f.hours==null ? '—'" in s)
-    # The only other sleep figure on screen was an unlabelled assumption.
-    chk('S6k · the free-hours card labels its 8h as an assumption',
-        'after an assumed 8h sleep' in s)
+    # The only other sleep figure on screen was an unlabelled assumption. HT-26 S1 (Cory 15:15,
+    # "delete the sleep display") keeps the label an ASSUMPTION but drops the word: the card now says
+    # it counts an assumed 16-hour day. The derivation functions above stay (hidden, never removed -
+    # R70.138) and golden_ht26 S1 asserts none of it renders.
+    chk('S6k · the free-hours card still labels its day as an assumption, without the removed display',
+        'of an assumed 16-hour day' in s and 'assumed 8h sleep' not in s)
     chk('S6l · bed and wake are probed like every other optional column',
         "probePv('bed_time','hasBed')" in s and "probePv('wake_time','hasWake')" in s)
     chk("S6m · and they ride this day's upsert rather than a second save path",

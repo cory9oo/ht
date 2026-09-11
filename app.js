@@ -13,6 +13,17 @@ var sb = (window.__MOCK_SB) || window.supabase.createClient(SB_URL, SB_KEY, {
 });
 window.ST = { sb: sb };
 
+/* ---- HT-26 S1 · THE FIVE INPUTS ONLY — Cory, 2026-09-10 15:15 ----------------------------
+   "No new inputs of any kind; delete the sleep display." The day takes exactly five inputs:
+   check-offs · the 1–10 rating with its why · the brain dump · completed · prayer. Sleep, bed,
+   wake, the Saturday weight and tomorrow's one thing are HIDDEN, NEVER REMOVED (R70.138): their
+   columns stay in the database and their code stays in this file, but while this is true nothing
+   probes, reads, writes or renders them — so a column that exists in production only because a
+   migration once ran (or never ran) cannot matter to this build. The later layers read it as
+   `ST.fiveInputsOnly`. */
+var FIVE_INPUTS_ONLY = true;
+window.ST.fiveInputsOnly = FIVE_INPUTS_ONLY;
+
 var WD    = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
 var WD2   = ['S','M','T','W','T','F','S'];
 var MO    = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
@@ -448,6 +459,11 @@ async function load(){
       t[col] = row[col];
     });
   }
+  /* HT-26 S1: under the five-inputs ruling none of these columns is even ASKED for. Every save
+     and paint path below already keys on these flags, so false here is the whole switch. */
+  if(FIVE_INPUTS_ONLY){
+    S.hasSleep = S.hasWeight = S.hasTomorrow = S.hasBed = S.hasWake = false;
+  } else {
   await probePv('sleep_hours','hasSleep');
   await probePv('weight_lb','hasWeight');
   await probePv('tomorrow_one_thing','hasTomorrow');
@@ -456,6 +472,7 @@ async function load(){
      to `self-reported`, which is the honest label for a number Cory typed. */
   await probePv('bed_time','hasBed');
   await probePv('wake_time','hasWake');
+  }
 
   S.priv = S.privAll[S.date] || null;
   return true;
@@ -1089,6 +1106,9 @@ function paintRScat(){
    null means do not draw, not draw at 340. */
 function paintRSleep(){
   var host=el('sSlp'); if(!host) return;
+  /* HT-26 S1 (stress 1): the chart that read sleep reads NOTHING under the ruling - no series, no
+     empty-state sentence about nights, and its block stays hidden in index.html. */
+  if(FIVE_INPUTS_ONLY){ host.innerHTML=''; var sn=el('sSlpN'); if(sn) sn.innerHTML=''; return; }
   var H=136, W=fitSvg('sSlp',H), X=[], Y=[];
   if(W==null) return;
   dates().forEach(function(k){
@@ -1471,7 +1491,8 @@ function paintTLedger(){
     kv('Per day unspent', fmt(days?lost/days:0)) +
     /* HT-25 S6: this 480 is an ASSUMPTION, not a measurement - the only other place a sleep
        figure reaches the screen. VERIFY says label it, so it says "assumed", not "after". */
-    kv('Free hours left in a day', fmt(1440-com-480)+' <span style="color:var(--ink3)">after an assumed 8h sleep</span>') +
+    /* HT-26 S1: still labeled an assumption (VERIFY), no longer in the words of the removed display */
+    kv('Free hours left in a day', fmt(1440-com-480)+' <span style="color:var(--ink3)">of an assumed 16-hour day</span>') +
     '</table>';
 }
 
@@ -1661,7 +1682,7 @@ function paintBudget(){
     : 'This fits inside a real day.';
   el('bud').innerHTML =
     '<div class="lab">Daily time budget</div>'+
-    '<div class="v" style="color:'+col+'">'+fmt(dMin)+' <span style="font-size:11px;color:var(--ink3)">of '+fmt(WAKE)+' waking</span></div>'+
+    '<div class="v" style="color:'+col+'">'+fmt(dMin)+' <span style="font-size:11px;color:var(--ink3)">of a '+fmt(WAKE)+' day</span></div>'+
     '<div class="t"><i style="width:'+pct+'%;background:'+col+'"></i>'+
       '<u style="left:'+Math.round(240/WAKE*100)+'%"></u><u style="left:'+Math.round(420/WAKE*100)+'%"></u></div>'+
     '<div class="k">'+dN+' daily'+(wN?' · '+wN+' weekly ('+fmt(wMin)+'/wk)':'')+
@@ -3244,8 +3265,13 @@ function earned(k){ return committed() - remaining(k); }
   /* HT-23 S2 · A HYSTERESIS DEAD ZONE WAS TRIED HERE AND REMOVED, and the removal is the honest
      part. It was added to fix the one-in-twenty landing defect `golden_ht23` S2e reports; it did
      not fix it, and code added to fix something that it does not fix is worse in a drag path than
-     no code at all - the next reader would take it for a working countermeasure. The defect is
-     characterised exactly in the receipt and left RED rather than papered over. */
+     no code at all - the next reader would take it for a working countermeasure.
+     HT-26 S3 · THE ROOT CAUSE, MEASURED (80 instrumented drags): the "defect" was never in this
+     function. Every failing drag released inside the 64px auto-scroll band (EDGE, below), where
+     autoScrollStep() keeps scrolling the list and calling moveDrag(lastY) while the finger is held
+     still - so the order on screen legitimately changes between "the finger stopped" and "the
+     finger lifted". The drop always kept the order at release. The test now releases outside the
+     band and asserts the band's own contract separately (golden_ht23 S2e1/S2e2). */
   function moveDrag(y){
     var log=document.getElementById('log'); if(!log) return;
     var others=q('.li',log).filter(function(n){ return n!==st.row; });
@@ -6244,10 +6270,13 @@ function earned(k){ return committed() - remaining(k); }
          carries the answer it was holding a place for, and the two new measures sit beside it.
          Each says UNKNOWN WITH ITS REASON until it has enough to say anything - never blank,
          and never a zero that reads as a measurement (R70.147 direction is acceptance). */
+      /* HT-26 S1: the three inputs these read are hidden by the five-inputs ruling, so their
+         outputs are too - hidden, never removed (R70.138): the functions stay, the tiles do not render. */
+      ((window.ST && window.ST.fiveInputsOnly) ? '' :
       flat10('Sleep vs rating', sleepVsRating(),
              'average rating after 7h+ nights vs shorter ones') +
       flat10('Weight', weightLine(), 'Saturday only') +
-      flat10('The one thing', oneThingLine(), 'kept, of the ones you set the night before');
+      flat10('The one thing', oneThingLine(), 'kept, of the ones you set the night before'));
 
     /* MORE: everything else HT-20 built, one tap down and not one measure lost (R70.138). */
     var more =

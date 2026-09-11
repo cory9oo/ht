@@ -36,7 +36,16 @@ def find_estate(start):
 
 
 ESTATE = find_estate(REPO)
-BASE = 'file://' + os.path.join(ESTATE, 'ht3', 'index.html').replace(os.sep, '/')
+def fixture_dir(estate):
+    """The headless fixture. R70.345 (2026-09-10) moved it with the machinery to <BEV>/_machine/ht3;
+    the old <BEV>/ht3 is the fallback, so this runs in either layout."""
+    for d in (os.path.join(estate, '_machine', 'ht3'), os.path.join(estate, 'ht3')):
+        if os.path.isdir(d):
+            return d
+    return os.path.join(estate, '_machine', 'ht3')
+
+
+BASE = 'file://' + os.path.join(fixture_dir(ESTATE), 'index.html').replace(os.sep, '/')
 
 RES = []
 def chk(name, ok, got=""):
@@ -206,7 +215,26 @@ async def S2(pw):
         uniform, {'heights': sorted(set(hs))})
 
     ids0 = await pg.evaluate(ROWS_JS)
-    misplaced, log = [], []
+    # ---- HT-26 S3 · THE "1-IN-20 DRAG DEFECT", MEASURED TO ITS ROOT ---------------------------
+    # 80 instrumented drags on 2026-09-10 (capture listeners recording every pointermove the page
+    # received and the order at pointerup): 3 failed, ALL on the first drag of a fresh page, ALL
+    # releasing at y=820 in an 844px viewport - inside the app's 64px bottom AUTO-SCROLL band
+    # (app.js `var EDGE=64`). The page had received all 14 moves (last y == the release point) and
+    # the settling pass on release changed nothing; the order changed WHILE THE FINGER WAS STILL,
+    # between `during` and the release, because the auto-scroll loop was scrolling the list and
+    # re-placing the row under the finger - which is its job. Later drags never failed: by then the
+    # page had scrolled and the rows sat higher. How often the first drag lost depended on how many
+    # animation frames ran between the last move and the release - hence 1-in-20, and 1-in-3 on a
+    # loaded laptop. THE APP WAS NEVER WRONG; THIS CHECK WAS DROPPING INTO THE ONE ZONE WHERE ITS
+    # OWN PROPERTY ("what you see mid-drag is what the drop keeps") IS FALSE BY DESIGN.
+    # So: every one of the twenty releases outside the band, on STATE - the release point and the
+    # scroll position are read, never a frame count or a sleep - and the band gets its own check (S2e2).
+    EDGE = 64                                        # app.js: var EDGE=64 (auto-scroll band)
+    vh = await pg.evaluate("() => window.innerHeight")
+    await pg.evaluate("""() => { window.__upScroll = null; window.__upOrder = null;
+        window.addEventListener('pointerup', () => { window.__upScroll = window.scrollY;
+          window.__upOrder = [...document.querySelectorAll('#log .li')].map(r => r.getAttribute('data-h')); }, true); }""")
+    misplaced, log, inband = [], [], []
     for n in range(20):
         before = await pg.evaluate(ROWS_JS)
         # WITHIN ONE GROUP. Crossing a group header is a DIFFERENT operation - `moveDrag` has an
@@ -215,18 +243,30 @@ async def S2(pw):
         # It gets its own check (S2p) rather than being folded into index arithmetic that does not
         # model headers. The default fixture's first group holds four rows.
         k = 1 + (n % 3)
-        a = await pg.evaluate(BOX_JS, {'i': 0, 'handle': True})
-        t = await pg.evaluate(BOX_JS, {'i': k, 'handle': False})
-        if not a or not t:
-            misplaced.append({'n': n, 'why': 'no box'}); break
-        dragged = before[0]
         # A QUARTER-ROW PAST THE TARGET'S MIDPOINT, NOT 2px FROM ITS EDGE. The insert rule is
         # midpoint-based, so a release that lands ON a midpoint has two defensible answers one row
         # apart, and which one you get depends on whether you measure with the row lifted or
         # settled. Two earlier versions of this check dropped exactly there and were measuring
         # their own boundary. Away from the boundary the answer is observer-independent, and the
         # assertion below is exact with no tolerance.
+        a = t = None
+        for _ in range(3):                           # recentre until press AND release are clear of the band
+            a = await pg.evaluate(BOX_JS, {'i': 0, 'handle': True})
+            t = await pg.evaluate(BOX_JS, {'i': k, 'handle': False})
+            if not a or not t:
+                break
+            endy = t['y'] + t['h'] * 0.25
+            if EDGE < a['y'] < vh - EDGE and EDGE < endy < vh - EDGE:
+                break
+            await pg.evaluate("(d) => window.scrollBy(0, d)", (a['y'] + endy) / 2 - vh / 2)
+            await settled(pg, "() => window.scrollY")
+        if not a or not t:
+            misplaced.append({'n': n, 'why': 'no box'}); break
         endy = t['y'] + t['h'] * 0.25
+        if not (EDGE < a['y'] < vh - EDGE and EDGE < endy < vh - EDGE):
+            inband.append({'n': n, 'press': round(a['y']), 'release': round(endy), 'vh': vh})
+        dragged = before[0]
+        sy0 = await pg.evaluate("() => window.scrollY")
 
         # ---- "0 MISPLACEMENTS", DEFINED AS SOMETHING THAT IS ACTUALLY TRUE ------------------
         # FOUR earlier drafts of this check each predicted a landing index - from the pre-drag
@@ -260,16 +300,43 @@ async def S2(pw):
         # stops describing the thing the assertion is about. Reverted, and recorded here so the
         # next person does not re-try it.
         during = await pg.evaluate(ROWS_JS)          # finger still down, at the last move
+        syd = await pg.evaluate("() => window.scrollY")
         await touch_release(pg, cdp)
         dropped = await settled(pg, ROWS_JS)         # the drop, once it has stopped moving
         after = await settled(pg, ROWS_JS)           # and again after endDrag()'s paintLog()
+        syu = await pg.evaluate("() => window.__upScroll")
+        if syd != sy0 or (syu is not None and syu != sy0):   # STATE, not frames: did the list scroll under the hold?
+            inband.append({'n': n, 'scrolled': [sy0, syd, syu]})
         log.append({'n': n, 'k': k})
         if after == before or during != dropped or dropped != after:
             misplaced.append({'n': n, 'k': k, 'moved': after != before,
                               'during': during[:6], 'dropped': dropped[:6], 'after': after[:6]})
+    chk("S2e1 " + u"·" + " every one of the twenty was pressed and released clear of the 64px auto-scroll "
+        "band, and the list never scrolled under a held finger", not inband, inband[:3])
     chk("S2e " + u"·" + " 20 consecutive TOUCH reorders: the order moved, and what you see mid-drag "
         "is what the drop and the repaint both keep",
         len(log) == 20 and not misplaced, misplaced[:2])
+
+    # ---- S2e2 · INSIDE THE BAND THE LIST MOVES, AND THE DROP KEEPS THE ORDER AT RELEASE ----------
+    # The zone S2e now stays out of has its own contract, and it is asserted rather than avoided:
+    # a finger held in the bottom band scrolls the list (that is how a long list is reordered end
+    # to end) and the row travels with it, so "during" is a moving target by design - but the order
+    # the drop commits is exactly the order on screen at the instant of release.
+    await pg.evaluate("() => window.scrollTo(0, 0)")
+    await settled(pg, "() => window.scrollY")
+    a = await pg.evaluate(BOX_JS, {'i': 0, 'handle': True})
+    sy0 = await pg.evaluate("() => window.scrollY")
+    await pg.evaluate("() => { window.__upScroll = null; window.__upOrder = null; }")
+    await touch_hold(pg, cdp, a['x'], a['y'], a['x'], vh - EDGE / 2)
+    await pg.wait_for_timeout(400)                   # held in the band: the auto-scroll loop runs
+    await touch_release(pg, cdp)
+    dropped = await settled(pg, ROWS_JS)
+    after = await settled(pg, ROWS_JS)
+    up = await pg.evaluate("() => ({ y: window.__upScroll, order: window.__upOrder })")
+    chk("S2e2 " + u"·" + " held in the bottom band the list auto-scrolls, and the drop keeps exactly the "
+        "order on screen at release",
+        up['y'] is not None and up['y'] > sy0 and up['order'] == dropped == after,
+        {'scroll': [sy0, up['y']], 'same': up['order'] == dropped == after})
 
     # ---- the ids are conserved: nothing lost, nothing duplicated -------------------------
     idsN = await pg.evaluate(ROWS_JS)

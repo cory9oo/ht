@@ -40,7 +40,16 @@ from playwright.async_api import async_playwright
 try: sys.stdout.reconfigure(encoding='utf-8', errors='replace')
 except Exception: pass
 
-BASE = 'file://' + os.path.join(_ESTATE, 'ht3', 'index.html').replace(os.sep, '/')
+def fixture_dir(estate):
+    """The headless fixture. R70.345 (2026-09-10) moved it with the machinery to <BEV>/_machine/ht3;
+    the old <BEV>/ht3 is the fallback, so this runs in either layout."""
+    for d in (os.path.join(estate, '_machine', 'ht3'), os.path.join(estate, 'ht3')):
+        if os.path.isdir(d):
+            return d
+    return os.path.join(estate, '_machine', 'ht3')
+
+
+BASE = 'file://' + os.path.join(fixture_dir(_ESTATE), 'index.html').replace(os.sep, '/')
 
 # S0's measured BEFORE column, from _reconcile/ht_batch18/measure_BEFORE.json — the direction
 # floors of R70.148 are checked against these and not against a constant typed by hand.

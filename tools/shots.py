@@ -73,6 +73,15 @@ async def main(a):
 
 ap = argparse.ArgumentParser()
 ap.add_argument('--tag', required=True)
-ap.add_argument('--dir', default=os.path.join(_ESTATE, 'ht3'))
+def fixture_dir(estate):
+    """The headless fixture. R70.345 (2026-09-10) moved it with the machinery to <BEV>/_machine/ht3;
+    the old <BEV>/ht3 is the fallback, so this runs in either layout."""
+    for d in (os.path.join(estate, '_machine', 'ht3'), os.path.join(estate, 'ht3')):
+        if os.path.isdir(d):
+            return d
+    return os.path.join(estate, '_machine', 'ht3')
+
+
+ap.add_argument('--dir', default=fixture_dir(_ESTATE))
 ap.add_argument('--out', default='shots')
 asyncio.run(main(ap.parse_args()))

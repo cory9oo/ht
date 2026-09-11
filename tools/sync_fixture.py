@@ -42,7 +42,16 @@ def find_estate(start):
     raise SystemExit('sync_fixture: no estate root above %s (looked for _reconcile/)' % start)
 
 
-DST = os.path.join(find_estate(SRC), 'ht3')
+def fixture_dir(estate):
+    """The headless fixture. R70.345 (2026-09-10) moved it with the machinery to <BEV>/_machine/ht3;
+    the old <BEV>/ht3 is the fallback, so this runs in either layout."""
+    for d in (os.path.join(estate, '_machine', 'ht3'), os.path.join(estate, 'ht3')):
+        if os.path.isdir(d):
+            return d
+    return os.path.join(estate, '_machine', 'ht3')
+
+
+DST = fixture_dir(find_estate(SRC))
 COPY = ['app.js', 'app.css', 'tokens.css', 'manifest.webmanifest']
 
 FONT_LINE = re.compile(
