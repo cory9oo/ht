@@ -2198,3 +2198,199 @@ html[data-simple][data-vtab="views"] #h26Ins, html[data-simple][data-vtab="views
 }
 /* MORE holds HT-13's own #vInsights node (moved, never copied); inside an OPENED More it may show */
 html[data-simple] #c5More[open] #vInsights, html[data-simple] #c5More[open] #vDow{ display:block !important }
+
+/* ======================= HT-28 · THE TRACKER CLOSE-OUT (PASTE 128 · WIRE HT-28) ======================= */
+/* D7 · the rating's why is back - one short line under the strip, at every width (DEC-171's five inputs).
+   Higher specificity than HT-9a's `html[data-simple] #whyFld{display:none !important}`, which stays. */
+html[data-simple] #whyFld.h28why{ display:block !important; padding:6px 0 0; border:0 }
+html[data-simple] #whyFld.h28why .lab{ margin-bottom:3px }
+html[data-simple] #whyFld.h28why textarea{ min-height:0; height:34px; resize:none }
+@media (min-width:1024px){
+  /* from 1024 up the why is the first of three in the journal's bottom row, so the dump keeps its height */
+  html[data-simple] #h18Btm:has(> .h28why){ grid-template-columns:1fr 1fr 1fr }
+  html[data-simple] #h18Btm > #whyFld.h28why{ padding:0; min-width:0 }
+}
+
+@media (max-width:640px){
+  /* A1 · no tap-zoom. iPhone Safari zooms into any text field whose font is under 16px; every one here
+     was 11-13px (.fld 12.5 · .vjbar 13 · .ed 11.5 · .find 11). The class is fixed, not the three boxes
+     Cory tapped: every text-entry control is 16px on the phone. The viewport keeps pinch-zoom (no
+     maximum-scale); desktop computed sizes do not change (this block is phone-only). */
+  html input:not([type=checkbox]):not([type=radio]):not([type=range]):not([type=button]):not([type=submit]):not([type=color]),
+  html textarea, html select{ font-size:16px !important }
+  /* A2 · the stray "X" beside the 1-10 is the rating's clear button. On the phone it goes; tapping the
+     chosen number already clears it (app.js input 2), so no path is lost. Desktop already hid it. */
+  html .rate .clr{ display:none !important }
+  /* D · "close the day" leaves the phone. It flushed the journal, stamped closed_at and reloaded; every
+     simple-view save already stamps closed_at and every input autosaves, so nothing depends on it.
+     Hidden, never removed (R70.138). "Completed" is the journal's own box and writes as you type. */
+  html #tClose, html #bClose{ display:none !important }
+}
+
+/* E14 · on the phone `html[data-simple] .li{display:flex}` out-ranked the browser's [hidden] (the desktop
+   had its own override), so a row the app hid stayed on screen. One rule, every width. */
+html[data-simple] #log .li[hidden]{ display:none !important }
+/* E14 · the Sabbath row on its day: one check mark - no time, no chip, no cue, no minutes */
+html[data-simple] #log .li.h28sab .pat, html[data-simple] #log .li.h28sab .dat,
+html[data-simple] #log .li.h28sab .tpfx, html[data-simple] #log .li.h28sab .wk,
+html[data-simple] #log .li.h28sab .cue, html[data-simple] #log .li.h28sab .mn,
+html[data-simple] #log .li.h28sab .ad, html[data-simple] #log .li.h28sab .sp16,
+html[data-simple] #log .li.h28sab .back{ display:none !important }
+/* ...and with its spacer gone the name takes the width, so the pencil and handle stay on the right edge */
+html[data-simple] #log .li.h28sab .nm{ flex:1 1 auto }
+/* F17 · the Sabbath's honour: one line under Insights, and a ring on the month chart's Saturdays */
+.h28sabline{ margin:10px 0 2px; font:500 11px/1.4 var(--mono); letter-spacing:.04em; color:var(--ink2) }
+.h28sabline b{ color:var(--ink); font-weight:600 }
+#vMonth .h28ring{ fill:none; stroke:var(--accent); stroke-width:1.4 }
+#vMonth .h28ring.kept{ fill:var(--accent) }
+/* E15 · Weekdays / Weekends presets and F18 · the rests-on-Sabbath switch, in the one palette */
+.dowq{ display:flex; gap:6px; margin:0 0 6px }
+.dowqb{ padding:5px 9px; border:1px solid var(--rule); color:var(--ink2); font:500 10px/1 var(--mono);
+  letter-spacing:.1em; text-transform:uppercase; background:transparent }
+.dowqb:active{ border-color:var(--accent); color:var(--ink) }
+.h28rest .h28sw{ display:flex; align-items:center; gap:8px; font-size:12.5px; color:var(--ink2) }
+.h28rest .h28sw input{ width:auto; accent-color:var(--accent) }
+/* F18 · `.fld{display:block}` out-ranks the browser's [hidden], so the sheet's hidden fields (the rests switch
+   on a weekly, the day picker on an every-day standard) still showed. One rule for the whole sheet. */
+#esheet [hidden]{ display:none !important }
+
+/* ---- HT-28 G21-G23 · F19 · the first-run card, the examples, the rest seed ------------------------
+   The card wears HT-11's sheet (bottom sheet on the phone, centred from 720px); these rules only set
+   what is inside it. One palette: ink for what you read, the accent for the numbers, muted for labels. */
+.h28first .ebody{ max-width:460px }
+.h28first .h28l{ list-style:none; margin:0; padding:10px 0 2px }
+.h28first .h28l li{ display:grid; grid-template-columns:20px 1fr; gap:0 6px; padding:5px 0;
+  font-size:14px; line-height:1.45; color:var(--ink); counter-increment:h28n }
+.h28first .h28l{ counter-reset:h28n }
+.h28first .h28l li::before{ content:counter(h28n); font:500 11px/20px var(--mono); color:var(--accent) }
+.h28first .h28l li.h28priv{ border-top:1px solid var(--rule); margin-top:4px; padding-top:9px }
+.h28first .h28ex1{ font-size:12px; line-height:1.45; color:var(--ink3); padding:8px 0 0 }
+.h28first .h28seed{ padding:8px 0 0 }
+.h28first .h28seed .fl, #log .h28ex .fl{ display:grid; grid-template-columns:44px 1fr auto; gap:0 8px;
+  align-items:baseline; padding:7px 0; border-bottom:1px solid var(--rule); font-size:14px; line-height:1.35 }
+.h28first .h28seed .fl i, #log .h28ex .fl i{ font:400 11px/1.3 var(--mono); color:var(--ink3); font-style:normal }
+.h28first .h28seed .fl b{ font-weight:500; color:var(--ink); letter-spacing:.04em }
+.h28first .h28seed .fl em{ display:block; font-style:normal; font-size:12.5px; color:var(--ink2); padding-top:2px }
+.h28first .h28seed .fl u, #log .h28ex .fl b{ text-decoration:none; font:500 9.5px/1.3 var(--mono);
+  letter-spacing:.12em; text-transform:uppercase; color:var(--muted) }
+.h28first .h28seed .fl.on{ opacity:.55 }
+#log .h28ex{ padding:10px 0 2px }
+#log .h28ex .k{ font:500 9.5px/1.35 var(--mono); letter-spacing:.14em; text-transform:uppercase;
+  color:var(--muted); padding-bottom:4px }
+#log .h28ex .h28t{ display:flex; padding:10px 0 4px }
+#log .h28add{ display:block }
+
+/* ---- HT-28 A4 · TODAY, COMPACT - PHONE ONLY ----------------------------------------------------------
+   MEASURED at 390x844 on Cory's 26 names: a row gave its name 131px of 366 - the checkbox, the time prefix
+   (65px), the pencil and the drag handle took the rest - so names wrapped to four and five lines and the
+   list was 1,919px. The planned time already leads the name (HT-21 `.pat`), so the second copy of it goes;
+   the name is 14px (paste: labels may go to 14px); the visible box is 22px inside its unchanged 44px target
+   (one-tap check-off, golden_ht18 S3g); rows lose their spare padding. Controls keep 44x44 (ht23 S2d). */
+@media (max-width:640px){
+  html[data-simple] #log .li{ min-height:44px; padding:2px 0; gap:4px }
+  html[data-simple] #log .li .nm{ font-size:14px; line-height:1.36 }
+  html[data-simple] #log .li .tpfx{ display:none }
+  html[data-simple] #log .li .sp16{ min-width:0 }
+  html[data-simple] #log .li .bx{ width:22px; height:22px }
+  html[data-simple] #log .li.on .bx::after{ width:12px; height:7px; left:4px; top:5px }
+}
+
+/* ---- HT-28 A6 + A3 · VIEWS ON THE PHONE: ONE ORDER, EQUAL CARDS, ONE HEADER, TABLES IN WORDS ------------
+   The panels arrive from five layers on five timers, so their source order is an accident of boot timing
+   (measured: the 4,142px journal list first, the month fourth). The order is now stated, not arrived at:
+   R70.100's MONTH · YEAR · SCORECARD · LIFE (with GROUP above the life chart, HT-18d), then INSIGHTS, then
+   the JOURNAL archive. Every card wears the same box and the same header; every table header is words. */
+@media (max-width:640px){
+  html[data-simple][data-vtab="views"] #h16Month{ order:1 }
+  html[data-simple][data-vtab="views"] #h16Year{ order:2 }
+  html[data-simple][data-vtab="views"] #h16Score{ order:3 }
+  html[data-simple][data-vtab="views"] #h16Ins{ order:4 }
+  html[data-simple][data-vtab="views"] .vWeeksSec{ order:5 }
+  html[data-simple][data-vtab="views"] #h26Ins{ order:6 }
+  html[data-simple][data-vtab="views"] #h26Jrn{ order:7 }
+  html[data-simple][data-vtab="views"] #vViews{ order:8 }
+  html[data-simple][data-vtab="views"] #h16Month, html[data-simple][data-vtab="views"] #h16Year,
+  html[data-simple][data-vtab="views"] #h16Score, html[data-simple][data-vtab="views"] #h16Ins,
+  html[data-simple][data-vtab="views"] .vWeeksSec, html[data-simple][data-vtab="views"] #h26Ins,
+  html[data-simple][data-vtab="views"] #h26Jrn{
+    box-sizing:border-box; width:100%; max-width:none; margin:0 0 12px; padding:0 12px 12px;
+    border:1px solid var(--border); background:var(--surface) }
+  html[data-simple][data-vtab="views"] .grid > .h16p > .sh,
+  html[data-simple][data-vtab="views"] .vWeeksSec > .sh{ padding:14px 0 8px }
+  /* GROUP (the circle) was the one header drawn in its own style - and on the phone in no style at all */
+  html[data-simple] #h18Group .h18gh{ display:flex; align-items:center; gap:8px; padding:14px 0 8px;
+    font:500 10px/1 var(--mono); letter-spacing:.17em; text-transform:uppercase; color:var(--ink) }
+  html[data-simple] #h18Group .h18gh .sp{ flex:1 1 auto; height:1px; background:var(--rule) }
+  html[data-simple] #h18Group .h18more{ font:400 9.5px/1 var(--mono); letter-spacing:.08em;
+    text-transform:uppercase; color:var(--ink3); background:none; border:1px solid var(--border); padding:8px 10px }
+  html[data-simple] #h18Group .h18gt{ width:100%; border-collapse:collapse; table-layout:fixed }
+  html[data-simple] #h18Group .h18gt td{ padding:7px 0; border-bottom:1px solid var(--border);
+    font:400 13px/1.35 var(--sans); color:var(--ink2) }
+  html[data-simple] #h18Group .h18gt td.n{ color:var(--ink) }
+  html[data-simple] #h18Group .h18gt th:not(:first-child), html[data-simple] #h18Group .h18gt td.p{ text-align:right }
+  html[data-simple] #h18Group .h18gt td.p{ font:400 12.5px/1.35 var(--mono); white-space:nowrap }
+  html[data-simple] #h18Group .h18gt td.p i{ display:inline-block; width:7px; height:7px; margin-right:6px }
+  html[data-simple] #h18Group .h18gt tr.h18me td{ color:var(--text) }
+  html[data-simple] #h18Group .h18gt tr.h18none td{ color:var(--muted); font-size:12px }
+  /* column headers: words, not codes - one style for every table on the Views tab and in Group details */
+  html[data-simple][data-vtab="views"] .h16sc th, html[data-simple] #h18Group .h18gt th, .h17dr .h28gt th{
+    font:500 11px/1.2 var(--sans); letter-spacing:0; text-transform:capitalize; color:var(--muted);
+    padding:0 0 6px; border-bottom:1px solid var(--border); overflow-wrap:normal; white-space:normal }
+  html[data-simple][data-vtab="views"] .h16sc{ table-layout:fixed }
+  html[data-simple] #h18Group .h18gt th:first-child{ text-align:left }
+  /* the phone already drops Weakest (column 5); the six it keeps get widths that add to 100 */
+  html[data-simple][data-vtab="views"] .h16sc th:first-child{ width:24%; text-align:left }
+  html[data-simple][data-vtab="views"] .h16sc th:nth-child(2){ width:15% }
+  html[data-simple][data-vtab="views"] .h16sc th:nth-child(3){ width:15% }
+  html[data-simple][data-vtab="views"] .h16sc th:nth-child(4){ width:13% }
+  html[data-simple][data-vtab="views"] .h16sc th:nth-child(6){ width:16% }
+  html[data-simple][data-vtab="views"] .h16sc th:nth-child(7){ width:17% }
+  html[data-simple][data-vtab="views"] .h16sc th:not(:first-child),
+  html[data-simple][data-vtab="views"] .h16sc td:not(:first-child){ padding-left:6px }
+  html[data-simple][data-vtab="views"] .h16sc td.g{ font:400 13px/1.3 var(--sans); letter-spacing:0;
+    text-transform:none; color:var(--text); overflow-wrap:normal; word-break:normal }
+  html[data-simple][data-vtab="views"] .h16sc svg.spark{ width:100%; max-width:84px; height:auto }
+  /* A3 · Group details: HT-17's sheet, rebuilt inside - the definition, six figures, one table */
+  .h17dr .h17dbody{ padding-left:12px; padding-right:12px }
+  .h17dr .h17dh h3{ letter-spacing:.17em; font-size:10px }
+  .h17dr .h28gdef{ flex:0 0 auto; padding:10px 0; border-bottom:1px solid var(--border);
+    font:400 12px/1.45 var(--sans); color:var(--ink2) }
+  .h17dr .h28gst{ flex:0 0 auto; display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:10px 12px;
+    padding:10px 0; border-bottom:1px solid var(--border) }
+  .h17dr .h28gst span{ display:block; font:400 11px/1.2 var(--sans); color:var(--muted) }
+  .h17dr .h28gst b{ display:block; padding-top:3px; font:500 14px/1.2 var(--mono); color:var(--ink) }
+  .h17dr .h28tbl{ flex:1 1 auto; min-height:0; overflow-y:auto; padding-top:10px }
+  .h17dr .h28gt{ width:100%; table-layout:fixed; border-collapse:collapse }
+  .h17dr .h28gt col.n{ width:43% }
+  .h17dr .h28gt col.v{ width:19% }
+  .h17dr .h28gt th:not(:first-child){ text-align:right }
+  .h17dr .h28gt th:first-child{ text-align:left }
+  .h17dr .h28gt td{ padding:9px 0; border-bottom:1px solid var(--border); vertical-align:top;
+    font:400 13px/1.35 var(--sans); color:var(--ink) }
+  .h17dr .h28gt td.v{ text-align:right; font:400 12.5px/1.35 var(--mono); color:var(--ink2); white-space:nowrap }
+  .h17dr .h28gt td.v i{ display:inline-block; width:7px; height:7px; margin-right:5px }
+  .h17dr .h28gnote{ padding:10px 0 0; font:400 12px/1.45 var(--sans); color:var(--muted) }
+}
+
+/* ---- HT-28 B · THE DESKTOP COMPLETION PANEL, ONE STEP QUIETER --------------------------------------------
+   Cory 9/11 19:10: "scrunch down the rows, the text, the boxes just a little bit; it's very loud". About 12%
+   off the row, its text, its box and the panel's own padding - nothing else. The 28x28 hit targets stay
+   (golden_ht18 S3g) and only the box drawn inside them shrinks; the group rules keep their 6/6 (ht20 P5); line
+   heights stay >= 1.35 of the type. Every other panel is byte-identical: every rule here is #h18Comp only. */
+@media (min-width:1024px){
+  html[data-simple] #h18Comp > .blk > .sh{ padding-top:6px; padding-bottom:5px }
+  html[data-simple] #h18Comp > .blk > .sh h2{ font-size:8.5px }
+  html[data-simple] #h18Comp .h16load{ font-size:9.5px; padding-top:3px; padding-bottom:3px }
+  html[data-simple] #h18Comp #log > .grp{ font-size:8.5px }
+  html[data-simple] #h18Comp .li{ min-height:30px; padding:1px 5px; font-size:12px }
+  html[data-simple] #h18Comp .li .nm, html[data-simple] #h18Comp .li a.nm{ font-size:12.5px; line-height:17px }
+  html[data-simple] #h18Comp .li .nm .pat{ font-size:9.5px; min-width:34px; margin-right:7px }
+  html[data-simple] #h18Comp .li .nm .dat{ font-size:9px }
+  html[data-simple] #h18Comp .li .tpfx{ font-size:9px }
+  html[data-simple] #h18Comp .li .bx{ width:19px; height:19px }
+  html[data-simple] #h18Comp .li.on .bx::after{ width:10px; height:6px; left:3px; top:4px }
+  html[data-simple] #h18Comp .li .edp{ font-size:10px }
+  html[data-simple] #h18Comp .li .drg{ flex:0 0 38px; width:38px; height:38px; font-size:13px }
+  html[data-simple] #h18Comp .li .wk{ font-size:8.5px }
+  html[data-simple] #h18Comp #log > .eadd, html[data-simple] #h18Comp #log > [data-add]{ font-size:9px }
+}

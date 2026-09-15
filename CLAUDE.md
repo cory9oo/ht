@@ -55,6 +55,8 @@ mirrored into this repo. Cite it by name; never copy it here.
 | **DEC-055** | **No cut.** All standards stay active. Do not propose trimming the list. |
 | **DEC-056** | **No tier.** `habits.tier` is a dead field — present in schema, ignored by the app. |
 | **DEC-171** | **Five inputs, and TIMED is a section** — supersedes DEC-057 and DEC-058 (2026-09-10, Cory's 117 words and his 15:15 ruling). The day takes exactly five inputs: check-offs · the 1–10 rating with its why · the brain dump · completed · prayer — and **no new input of any kind**. Sleep, bed, wake, the Saturday weight and tomorrow's one thing sit behind `FIVE_INPUTS_ONLY` in `app.js` (hidden, never removed — R70.138): nothing probes, reads, writes or renders their columns, and `golden_ht26` S1 fails the moment a sixth input renders. Timed standards group under **TIMED, then ANYTIME, then WEEKLY**; lateness is a label and never moves a score (`golden_ht25` S3). |
+| **DEC-172** | **Sabbath scoring** (2026-09-15, Cory's 9/10 20:30 pre-approval, PASTE 128 F20): the Sabbath is `dow:6` — on Saturday one ordinary due item, weight 1, no boost, no cap; on every other day not rendered, not in `active_set`, not in the denominator. Honoured by "Sabbaths kept · N in a row · M of the last 12" and the month chart's Saturday rings. Saturday's weight moves only through a standard's "Rests on Sabbath" switch (`golden_ht28` E/F). |
+| **DEC-173** | **Rest standards are ordinary standards** — kept like any rule, never scored higher. They reach a list the way any standard can: typed in, or proposed by an add-link (`#add=<base64url JSON>` — a fragment, never sent to a server: a card, one tap, idempotent by name). **No person's standards are ever written into this public code** — a list is private (R47.3); the link carries them. |
 | ~~DEC-057~~ | SUPERSEDED by DEC-171 — it said never group or order the list by clock. Do not re-apply it. |
 | ~~DEC-058~~ | SUPERSEDED by DEC-171 — it said three inputs. Do not re-apply it. |
 | **DEC-059** | Percentage renders as a continuous density ramp of the accent. Grade letters yes; grade colours no. |
@@ -66,6 +68,19 @@ mirrored into this repo. Cite it by name; never copy it here.
 
 `saveDay()` writes `active_set` on every save (P4 closed) — past grades must never be repriced by a
 later list change. Do not remove that write.
+
+**SYNC (HT-28c) — a device writes only what it changed.** Every check-off and journal field is recorded
+as an op against the server's copy of that day. Check-offs are one JSONB column, so `mergeDay` reads the
+server's row, lays the ops over its map and writes the map; journal fields are written ONE COLUMN AT A TIME
+(`writePrivFields`, a partial upsert), so another device's field is never in the payload, and a save takes
+in nothing it did not send. A save with no op writes nothing; **a device whose load failed writes and
+replays nothing until it has reloaded** (`S.loadOk`). When both devices changed the same key the later write
+wins and the replaced value goes to this account's on-device ring `ht28_sync_lost_<id>` (cleared at sign-out,
+with the queue `ht28_sync_q_<id>`). The pull runs every 30 s while the page is visible and never while it is
+hidden (PHASE GATE). **Never add a write of a whole `days`/`day_private` row that goes around those
+wrappers** — that is exactly how a stale desktop blanked a phone's journal. `golden_ht28` C (R1–R9) holds all
+of it. `load()` sets `S.loadOk` — false on any network-shaped probe error too; nothing may offer to create
+rows unless it is `true` (a failed load looks exactly like an empty account).
 
 ## DEPLOY
 
@@ -88,8 +103,12 @@ permission-gated — *unshareable*: there must be no schema path from another us
 fields. The standards LIST is not shareable either: when people know their list is watched they set
 fewer and safer standards, which cancels the whole point of the circle.
 
-Today exactly one query crosses users — `days.select('user_id,date,pct')` in `paintCircle()`. Keep
-it that way. (HT-26's Insights compare reads `S.circleView`, which `paintCircle()` fills from that same
+Exactly one query SHAPE crosses users — `days.select('user_id,date,pct')` — at two call sites:
+`paintCircle()` and the DETAIL page's `circleMembers()` (the second spans two lines, which is why
+`golden_ht28` G22 reads the source across lines and asserts both). Keep it that way. The statement the
+app shows on the sign-in screen, the first-run card and in Settings is verbatim: "Your journal is yours.
+The app never shows it to anyone else — including Cory." Never write that the database owner cannot see
+rows — they can; end-to-end encryption is the later option that would make it true. (HT-26's Insights compare reads `S.circleView`, which `paintCircle()` fills from that same
 query — completion % only; `golden_ht26` S2k fails if a second cross-user select appears.) **`_reconcile/ht_batch5/privacy_check.py` enforces this mechanically and must pass in
 every HT wire**; it fails loud on an unscoped `day_private` read, a cross-user `habits` read, or any
 cross-user column outside `{user_id,date,pct}`.

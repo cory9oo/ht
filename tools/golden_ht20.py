@@ -219,13 +219,18 @@ async def P1a(pw):
         rows[-1]['done'] == 'found', rows[-1]['done'])
     chk("P1a4 · zero page errors across twenty loads", not errs, errs[:2])
 
-    # (b) from ZERO: exactly one is created, and the twenty-first load creates none
+    # (b) from ZERO: NOTHING is created, and twenty loads never move the count.
+    # AMENDED BY NAME, HT-28 G21 (PASTE 128), the way HT-24/25 amended their own checks (R67.2). This
+    # used to require that the app CREATE one Sabbath standard for an account with none. Paste 128 opens
+    # the app to a second person (Andrew) who must land on example standards, "not Cory's habits" - and a
+    # Sabbath the app inserts silently on first load is exactly Cory's habit. `SABBATH_AUTO_INSERT` is now
+    # false (hidden, never removed); Cory's own row already exists and the dedupe repair (c) still runs.
+    # The property this section was written for - the Sabbath never multiplies - is still what is graded.
     counts0, rows0, errs0 = await loads(pw, N, {})
-    chk("P1a5 · from zero sabbath habits, exactly one is created", rows0[-1]['sabAll'] == 1, rows0[-1])
-    # the creation happens DURING load 1, so load 1 already reads base+1; the claim under test is
-    # that loads 2..20 add nothing, i.e. the twenty counts are all the same number.
-    chk("P1a6 · and the twenty-first load creates none — the count never moves again",
-        len(set(counts0)) == 1 and rows0[-1]['sabAll'] == 1, {'counts': counts0})
+    chk("P1a5 · from zero sabbath habits, none is created (HT-28 G21: no silent insert for a new account)",
+        rows0[-1]['sabAll'] == 0 and rows0[-1]['done'] == 'absent-left', rows0[-1])
+    chk("P1a6 · and twenty loads never move the count",
+        len(set(counts0)) == 1 and rows0[-1]['sabAll'] == 0, {'counts': counts0})
 
     # (c) FIVE live rows -- Cory's measured live state -- are repaired to one, oldest kept,
     #     the other four ARCHIVED and not deleted

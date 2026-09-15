@@ -167,14 +167,66 @@ function skinSwatch(s){
    as "not weekly", i.e. as DAILY - a Sabbath on a Tuesday. So the comparison gets a name, and
    `dueOn()` is the only thing that answers "is this standard due on this date". The receipt
    carries a verdict for every one of the 29 sites. */
-function isWeekly(h){ return !!h && h.cadence === 'weekly'; }
-function dowOf(h){
-  var c = h && h.cadence;
-  if(typeof c !== 'string' || c.slice(0,4) !== 'dow:') return null;
-  var d = c.slice(4).split(',').map(function(x){ return parseInt(String(x).trim(), 10); })
-           .filter(function(n){ return n >= 0 && n <= 6; });
-  return d.length ? d : null;
+/* ---- HT-28 E11 (PASTE 128) · ONE PARSER, ONE SERIALIZER -------------------------------------
+   Every reader of `cadence` goes through parseCadence; every writer goes through serializeCadence,
+   so a Days control cannot write a string the renderer cannot read (stress 8 - round-trip tested).
+     parseCadence('dow: 1 , 3 ') -> {kind:'dow', days:[1,3]}      junk / empty day lists -> daily
+     serializeCadence({kind:'dow', days:[3,1,1]}) -> 'dow:1,3'    all seven days -> 'daily' */
+function parseCadence(c){
+  if(c === 'weekly') return { kind:'weekly', days:null };
+  if(typeof c === 'string' && c.slice(0,4) === 'dow:'){
+    var d = c.slice(4).split(',').map(function(x){ return parseInt(String(x).trim(), 10); })
+             .filter(function(n){ return n >= 0 && n <= 6; });
+    if(d.length) return { kind:'dow', days:d };
+  }
+  return { kind:'daily', days:null };
 }
+function serializeCadence(p){
+  if(!p || p.kind === 'daily') return 'daily';
+  if(p.kind === 'weekly') return 'weekly';
+  var seen = {}, d = (p.days || []).filter(function(n){
+    n = +n; if(!(n >= 0 && n <= 6) || seen[n]) return false; seen[n] = 1; return true;
+  }).map(Number).sort(function(a,b){ return a - b; });
+  if(!d.length || d.length === 7) return 'daily';
+  return 'dow:' + d.join(',');
+}
+/* THE SABBATH, NAMED ONCE. A standard is the Sabbath when its name starts with "Sabbath" or it sits in
+   the SABBATH group - the shape HT-19 created ("Sabbath - rest and worship", group SABBATH, daily).
+   HT-18's broader `/sabbath/i` would also have caught "Prepare for Sabbath", a Friday task; this does not. */
+function isSabbathStd(h){
+  return !!h && (/^\s*sabbath\b/i.test(String(h.name || '')) || /^sabbath$/i.test(String(h.group_name || '')));
+}
+/* HT-28 E/F16 · SATURDAY IS AN ORDINARY DAY WITH THE SABBATH IN IT. HT-19 B3 narrowed Saturday to the
+   Sabbath alone (and on the phone that narrowing never even hid the rows - `html[data-simple] .li`
+   out-ranked [hidden]). Cory's 9/10 20:30 model replaces it: the Sabbath is one due item, weight 1, and
+   what rests on Saturday is each standard's own "Rests on Sabbath" switch. Hidden, never removed. */
+var SABBATH_ONLY_SATURDAY = false;
+/* HT-28 G21 · the app no longer creates a Sabbath standard for an account that has none. HT-19 inserted
+   one silently on first load, which would have handed a brand-new user (Andrew) Cory's habit; Cory's
+   own row already exists. The dedupe repair stays on. Hidden, never removed. */
+var SABBATH_AUTO_INSERT = false;
+/* true until this account's one-time E13 migration has run on this device (sabMigrate28 sets it false) */
+var SAB_LEGACY_READ = true;
+function isWeekly(h){ return !!h && parseCadence(h.cadence).kind === 'weekly'; }
+function dowOf(h){
+  var p = parseCadence(h && h.cadence);
+  if(p.kind === 'dow') return p.days;
+  /* A LEGACY SABBATH (stored 'daily' by HT-19) is Saturday-only until the app migrates the row to
+     'dow:6' under the owner's own session (HT-28 E13). Without this the first paint after the deploy
+     would show the Sabbath on a Tuesday and count it missing Monday to Friday. */
+  if(p.kind === 'daily' && SAB_LEGACY_READ && isLegacySabbath(h)) return [6];
+  return null;
+}
+/* ONLY THE ROW HT-19 CREATED IS LEGACY: "Sabbath - rest and worship" in group SABBATH. A person's own
+   standard named Sabbath, in any other group, is left exactly as they saved it - never read as Saturday-only
+   and never migrated (review of 1688104: the name-only test caught every account). */
+function isLegacySabbath(h){
+  return !!h && /^sabbath$/i.test(String(h.group_name || '')) && /^\s*sabbath\b/i.test(String(h.name || ''));
+}
+/* the Sabbath whose honour is kept: due on Saturday and on no other day */
+function isSatOnly(h){ var d = dowOf(h); return !!d && d.length === 1 && d[0] === 6; }
+/* due on this day at all: a weekly answers for its own period, so it is always "due" here */
+function dueDay(h, k){ return isWeekly(h) || dueOn(h, k); }
 /* IS THIS STANDARD DUE ON THIS DAY? A weekly answers for its own period elsewhere (weekDone);
    a `dow:` item is due only on its days; anything else is daily and always due. */
 function dueOn(h, k){
@@ -201,6 +253,7 @@ function bucketOf(h){
    navigation never happened and two checks passed against a page that had not moved. A vacuous
    green is worse than a red. Exported deliberately, read-only, and used by the golden only. */
 window.__HT24 = { isWeekly:isWeekly, dowOf:dowOf, dueOn:dueOn, bucketOf:bucketOf,
+                  parseCadence:parseCadence, serializeCadence:serializeCadence, isSabbathStd:isSabbathStd,
                   goDay:function(k){ return goDay(k); }, daily:function(){ return daily(); },
                   today:function(){ return today(); } };
 
@@ -384,14 +437,30 @@ function dates(){ return S.days.map(function(d){return d.date;}).filter(function
 
 /* ============================ data ============================ */
 async function load(){
-  var u=(await sb.auth.getUser()).data.user;
+  var gu=await sb.auth.getUser(), u=gu && gu.data && gu.data.user;
+  /* HT-28 C · OFFLINE IS NOT SIGNED OUT. getUser() asks the server; with no connection it returns no user
+     and the app used to show the sign-in screen to someone who never signed out. Only when the failure is
+     the network (or the device says it is offline) does it fall back to the session already on the device;
+     the reads below then fail, S.loadOk says so, and the sync layer reloads on `online`. */
+  if(!u && gu && gu.error && (navigator.onLine===false || /fetch|network|load failed/i.test(String(gu.error.message||'')))
+     && sb.auth.getSession){
+    try{ var gs=await sb.auth.getSession(); u=gs && gs.data && gs.data.session && gs.data.session.user; }catch(e){}
+  }
   if(!u){ authScreen(); return false; }
   var uid=u.id;
+  /* HT-28 C · A PROBE THAT DROPS ON THE NETWORK IS NOT A MISSING COLUMN. Each optional column below is probed
+     widest-first and the error steps down to a narrower read - so a dropped connection on the FIRST read, and a
+     good one on the second, used to leave hasDump/hasCue/hasClosedAt false with loadOk true: the brain dump then
+     stopped saving with no word (second review of 9d4ac6b). A network-shaped error on any probe marks the load
+     as failed, and the sync layer reloads. A real missing column is `42703 column ... does not exist`. */
+  var netDrop=false;
+  function netShaped(e){ return !!e && (navigator.onLine===false || /fetch|network|load failed|timed? ?out/i.test(String(e.message||e))); }
   var p  = await sb.from('profiles').select('id,display_name,handle').eq('id',uid).maybeSingle();
   /* HT-13 B1: `target_age` is optional until its migration lands. Probe widest first, then step
      down — the same contract as habits.cue and day_private.predict / brain_dump. */
+  if(netShaped(p.error)) netDrop=true;
   var pp = await sb.from('profile_private').select('birth_date,target_age').eq('id',uid).maybeSingle();
-  if(pp.error){ S.hasTargetAge=false;
+  if(pp.error){ S.hasTargetAge=false; if(netShaped(pp.error)) netDrop=true;
     pp = await sb.from('profile_private').select('birth_date').eq('id',uid).maybeSingle();
   } else { S.hasTargetAge=true; }
   S.me = p.data || { id:uid, display_name:(u.email||'').split('@')[0], handle:null };
@@ -404,7 +473,7 @@ async function load(){
   var h = await sb.from('habits').select(HCOLS+',cue')
     .eq('user_id',uid).eq('active',true).order('sort_order');
   if(h.error){
-    S.hasCue=false;
+    S.hasCue=false; if(netShaped(h.error)) netDrop=true;
     h = await sb.from('habits').select(HCOLS)
       .eq('user_id',uid).eq('active',true).order('sort_order');
   } else { S.hasCue=true; }
@@ -414,14 +483,12 @@ async function load(){
      live as of 2026-09-07, but the same build must run against a database that does not have it. */
   var DCOLS='date,checked,active_set,pct,floor_pct';
   var d = await sb.from('days').select(DCOLS+',closed_at').eq('user_id',uid).order('date');
-  if(d.error){ S.hasClosedAt=false;
+  if(d.error){ S.hasClosedAt=false; if(netShaped(d.error)) netDrop=true;
     d = await sb.from('days').select(DCOLS).eq('user_id',uid).order('date');
   } else { S.hasClosedAt=true; }
-  S.days = d.data||[];
-  S.byDate = {}; S.days.forEach(function(r){ S.byDate[r.date]=r; });
-  if(!S.date) S.date = today();
-  if(!S.byDate[S.date]) S.byDate[S.date]={ date:S.date, checked:{}, pct:0 };
-  if(!S.calYM){ var t=dnum(today()); S.calYM=[t.getFullYear(),t.getMonth()]; }
+  /* HT-28 C: the day rows are handed to S together with the journal rows, after every read below - a tap
+     during the journal reads must not meet a fresh days map beside a stale baseline (third review) */
+  var daysRows = d.data||[], byDateNew = {}; daysRows.forEach(function(r){ byDateNew[r.date]=r; });
 
   /* the whole private record — rating and journal are inputs, so they get outputs */
   /* `predict` may not exist yet (its migration is Cory's to run) — probe, then degrade. */
@@ -431,16 +498,26 @@ async function load(){
   var pv = await sb.from('day_private').select(PVCOLS+',predict,brain_dump').eq('user_id',uid);
   if(!pv.error){ S.hasPredict=true; S.hasDump=true; }
   else {
+    if(netShaped(pv.error)) netDrop=true;
     pv = await sb.from('day_private').select(PVCOLS+',predict').eq('user_id',uid);
     if(!pv.error){ S.hasPredict=true; S.hasDump=false; }
     else {
+      if(netShaped(pv.error)) netDrop=true;
       pv = await sb.from('day_private').select(PVCOLS+',brain_dump').eq('user_id',uid);
       if(!pv.error){ S.hasPredict=false; S.hasDump=true; }
       else { S.hasPredict=false; S.hasDump=false;
              pv = await sb.from('day_private').select(PVCOLS).eq('user_id',uid); }
     }
   }
+  S.days = daysRows; S.byDate = byDateNew;
+  if(!S.date) S.date = today();
+  if(!S.byDate[S.date]) S.byDate[S.date]={ date:S.date, checked:{}, pct:0 };
+  if(!S.calYM){ var t=dnum(today()); S.calYM=[t.getFullYear(),t.getMonth()]; }
   S.privAll = {}; (pv.data||[]).forEach(function(r){ S.privAll[r.date]=r; });
+  /* HT-28 D4 · A FAILED LOAD IS NOT A NEW ACCOUNT. Every select above degrades to an empty array on
+     error, so "no standards, no days" is also what a dropped connection looks like. The first-run card,
+     the examples and the add-link read this, and nothing offers to add rows unless it is true. */
+  S.loadOk = !h.error && !d.error && !pv.error && !netDrop;
 
   /* ---- HT-22 S1 . THE THREE INPUTS THE MIGRATION UNBLOCKED (R70.284) --------------------
      `sleep_hours`, `weight_lb` and `tomorrow_one_thing` landed on 2026-09-09. This build still
@@ -505,6 +582,7 @@ async function savePriv(){
   var n=0; ['brain_dump','tasks','prayer'].forEach(function(k){ if(p[k]) n++; });
   el('jrnC').textContent = n? n+' of 3 written · autosaves' : 'saves as you type';
   paintRating(); paintRChart(); paintRScat(); paintRSleep(); paintRByMo(); paintJournal(); paintCal();
+  return res;                                     /* HT-28 C: the sync layer needs to know it landed */
 }
 /* ---- HT-22 S1 . TOMORROW'S ONE THING IS WRITTEN ONTO TOMORROW ---------------------------
    Storing it on today's row and reading it back with a +1 offset works exactly until he writes
@@ -661,6 +739,7 @@ function adherence30(hid){
   var n=0,t=0;
   for(var i=0;i<30;i++){
     var k=shift(today(),-i); if(!S.byDate[k]) continue;
+    if(!dueDay(h,k)) continue;             /* HT-28 E12: a dow: item's off-days are not misses */
     t++; if(doneOn(h,k)) n++;
   }
   return t? Math.round(n/t*100) : null;
@@ -925,7 +1004,7 @@ function toggle(hid){
   var h=S.habits.filter(function(x){return x.id===hid;})[0]; if(!h) return;
   var r=S.byDate[S.date] || (S.byDate[S.date]={date:S.date,checked:{},pct:0});
   r.checked = r.checked || {};
-  if(h.cadence==='weekly'){
+  if(isWeekly(h)){
     /* ---- HT-20 P2 · A CHECK IS ALWAYS A TOGGLE (R70.263) ------------------------------
        A weekly is still CREDITED on the day it is done. What changed is that it can be UNDONE
        from any day in the same period. The old branch refused with "already done this week",
@@ -1400,6 +1479,7 @@ function stats(){
     var n=0,t=0,cur=0,best=0,run=0,seen=false;
     for(var i=89;i>=0;i--){
       var k=shift(today(),-i); if(!S.byDate[k]) continue;
+      if(!dueDay(h,k)) continue;           /* HT-28 E12: off-days neither count nor break a streak */
       if(i<30){ t++; if(doneOn(h,k)) n++; }
       seen=true;
       if(doneOn(h,k)){ run++; if(run>best) best=run; } else if(k!==today()) run=0;
@@ -1590,8 +1670,12 @@ function openSettings(){
         '" title="Cue — the event this standard hangs off. Ten weakest are flagged.">'):'')+
       '<select class="eg">'+GROUPS.map(function(g){
         return '<option'+(g===(h.group_name||'Other')?' selected':'')+'>'+g+'</option>'; }).join('')+'</select>'+
-      '<select class="ec"><option value="daily"'+(h.cadence!=='weekly'?' selected':'')+'>Daily</option>'+
-        '<option value="weekly"'+(h.cadence==='weekly'?' selected':'')+'>Weekly</option></select>'+
+      /* HT-28 E12: this list offered only Daily/Weekly, so SAVING it turned every dow: standard
+         (the Sabbath included) back into daily. A dow: row now carries its own option, selected. */
+      (function(){ var pc=parseCadence(h.cadence), dowv=pc.kind==='dow'?serializeCadence(pc):null;
+        return '<select class="ec"><option value="daily"'+(pc.kind==='daily'?' selected':'')+'>Every day</option>'+
+          (dowv?'<option value="'+dowv+'" selected>Certain days</option>':'')+
+          '<option value="weekly"'+(pc.kind==='weekly'?' selected':'')+'>Once a week</option></select>'; })()+
       '<button class="x" data-rm="'+i+'" title="archive">×</button></div>';
   }
   var body=
@@ -1631,7 +1715,7 @@ function openSettings(){
 
     '<div class="sh"><h2>Session</h2><span class="ln"></span><span class="c"></span></div>'+
     '<div class="tools"><button class="btn" id="bOut">Sign out</button></div>'+
-    '<div class="note" style="padding:14px 0 0">Your data is yours. Every table is row-level locked to your account; nobody in a circle can see anything but a daily percentage.</div>';
+    '<div class="note" id="privNote" style="padding:14px 0 0">Your journal is yours. The app never shows it to anyone else — including Cory. Every table is row-level locked to your account; nobody in a circle can see anything but a daily percentage.</div>';
 
   openOv('Settings',body,function(){
     var list=el('edList');
@@ -1817,7 +1901,8 @@ function authScreen(){
   document.querySelector('.app').innerHTML=
     '<div style="max-width:340px;margin:16vh auto 0;padding:0 4px">'+
     '<div class="wm" style="font-size:15px">HT<b>.</b></div>'+
-    '<div class="note" style="padding:10px 0 22px">A ledger of the self. One number a day, and nowhere to hide.</div>'+
+    '<div class="note" style="padding:10px 0 8px">A ledger of the self. One number a day, and nowhere to hide.</div>'+
+    '<div class="note" id="aPriv" style="padding:0 0 22px">Your journal is yours. The app never shows it to anyone else — including Cory.</div>'+
     '<label class="fld"><span class="lab">Email</span><input id="aEmail" type="email" autocomplete="email"></label>'+
     '<label class="fld"><span class="lab">Password</span><input id="aPass" type="password" autocomplete="current-password"></label>'+
     '<div class="tools" style="padding-top:14px"><button class="btn pri" id="aIn" style="flex:1">Sign in</button>'+
@@ -1828,7 +1913,8 @@ function authScreen(){
     var e=el('aEmail').value.trim(), p=el('aPass').value;
     if(!e||!p){ msg('Email and password.'); return; }
     msg('…');
-    var r = kind==='up' ? await sb.auth.signUp({email:e,password:p})
+    var r = kind==='up' ? await sb.auth.signUp({email:e,password:p,
+                              options:{ emailRedirectTo: location.origin + location.pathname }})
                         : await sb.auth.signInWithPassword({email:e,password:p});
     if(r.error){ msg(r.error.message); return; }
     if(kind==='up' && !r.data.session){ msg('Check your email to confirm, then sign in.'); return; }
@@ -2220,7 +2306,7 @@ function missRun(hid){                        /* consecutive missed days, ending
   for(var i=0;i<S.habits.length;i++) if(S.habits[i].id===hid) h=S.habits[i];
   if(!h || h.cadence==='weekly') return 0;
   while(guard++<120){
-    if(!loggedOn(k)){ k=shift(k,-1); continue; }
+    if(!loggedOn(k) || !dueDay(h,k)){ k=shift(k,-1); continue; }   /* HT-28 E12 */
     if(doneOn(h,k)) break;
     n++; k=shift(k,-1);
   }
@@ -2453,6 +2539,7 @@ function returnedOn(h,k){
   if(!h || h.cadence==='weekly') return false;
   if(!doneOn(h,k)) return false;
   var p=prevLogged(k);
+  while(p && !dueDay(h,p)) p=prevLogged(p);   /* HT-28 E12: the last logged day it was DUE */
   return !!p && !doneOn(h,p);                 /* done today, missed the last logged day */
 }
 function returnsIn(ks){
@@ -2511,11 +2598,9 @@ async function savePredict(v){
   if(!S.hasPredict) return;
   var p=S.priv || (S.priv={});
   p.date=S.date; p.predict=v; S.privAll[S.date]=p;
-  var res=await sb.from('day_private').upsert({
-    user_id:S.me.id, date:S.date,
-    rating:(p.rating==null?null:p.rating), why:p.why||'', tasks:p.tasks||'', prayer:p.prayer||'',
-    predict:v
-  },{ onConflict:'user_id,date' });
+  /* HT-28 C: only the column this control owns. It used to write rating, why, tasks and prayer from this
+     device's copy as well - a whole journal row around the sync layer, which could put stale text back. */
+  var res=await sb.from('day_private').upsert({ user_id:S.me.id, date:S.date, predict:v },{ onConflict:'user_id,date' });
   toast(res.error ? 'prediction not saved' : (v?'called it — yes':'called it — no'));
   paintPredict();
 }
@@ -2724,8 +2809,8 @@ function earned(k){ return committed() - remaining(k); }
     w.style.marginTop='14px';
     var on = advanced();
     w.innerHTML = '<div class="lab">Advanced</div>' +
-      '<div class="note" style="margin:6px 0 9px">Everything the simple view hides — the instruments, ' +
-      'the statistics, the other themes and the sheet controls. Nothing was deleted; this shows it again.</div>' +
+      /* HT-28 A7 (PASTE 128): one plain line - Cory asked what it does */
+      '<div class="note" style="margin:6px 0 9px">Shows the older full layout — every chart, stat, theme and control the simple view hides.</div>' +
       '<button class="btn" id="advBtn">' + (on ? 'Advanced is ON — turn it off' : 'Turn Advanced ON') + '</button>';
     ov.appendChild(w);
     document.getElementById('advBtn').onclick = function(){
@@ -3015,18 +3100,30 @@ function earned(k){ return committed() - remaining(k); }
       /* HT-24 C1: three cadences now, and the third carries a day picker that is only shown
          when it is chosen. `dow:` is stored as the grammar, never as a second column. */
       (function(){
-        var dw = dowOf(h), cad = isWeekly(h) ? 'weekly' : (dw ? 'dow' : 'daily');
-        return fld('Cadence','<select id="eCad">'+
-            '<option value="daily"'+(cad==='daily'?' selected':'')+'>Daily</option>'+
+        /* HT-28 E15 · DAYS IN PLAIN WORDS (Every day · Weekdays · Weekends · pick days) and F18 · RESTS
+           ON SABBATH. The option VALUES stay daily / dow / weekly (golden_ht23 C1j reads them); only the
+           words change. A daily standard that rests on the Sabbath is stored as every day but Saturday
+           (`dow:0,1,2,3,4,5`) and reads back as "Every day" with the switch on - one grammar, no column. */
+        var dw = dowOf(h), sab = isSabbathStd(h);
+        var rests = !sab && !!(dw && dw.length===6 && dw.indexOf(6)<0);
+        var cad = isWeekly(h) ? 'weekly' : ((dw && !rests) ? 'dow' : 'daily');
+        return fld('Days','<select id="eCad">'+
+            '<option value="daily"'+(cad==='daily'?' selected':'')+'>Every day</option>'+
             '<option value="dow"'+(cad==='dow'?' selected':'')+'>Certain days</option>'+
-            '<option value="weekly"'+(cad==='weekly'?' selected':'')+'>Weekly</option></select>')+
+            '<option value="weekly"'+(cad==='weekly'?' selected':'')+'>Once a week</option></select>')+
           '<div class="fld dowf" id="eDowFld"'+(cad==='dow'?'':' hidden')+'>'+
-            '<span class="lab">Which days</span><div class="dow" id="eDow">'+
+            '<span class="lab">Which days</span>'+
+            '<div class="dowq" id="eDowQ"><button type="button" class="dowqb" data-q="1,2,3,4,5">Weekdays</button>'+
+              '<button type="button" class="dowqb" data-q="0,6">Weekends</button></div>'+
+            '<div class="dow" id="eDow">'+
             ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].map(function(nm,i){
-              var on = dw ? dw.indexOf(i)>=0 : false;
+              var on = (dw && !rests) ? dw.indexOf(i)>=0 : false;
               return '<button type="button" class="dowb'+(on?' on':'')+'" data-d="'+i+'" '+
                      'aria-pressed="'+(on?'true':'false')+'">'+nm+'</button>';
-            }).join('')+'</div></div>';
+            }).join('')+'</div></div>'+
+          (sab ? '' : '<label class="fld h28rest" id="eRestFld"'+(cad==='weekly'?' hidden':'')+'>'+
+            '<span class="lab">Rests on Sabbath</span>'+
+            '<span class="h28sw"><input type="checkbox" id="eRest"'+(rests?' checked':'')+'> not due on Saturdays</span></label>');
       })()+
       (S.hasTime ? '<div class="fld" id="eTimeFld"><span class="lab">Planned time</span>'+
           '<div class="win"><input id="eAnchor" type="time" value="'+esc(hhmm(h.time_anchor)||'')+'">'+
@@ -3068,7 +3165,7 @@ function earned(k){ return committed() - remaining(k); }
           '<textarea rows="3" disabled placeholder="one migration away — see below"></textarea>'+
           '</div>')+
       '<div class="etools">'+
-        (isNew?'':'<button class="btn" id="eArch">Archive</button>')+
+        (isNew?'':'<button class="btn" id="eArch">Delete</button>')+
         '<span style="flex:1"></span>'+
         '<button class="btn" id="eCancel">Cancel</button>'+
         '<button class="btn pri" id="eSave">Save</button>'+
@@ -3098,7 +3195,22 @@ function earned(k){ return committed() - remaining(k); }
        stops writing it once Notes carries the text. */
     /* HT-24 C1: the day picker shows only for "Certain days", and each day toggles. */
     var cad=document.getElementById('eCad'), dowFld=document.getElementById('eDowFld');
-    if(cad && dowFld) cad.onchange=function(){ dowFld.hidden = (cad.value!=='dow'); };
+    var restFld=document.getElementById('eRestFld');
+    if(cad && dowFld) cad.onchange=function(){
+      dowFld.hidden = (cad.value!=='dow');
+      if(restFld) restFld.hidden = (cad.value==='weekly');        /* HT-28 F18: a weekly is not graded per day */
+    };
+    /* HT-28 E15: Weekdays / Weekends set the picker in one tap; the days still toggle one by one */
+    var dowQ=document.getElementById('eDowQ');
+    if(dowQ) dowQ.onclick=function(e){
+      var b=e.target.closest('.dowqb'); if(!b) return;
+      e.preventDefault();
+      var want=b.getAttribute('data-q').split(',').map(Number);
+      q('.dowb', document.getElementById('eDow')||document).forEach(function(x){
+        var on=want.indexOf(+x.getAttribute('data-d'))>=0;
+        x.classList.toggle('on', on); x.setAttribute('aria-pressed', on?'true':'false');
+      });
+    };
     var dowBox=document.getElementById('eDow');
     if(dowBox) dowBox.onclick=function(e){
       var b=e.target.closest('.dowb'); if(!b) return;
@@ -3131,13 +3243,21 @@ function earned(k){ return committed() - remaining(k); }
               cadence:(function(){
                 var v=str('eCad');
                 if(v==='weekly') return 'weekly';
-                if(v!=='dow') return 'daily';
-                var on=q('.dowb.on', document.getElementById('eDow')||document)
-                        .map(function(b){ return +b.getAttribute('data-d'); }).sort();
-                /* NO DAYS PICKED IS NOT A CADENCE. It would render a standard that is due on no
-                   day at all and can never be completed, so it degrades to daily rather than
-                   writing `dow:` with nothing after it. */
-                return on.length ? ('dow:'+on.join(',')) : 'daily';
+                var days=[0,1,2,3,4,5,6];
+                if(v==='dow'){
+                  var on=q('.dowb.on', document.getElementById('eDow')||document)
+                          .map(function(b){ return +b.getAttribute('data-d'); });
+                  /* NO DAYS PICKED IS NOT A CADENCE. It would render a standard that is due on no
+                     day at all and can never be completed, so it degrades to daily rather than
+                     writing `dow:` with nothing after it. */
+                  if(on.length) days=on;
+                }
+                /* HT-28 F18: resting on the Sabbath takes Saturday out of the set - unless Saturday is
+                   the only day, where the switch has nothing to rest */
+                var rest=document.getElementById('eRest');
+                if(rest && rest.checked && !(days.length===1 && days[0]===6))
+                  days=days.filter(function(d){ return d!==6; });
+                return serializeCadence({ kind:'dow', days:days });   /* all seven -> 'daily' */
               })(),
               minutes:num('eMin'), link:str('eLink')||null };
     /* S5 · THE ONE LINE THAT WOULD HAVE DESTROYED EVERY CUE. `str('eCue')` returns '' when the
@@ -3145,6 +3265,9 @@ function earned(k){ return committed() - remaining(k); }
        standard on the next save — the same shape of defect as HT-20's Strip button, which also
        wrote a helper's output back over real data. The cue is written only when the person can
        see and edit it. */
+    /* HT-28 E13: a Sabbath deliberately saved as every day leaves the SABBATH group - the migration's whole
+       signature - so a device that has not run it yet can never turn it back into Saturday-only */
+    if(rec.cadence==='daily' && isLegacySabbath(rec)) rec.group_name='Other';
     var cueIn = document.getElementById('eCue');
     if(S.hasCue && cueIn) rec.cue = str('eCue');
     /* S5: the planned-window inputs are no longer rendered (superseded by planned time +
@@ -3186,15 +3309,20 @@ function earned(k){ return committed() - remaining(k); }
 
   /* archive is `active=false` + `archived_at` — DEC-037: it leaves TODAY, it stays in every past day */
   async function archiveOne(h){
-    if(!confirm('Archive "'+nameOf(h.name)+'"? It leaves TODAY and stays in every past day and export.')) return;
+    /* HT-28 G21: a new person looks for "delete". The act is still the archive below - the row leaves the
+       list and every day already logged keeps it (DEC-037) - and the question says exactly that. */
+    if(!confirm('Delete "'+nameOf(h.name)+'" from your list? Days you already logged keep it.')) return;
     var res = await sb.from('habits')
       .update({ active:false, archived_at:new Date().toISOString() })
       .eq('id',h.id).eq('user_id',S.me.id);
     if(res && res.error){ toast('not archived — '+String(res.error.message||'').slice(0,60)); return; }
-    closeSheet(); toast('archived');
+    closeSheet(); toast('deleted — logged days keep it');
     await reload();
   }
   async function reload(){ probed=false; await load(); await probe(); paintAll(); }
+  /* HT-28: load() alone drops the probed columns (planned time, notes, window) until the next probe, so
+     a row added elsewhere would render untimed. The later layers reload through this. */
+  window.__HT11 = { reload: reload, probe: function(){ probed=false; return probe(); } };
 
   /* ---- 3 · the affordances: a pencil on hover (desktop), a long press (phone) ---- */
   function decorate(){
@@ -5306,7 +5434,7 @@ function earned(k){ return committed() - remaining(k); }
   function loadSums(k){
     var day=k||S.date, ck=ckOf(day), planned=0, done=0;
     S.habits.forEach(function(h){
-      if(h.cadence==='weekly') return;
+      if(isWeekly(h) || !dueOn(h,day)) return;          /* HT-28 E12: only what is due that day */
       var m=planOf(h); if(m==null) return;
       planned+=m; if(ck[h.id]) done+=m;
     });
@@ -6859,7 +6987,7 @@ function earned(k){ return committed() - remaining(k); }
   var _daily=daily;
   daily=function(){
     var all=_daily.apply(null, arguments);
-    if(advanced()) return all;
+    if(advanced() || !SABBATH_ONLY_SATURDAY) return all;    /* HT-28: the base daily() is the due set */
     if(isSabbath(S.date)){
       var only=all.filter(isSabbathGroup);
       return only.length? only : all;      /* no Sabbath standard yet: change nothing (HT-18e) */
@@ -6941,6 +7069,8 @@ function earned(k){ return committed() - remaining(k); }
       return 'found';
     }
 
+    /* HT-28 G21: an account without a Sabbath standard is left without one (SABBATH_AUTO_INSERT) */
+    if(!SABBATH_AUTO_INSERT){ window.__h18SabDone='absent-left'; return 'absent-left'; }
     var orders=(q && q.data || []).map(function(x){ return x.sort_order||0; });
     var rec={ user_id:S.me.id, name:SAB_NAME, group_name:SAB_GROUP, cadence:'daily',
               minutes:0, active:true,
@@ -7005,8 +7135,12 @@ function earned(k){ return committed() - remaining(k); }
     /* WITHOUT a Sabbath standard nothing changes but the note. daily() already falls through in
        that case, so the day keeps grading on all twenty-six — narrowing the list while the score
        still counted twenty-six would have written a 0% Saturday, which is the opposite of rest. */
-    var active = on && !!sh;
+    var active = on && !!sh && SABBATH_ONLY_SATURDAY;      /* HT-28: the narrowing is off */
     log.classList.toggle('h18sab', active);
+    if(!SABBATH_ONLY_SATURDAY){
+      var n0=document.getElementById('h18SabNote'); if(n0) n0.hidden=true;
+      return true;
+    }
     /* B3: Saturday shows the SABBATH group and nothing else; every other day shows everything
        EXCEPT it. A standard that cannot count today has no business taking a row today — daily()
        already excludes it from the score, and this keeps the list saying the same thing. */
@@ -7554,6 +7688,1137 @@ function earned(k){ return committed() - remaining(k); }
   var _pj=paintJournal; paintJournal=function(){ _pj.apply(null,arguments); if(S.me){ paintJ(); paintStrip(); } };
   if(document.readyState==='complete') setTimeout(boot26, 450);
   else window.addEventListener('load', function(){ setTimeout(boot26, 450); });
+})();
+
+/* ======================= HT-28 · THE TRACKER CLOSE-OUT (PASTE 128 · WIRE HT-28) =======================
+   123 and 124 in one sweep. Every part re-asserts over the base paint the way the earlier layers do -
+   by wrapping the functions the app calls by name - and every part respects Advanced (R70.138: the
+   simple view hides, Advanced shows everything as it was). Section letters follow the paste. */
+(function(){
+  function advanced(){
+    try{ if(localStorage.getItem('ht_advanced')==='1') return true; }catch(e){}
+    if(window.__ADVANCED===true) return true;
+    return /[?&]advanced=1/.test(location.search);
+  }
+
+  /* ---- D7 · THE RATING'S "WHY" COMES BACK ------------------------------------------------------
+     DEC-171 names five inputs, and one of them is "the 1-10 rating WITH ITS WHY". HT-9a's simple view
+     took the why out ("why leaves") before that ruling, and nothing put it back: #iWhy stayed in the
+     DOM inside the emptied Rate-the-day block (`ht9a-off`, display:none), so golden_ht26 S1c - which
+     asks only that the element EXISTS - passed while no one could type a why at any width. Measured
+     2026-09-15 on 2cdf48d: #whyFld invisible at 390 and at 1280. The field moves in right under the
+     strip as one short line; its input listener travels with the node, so the save path is untouched. */
+  /* WHERE IT SITS IS MEASURED, NOT CHOSEN. Under the strip it is one short line; on the desktop that
+     line came straight off the brain dump (golden_ht18 S2c/S2d at 1280x720: dump 92 -> 52 against a
+     floor of 88, because HT-18's grow() hands the dump whatever the quadrant has left). So from 1024 up
+     it joins COMPLETED and PRAYER in the journal's bottom row (#h18Btm), as its first of three columns,
+     which costs the dump nothing; below 1024 #h18Btm is inert and it sits under the strip. */
+  var WIDE = window.matchMedia ? window.matchMedia('(min-width:1024px)') : { matches:false };
+  function whyBack(){
+    if(advanced()) return;
+    var f = document.getElementById('whyFld'), rw = document.getElementById('rateWrap');
+    if(!f || !rw || !rw.parentNode) return;
+    var btm = document.getElementById('h18Btm');
+    if(WIDE.matches && btm){
+      if(btm.firstElementChild !== f) btm.insertBefore(f, btm.firstElementChild);
+    }else if(f.previousElementSibling !== rw){
+      rw.parentNode.insertBefore(f, rw.nextSibling);
+    }
+    f.classList.add('h28why');
+    var lab = f.querySelector('.lab'); if(lab && lab.textContent !== 'Why') lab.textContent = 'Why';
+    var t = document.getElementById('iWhy');
+    if(t){ t.rows = 1; if(!t.value) t.placeholder = 'Why that number?'; }
+  }
+
+  function q(s,r){ return Array.prototype.slice.call((r||document).querySelectorAll(s)); }
+  function byIdMap(){ var m={}; S.habits.forEach(function(h){ m[h.id]=h; }); return m; }
+  /* the Sabbath standard due on day k (null on every other day, and when there is none) */
+  function sabOn(k){
+    var s=S.habits.filter(function(h){ return isSabbathStd(h) && isSatOnly(h) && dueOn(h, k); });
+    return s[0] || null;
+  }
+
+  /* ---- E14 + DEC-171 · TIMED, THEN ANYTIME, THEN WEEKLY - AND THE SABBATH FIRST IN ANYTIME ---------
+     HT-16's reorderToday() rebuilt the list as "timed rows, one ANYTIME header, everything else" the
+     moment any standard carried a planned time - so on Cory's real list (which has times) the TIMED and
+     WEEKLY headers never showed, and a weekly sat under ANYTIME. goDay() then re-grouped through 9a's
+     group(), so the headers depended on HOW you reached the day. Measured on 2cdf48d. This runs last,
+     after both, and says the same thing every time: TIMED (by planned time) · ANYTIME · WEEKLY.
+     On a day the Sabbath is due, its row leads ANYTIME and wears one check mark and nothing else.
+     Rows are MOVED, never recreated, so every listener the earlier layers bound stays bound; when the
+     list is already right nothing is touched. */
+  function regroup28(){
+    if(advanced()) return;
+    var log=document.getElementById('log'); if(!log) return;
+    var kids=q('#log > *'), rows=kids.filter(function(c){ return c.classList.contains('li'); });
+    if(!rows.length) return;
+    var hm=byIdMap(), sab=sabOn(S.date), B={ TIMED:[], ANYTIME:[], WEEKLY:[] }, other=[];
+    kids.forEach(function(c, i){
+      if(c.classList.contains('li')){
+        var h=hm[c.getAttribute('data-h')], g=h ? bucketOf(h) : 'ANYTIME';
+        if(sab && h && h.id===sab.id) g='ANYTIME';
+        (B[g]||B.ANYTIME).push({ r:c, h:h, i:i });
+      }else if(!c.classList.contains('grp')) other.push(c);
+    });
+    B.TIMED.sort(function(a,b){
+      var x=a.h?winStartMin(a.h):null, y=b.h?winStartMin(b.h):null;
+      return (x==null?1e9:x)-(y==null?1e9:y) || a.i-b.i; });
+    if(sab){
+      B.ANYTIME.sort(function(a,b){
+        return ((b.h&&b.h.id===sab.id)?1:0)-((a.h&&a.h.id===sab.id)?1:0) || a.i-b.i; });
+    }
+    var want=[];
+    ['TIMED','ANYTIME','WEEKLY'].forEach(function(g){
+      if(!B[g].length) return;
+      want.push(g); B[g].forEach(function(x){ want.push(x.r); });
+    });
+    var cur=kids.filter(function(c){ return c.classList.contains('li') || c.classList.contains('grp'); });
+    var same=cur.length===want.length && cur.every(function(c,i){
+      var w=want[i];
+      return typeof w==='string' ? (c.classList.contains('grp') && c.textContent.trim()===w) : c===w; });
+    if(!same){
+      var frag=document.createDocumentFragment();
+      want.forEach(function(w){
+        if(typeof w==='string'){ var hd=document.createElement('div'); hd.className='grp'; hd.textContent=w; frag.appendChild(hd); }
+        else frag.appendChild(w);
+      });
+      other.forEach(function(o){ frag.appendChild(o); });
+      log.innerHTML=''; log.appendChild(frag);
+    }
+    q('#log .li.h28sab').forEach(function(r){ if(!sab || r.getAttribute('data-h')!==sab.id) r.classList.remove('h28sab'); });
+    if(sab){ var sr=log.querySelector('.li[data-h="'+sab.id+'"]'); if(sr) sr.classList.add('h28sab'); }
+  }
+
+  /* ---- E13 · CORY'S SABBATH ROW BECOMES dow:6, UNDER HIS OWN SESSION ----------------------------------
+     The paste's route A had this executor sign in as Cory with his password and keep a refresh token in a
+     .env; the executor handles no password and keeps no .env (CC_STANDING section 3 · R70.333). So the APP
+     does it: the first load after this build, in Cory's own browser, signed in as him, RLS enforcing it,
+     turns a Sabbath standard still stored as 'daily' into 'dow:6'. Once per session, awaited, idempotent (a
+     migrated row is not selected again), logged, never from a render path, never in Advanced. Until it
+     lands, dowOf() already reads a legacy Sabbath as Saturday-only, so nothing flashes on a Tuesday. */
+  var _mig=null;
+  function sabMigrate28(){
+    if(_mig || advanced() || !S.me || S.loadOk!==true || !S.habits.length) return _mig;
+    var key='ht28_sabmig_'+S.me.id, before=false;
+    try{ before = localStorage.getItem(key)==='1'; }catch(e){}
+    function mark(){ SAB_LEGACY_READ=false; try{ localStorage.setItem(key,'1'); }catch(e){} }
+    if(before){ SAB_LEGACY_READ=false; window.__h28SabMig='done-before'; return null; }
+    var legacy=S.habits.filter(function(h){ return isLegacySabbath(h) && parseCadence(h.cadence).kind==='daily'; });
+    if(!legacy.length){ window.__h28SabMig='none'; mark(); return null; }
+    _mig=(async function(){
+      var done=0, failed=0;
+      for(var i=0;i<legacy.length;i++){
+        var res=await sb.from('habits').update({ cadence:'dow:6' }).eq('id', legacy[i].id).eq('user_id', S.me.id);
+        if(res && res.error) failed++; else { legacy[i].cadence='dow:6'; done++; }
+      }
+      if(!failed) mark();
+      window.__h28SabMig = failed ? 'failed' : 'migrated';
+      try{ console.log('HT-28 E13: Sabbath cadence daily -> dow:6 · migrated '+done+' · failed '+failed); }catch(e){}
+      return window.__h28SabMig;
+    })().catch(function(e){ window.__h28SabMig='failed';
+      try{ console.log('HT-28 E13: Sabbath migration failed - '+(e && e.message)); }catch(_){}
+      return 'failed'; });
+    return _mig;
+  }
+
+  /* ---- F17 · THE SABBATH'S OWN HONOUR: "Sabbaths kept · N in a row · M of the last 12" + month rings --
+     A Saturday counts once the Sabbath has been part of a day (it sits in that day's active_set or its
+     check): no ring and no count before that (stress 7). Today's Saturday, not yet ticked, is not a miss -
+     the day is not over. The daily % is untouched: the Sabbath is one due item on Saturday, weight 1. */
+  function sabHistory(){
+    var sab=S.habits.filter(function(h){ return isSabbathStd(h) && isSatOnly(h); })[0]; if(!sab) return null;
+    var first=null;
+    Object.keys(S.byDate).sort().some(function(k){
+      var r=S.byDate[k];
+      if(r && dnum(k).getDay()===6 && (((r.active_set||[]).indexOf(sab.id)>=0) || (r.checked||{})[sab.id])){ first=k; return true; }
+      return false;
+    });
+    var t=today(), k=shift(t, -((dnum(t).getDay()+1)%7)), sats=[];
+    for(var i=0;i<120 && first && k>=first;i++){ sats.push(k); k=shift(k,-7); }
+    var kept=function(d){ return !!ckOf(d)[sab.id]; };
+    var done=sats.filter(function(d){ return !(d===t && !kept(d)); });   /* an unticked today is not over */
+    var run=0; for(var j=0;j<done.length;j++){ if(kept(done[j])) run++; else break; }
+    var last=done.slice(0,12), m=last.filter(kept).length;
+    return { sab:sab, first:first, kept:kept, run:run, m:m, of:last.length };
+  }
+  function sabLine28(){
+    var host=document.getElementById('c5Five'); if(!host) return;
+    var sh=sabHistory(), line=document.getElementById('h28Sab');
+    if(!sh){ if(line) line.hidden=true; return; }
+    if(!line){ line=document.createElement('div'); line.id='h28Sab'; line.className='h28sabline';
+               host.parentNode.insertBefore(line, host.nextSibling); }
+    line.hidden=false;
+    line.innerHTML = sh.first
+      ? 'Sabbaths kept · <b>'+sh.run+'</b> in a row · <b>'+sh.m+'</b> of the last '+(sh.of===12?'12':sh.of)
+      : 'Sabbaths kept · counting starts on the first Saturday';
+  }
+  function rings28(){
+    var svg=document.getElementById('vMonth'); if(!svg) return;
+    q('.h28ring', svg).forEach(function(n){ n.parentNode.removeChild(n); });
+    var sh=sabHistory(); if(!sh || !sh.first) return;
+    var ax=svg.querySelector('line.ax0'); if(!ax) return;
+    var y=(+ax.getAttribute('y1'))-7, t=today(), ns='http://www.w3.org/2000/svg';
+    q('circle.hit[data-vgd]', svg).forEach(function(c){
+      var k=c.getAttribute('data-vgd');
+      if(!k || k<sh.first || k>t || dnum(k).getDay()!==6) return;
+      var kept=sh.kept(k);
+      if(k===t && !kept) return;
+      var r=document.createElementNS(ns,'circle');
+      r.setAttribute('class','h28ring'+(kept?' kept':' miss'));
+      r.setAttribute('cx', c.getAttribute('cx')); r.setAttribute('cy', y.toFixed(1)); r.setAttribute('r','3.6');
+      var tt=document.createElementNS(ns,'title'); tt.textContent='Sabbath '+(kept?'kept':'missed'); r.appendChild(tt);
+      svg.appendChild(r);
+    });
+  }
+  var ringT=null;
+  function ringsLater(){ clearTimeout(ringT); setTimeout(rings28, 60); ringT=setTimeout(rings28, 450); }
+
+  function boot28(){
+    if(!S.me) return;
+    whyBack();
+    regroup28();
+    sabMigrate28();
+    sabLine28();
+    ringsLater();
+  }
+  window.__HT28 = { repaint: boot28, regroup: regroup28, sabHistory: sabHistory, rings: rings28,
+                    migrate: function(){ return sabMigrate28(); } };
+  var _pa=paintAll; paintAll=function(){ _pa.apply(null,arguments); boot28(); };
+  var _pl=paintLog; paintLog=function(){ _pl.apply(null,arguments); if(S.me){ regroup28(); } };
+  var _go=goDay;    goDay=function(k){ _go.call(null,k); if(S.me){ whyBack(); regroup28(); ringsLater(); } };
+  document.addEventListener('click', function(e){ if(e.target.closest && e.target.closest('#h16Month')) ringsLater(); }, true);
+  var rs28=null;
+  window.addEventListener('resize', function(){ clearTimeout(rs28); rs28=setTimeout(boot28, 180); });
+  if(document.readyState==='complete') setTimeout(boot28, 500);
+  else window.addEventListener('load', function(){ setTimeout(boot28, 500); });
+})();
+
+/* ======================= HT-28b · THE SECOND USER: FIRST RUN, EXAMPLES, PRIVACY, ADD-LINK =======================
+   Paste 128 G21-G23 and F19. Andrew opens the link with no one beside him: he signs up, is told how the
+   app works in five lines, starts from EXAMPLES (never Cory's list, never blank) with one tap, and edits
+   them in the same sheet everyone uses. Nothing here writes a row without a tap (D4), and nothing here
+   offers to write one unless load() SUCCEEDED - a dropped connection looks exactly like an empty account.
+   F19 · AN ADD-LINK, NOT A LIST IN THE CODE. This repository is public, and a standards list is private
+   (R47.3), so Cory's three rest standards are not in this file: `#add=<base64url JSON>` proposes standards
+   carried by the link itself - a card, one tap, idempotent by name, the fragment removed after. A FRAGMENT,
+   not a query: a browser never sends it to the server, so the list is in no request log either. The link
+   with his three lives in his receipt, not here. Any link can only PROPOSE; the account owner taps. */
+(function(){
+  function advanced(){
+    try{ if(localStorage.getItem('ht_advanced')==='1') return true; }catch(e){}
+    if(window.__ADVANCED===true) return true;
+    return /[?&]advanced=1/.test(location.search);
+  }
+  var FIRST_KEY = 'ht28_firstrun_', ADD_MAX = 10;
+  /* G21 · the examples show all three sections: two TIMED, one ANYTIME, one WEEKLY */
+  var EXAMPLES = [
+    { name:'Move for 20 minutes', minutes:20, time:'07:00', cadence:'daily',  group_name:'Morning' },
+    { name:'Read 10 pages',       minutes:15, time:null,    cadence:'daily',  group_name:'Other' },
+    { name:'Lights out',          minutes:0,  time:'22:30', cadence:'daily',  group_name:'Night' },
+    { name:'Plan the week',       minutes:30, time:null,    cadence:'weekly', group_name:'Weekly' }
+  ];
+  /* G23 · the five lines. The fifth is G22's statement, verbatim. */
+  var LINES = [
+    'Check off a standard when you keep it. The day\u2019s % is what you kept.',
+    'Rate the day 1\u201310 and write why in a line.',
+    'Brain dump, completed, prayer \u2014 write as much or as little as you want.',
+    'Tap \u270e beside a standard to change its name, time or days, or add your own.',
+    'Your journal is yours. The app never shows it to anyone else \u2014 including Cory.'
+  ];
+
+  /* one row, shaped the way HT-11's saveSheet shapes it, so an added row is indistinguishable from a typed one */
+  function recOf(x, order){
+    var rec = { user_id:S.me.id, name:x.name, group_name:x.group_name||'Other', cadence:x.cadence||'daily',
+                minutes:x.minutes||0, sort_order:order };
+    if(S.hasTime){ rec.time_anchor = x.time||null; rec.minutes_planned = x.minutes||null; }
+    if(S.hasWindow){ rec.planned_start = x.time||null;
+                     rec.planned_end = x.time ? fmtClock(minsOf(x.time)+(x.minutes||0)) : null; }
+    if(S.hasNotes && x.notes) rec.notes = x.notes;
+    return rec;
+  }
+  /* a tap can come before HT-11's column probe has run; an unknown column is asked, never assumed absent -
+     otherwise a quick tap inserts the timed examples with no time (review NIT) */
+  async function ensureFlags(){
+    var uid=S.me.id;
+    if(S.hasTime===undefined){ var a=await sb.from('habits').select('id,time_anchor,minutes_planned').eq('user_id',uid).limit(1); S.hasTime=!a.error; }
+    if(S.hasWindow===undefined){ var w=await sb.from('habits').select('id,planned_start,planned_end').eq('user_id',uid).limit(1); S.hasWindow=!w.error; }
+    if(S.hasNotes===undefined){ var n=await sb.from('habits').select('id,notes').eq('user_id',uid).limit(1); S.hasNotes=!n.error; }
+  }
+  async function fullReload(){
+    if(window.__HT11 && window.__HT11.reload) return window.__HT11.reload();
+    await load(); paintAll();
+  }
+  function noHistory(){
+    return S.loadOk===true && !(S.days||[]).length && !Object.keys(S.privAll||{}).length;
+  }
+  function offerExamples(){ return noHistory() && !S.habits.length; }
+  function dismissed(){ try{ return localStorage.getItem(FIRST_KEY+S.me.id)==='1'; }catch(e){ return false; } }
+  function dismiss(){ try{ localStorage.setItem(FIRST_KEY+S.me.id,'1'); }catch(e){} }
+  function errText(r){ return String((r && r.error && r.error.message) || '').slice(0,60); }
+
+  /* ---- F19 · the add-link: validated whole or refused whole ---- */
+  function linkRaw(){ try{ return new URLSearchParams(String(location.hash||'').replace(/^#/,'')).get('add'); }catch(e){ return null; } }
+  function linkItems(){
+    var raw=linkRaw(); if(!raw) return null;
+    try{
+      var b64=raw.replace(/-/g,'+').replace(/_/g,'/'); while(b64.length%4) b64+='=';
+      var bin=atob(b64), bytes=new Uint8Array(bin.length);
+      for(var i=0;i<bin.length;i++) bytes[i]=bin.charCodeAt(i);
+      var list=JSON.parse(new TextDecoder('utf-8').decode(bytes));
+      if(!Array.isArray(list) || !list.length || list.length>ADD_MAX) return [];
+      var out=[];
+      for(var j=0;j<list.length;j++){
+        var x=list[j]||{}, n=String(x.n==null?'':x.n).trim(), tm=(x.t==null||x.t==='')?null:String(x.t);
+        var d=(x.d==null||x.d==='')?null:String(x.d).trim();
+        if(!n || n.length>120) return [];
+        if(tm!==null && !/^([01]\d|2[0-3]):[0-5]\d$/.test(tm)) return [];
+        if(d!==null && d.length>300) return [];
+        out.push({ name:n, time:tm, notes:d, cadence:(x.c==='weekly'?'weekly':'daily') });
+      }
+      return out;
+    }catch(e){ return []; }
+  }
+  function dropLinkParam(){
+    try{ history.replaceState(null, '', location.pathname + location.search); }catch(e){}
+  }
+
+  /* ---- the card: HT-11's sheet classes, so it looks like the one sheet the app already has ---- */
+  function card(){
+    var n=document.getElementById('h28First');
+    if(n) return n;
+    n=document.createElement('div'); n.id='h28First'; n.className='esheet h28first';
+    n.setAttribute('role','dialog'); n.setAttribute('aria-modal','true');
+    n.innerHTML='<div class="ebody" id="h28FirstBody"></div>';
+    document.body.appendChild(n);
+    /* the scrim closes it for now; only the card's own buttons put it away for good */
+    n.addEventListener('click', function(e){ if(e.target===n) closeCard(); });
+    n.addEventListener('keydown', function(e){ if(e.key==='Escape') closeCard(); });
+    return n;
+  }
+  function closeCard(){ var n=document.getElementById('h28First'); if(n){ n.classList.remove('on'); n.removeAttribute('data-kind'); } }
+
+  var firstShown=false, linkShown=false, linkDone=false, busy=false;
+  function showFirst(){
+    var n=card(), b=document.getElementById('h28FirstBody');
+    var ex=offerExamples();
+    b.innerHTML='<div class="eh"><h3>How to start</h3></div>'+
+      '<ol class="h28l">'+LINES.map(function(s,i){
+        return '<li'+(i===4?' class="h28priv"':'')+'>'+esc(s)+'</li>'; }).join('')+'</ol>'+
+      (ex?'<div class="h28ex1">Examples: '+EXAMPLES.map(function(x){ return esc(x.name); }).join(' \u00b7 ')+'</div>':'')+
+      '<div class="etools">'+
+        (ex?'<button class="btn pri" id="h28Ex" type="button">Start with 4 examples</button>':'')+
+        '<span style="flex:1"></span>'+
+        '<button class="btn'+(ex?'':' pri')+'" id="h28Got" type="button">Got it</button>'+
+      '</div>';
+    n.setAttribute('data-kind','first'); n.classList.add('on');
+    document.getElementById('h28Got').onclick=function(){ dismiss(); closeCard(); };
+    var eb=document.getElementById('h28Ex');
+    if(eb) eb.onclick=function(){ dismiss(); addExamples(eb); };
+  }
+  function haveNames(){ var m={}; S.habits.forEach(function(h){ m[String(h.name||'').trim().toUpperCase()]=1; }); return m; }
+  function showLink(items){
+    var n=card(), b=document.getElementById('h28FirstBody'), have=haveNames();
+    var todo=items.filter(function(x){ return !have[x.name.toUpperCase()]; });
+    b.innerHTML='<div class="eh"><h3>Add standards</h3></div>'+
+      '<div class="h28seed">'+items.map(function(x){
+        var on=have[x.name.toUpperCase()];
+        return '<div class="fl'+(on?' on':'')+'"><i>'+(x.time?esc(x.time):'')+'</i>'+
+          '<span><b>'+esc(x.name)+'</b>'+(x.notes?'<em>'+esc(x.notes)+'</em>':'')+'</span>'+
+          '<u>'+(on?'on your list':(x.cadence==='weekly'?'weekly':(x.time?'timed':'anytime')))+'</u></div>'; }).join('')+
+      '</div>'+
+      '<div class="h28ex1">From a link \u00b7 each counts once, like any standard.</div>'+
+      '<div class="etools">'+
+        (todo.length?'<button class="btn pri" id="h28Seed" type="button">'+
+          (todo.length===items.length?'Add '+(items.length===1?'it':'all '+items.length):'Add the missing '+todo.length)+'</button>':'')+
+        '<span style="flex:1"></span>'+
+        '<button class="btn'+(todo.length?'':' pri')+'" id="h28SeedNo" type="button">'+(todo.length?'Not now':'Close')+'</button>'+
+      '</div>';
+    n.setAttribute('data-kind','add'); n.classList.add('on');
+    document.getElementById('h28SeedNo').onclick=function(){ linkDone=true; dropLinkParam(); closeCard(); };
+    var bt=document.getElementById('h28Seed');
+    if(bt) bt.onclick=function(){ addFromLink(items, bt); };
+  }
+
+  async function addExamples(btn){
+    if(busy || !S.me || S.loadOk!==true) return;
+    busy=true; if(btn){ btn.disabled=true; btn.textContent='adding\u2026'; }
+    var outcome='none';
+    try{
+      /* ask the server, not S: a second device may have added rows since this one loaded */
+      var chk = await sb.from('habits').select('id').eq('user_id',S.me.id).eq('active',true);
+      if(chk.error){ outcome='failed'; toast('not added \u2014 '+errText(chk)); return; }
+      if((chk.data||[]).length){ outcome='had-rows'; closeCard(); toast('your list already has standards'); await fullReload(); return; }
+      await ensureFlags();
+      var res = await sb.from('habits').insert(EXAMPLES.map(function(x,i){ return recOf(x,i); }));
+      if(res && res.error){ outcome='failed'; toast('not added \u2014 '+errText(res)); return; }
+      outcome='added'; closeCard();
+      toast('4 examples added \u2014 change or delete any');
+      await fullReload();
+    }finally{
+      busy=false; window.__h28Examples=outcome;
+      if(btn && btn.isConnected){ btn.disabled=false; btn.textContent=btn.id==='h28Ex'?'Start with 4 examples':'Add these 4'; }
+    }
+  }
+  async function addFromLink(items, btn){
+    if(busy || !S.me || S.loadOk!==true) return;
+    busy=true; if(btn){ btn.disabled=true; btn.textContent='adding\u2026'; }
+    try{
+      var cur = await sb.from('habits').select('id,name,sort_order').eq('user_id',S.me.id).eq('active',true);
+      if(cur.error){ toast('not added \u2014 '+errText(cur)); window.__h28Add={ failed:true }; return; }
+      var have={}, top=0;
+      (cur.data||[]).forEach(function(r){ have[String(r.name||'').trim().toUpperCase()]=1; top=Math.max(top, +r.sort_order||0); });
+      var todo=items.filter(function(x){ return !have[x.name.toUpperCase()]; });
+      if(todo.length){
+        await ensureFlags();
+        var res=await sb.from('habits').insert(todo.map(function(x,i){
+          return recOf({ name:x.name, time:x.time, notes:x.notes, minutes:0, cadence:x.cadence, group_name:'Other' }, top+1+i); }));
+        if(res && res.error){ toast('not added \u2014 '+errText(res)); window.__h28Add={ failed:true }; return; }
+      }
+      window.__h28Add={ added:todo.length, skipped:items.length-todo.length };
+      try{ console.log('HT-28 F19: add-link \u00b7 added '+todo.length+' \u00b7 already there '+(items.length-todo.length)); }catch(e){}
+      linkDone=true; dropLinkParam(); closeCard();
+      toast(todo.length ? todo.length+' standard'+(todo.length>1?'s':'')+' added' : 'already on your list');
+      await fullReload();
+    }finally{
+      busy=false;
+      if(btn && btn.isConnected){ btn.disabled=false; }
+    }
+  }
+
+  /* ---- G21 · THE EMPTY LIST: what went wrong or what to do, and always a way to add one ------------- */
+  function exHtml(){
+    return '<div class="k">Examples \u00b7 keep, change or delete any</div>'+
+      EXAMPLES.map(function(x){
+        return '<div class="fl"><i>'+(x.time?esc(x.time):'')+'</i><span>'+esc(x.name)+'</span>'+
+          '<b>'+(x.cadence==='weekly'?'WEEKLY':(x.time?'TIMED':'ANYTIME'))+'</b></div>'; }).join('')+
+      '<div class="h28t"><button class="btn pri" type="button" data-h28ex="1">Add these 4</button></div>';
+  }
+  function emptyLog28(){
+    if(advanced() || !S.me) return;
+    var log=document.getElementById('log'); if(!log) return;
+    var ex=log.querySelector('.h28ex'), add=log.querySelector('.h28add'), em=log.querySelector('.empty');
+    if(log.querySelector('.li') || (S.habits.length && S.loadOk!==false)){
+      if(ex) ex.parentNode.removeChild(ex);
+      if(add) add.parentNode.removeChild(add);
+      return;                                     /* rows, or a filter that matched none: not ours */
+    }
+    if(S.loadOk===false){
+      if(em) em.textContent='Could not load your standards \u2014 check the connection, then reload.';
+      if(ex) ex.parentNode.removeChild(ex);
+      if(add) add.parentNode.removeChild(add);
+      return;
+    }
+    if(em && em.textContent!=='No standards yet.') em.textContent='No standards yet.';
+    if(offerExamples()){
+      if(!ex){ ex=document.createElement('div'); ex.className='h28ex'; ex.innerHTML=exHtml(); log.appendChild(ex); }
+      var eb=ex.querySelector('[data-h28ex]');
+      if(eb && !eb.dataset.bound){ eb.dataset.bound='1'; eb.addEventListener('click', function(e){
+        e.preventDefault(); e.stopPropagation(); dismiss(); addExamples(eb); }); }
+    }else if(ex) ex.parentNode.removeChild(ex);
+    /* HT-11's footers add "+ Add standard" only under existing rows; with none there was no way to add one
+       from TODAY. Its own capture listener on #log opens the sheet for any `.eadd`. */
+    if(!add){ add=document.createElement('button'); add.type='button'; add.className='eadd h28add';
+              add.setAttribute('data-add',''); add.textContent='+ Add standard'; }
+    if(add.parentNode!==log || log.lastElementChild!==add) log.appendChild(add);
+  }
+
+  function boot28b(){
+    if(!S.me) return;
+    emptyLog28();
+    if(advanced() || S.loadOk!==true) return;
+    if(linkRaw() && !linkDone){
+      if(!linkShown){
+        linkShown=true;
+        var items=linkItems();
+        if(items && items.length) showLink(items);
+        else { linkDone=true; dropLinkParam(); toast('that add-link could not be read'); }
+      }
+      return;
+    }
+    if(!firstShown && noHistory() && !dismissed()){ firstShown=true; showFirst(); }
+  }
+
+  /* the legacy "Start with these three" is the Advanced view's; the simple view uses the card above */
+  var _ps=paintStarter;
+  paintStarter=function(){
+    if(!advanced()){
+      try{ document.documentElement.setAttribute('data-firstrun','0'); }catch(e){}
+      var n=el('starter'); if(n){ n.style.display='none'; n.innerHTML=''; }
+      return;
+    }
+    if(S.loadOk===false){ var m=el('starter'); if(m){ m.style.display='none'; m.innerHTML=''; } return; }
+    return _ps.apply(null, arguments);
+  };
+  window.__HT28b = { repaint:boot28b, lines:LINES.slice(), examples:EXAMPLES.slice(),
+                     noHistory:noHistory, offerExamples:offerExamples, linkItems:linkItems };
+  var _pa=paintAll; paintAll=function(){ _pa.apply(null,arguments); boot28b(); };
+  var _pl=paintLog; paintLog=function(){ _pl.apply(null,arguments); emptyLog28(); };
+  if(document.readyState==='complete') setTimeout(boot28b, 650);
+  else window.addEventListener('load', function(){ setTimeout(boot28b, 650); });
+})();
+
+/* ======================= HT-28c · SYNC - PHONE AND DESKTOP STAY ONE (PASTE 128 C) =======================
+   Cory 19:25: a check-off on the phone was not on the desktop until he reloaded, and the desktop could
+   then write its stale day back over it. Measured on 2cdf48d: no visibilitychange, focus, online, poll or
+   subscription anywhere in the app - every device kept the day it loaded.
+
+   THE SERVER IS THE TRUTH, AND A DEVICE ONLY EVER WRITES WHAT IT CHANGED.
+   1 · every edit is recorded as an OP (this key / this field -> this value) against the server's own copy of
+       that day, and survives a reload in localStorage (per account) until the server has it;
+   2 · a save reads the server's row first. Check-offs are one JSONB column, so the ops are laid over the
+       server's map and the map is written; journal fields are written ONE COLUMN AT A TIME - PostgREST's
+       upsert sets only the columns it names - so another device's field is never in the payload at all.
+       Where both devices changed the same key the later write wins (last-write-wins) and the value it
+       replaced goes to this account's on-device ring `ht28_sync_lost_<id>`; the console gets the key only;
+   3 · A DEVICE WHOSE LOAD FAILED WRITES NOTHING AND REPLAYS NOTHING. It reloads first. A failed load leaves
+       S with no standards and no days, and a save from there would reprice a real day to 0 % (review BLOCK);
+   4 · a pull - every 30 s while the page is visible, at once on return / focus / reconnect, none while
+       hidden, backing off on failure - fetches the last 14 days and applies what differs. A field that is
+       focused keeps what is on screen AND keeps its old baseline, so leaving it later cannot write the stale
+       text over the other device's newer text (review BLOCK);
+   5 · offline, edits are saved on the device and replayed on `online`; signing out replays what it can and
+       then clears this account's queue and ring from the device.
+   No Realtime subscription: it needs the tables in Supabase's realtime publication, a migration this wire
+   does not run; the in-page pull is the whole mechanism and the named upgrade path. Nothing here runs while
+   the page is hidden and nothing is scheduled outside the page - the repo's PHASE GATE reads "no automated
+   pulls", and that reading is SPEC's to rule (receipt 128, FOR SPEC). */
+(function(){
+  var POLL_MS = +(window.__SYNC_MS || 30000), MAX_BACKOFF = 300000, WINDOW_DAYS = 14;
+  var TYPING_HOLD_MS = +(window.__SYNC_TYPING_MS || 60000);
+  var PF = ['rating','why','tasks','prayer','brain_dump'];
+  var LOST_KEY = 'ht28_sync_lost_', Q_KEY = 'ht28_sync_q_';
+  var OPS = { days:{}, dbase:{}, priv:{}, pbase:{} };
+  var SHADOW = {}, shadowSrc = null, DSHADOW = {}, dshadowSrc = null;
+  var SY = { last:null, state:'idle', busy:false, timer:null, nextMs:null, fails:0, edits:0,
+             pendDay:false, pendPriv:false, deferred:false, lastTry:0, lastType:0, started:false,
+             stopped:false, pulls:0, applied:0, lostN:0, restored:false, reason:null, held:null };
+  var SKIPPED = { data:null, error:null, skipped:true };
+  function queued(why){ return { data:null, error:{ message:why }, queued:true }; }
+
+  function has(o,k){ return Object.prototype.hasOwnProperty.call(o,k); }
+  function norm(v){ return v==null ? '' : String(v); }
+  function copy(o){ var r={}; for(var k in o) if(has(o,k)) r[k]=o[k]; return r; }
+  function count(m){ var n=0; for(var d in m) if(has(m,d)) n+=Object.keys(m[d]).length; return n; }
+  function hasOps(){ return count(OPS.days)+count(OPS.priv) > 0; }
+  function offline(){ return navigator.onLine === false; }
+  function isNetErr(e){ return !!e && /fetch|network|load failed|offline|timed? ?out/i.test(String(e.message||e)); }
+  function mine(r){ return !r.user_id || (S.me && r.user_id === S.me.id); }
+  function clock2(d){ return ('0'+d.getHours()).slice(-2)+':'+('0'+d.getMinutes()).slice(-2); }
+  function ready(){ return !!S.me && S.loadOk === true; }
+  function warn(what, e){ try{ console.warn('HT-28 sync: '+what+(e && e.message ? ' - '+String(e.message).slice(0,120) : '')); }catch(_){} }
+
+  /* ---- the op log and the ring, both per account ---- */
+  function persist(){
+    if(!S.me) return;
+    try{ if(hasOps()) localStorage.setItem(Q_KEY+S.me.id, JSON.stringify(OPS));
+         else localStorage.removeItem(Q_KEY+S.me.id); }catch(e){}
+  }
+  function restore(){
+    if(SY.restored || !S.me) return; SY.restored=true;
+    var got=null; try{ got=JSON.parse(localStorage.getItem(Q_KEY+S.me.id)||'null'); }catch(e){}
+    if(!got) return;
+    ['days','dbase','priv','pbase'].forEach(function(p){
+      var src=got[p]||{};
+      for(var d in src) if(has(src,d)){
+        var dst=OPS[p][d]||(OPS[p][d]={});
+        for(var k in src[d]) if(has(src[d],k) && !has(dst,k)) dst[k]=src[d][k];
+      }
+    });
+  }
+  function lost(entry){
+    entry.at = new Date().toISOString(); SY.lostN++;
+    try{ console.warn('HT-28 sync: a later edit replaced an earlier one - '+entry.table+' '+entry.date+' '+entry.key); }catch(e){}
+    try{ var key=LOST_KEY+S.me.id, a=JSON.parse(localStorage.getItem(key)||'[]'); a.push(entry);
+         while(a.length>50) a.shift(); localStorage.setItem(key, JSON.stringify(a)); }catch(e){}
+  }
+
+  /* ---- 1 · RECORD, against the server's copy of the day - for every loaded day, not a window ---- */
+  function shadowNow(){
+    if(S.privAll === shadowSrc) return;
+    shadowSrc = S.privAll; SHADOW = {};
+    for(var d in S.privAll) if(has(S.privAll,d)){
+      var r=S.privAll[d]||{}, s={}; PF.forEach(function(f){ if(has(r,f)) s[f]=r[f]; }); SHADOW[d]=s;
+    }
+  }
+  function dshadowNow(){
+    if(S.days === dshadowSrc) return;
+    dshadowSrc = S.days; DSHADOW = {};
+    S.days.forEach(function(r){ DSHADOW[r.date]=copy(r.checked||{}); });
+  }
+  function recordPriv(){
+    var k=S.date, p=S.priv; if(!p || !S.me || !k) return;
+    var sh=SHADOW[k]||{};
+    PF.forEach(function(f){
+      if(!has(p,f)) return;
+      if(f==='brain_dump' && S.loadOk===true && !S.hasDump) return;   /* the column truly is not there */
+      var o=OPS.priv[k];
+      if(norm(p[f]) === norm(has(sh,f)?sh[f]:null)){
+        if(o && has(o,f)) o[f]=p[f];                                   /* typed back to what the server has */
+        return;
+      }
+      o = o || (OPS.priv[k]={}); var b=OPS.pbase[k]||(OPS.pbase[k]={});
+      if(!has(o,f)) b[f] = has(sh,f) ? sh[f] : null;
+      if(!has(o,f) || norm(o[f]) !== norm(p[f])){ o[f]=p[f]; SY.edits++; }   /* a cleared field is an op too */
+    });
+    persist();
+  }
+  function recordDayShadow(d){
+    var r=S.byDate[d]; if(!r || !S.me) return;
+    var now=r.checked||{}, sh=DSHADOW[d]||{}, keys={};
+    Object.keys(now).forEach(function(x){ keys[x]=1; }); Object.keys(sh).forEach(function(x){ keys[x]=1; });
+    Object.keys(keys).forEach(function(x){
+      var o=OPS.days[d];
+      if(!!now[x] === !!sh[x]){ if(o && has(o,x)) o[x] = now[x] ? now[x] : null; return; }
+      o = o || (OPS.days[d]={}); var b=OPS.dbase[d]||(OPS.dbase[d]={});
+      if(!has(o,x)) b[x] = sh[x] ? sh[x] : null;
+      if(!has(o,x) || norm(o[x]) !== norm(now[x]||null)){ o[x] = now[x] ? now[x] : null; SY.edits++; }   /* an uncheck is an op too */
+    });
+    persist();
+  }
+  /* local ops are the truth until the server has them: laid over whatever load() or a pull just put in S */
+  function overlay(){
+    var d, k;
+    for(d in OPS.days) if(has(OPS.days,d)){
+      var r=S.byDate[d] || (S.byDate[d]={ date:d, checked:{}, pct:0 });
+      r.checked = r.checked || {};
+      for(k in OPS.days[d]) if(has(OPS.days[d],k)){ var v=OPS.days[d][k]; if(v) r.checked[k]=v; else delete r.checked[k]; }
+    }
+    for(d in OPS.priv) if(has(OPS.priv,d)){
+      var p=S.privAll[d] || (S.privAll[d]={ date:d, user_id:S.me.id });
+      for(k in OPS.priv[d]) if(has(OPS.priv[d],k)) p[k]=OPS.priv[d][k];
+      if(d===S.date) S.priv=p;
+    }
+  }
+
+  /* ---- 2 · MERGE ON SAVE ---- */
+  async function fetchDay(k){
+    try{
+      var uid=S.me.id, cols='date,checked,active_set,pct'+(S.hasClosedAt?',closed_at':'');
+      var r = await sb.from('days').select(cols).eq('user_id',uid).eq('date',k);
+      if(r.error){ if(!isNetErr(r.error)) warn('day read refused', r.error); return { ok:false, network:offline()||isNetErr(r.error) }; }
+      return { ok:true, row:(r.data||[]).filter(function(x){ return x.date===k && mine(x); })[0] || null };
+    }catch(e){ warn('day read failed', e); return { ok:false, network:offline()||isNetErr(e) }; }
+  }
+  async function fetchPriv(k){
+    try{
+      var uid=S.me.id, cols='date,'+PF.filter(function(f){ return f!=='brain_dump' || S.hasDump; }).join(',');
+      var r = await sb.from('day_private').select(cols).eq('user_id',uid).eq('date',k);
+      if(r.error){ if(!isNetErr(r.error)) warn('journal read refused', r.error); return { ok:false, network:offline()||isNetErr(r.error) }; }
+      return { ok:true, row:(r.data||[]).filter(function(x){ return x.date===k && mine(x); })[0] || null };
+    }catch(e){ warn('journal read failed', e); return { ok:false, network:offline()||isNetErr(e) }; }
+  }
+  function savedHere(){ SY.state='offline'; SY.held=null; persist(); stamp(); toast('saved on this device \u00b7 syncs when online'); }
+  function hold(why, say){ SY.state=offline()?'offline':'error'; SY.held=why; persist(); stamp();
+    if(say) toast('saved on this device \u00b7 will retry'); }
+
+  async function mergeDay(k, write, explicit, bound){
+    await Promise.resolve();                       /* the caller's own bookkeeping runs first */
+    SY.pendDay=false;
+    if(!S.me) return write();
+    recordDayShadow(k);
+    var ops=OPS.days[k], carried=(ops && Object.keys(ops).length) ? copy(ops) : null;
+    if(!carried && !explicit) return SKIPPED;      /* nothing changed here: nothing to write */
+    if(!ready()){ hold('not loaded', !!carried); return queued('not loaded'); }
+    if(offline()){ if(carried) savedHere(); return queued('offline'); }
+    var srv=await fetchDay(k);
+    if(!srv.ok){ if(srv.network){ if(carried) savedHere(); } else hold('read failed', !!carried); return queued('read failed'); }
+    if(bound && k!==S.date) return null;           /* saveDay writes the day ON SCREEN: moved away - the replay has it */
+    if(!ready()){ hold('not loaded'); return queued('not loaded'); }
+    var r=S.byDate[k] || (S.byDate[k]={ date:k, checked:{}, pct:0 });
+    /* a past day is repriced from ITS OWN snapshot - taken from the server when this device holds none */
+    if(srv.row && srv.row.active_set && srv.row.active_set.length && !(r.active_set && r.active_set.length))
+      r.active_set = srv.row.active_set.slice();
+    var sc=(srv.row && srv.row.checked) || {}, merged=copy(sc), base=OPS.dbase[k]||{}, cur=OPS.days[k]||carried||{};
+    Object.keys(cur).forEach(function(h){
+      var v=cur[h], sv=sc[h];
+      if(has(base,h) && !!sv !== !!base[h] && !!sv !== !!v)
+        lost({ table:'days', date:k, key:h, lost:(sv||null), kept:(v||null) });
+      if(v) merged[h]=v; else delete merged[h];
+    });
+    var foreign = JSON.stringify(Object.keys(merged).sort()) !== JSON.stringify(Object.keys(r.checked||{}).sort());
+    r.checked = merged;
+    var written = copy(merged);
+    var res = await write();
+    if(res && !res.error){
+      var left=OPS.days[k];
+      if(carried && left){
+        Object.keys(carried).forEach(function(h){
+          if(!has(left,h)) return;
+          if(left[h]===carried[h]){ delete left[h]; if(OPS.dbase[k]) delete OPS.dbase[k][h]; }
+          else (OPS.dbase[k]||(OPS.dbase[k]={}))[h] = written[h] || null;   /* ticked again mid-write: its base is what was written */
+        });
+        if(!Object.keys(left).length){ delete OPS.days[k]; delete OPS.dbase[k]; }
+      }
+      DSHADOW[k] = written;
+      SY.held=null; persist(); ok();
+      if(foreign) soft();
+    }else if(res && res.error && isNetErr(res.error)) savedHere();
+    return res;
+  }
+  async function mergePriv(write){
+    await Promise.resolve();
+    SY.pendPriv=false;
+    if(!S.me) return write();
+    var k=S.date;
+    if(S.priv){ S.priv.date=k; S.priv.user_id=S.me.id; S.privAll[k]=S.priv; }
+    recordPriv();
+    var ops=OPS.priv[k];
+    if(!ops || !Object.keys(ops).length) return SKIPPED;   /* nothing changed here: nothing to write */
+    if(!ready()){ hold('not loaded', true); return queued('not loaded'); }
+    if(offline()){ savedHere(); return queued('offline'); }
+    var res = await writePrivFields(k);
+    if(res && !res.error && !res.skipped && k===S.date) privTail();
+    else if(res && res.error && !res.queued) toast('note not saved');
+    return res;
+  }
+  /* THE FIELDS THIS DEVICE CHANGED, AND ONLY THOSE. The full-row write is gone from this path: with it, a
+     stale field on this screen could ride along over another device's newer text (review BLOCK). */
+  async function writePrivFields(k){
+    var ops=OPS.priv[k]; if(!ops || !Object.keys(ops).length) return SKIPPED;
+    var srv=await fetchPriv(k);
+    if(!srv.ok){ if(srv.network) savedHere(); else hold('read failed', true); return queued('read failed'); }
+    if(!ready()){ hold('not loaded'); return queued('not loaded'); }
+    var cur=OPS.priv[k]||{}, base=OPS.pbase[k]||{}, row={ user_id:S.me.id, date:k }, sent={}, n=0;
+    Object.keys(cur).forEach(function(f){
+      if(PF.indexOf(f)<0) return;
+      if(f==='brain_dump' && !S.hasDump){ delete cur[f]; delete base[f]; return; }   /* no column can hold it */
+      var sv = srv.row ? srv.row[f] : null;
+      if(has(base,f) && norm(sv)!==norm(base[f]) && norm(sv)!==norm(cur[f]))
+        lost({ table:'day_private', date:k, key:f, lost:(sv==null?null:sv), kept:cur[f] });
+      row[f] = (f==='rating') ? ((cur[f]==null||cur[f]==='') ? null : +cur[f]) : (cur[f]==null ? '' : String(cur[f]));
+      sent[f] = cur[f]; n++;
+    });
+    if(!n){ if(OPS.priv[k] && !Object.keys(OPS.priv[k]).length){ delete OPS.priv[k]; delete OPS.pbase[k]; } persist(); return SKIPPED; }
+    var res = await sb.from('day_private').upsert(row, { onConflict:'user_id,date' });
+    if(res && !res.error){
+      var s=SHADOW[k]||(SHADOW[k]={}), p=S.privAll[k]||(S.privAll[k]={ date:k, user_id:S.me.id }), left=OPS.priv[k]||{};
+      /* ONLY WHAT WAS SENT MOVES THE BASELINE. The other device's fields are NOT taken in here: this path
+         does not redraw the boxes, so memory would hold the phone's text while the desk's box still showed the
+         old one, and typing into that box later would baseline on the phone's text and overwrite it with no
+         conflict logged (second review of 9d4ac6b). The next pull sees the difference, takes it in, and
+         redraws - through the focus-keeping repaint. */
+      Object.keys(sent).forEach(function(f){ s[f]=sent[f]; });
+      Object.keys(sent).forEach(function(f){
+        if(!has(left,f)) return;
+        if(norm(left[f])===norm(sent[f])){ delete left[f]; if(OPS.pbase[k]) delete OPS.pbase[k][f]; }
+        else (OPS.pbase[k]||(OPS.pbase[k]={}))[f]=sent[f];                        /* typed on during the write */
+      });
+      if(OPS.priv[k] && !Object.keys(OPS.priv[k]).length){ delete OPS.priv[k]; delete OPS.pbase[k]; }
+      if(k===S.date) S.priv=p;
+      SY.held=null; persist(); ok();
+    }else if(res && res.error && isNetErr(res.error)) savedHere();
+    return res;
+  }
+  /* what the original savePriv did after its write, for the row this layer wrote */
+  function privTail(){
+    toast('saved');
+    var p=S.priv||{}, n=0; ['brain_dump','tasks','prayer'].forEach(function(f){ if(p[f]) n++; });
+    var c=el('jrnC'); if(c) c.textContent = n ? n+' of 3 written \u00b7 autosaves' : 'saves as you type';
+    try{ paintRating(); paintRChart(); paintRScat(); paintRSleep(); paintRByMo(); paintJournal(); paintCal(); }
+    catch(e){ warn('repaint after save failed', e); }
+  }
+  var replaying=null;
+  function replay(){
+    if(replaying) return replaying;
+    replaying=(async function(){
+      if(offline() || !ready()) return false;
+      var d, dates=Object.keys(OPS.days);
+      for(var i=0;i<dates.length;i++){
+        d=dates[i];
+        var res = (d===S.date) ? await saveDay() : await saveDayFor(d);
+        if(res && res.error) return false;
+      }
+      dates=Object.keys(OPS.priv);
+      for(var j=0;j<dates.length;j++){
+        d=dates[j];
+        var r2 = (d===S.date) ? await savePriv() : await writePrivFields(d);
+        if(r2 && r2.error) return false;
+      }
+      return true;
+    })().finally(function(){ replaying=null; });
+    return replaying;
+  }
+
+  /* ---- 3 · PULL ---- */
+  function typingIn(f){
+    var ids={ why:'iWhy', brain_dump:'iDump', tasks:'iTasks', prayer:'iPrayer' };
+    var a=document.activeElement; return !!a && a.id===ids[f];
+  }
+  function textFocus(){
+    var a=document.activeElement;
+    if(!a || a===document.body) return null;
+    var tag=(a.tagName||'').toLowerCase();
+    if(tag==='textarea' || a.isContentEditable || (tag==='input' && !/^(checkbox|radio|button|submit|range|color)$/i.test(a.type||''))) return a;
+    return null;
+  }
+  async function fetchWindow(){
+    var uid=S.me.id, from=shift(today(), -(WINDOW_DAYS-1));
+    if(S.date && S.date<from) from=S.date;
+    var hc='id,name,group_name,cadence,tier,minutes,link,sort_order'+(S.hasCue?',cue':'')+
+           (S.hasWindow?',planned_start,planned_end':'')+(S.hasNotes?',notes':'')+(S.hasTime?',time_anchor,minutes_planned':'');
+    var dc='date,checked,active_set,pct,floor_pct'+(S.hasClosedAt?',closed_at':'');
+    var pc='date,rating,why,tasks,prayer'+(S.hasPredict?',predict':'')+(S.hasDump?',brain_dump':'');
+    try{
+      var r = await Promise.all([
+        sb.from('habits').select(hc).eq('user_id',uid).eq('active',true).order('sort_order'),
+        sb.from('days').select(dc).eq('user_id',uid).gte('date',from).order('date'),
+        sb.from('day_private').select(pc).eq('user_id',uid).gte('date',from)
+      ]);
+      var bad=r.filter(function(x){ return x && x.error; })[0];
+      if(bad){ if(!isNetErr(bad.error)) warn('pull refused', bad.error); return { ok:false, network:offline()||isNetErr(bad.error) }; }
+      return { ok:true, from:from, habits:(r[0].data||[]),
+               days:(r[1].data||[]).filter(mine), priv:(r[2].data||[]).filter(mine) };
+    }catch(e){ warn('pull read failed', e); return { ok:false, network:offline()||isNetErr(e) }; }
+  }
+  var HF=['id','name','group_name','cadence','minutes','link','sort_order','cue','time_anchor','minutes_planned','planned_start','planned_end','notes'];
+  function fpH(list){ return JSON.stringify((list||[]).map(function(h){ return HF.map(function(f){ return h[f]==null?null:h[f]; }); })); }
+  function fpCk(c){ c=c||{}; return JSON.stringify(Object.keys(c).sort().map(function(k){ return [k, c[k]]; })); }
+  function fpP(p){ p=p||{}; return JSON.stringify(PF.map(function(f){ return norm(p[f]); })); }
+  function apply(snap){
+    var changed=false;
+    var hs=snap.habits.map(function(x,i){ if(x.sort_order==null) x.sort_order=i; return x; });
+    if(fpH(hs)!==fpH(S.habits)){ S.habits=hs; changed=true; }
+    var idx={}; S.days.forEach(function(r,i){ idx[r.date]=i; });
+    snap.days.forEach(function(row){
+      DSHADOW[row.date]=copy(row.checked||{});            /* the server's copy, before this device's ops */
+      var o=OPS.days[row.date];
+      if(o){ row.checked=copy(row.checked||{}); for(var h in o) if(has(o,h)){ if(o[h]) row.checked[h]=o[h]; else delete row.checked[h]; } }
+      var loc=S.byDate[row.date];
+      if(loc && fpCk(loc.checked)===fpCk(row.checked) && JSON.stringify(loc.active_set||[])===JSON.stringify(row.active_set||[])) return;
+      if(has(idx,row.date)) S.days[idx[row.date]]=row; else S.days.push(row);
+      S.byDate[row.date]=row; changed=true;
+    });
+    S.days.sort(function(a,b){ return a.date<b.date?-1:(a.date>b.date?1:0); });
+    snap.priv.forEach(function(row){
+      var o=OPS.priv[row.date]||{}, loc=S.privAll[row.date], next=copy(row), s=copy(SHADOW[row.date]||{});
+      PF.forEach(function(f){
+        if(!has(row,f)) return;
+        if(has(o,f)){ next[f]=o[f]; s[f]=row[f]; return; }
+        /* FOCUSED, AND THE SERVER MOVED: the screen keeps its text and the baseline stays where it was, so
+           leaving the field without typing writes nothing, and typing into it is a real, logged conflict */
+        if(row.date===S.date && typingIn(f) && loc && norm(loc[f])!==norm(row[f])){ next[f]=loc[f]; return; }
+        s[f]=row[f];
+      });
+      SHADOW[row.date]=s;
+      if(loc && fpP(loc)===fpP(next)) return;
+      if(loc){ PF.forEach(function(f){ if(has(next,f)) loc[f]=next[f]; }); }   /* in place: S.priv may point at it */
+      else S.privAll[row.date]=next;
+      changed=true;
+    });
+    if(S.date){ S.priv=S.privAll[S.date]||null; if(!S.byDate[S.date]) S.byDate[S.date]={ date:S.date, checked:{}, pct:0 }; }
+    return changed;
+  }
+
+  function ok(){ SY.fails=0; SY.last=new Date(); SY.state='ok'; stamp(); }
+  function soft(){
+    if(textFocus() && Date.now()-SY.lastType < TYPING_HOLD_MS){ SY.deferPaint=true; return; }   /* memory is current; the screen waits */
+    repaintKeepingFocus();
+  }
+  function repaintKeepingFocus(){
+    var a=textFocus(), keep=a ? { id:a.id, s:a.selectionStart, e:a.selectionEnd, top:a.scrollTop } : null;
+    paintAll();
+    if(keep && keep.id){
+      var n=document.getElementById(keep.id);
+      if(n && document.activeElement!==n){ try{ n.focus({ preventScroll:true }); }catch(e){} }
+      if(n && keep.s!=null){ try{ n.setSelectionRange(keep.s, keep.e); n.scrollTop=keep.top; }catch(e){} }
+    }
+  }
+  function stop(){ SY.stopped=true; clearTimeout(SY.timer); SY.timer=null; SY.nextMs=null; }
+  /* the reload a failed load needs: load, then HT-11's column probe, then paint - and if load() put the
+     sign-in screen up, nothing is painted over it and the sync stops */
+  async function reloadAll(){
+    S.loadOk=null;
+    var got = await load();
+    if(got===false){ stop(); return false; }
+    if(window.__HT11 && window.__HT11.probe){ try{ await window.__HT11.probe(); }catch(e){ warn('column probe failed', e); } }
+    repaintKeepingFocus();
+    return true;
+  }
+  async function pull(reason){
+    if(!S.me || SY.busy || SY.stopped) return;
+    if(document.visibilityState==='hidden'){ schedule(); return; }
+    SY.lastTry=Date.now(); SY.pulls++; SY.reason=reason;
+    if(offline()){ SY.state='offline'; stamp(); schedule(); return; }
+    SY.busy=true;
+    try{
+      if(S.loadOk!==true){                         /* reload BEFORE any replay (review BLOCK) */
+        if(!(await reloadAll())) return;
+        if(S.loadOk!==true){ SY.fails++; SY.state=offline()?'offline':'error'; return; }
+        ok();
+      }
+      if(SY.pendDay || SY.pendPriv) await flush();
+      if(hasOps()){ await replay(); if(hasOps()){ SY.fails++; SY.state=offline()?'offline':'error'; return; } }
+      var e0=SY.edits;
+      var snap=await fetchWindow();
+      if(!snap.ok){ SY.fails++; SY.state=snap.network?'offline':'error'; return; }
+      if(SY.edits!==e0 || SY.pendDay || SY.pendPriv || hasOps()){ SY.fails=0; return; }   /* edited mid-fetch: next pull */
+      if(textFocus() && Date.now()-SY.lastType < TYPING_HOLD_MS){ SY.deferred=true; return; }   /* never under a field being typed in */
+      var changed=apply(snap);
+      ok();
+      if(changed){ SY.applied++; repaintKeepingFocus(); }
+    }catch(e){
+      SY.fails++; SY.state='error'; warn('pull failed', e);
+    }finally{
+      SY.busy=false; stamp(); schedule();
+    }
+  }
+  function schedule(){
+    clearTimeout(SY.timer); SY.timer=null;
+    if(!S.me || SY.stopped || document.visibilityState==='hidden'){ SY.nextMs=null; return; }   /* paused while hidden */
+    var ms = SY.fails ? Math.min(MAX_BACKOFF, POLL_MS*Math.pow(2, Math.min(SY.fails,4))) : POLL_MS;
+    SY.nextMs=ms;
+    SY.timer=setTimeout(function(){ pull('poll'); }, ms);
+  }
+  async function flush(){
+    var ps=[];
+    if(SY.pendDay){ clearTimeout(saveT); ps.push(saveDay()); }
+    if(SY.pendPriv){ clearTimeout(pvT); ps.push(savePriv()); }
+    try{ await Promise.all(ps); }catch(e){ warn('flush failed', e); }
+  }
+
+  /* ---- "Synced · 14:32" on the Session line in Settings - text on an existing element, no new geometry ---- */
+  function stampText(){
+    if(SY.state==='offline') return hasOps() ? 'Offline \u00b7 saved on this device' : 'Offline';
+    if(SY.state==='error') return hasOps() ? 'Not synced \u00b7 saved on this device, retrying' : 'Not synced \u00b7 retrying';
+    if(SY.last) return 'Synced \u00b7 '+clock2(SY.last);
+    return 'Not synced yet';
+  }
+  function stamp(){
+    var n=document.getElementById('h28Synced');
+    if(n){ var t2=stampText(); if(n.textContent!==t2) n.textContent=t2; }
+  }
+  function stampSettings(){
+    var ov=document.getElementById('ov'); if(!ov) return;
+    var heads=ov.querySelectorAll('.sh');
+    for(var i=0;i<heads.length;i++){
+      var h2=heads[i].querySelector('h2'), c=heads[i].querySelector('.c');
+      if(h2 && c && /session/i.test(h2.textContent||'')){ c.id='h28Synced'; stamp(); return; }
+    }
+  }
+
+  /* ---- wiring: every save path, every load, every trigger ---- */
+  /* the shadows AND the unsynced edits are retaken the moment load() returns: laid on only at the next paint,
+     a keystroke or a debounced save during HT-11's probe saw the fresh server text, took it for "typed back",
+     and wrote it over the edit (second review of 9d4ac6b) */
+  var _ld=load;        load=async function(){ var r=await _ld.apply(null, arguments); if(r!==false && S.me){ shadowNow(); dshadowNow(); overlay(); } return r; };
+  var _qs=queueSave;   queueSave=function(){ SY.pendDay=true; SY.edits++; var r=_qs.apply(null,arguments); recordDayShadow(S.date); return r; };
+  var _qp=queuePriv;   queuePriv=function(){ SY.pendPriv=true; SY.lastType=Date.now(); recordPriv(); return _qp.apply(null,arguments); };
+  var _sd=saveDay;     saveDay=function(opts){ var k=S.date;
+    return mergeDay(k, function(){ return _sd.call(null, opts); }, !!(opts && opts.close), true); };
+  var _sdf=saveDayFor; saveDayFor=function(k){
+    if(k===S.date) return saveDay();
+    return mergeDay(k, function(){ return _sdf.call(null, k); }); };
+  var _spv=savePriv;   savePriv=function(){ return mergePriv(function(){ return _spv.call(null); }); };
+  var _pa=paintAll;    paintAll=function(){
+    if(S.me){ if(!SY.started) restore(); shadowNow(); dshadowNow(); overlay(); }
+    _pa.apply(null, arguments);
+    if(S.me && !SY.started){
+      SY.started=true; SY.loadedAt=Date.now();
+      if(S.loadOk===true){ SY.last=new Date(); SY.state='ok'; if(hasOps()) setTimeout(function(){ pull('restore'); }, 1200); }
+      else { SY.last=null; SY.state=offline()?'offline':'error'; setTimeout(function(){ pull('reload'); }, 1500); }
+      schedule();
+    }
+  };
+  var _os=openSettings; openSettings=function(){ _os.apply(null, arguments); setTimeout(stampSettings, 30); };
+  /* SIGNING OUT: replay what can be replayed, ask before discarding what cannot, then clear this account's
+     queue and ring from the device - a shared device must not keep someone's journal text (review FIX) */
+  if(sb && sb.auth && sb.auth.signOut && !sb.auth.__h28){
+    var _so=sb.auth.signOut;
+    sb.auth.signOut=async function(){
+      var id=S.me && S.me.id;
+      try{ if(id && (SY.pendDay || SY.pendPriv)) await flush(); if(id && hasOps() && ready() && !offline()) await replay(); }
+      catch(e){ warn('replay before sign-out failed', e); }
+      if(id && hasOps() && !confirm('Changes on this device have not synced yet. Sign out and discard them?'))
+        return { data:null, error:{ message:'sign-out cancelled' } };
+      var out=await _so.apply(sb.auth, arguments);
+      if(out && out.error){ warn('sign-out failed - this device keeps its queue', out.error); return out; }   /* offline: still signed in */
+      stop();
+      if(id){ try{ localStorage.removeItem(Q_KEY+id); localStorage.removeItem(LOST_KEY+id); }catch(e){} }
+      return out;
+    };
+    sb.auth.__h28=true;
+  }
+
+  document.addEventListener('visibilitychange', function(){
+    if(!S.me || SY.stopped) return;
+    if(document.visibilityState==='hidden'){ clearTimeout(SY.timer); SY.timer=null; SY.nextMs=null; flush(); }
+    else pull('visible');
+  });
+  window.addEventListener('focus', function(){ if(S.me && Date.now()-SY.lastTry > 5000) pull('focus'); });
+  window.addEventListener('online', function(){ if(S.me) pull('online'); });
+  window.addEventListener('offline', function(){ if(S.me){ SY.state='offline'; stamp(); } });
+  window.addEventListener('pagehide', function(){ if(S.me && !SY.stopped) flush(); });
+  document.addEventListener('focusout', function(){
+    /* a repaint held back while someone typed happens when they leave the field: memory already matches the
+       server, so a pull alone would find nothing to redraw and the list would keep its old ticks (third review) */
+    if(SY.deferPaint){ SY.deferPaint=false; setTimeout(function(){ if(textFocus()) SY.deferPaint=true; else repaintKeepingFocus(); }, 350); }
+    if(SY.deferred){ SY.deferred=false; setTimeout(function(){ pull('focusout'); }, 400); } }, true);
+
+  window.__HT28c = {
+    pull: function(){ return pull('test'); },
+    flush: flush,
+    config: function(){ return { POLL_MS:POLL_MS, MAX_BACKOFF:MAX_BACKOFF, WINDOW_DAYS:WINDOW_DAYS, TYPING_HOLD_MS:TYPING_HOLD_MS }; },
+    state: function(){ return { state:SY.state, last:SY.last && SY.last.toISOString(), nextMs:SY.nextMs, fails:SY.fails,
+      pulls:SY.pulls, applied:SY.applied, ops:count(OPS.days)+count(OPS.priv), lost:SY.lostN, stamp:stampText(),
+      deferred:SY.deferred, stopped:SY.stopped, held:SY.held, reason:SY.reason }; },
+    ops: function(){ return JSON.parse(JSON.stringify(OPS)); },
+    lost: function(){ try{ return S.me ? JSON.parse(localStorage.getItem(LOST_KEY+S.me.id)||'[]') : []; }catch(e){ return []; } }
+  };
+})();
+
+/* ======================= HT-28d · THE PHONE'S VIEWS: GROUP DETAILS, ONE HEADER, ONE ORDER (PASTE 128 A3 · A6) =======================
+   PHONE ONLY (<=640px). Cory's phone review, 9/11 19:00-19:15: "Group details - the whole section better".
+   Group details is HT-17's drawer - tap a row of GROUP ADHERENCE and it opens that group's standards. On the
+   phone it rendered six desktop columns into 366px: names in 117px, a percentage wrapping under its own dot,
+   "LAST DONE" breaking in two. Rebuilt here as one clean table per group - Standard · Completion · Rating ·
+   Streak - under the group definition line Cory's words already ship with (HT-16's ADHERENCE_DEF). Every
+   label a person reads is humanized (words, Title Case, acronyms kept). The desktop drawer is untouched:
+   nothing below runs above 640px, and the columns it drops here (missed, last done, usual) stay on the
+   desktop and in DETAIL -> MORE (R70.138). Order, equal cards and the header style are CSS (app.css HT-28 A6). */
+(function(){
+  function advanced(){
+    try{ if(localStorage.getItem('ht_advanced')==='1') return true; }catch(e){}
+    if(window.__ADVANCED===true) return true;
+    return /[?&]advanced=1/.test(location.search);
+  }
+  function q(s,r){ return Array.prototype.slice.call((r||document).querySelectorAll(s)); }
+  var PHONE = window.matchMedia ? window.matchMedia('(max-width:640px)') : { matches:false };
+  function on(){ return PHONE.matches && !advanced(); }
+
+  /* stress 2: a humanizer that lowercases HT into "Ht" is worse than none - known acronyms are kept */
+  var ACRONYMS = ['HT','BEV','AM','PM','ID','SPEC','KPI','CC'];
+  function humanize(s){
+    var w = String(s==null?'':s).replace(/[_]+/g,' ').replace(/([a-z0-9])([A-Z])/g,'$1 $2')
+              .replace(/\s+/g,' ').trim();
+    if(!w) return w;
+    return w.split(' ').map(function(x){
+      var up=x.toUpperCase();
+      if(ACRONYMS.indexOf(up)>=0) return up;
+      if(/^[0-9]/.test(x)) return x;
+      return x.charAt(0).toUpperCase()+x.slice(1).toLowerCase();
+    }).join(' ');
+  }
+
+  /* ---- A6 · the scorecard's labels, in words ---- */
+  var SC = { 'group':'Group', '30d':'30 Days', '\u0394':'Change', 'streak':'Streak', 'weakest':'Weakest',
+             '12 weeks':'12 Weeks', 'on time':'On Time' };
+  function humanizeScorecard(){
+    var host=document.getElementById('vGroups'); if(!host) return;
+    /* THE ROWS ARE THE DOOR TO GROUP DETAILS, AND A DAY CHANGE UNTAGGED THEM. HT-17 tags each row with its
+       group from its paintAll/paintLog wrappers only; goDay() repaints the scorecard without either, so after
+       moving one day back and forth no row carried data-grp and tapping a group did nothing (measured: 4/4
+       tagged at load, 0/4 after goDay). Re-tagged here on every re-render, at every width - an attribute,
+       not a pixel. */
+    var names=(window.__HT16 && window.__HT16.scorecardRows) ? window.__HT16.scorecardRows().map(function(r){ return r.group; }) : [];
+    q('tbody tr', host).forEach(function(tr, i){
+      if(names[i]!=null && tr.getAttribute('data-grp')!==names[i]) tr.setAttribute('data-grp', names[i]); });
+    var ph=on();
+    q('thead th', host).forEach(function(th){
+      if(!th.hasAttribute('data-h28o')) th.setAttribute('data-h28o', th.textContent);
+      var o=th.getAttribute('data-h28o'), v=ph ? (SC[o.trim()] || SC[o.trim().toLowerCase()] || humanize(o)) : o;
+      if(th.textContent!==v) th.textContent=v;
+    });
+    q('tbody td.g', host).forEach(function(td){
+      if(!td.hasAttribute('data-h28o')) td.setAttribute('data-h28o', td.textContent);
+      var o=td.getAttribute('data-h28o'), v=ph ? humanize(o) : o;
+      if(td.textContent!==v) td.textContent=v;
+    });
+  }
+
+  /* ---- A3 · one group's details, one clean table ---- */
+  function ratingAvg(h){
+    var a=[];
+    for(var i=0;i<30;i++){ var k=shift(today(),-i);
+      if(!loggedOn(k) || !doneOn(h,k)) continue;
+      var r=ratingOf(k); if(r!=null) a.push(r); }
+    return a.length ? Math.round(a.reduce(function(x,y){ return x+y; },0)/a.length*10)/10 : null;
+  }
+  function streakOf(h){
+    var n=0;
+    for(var i=0;i<400;i++){ var k=shift(today(),-i);
+      if(!loggedOn(k)){ if(i===0) continue; break; }
+      if(!dueDay(h,k)) continue;                 /* HT-28 E12: an off-day neither extends nor breaks it */
+      if(doneOn(h,k)) n++; else break; }
+    return n;
+  }
+  function pc(v){ return v==null ? '\u2014' : v+'%'; }
+  function groupDetails(g){
+    var body=document.getElementById('h17DrBody'); if(!body || !g) return false;
+    var H=window.__HT16||{}, win=H.adherenceWindow;
+    var hs=S.habits.filter(function(h){ return (h.group_name||'Other')===g; });
+    var cur=win ? win(g,0,29) : { pct:null, hit:0, opp:0 }, prv=win ? win(g,30,59) : { pct:null };
+    var ot=H.onTime30 ? H.onTime30(g) : null, wk=[];
+    for(var w=0;w<12;w++){ var a=win ? win(g,w*7,w*7+6) : null; if(a && a.opp) wk.push(a.pct); }
+    var best=wk.length ? Math.max.apply(null,wk) : null, worst=wk.length ? Math.min.apply(null,wk) : null;
+    var rf=H.rampFill || function(){ return 'var(--surface)'; };
+    function stat(l,v){ return '<div><span>'+esc(l)+'</span><b>'+v+'</b></div>'; }
+    var rows=hs.map(function(h){
+      var p=adherence30(h.id), r=ratingAvg(h);
+      return '<tr data-h="'+esc(h.id)+'"><td class="n">'+esc(nameOf(h.name))+'</td>'+
+        '<td class="v"><i style="background:'+rf(p)+'"></i>'+pc(p)+'</td>'+
+        '<td class="v">'+(r==null?'\u2014':r.toFixed(1))+'</td>'+
+        '<td class="v">'+streakOf(h)+'</td></tr>';
+    }).join('');
+    body.innerHTML=
+      '<div class="h17dh"><h3>'+esc(humanize(g))+'</h3><span style="flex:1"></span>'+
+        '<button class="tbtn" data-drx="1" type="button">Close</button></div>'+
+      '<div class="h28gdef">'+esc(H.ADHERENCE_DEF || '')+'</div>'+
+      '<div class="h28gst">'+
+        stat('Last 30 Days', pc(cur.pct)) + stat('Completed', cur.hit+' of '+cur.opp) + stat('On Time', pc(ot)) +
+        stat('Prior 30 Days', pc(prv.pct)) + stat('Best Week', pc(best)) + stat('Worst Week', pc(worst)) +
+      '</div>'+
+      '<div class="h28tbl">'+
+        (hs.length ?
+          '<table class="h28gt"><colgroup><col class="n"><col class="v"><col class="v"><col class="v"></colgroup>'+
+          '<thead><tr><th>Standard</th><th>Completion</th><th>Rating</th><th>Streak</th></tr></thead>'+
+          '<tbody>'+rows+'</tbody></table>' : '')+
+        '<div class="h28gnote">'+
+          (hs.length===0 ? 'No standards in this group.' :
+           hs.length===1 ? 'One standard in this group so far \u2014 add another from Today and they line up here.' : '')+
+          (hs.length ? (hs.length===1?' ':'')+'Rating is your own 1\u201310, averaged over the days you kept it.' : '')+
+        '</div>'+
+      '</div>';
+    body.setAttribute('data-h28', g);
+    return true;
+  }
+  function drawerOpenGroup(){
+    var d=document.getElementById('h17Drawer');
+    return (d && d.classList.contains('on')) ? d.getAttribute('data-grp') : null;
+  }
+  function reassertDrawer(){
+    if(!on()) return;
+    var g=drawerOpenGroup(), body=document.getElementById('h17DrBody');
+    if(g && body && !body.querySelector('.h28gt, .h28gnote')) groupDetails(g);
+  }
+  /* HT-17 opens the drawer from its own listener on #vGroups; this one is on the document, so it runs after */
+  document.addEventListener('click', function(e){
+    if(!on() || !e.target.closest) return;
+    var tr=e.target.closest('#vGroups [data-grp]'); if(!tr) return;
+    groupDetails(tr.getAttribute('data-grp')); watch();
+  });
+  var mo=null;
+  function watch(){
+    var body=document.getElementById('h17DrBody');
+    if(!body || mo || !window.MutationObserver) return;
+    mo=new MutationObserver(function(){ reassertDrawer(); });
+    mo.observe(body, { childList:true });
+  }
+
+  function boot28d(){
+    if(!S.me) return;
+    humanizeScorecard(); watch(); reassertDrawer();
+  }
+  window.__HT28d = { humanize:humanize, groupDetails:groupDetails, repaint:boot28d };
+  var _pa=paintAll; paintAll=function(){ _pa.apply(null,arguments); boot28d(); };
+  function watchScore(){
+    var host=document.getElementById('vGroups');
+    if(!host || host.__h28mo || !window.MutationObserver) return;
+    host.__h28mo=new MutationObserver(function(){ humanizeScorecard(); });
+    host.__h28mo.observe(host, { childList:true });
+  }
+  if(PHONE.addEventListener) PHONE.addEventListener('change', function(){ humanizeScorecard(); });
+  if(document.readyState==='complete') setTimeout(function(){ boot28d(); watchScore(); }, 700);
+  else window.addEventListener('load', function(){ setTimeout(function(){ boot28d(); watchScore(); }, 700); });
 })();
 
 })();
