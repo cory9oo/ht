@@ -57,6 +57,7 @@ mirrored into this repo. Cite it by name; never copy it here.
 | **DEC-171** | **Five inputs, and TIMED is a section** — supersedes DEC-057 and DEC-058 (2026-09-10, Cory's 117 words and his 15:15 ruling). The day takes exactly five inputs: check-offs · the 1–10 rating with its why · the brain dump · completed · prayer — and **no new input of any kind**. Sleep, bed, wake, the Saturday weight and tomorrow's one thing sit behind `FIVE_INPUTS_ONLY` in `app.js` (hidden, never removed — R70.138): nothing probes, reads, writes or renders their columns, and `golden_ht26` S1 fails the moment a sixth input renders. Timed standards group under **TIMED, then ANYTIME, then WEEKLY**; lateness is a label and never moves a score (`golden_ht25` S3). |
 | **DEC-172** | **Sabbath scoring** (2026-09-15, Cory's 9/10 20:30 pre-approval, PASTE 128 F20): the Sabbath is `dow:6` — on Saturday one ordinary due item, weight 1, no boost, no cap; on every other day not rendered, not in `active_set`, not in the denominator. Honoured by "Sabbaths kept · N in a row · M of the last 12" and the month chart's Saturday rings. Saturday's weight moves only through a standard's "Rests on Sabbath" switch (`golden_ht28` E/F). |
 | **DEC-173** | **Rest standards are ordinary standards** — kept like any rule, never scored higher. They reach a list the way any standard can: typed in, or proposed by an add-link (`#add=<base64url JSON>` — a fragment, never sent to a server: a card, one tap, idempotent by name). **No person's standards are ever written into this public code** — a list is private (R47.3); the link carries them. |
+| **Ruling 3** | **FOUR SECTIONS, PLACED BY THE PERSON** (Cory 2026-09-15, paste 133) — Morning routine · Night routine · Standards · Weekly, in that order, and a standard sits where HE put it (`habits.section`), never where the clock would put it. This supersedes DEC-171's last clause ("Timed standards group under TIMED, then ANYTIME, then WEEKLY"): those three were computed from cadence and the planned time. A row with no section yet shows where it showed before — weekly → Weekly, a planned time → Morning, no time → Standards, the Sabbath → Night — and the SAME rule is written three times over, in `HT29SEC.sectionOf`, in the vault copier (`tools/copiers/_ht.py`) and in the sender (`core.js`); `golden_ht29` S2 holds them together. Inside Morning and Night the planned time orders the rows, as TIMED always did; inside Standards and Weekly the drag order does. **The definition of done is `habits.notes`, relabelled "Done when" — no new column.** |
 | ~~DEC-057~~ | SUPERSEDED by DEC-171 — it said never group or order the list by clock. Do not re-apply it. |
 | ~~DEC-058~~ | SUPERSEDED by DEC-171 — it said three inputs. Do not re-apply it. |
 | **DEC-059** | Percentage renders as a continuous density ramp of the accent. Grade letters yes; grade colours no. |
@@ -95,15 +96,23 @@ blob × n → tree (with `base_tree`) → commit → update-ref, then poll live 
 matches. Full procedure in `STANDARD_LIVE_STATE.md` § DEPLOY PROCEDURE. Substitute `__URL__` /
 `__KEY__` inside the sandbox so the Supabase key never enters a context window.
 
-## PRIVACY — R47.3, and it is structural, not a setting
+## PRIVACY — R47.3 as **Cory amended it on 2026-09-15** (paste 133 Ruling 4), and it is still structural
 
-A circle sees **adherence-class data only**: completion %, streaks, capacity band. **Journals
-(`why` · `tasks` · `prayer`) and day-ratings are never visible to anyone but their author.** Not
-permission-gated — *unshareable*: there must be no schema path from another user's id to those
-fields. The standards LIST is not shareable either: when people know their list is watched they set
-fewer and safer standards, which cancels the whole point of the circle.
+**THE JOURNAL IS UNSHAREABLE. Everything else about a day is the group's.** Cory, 9/15: "document our
+inputs and hold each other accountable between group members" — so a group sees each other's **task
+names, sections, planned and actual times, definitions of done, check-offs and the day's completion %**,
+and (SPEC's call, which Cory reverses in one word) **the rating NUMBER**. It never sees the **brain dump,
+completed, prayer or the rating's why** — those four are the journal, and there is no path to them from
+anyone else's id: the base tables are owner-only in every direction, and what crosses users crosses
+through two functions with an explicit column list — `ht29_member_day` and `ht29_circle_ratings`
+(`tools/sql/2026-09-15_ht29.sql`, proven on a real Postgres by `tools/sql/test_privacy_pg.py`).
+*What changed and why:* the standards LIST used to be unshareable too ("people set safer standards when
+watched"). Cory's ruling overrides that: comparable check-offs are the whole point of the group, and a
+shared **definition of done** is what makes two people's check-offs mean the same thing.
+**One line reverses the rating number:** `revoke execute on function public.ht29_circle_ratings(date, date)
+from authenticated;` — then the app's own lines show nothing where the number was.
 
-Exactly one query SHAPE crosses users — `days.select('user_id,date,pct')` — at two call sites:
+Exactly one SELECT shape crosses users — `days.select('user_id,date,pct')` — at two call sites:
 `paintCircle()` and the DETAIL page's `circleMembers()` (the second spans two lines, which is why
 `golden_ht28` G22 reads the source across lines and asserts both). Keep it that way. The statement the
 app shows on the sign-in screen, the first-run card and in Settings is verbatim: "Your journal is yours.
@@ -117,5 +126,21 @@ CIRCLE-1 (Andrew · Dale · Justin) is **chartered, not built** — it opens on 
 
 ## PHASE GATE
 
-**No reminders, no keep-alive, no automated pulls before Phase D** (DEC-068 sequencing). The
-reminder item is deliberately parked, not forgotten.
+**No keep-alive and no automated pulls before Phase D** (DEC-068 sequencing): the 30 s pull runs only
+while the page is visible and stops the moment it is hidden (HT-28c), and nothing in this app polls,
+wakes or fetches when it is closed.
+**HT-29 S7.27 adds a Realtime subscription ON THE SAME TERMS, and it is not a keep-alive.** The app
+subscribes to `days`, `day_private` and `habits` — the three tables `tools/sql/2026-09-15_ht29.sql` puts
+in the `supabase_realtime` publication, the migration HT-28c named as its own upgrade path — filtered
+`user_id=eq.<me>`, and a change notification does one thing: ask HT-28c to pull. Nothing is read out of
+the event. The socket is opened only while the page is visible and **closed the moment it is hidden**
+(`golden_ht29` S7f), so this app still holds nothing open behind itself. Cory's 9/15 acceptance for it:
+a check on the phone shows on the desktop within 5 s, and the reverse — measured at 579 ms and 458 ms
+with the 30 s pull set an hour away, so the event, not a timer, is what moved it.
+**ONE EXCEPTION, ON CORY'S ORDER of 2026-09-15 15:28 (paste 133 S9): the evening nudge.** A web push at
+noon and at 21:00, per person, off for a new account, and it sends nothing until (1) that person taps
+Allow, (2) the sender is deployed, and (3) **the schedule is armed — which needs Cory's word, not a
+wire's** (R70.344: nothing is armed until he says "arm"). The sender is
+`tools/supabase/functions/nudge/`; its schedule is `tools/sql/2026-09-15_ht29_arm.sql`, which this wire
+did NOT run. The message carries numbers only — "12 of 21 · Andrew 9 of 18 · rate the day" — never a
+word of anyone's journal.

@@ -554,8 +554,13 @@ async def C1(pw):
     # unchanged: the list has exactly these three headers and no others. The legacy group_name
     # `STANDARDS` still exists on real rows and is still offered in the sheet (R70.138), which is
     # why the tuple below is not simply renamed - it is the COMPUTED set that narrowed.
-    chk("C1f " + u"·" + " the list is grouped into TIMED / ANYTIME / WEEKLY and nothing else",
-        heads and all(h in ('TIMED', 'ANYTIME', 'WEEKLY') for h in heads), heads)
+    # AMENDED BY NAME AGAIN, HT-29 S2 (R67.2, paste 133 Ruling 3, Cory 2026-09-15). The three computed
+    # buckets become FOUR PLACED sections - Morning routine · Night routine · Standards · Weekly - and the
+    # placement is the person's, not the clock's. The property this check protects is unchanged: the list
+    # carries exactly the sections the app knows and no others, and no Sabbath section (C1g).
+    SECS29 = ('Morning routine', 'Night routine', 'Standards', 'Weekly')
+    chk("C1f " + u"·" + " the list is grouped into the four sections and nothing else",
+        heads and all(h in SECS29 for h in heads), heads)
     chk("C1g " + u"·" + " there is NO Sabbath section", not any('SABBATH' in h for h in (heads or [])),
         heads)
 

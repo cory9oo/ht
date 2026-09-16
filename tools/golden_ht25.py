@@ -288,12 +288,14 @@ async def s3(pw):
 
         heads = await pg.evaluate("""() => [...document.querySelectorAll('#log .grp')]
             .map(k => k.textContent.trim())""")
-        chk('S3h · the headers read TIMED / ANYTIME / WEEKLY and nothing else',
-            heads and all(h in ('TIMED','ANYTIME','WEEKLY') for h in heads), heads)
+        # ---- AMENDED BY HT-29 S2 (CC HT 2026-09-15) · R67.2 · paste 133 Ruling 3 ----------------------
+        # Four sections, placed by the person, in one fixed order. Lateness is still only a label (S3g
+        # above), which is what this section is really about; the header names are the part that moved.
+        SECS29 = ['Morning routine', 'Night routine', 'Standards', 'Weekly']
+        chk('S3h · the headers read the four sections and nothing else',
+            heads and all(h in SECS29 for h in heads), heads)
         chk('S3i · and they appear in that order',
-            [h for h in heads if h in ('TIMED','ANYTIME','WEEKLY')] ==
-            sorted(set(h for h in heads if h in ('TIMED','ANYTIME','WEEKLY')),
-                   key=['TIMED','ANYTIME','WEEKLY'].index), heads)
+            [h for h in heads if h in SECS29] == sorted(set(h for h in heads if h in SECS29), key=SECS29.index), heads)
 
         chk('S3j · no console error', not errs, errs[:2])
     finally:

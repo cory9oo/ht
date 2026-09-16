@@ -183,16 +183,29 @@ async def sec_a(pw):
         chrome: [...new Set(els.map(cs))], heads: [...new Set(heads)],
         scTh: [...document.querySelectorAll('#vGroups thead th')].filter(vis).map(t=>t.textContent),
         scG: [...document.querySelectorAll('#vGroups tbody td.g')].map(t=>t.textContent) }; }""")
-    chk("A6 · Views has one order: month, year, group adherence, group + life, life in weeks, insights, journal",
-        v['order'] == ['h16Month', 'h16Year', 'h16Score', 'h16Ins', 'vWeeksSec', 'h26Ins', 'h26Jrn'], v['order'])
+    # ---- AMENDED BY HT-29 S0 (CC HT 2026-09-15) · R67.2 · paste 133 S0.2, AUDIT rows A26 + A28 ----------
+    # TWO CARDS LEFT THE VIEWS TAB, both hidden and neither deleted: GROUP ADHERENCE (`#h16Score`) is not one
+    # of Cory's five outputs and is one tap away inside Insights → More → "Every standard, in detail"; and the
+    # GROUP card is Insights' third card now, so the phone shows those lines once, not twice. The order of
+    # what REMAINS is what this check protects, and it is unchanged.
+    chk("A6 · Views has one order: month, year, group + life, life in weeks, insights, journal",
+        v['order'] == ['h16Month', 'h16Year', 'h16Ins', 'vWeeksSec', 'h26Ins', 'h26Jrn'], v['order'])
     chk("A6 · equal cards: one width and one box (border, background, padding) for all seven",
         len(v['widths']) == 1 and len(v['chrome']) == 1, [v['widths'], v['chrome']])
     chk("A6 · one header style: every card header and GROUP read the same", len(v['heads']) == 1, v['heads'])
     await pg.wait_for_timeout(2500)
-    v2 = await pg.evaluate("() => ['h16Month','h16Year','h16Score','h16Ins','h26Ins','h26Jrn'].map(i=>document.getElementById(i)).sort((a,b)=>a.getBoundingClientRect().top-b.getBoundingClientRect().top).map(e=>e.id)")
+    v2 = await pg.evaluate("() => { " + VIS + " return ['h16Month','h16Year','h16Score','h16Ins','h26Ins','h26Jrn']"
+                           ".map(i=>document.getElementById(i)).filter(vis)"
+                           ".sort((a,b)=>a.getBoundingClientRect().top-b.getBoundingClientRect().top).map(e=>e.id); }")
     chk("A6 · ...and the same order 2.5 s later, after every layer's timer has fired", v2 == [x for x in v['order'] if x != 'vWeeksSec'], v2)
-    bad = [t for t in v['scTh'] + v['scG'] if re.search(r'_|[a-z][A-Z]', t) or (t.isupper() and len(t) > 3)]
-    chk("A3 · the scorecard's labels are words in Title Case (%s)" % ', '.join(v['scTh']), v['scTh'] and not bad, bad)
+    # ---- AMENDED BY HT-29 S0 · R67.2 · A28: the scorecard moved behind DETAIL, so its labels are read there ----
+    sc = await pg.evaluate("() => { window.__HT29_DETAIL(); return new Promise(r=>setTimeout(r,400)); }")
+    sc = await pg.evaluate("() => { " + VIS + """
+      return { th:[...document.querySelectorAll('#vGroups thead th')].filter(vis).map(t=>t.textContent),
+               g:[...document.querySelectorAll('#vGroups tbody td.g')].map(t=>t.textContent) }; }""")
+    bad = [t for t in sc['th'] + sc['g'] if re.search(r'_|[a-z][A-Z]', t) or (t.isupper() and len(t) > 3)]
+    chk("A3 · the scorecard's labels are words in Title Case, where it lives now (%s)" % ', '.join(sc['th']),
+        sc['th'] and not bad, bad)
     hz = await pg.evaluate("() => ['HT','ht','morning_routine','timeAnchor','STANDARDS','Sabbath','30d','bev inbox'].map(window.__HT28d.humanize)")
     chk("A3 · the humanizer keeps acronyms and turns codes into words",
         hz == ['HT', 'HT', 'Morning Routine', 'Time Anchor', 'Standards', 'Sabbath', '30d', 'BEV Inbox'], hz)
@@ -656,15 +669,21 @@ async def sec_e(pw):
     sat = await pg.evaluate("() => { " + VIS + """
       const kids=[...document.querySelectorAll('#log > *')].filter(vis);
       const heads=kids.filter(e=>e.classList.contains('grp')).map(e=>e.textContent.trim());
-      const ai=kids.findIndex(e=>e.classList.contains('grp') && e.textContent.trim()==='ANYTIME');
+      /* HT-29 S2.10 (R67.2): the Sabbath is placed in NIGHT ROUTINE now - it was the head of ANYTIME when
+         the three buckets were computed. The section it leads is what moved; leading it is what is tested. */
+      const SEC29='Night routine';
+      const ai=kids.findIndex(e=>e.classList.contains('grp') && [SEC29,'ANYTIME'].indexOf(e.textContent.trim())>=0);
       const first=kids.slice(ai+1).find(e=>e.classList.contains('li'));
       const row=document.querySelector('#log .li[data-h="h1"]');
       const shown=row?[...row.querySelectorAll('.pat,.dat,.tpfx,.wk,.cue,.mn,.ad,.back')].filter(vis).length:null;
       return { heads, firstAnytime: first && first.getAttribute('data-h'), sab: row && row.classList.contains('h28sab'), shown,
         daily: window.__HT24.daily().map(h=>h.id) }; }""")
-    chk("E14 · Saturday: the Sabbath leads ANYTIME as one check mark (no time, chip, minutes or percent)",
+    chk("E14 · Saturday: the Sabbath leads its section as one check mark (no time, chip, minutes or percent)",
         sat['firstAnytime'] == 'h1' and sat['sab'] and sat['shown'] == 0, sat)
-    chk("E14 · the sections are TIMED, then ANYTIME, then WEEKLY", sat['heads'] == ['TIMED', 'ANYTIME', 'WEEKLY'], sat['heads'])
+    # AMENDED BY HT-29 S2 · R67.2 · paste 133 Ruling 3: four placed sections, in this order.
+    SECS29 = ['Morning routine', 'Night routine', 'Standards', 'Weekly']
+    chk("E14 · the sections are Morning routine, Night routine, Standards, Weekly",
+        sat['heads'] == [s for s in SECS29 if s in sat['heads']] and sat['heads'], sat['heads'])
     chk("F16 · Saturday: the Sabbath is one ordinary due item (in the denominator, weight 1)", 'h1' in sat['daily'], sat['daily'])
     await pg.evaluate("() => { window.__WRITES=[]; }")
     await pg.click('#log .li[data-h="h1"]'); await pg.wait_for_timeout(1300)
@@ -758,9 +777,13 @@ async def sec_f(pw):
                  ['Test evening two', 'daily', None, 'second definition'],
                  ['Test evening three', 'daily', '21:45', None]], flat)
     order = await pg.evaluate("() => [...document.querySelectorAll('#log > *')].map(e=>e.classList.contains('grp')?'#'+e.textContent.trim():e.getAttribute('data-h')&&(window.__MOCK_DB.habits.find(h=>h.id===e.getAttribute('data-h'))||{}).name).filter(Boolean)")
-    ti, ai = order.index('#TIMED'), order.index('#ANYTIME')
-    chk("F19 · they render on a weekday: the two timed ones in TIMED, the other in ANYTIME",
-        ti < order.index(names[0]) < ai and ti < order.index(names[2]) < ai and order.index(names[1]) > ai, order)
+    # AMENDED by WIRE HT-29 (paste 133 Ruling 3, Cory 2026-09-15): "Morning routine · Night routine ·
+    # Standards · Weekly ... a standard sits where HE put it, never where the clock would put it."
+    # TIMED and ANYTIME are gone, so this reads the two sections a NEW standard lands in: one with a
+    # planned time starts in Morning routine, one without starts in Standards. Same claim, current shape.
+    mo, st = order.index('#Morning routine'), order.index('#Standards')
+    chk("F19 · they render on a weekday: the two timed ones in Morning routine, the other in Standards",
+        mo < order.index(names[0]) < st and mo < order.index(names[2]) < st and order.index(names[1]) > st, order)
     after = await pg.evaluate("(n) => JSON.stringify(window.__MOCK_DB.habits.filter(h=>n.indexOf(h.name)<0).map(h=>[h.id,h.name,h.cadence,h.sort_order,h.time_anchor||null]))", names)
     ups = await pg.evaluate("() => (window.__UPDATES||[]).filter(u=>u[0]==='habits').length")
     chk("F19 · every existing standard is untouched", before == after and ups == 0, [ups])
@@ -805,8 +828,12 @@ async def sec_g(pw):
         s['rows'] == 0 and s['ex'] and s['add'] and await pg.evaluate("() => (window.__INSERTS||[]).length") == 0, s)
     await pg.click('#h28Ex'); await pg.wait_for_timeout(2500)
     e = await pg.evaluate("() => ({ heads:[...document.querySelectorAll('#log .grp')].map(g=>g.textContent.trim()), rows:[...document.querySelectorAll('#log .li')].length, card: document.getElementById('h28First').classList.contains('on'), ins:(window.__INSERTS||[]).filter(i=>i[0]==='habits').map(i=>[].concat(i[1]).map(r=>r.name+'|'+r.cadence+'|'+(r.time_anchor||''))) })")
-    chk("G21 · one tap starts from four EXAMPLES across TIMED, ANYTIME and WEEKLY",
-        e['rows'] == 4 and e['heads'] == ['TIMED', 'ANYTIME', 'WEEKLY'] and not e['card']
+    # AMENDED by WIRE HT-29 (paste 133 Ruling 3, Cory 2026-09-15). The four examples are unchanged and are
+    # still asserted name for name; only the headers they land under moved, because the sections did: a row
+    # with no section of its own shows where Ruling 3 places it - a planned time in Morning routine (07:00
+    # and 22:30), no time in Standards, weekly in Weekly. Cory moves them from there; the clock never does.
+    chk("G21 · one tap starts from four EXAMPLES across Morning routine, Standards and Weekly",
+        e['rows'] == 4 and e['heads'] == ['Morning routine', 'Standards', 'Weekly'] and not e['card']
         and e['ins'] == [['Move for 20 minutes|daily|07:00', 'Read 10 pages|daily|', 'Lights out|daily|22:30', 'Plan the week|weekly|']], e)
     # edit: rename + Days + delete, all in the app
     rid = await pg.evaluate("() => [...document.querySelectorAll('#log .li')].find(r=>/Read 10 pages/.test(r.textContent)).getAttribute('data-h')")

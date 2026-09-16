@@ -2394,3 +2394,141 @@ html[data-simple] #log .li.h28sab .nm{ flex:1 1 auto }
   html[data-simple] #h18Comp .li .wk{ font-size:8.5px }
   html[data-simple] #h18Comp #log > .eadd, html[data-simple] #h18Comp #log > [data-add]{ font-size:9px }
 }
+
+/* ---- HT-29 S2 (PASTE 133) · THE TIME ON A TASK IS A DOT, NEVER A NUMBER ------------------------------------
+   One dot beside a checked task that has a planned time: on time (within 15 min) · late (within 60) · beyond.
+   The minutes are a tap away (the dot's own toast). HT-25's "✓ 08:34 +12m" label is hidden, never removed. */
+.li .dat.dat29off{ display:none !important }
+.li .dot29{ display:inline-block; width:8px; height:8px; border-radius:50%; margin-left:8px; vertical-align:middle;
+  flex:0 0 auto; cursor:pointer; background:var(--st-done); position:relative }
+.li .dot29::after{ content:''; position:absolute; inset:-14px }          /* a finger-sized target, drawn small */
+.li .dot29.late{ background:var(--st-late) }
+.li .dot29.beyond{ background:var(--ht-red) }
+.li .dot29:focus-visible{ outline:2px solid var(--accent); outline-offset:3px }
+html[data-simple] #log > .eadd[data-sec]{ text-transform:none }
+
+/* ---- HT-29 S3 (PASTE 133) · THE GROUP: FIVE COLUMNS, ONE RENDERER, A MEMBER'S DAY --------------------------
+   member · today · 7 days · 30 days · logged, the same table on the phone's Insights and the desktop's GROUP
+   card. A member's line opens their day (read only). DETAIL is retired: hidden, never removed. */
+.h29off{ display:none !important }                    /* A24 the GROUP card's DETAIL button - one door, not two */
+html[data-simple] #h18Group .h29gt, .h29ins .h29gt{ width:100%; border-collapse:collapse; table-layout:fixed }
+html[data-simple] .h29gt col.n{ width:34% }
+html[data-simple] .h29gt td.l{ text-align:right; font:400 11.5px/1 var(--mono); color:var(--ink2); white-space:nowrap }
+html[data-simple] .h29gt th:nth-child(5){ text-align:right }
+html[data-simple] .h29gt td.p{ white-space:nowrap }
+html[data-simple] .h29gt tr[data-h29m]{ cursor:pointer }
+html[data-simple] .h29gt tr[data-h29m]:hover td, html[data-simple] .h29gt tr[data-h29m]:focus-visible td{ background:var(--surface-2) }
+html[data-simple] .h29gt .h29go{ color:var(--ink3); margin-left:2px }
+html[data-simple] #h18Group .h29gn{ font:400 9px/1 var(--mono); letter-spacing:.06em; color:var(--muted); text-transform:none }
+html[data-simple] #h18Group .h29inv, .h29lnk{ font:400 9px/1 var(--mono); letter-spacing:.1em; text-transform:uppercase;
+  background:none; border:1px solid var(--border); color:var(--muted); padding:5px 8px; border-radius:2px; cursor:pointer; min-height:28px }
+.h29lnk{ text-transform:none; letter-spacing:0; font-size:12px; border:0; padding:0 0 0 4px; color:var(--accent); min-height:0 }
+.h29code{ font:400 12px/1.4 var(--mono); color:var(--ink2); padding:0 0 10px }
+.h29code b{ font-size:16px; letter-spacing:.12em; color:var(--text) }
+.h29day .h29nav{ display:flex; align-items:center; justify-content:space-between; gap:10px; padding:2px 0 8px }
+.h29day .h29nav b{ font:500 13px/1 var(--sans); color:var(--text) }
+.h29day .h29nav .tbtn{ min-width:44px; min-height:44px }
+.h29day .h29sum{ font:400 12px/1.4 var(--mono); color:var(--ink2); padding:0 0 10px }
+.h29day .grp{ font:500 9.5px/1 var(--mono); letter-spacing:.14em; text-transform:uppercase; color:var(--muted); padding:12px 0 6px }
+.h29day .h29r{ display:flex; align-items:center; gap:10px; min-height:36px; border-bottom:1px solid var(--border) }
+.h29day .h29ck{ flex:0 0 18px; height:18px; border:1px solid var(--rule2); border-radius:2px; font:600 12px/16px var(--sans);
+  text-align:center; color:var(--accent-ink); background:transparent }
+.h29day .h29r.on .h29ck{ background:var(--st-done); border-color:var(--st-done) }
+.h29day .h29r .nm{ flex:1 1 auto; font:400 14px/1.35 var(--sans); color:var(--ink) }
+.h29day .dot29{ display:inline-block; width:8px; height:8px; border-radius:50%; background:var(--st-done); position:relative; cursor:pointer }
+.h29day .dot29::after{ content:''; position:absolute; inset:-14px }
+.h29day .dot29.late{ background:var(--st-late) }
+.h29day .dot29.beyond{ background:var(--ht-red) }
+.h29day .h29priv{ padding:14px 0 0 }
+/* ---- HT-29 S5 (PASTE 133) · ONE INSIGHTS: A BOTTOM BAR ON THE PHONE, THREE CARDS ------------------------------
+   Today · Views · Insights sit at the bottom of the phone where a thumb is; HT-13's two tabs under the header are
+   hidden, never removed. Insights on the phone is its own tab; on the desktop it is the overlay it always was. */
+html[data-simple] .h29bar{ display:none }
+@media (max-width:1023px){
+  html[data-simple] .h29bar{ display:flex; position:fixed; left:0; right:0; bottom:0; z-index:40; background:var(--surface);
+    border-top:1px solid var(--rule); padding:0 max(8px, env(safe-area-inset-left)) env(safe-area-inset-bottom) }
+  html[data-simple] .h29bar button{ flex:1 1 0; min-height:52px; background:none; border:0; font:500 11px/1 var(--mono);
+    letter-spacing:.12em; text-transform:uppercase; color:var(--muted); cursor:pointer }
+  html[data-simple] .h29bar button.on{ color:var(--text); box-shadow:inset 0 2px 0 var(--accent) }
+  html[data-simple] body{ padding-bottom:calc(60px + env(safe-area-inset-bottom)) }
+  html[data-simple] #vTabs{ display:none !important }
+  html[data-simple][data-vtab="insights"] .colL{ display:none }
+  html[data-simple][data-vtab="insights"] #h26Ins{ display:block }
+  html[data-simple][data-vtab="insights"] #h16Month, html[data-simple][data-vtab="insights"] #h16Year,
+  html[data-simple][data-vtab="insights"] #h16Score, html[data-simple][data-vtab="insights"] #h16Ins,
+  html[data-simple][data-vtab="insights"] .vWeeksSec, html[data-simple][data-vtab="insights"] #h26Jrn,
+  html[data-simple][data-vtab="insights"] #vViews{ display:none }
+}
+.h29ins{ display:block }
+.h29ins .h29c{ margin:0 0 12px }
+.h29ins .h29seg{ margin:6px 0 8px }
+.h29ins .h29seg button{ min-height:36px }
+.h29ins .vline b{ color:var(--text) }
+.h29ins .ch29{ display:block; width:100%; max-width:100%; height:120px; margin:6px 0 4px }
+.h29ins .ch29 polyline{ stroke-width:1.6; vector-effect:non-scaling-stroke }
+.h29ins .ch29 .l29r{ stroke:var(--accent) }
+.h29ins .ch29 .l29t{ stroke:var(--st-late); stroke-dasharray:3 3 }
+.h29ins .ch29 .l29m0{ stroke:var(--ink) } .h29ins .ch29 .l29m1{ stroke:var(--ink3) } .h29ins .ch29 .l29m2{ stroke:var(--st-done) }
+.h29ins .h29leg{ display:flex; flex-wrap:wrap; gap:6px 12px; align-items:center; font:400 11px/1.3 var(--mono); color:var(--muted) }
+.h29ins .h29leg i{ display:inline-block; width:12px; height:2px; vertical-align:middle; margin-right:5px }
+.h29ins .h29leg i.r{ background:var(--accent) } .h29ins .h29leg i.t{ background:var(--st-late) }
+.h29ins .h29leg i.m0{ background:var(--ink) } .h29ins .h29leg i.m1{ background:var(--ink3) } .h29ins .h29leg i.m2{ background:var(--st-done) }
+.h29ins .h29mb{ background:none; border:1px solid var(--border); border-radius:2px; color:var(--muted); font:400 11px/1 var(--mono);
+  padding:6px 8px; min-height:32px; cursor:pointer }
+.h29ins .h29mb.on{ color:var(--text); border-color:var(--rule2) }
+.h29ins .h29nums{ display:grid; grid-template-columns:repeat(10, minmax(0, 1fr)); gap:4px; margin:8px 0 10px }
+.h29ins .h29nums button{ min-height:44px; border:1px solid var(--border); background:none; border-radius:2px; cursor:pointer;
+  display:flex; flex-direction:column; align-items:center; justify-content:center; gap:2px; color:var(--ink) }
+.h29ins .h29nums button b{ font:500 14px/1 var(--mono) } .h29ins .h29nums button span{ font:400 9px/1 var(--mono); color:var(--muted) }
+.h29ins .h29nums button.on{ border-color:var(--accent); box-shadow:inset 0 0 0 1px var(--accent) }
+.h29ins .h29nums button:disabled{ opacity:.35; cursor:default }
+.h29ins .c5r .v i{ font-style:normal; color:var(--muted) }
+.h29ins .h29why{ margin-top:10px; border-top:1px solid var(--border); padding-top:8px; font:400 13px/1.45 var(--sans); color:var(--ink2) }
+.h29ins .h29why > div{ padding:3px 0 } .h29ins .h29why .d{ color:var(--muted); margin-right:6px }
+.h29detail{ padding:10px 0 0 }
+/* ---- HT-29 S0 (PASTE 133) · THE AUDIT, APPLIED — hidden, never removed (R70.138). Each line names its row in
+   ht_stage\133\AUDIT.md; deleting one line brings that element back exactly as it was. */
+html[data-simple] .sh h2 > i.n{ display:none !important }                     /* A03 the old input numbers */
+html[data-simple] #h16Load{ display:none !important }                         /* A10 the planned/done/left ledger */
+html[data-simple] .li .wk{ display:none !important }                          /* A15 WEEKLY chip — the section says it */
+html[data-simple] .h19closed{ display:none !important }                       /* A19 CLOSED chip */
+html[data-simple] #vYearNav .h16leg{ display:none !important }                /* A22 the year's copy of the legend */
+@media (min-width:1024px){
+  html[data-simple] .li .tpfx{ display:none !important }                      /* A14 the time printed twice on a row */
+  /* A17 the second TODAY. `.mast #tape` MATCHES the selector that un-hid it (HT-18 (5), `display:flex
+     !important`): one class less and this line loses the cascade in silence — measured, the tile was
+     still on screen at 1280 with the rule already written. Deleting this line brings the tile back. */
+  html[data-simple] .mast #tape{ display:none !important }
+}
+@media (max-width:1023px){
+  html[data-simple] #h18Group{ display:none !important }                      /* A26 lives in Insights' third card */
+  /* A28 behind More -> every standard. Like S5's desktop rule this names a DIRECT child of .grid, so it
+     stops matching the moment the drawer adopts the panel — which is what makes "Every standard, in detail"
+     (`#i29Detail` -> `__HT29_DETAIL`) show something. Without the `.grid >`, that tap opened an empty drawer. */
+  html[data-simple][data-vtab="views"] .grid > #h16Score{ display:none !important }
+  html[data-simple] #h16Ins > #h18Draw > #h16Score{ display:flex; overflow:visible; min-height:0 }
+}
+/* HT-29 S5.18 · the group side by side inside Insights reads like the GROUP card it replaces on the phone */
+.h29ins .h29gt th{ font:500 9px/1 var(--mono); letter-spacing:.1em; text-transform:uppercase; color:var(--muted); padding:0 0 8px;
+  text-align:right; border-bottom:1px solid var(--rule) }
+.h29ins .h29gt th:first-child{ text-align:left }
+.h29ins .h29gt td{ padding:8px 0; border-bottom:1px solid var(--border); color:var(--ink2); vertical-align:middle }
+.h29ins .h29gt td.n{ color:var(--ink); font:400 14px/1.3 var(--sans); overflow:hidden; text-overflow:ellipsis; white-space:nowrap }
+.h29ins .h29gt td.p{ text-align:right; font:400 12.5px/1 var(--mono); white-space:nowrap }
+.h29ins .h29gt td.p i{ display:inline-block; width:7px; height:7px; margin-right:5px; vertical-align:middle }
+.h29ins .h29gt td.l{ text-align:right; font:400 12px/1 var(--mono); color:var(--ink2) }
+.h29ins .h29gt tr.h18me td{ color:var(--text) }
+.h29ins .h29gt tr.h18none td{ color:var(--muted); font:400 13px/1.4 var(--sans); white-space:normal }
+.h29ins .h29gt col.n{ width:34% }
+/* ---- HT-29 S6 · S8 · S9 (PASTE 133) · the journal panel, the update banner, nudges ---------------------------- */
+.h29help{ margin-top:10px }
+.h29help summary{ cursor:pointer; font:500 11px/1.4 var(--mono); letter-spacing:.06em; color:var(--muted); padding:6px 0 }
+.h29help .h29hb{ padding:6px 0 4px }
+.h29help .h29hb b{ font:500 13px/1.4 var(--sans); color:var(--text) }
+.h29help ol{ margin:4px 0 0 18px; padding:0; font:400 13px/1.5 var(--sans); color:var(--ink2) }
+.h29upd{ position:fixed; left:50%; top:max(10px, env(safe-area-inset-top)); transform:translateX(-50%); z-index:60;
+  min-height:44px; padding:10px 16px; border-radius:22px; border:1px solid var(--accent); background:var(--surface);
+  color:var(--text); font:500 13px/1.2 var(--sans); cursor:pointer; box-shadow:0 6px 24px rgba(0,0,0,.35); max-width:calc(100vw - 32px) }
+.h29upd:disabled{ opacity:.8; cursor:default }
+.h29times{ display:grid; grid-template-columns:1fr 1fr; gap:10px }
+.h29times input[type=time]{ font-size:16px; min-height:44px }

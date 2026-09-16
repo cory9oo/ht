@@ -2,3 +2,8 @@
 .env
 .env.*
 !.env.example
+
+# WIRE HT-29: the goldens are Python now, so running them leaves bytecode beside them. A blanket
+# `git add -A` swept exactly this kind of sidecar into a commit once (master-brain A-3 defect W1).
+__pycache__/
+*.pyc

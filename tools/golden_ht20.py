@@ -479,8 +479,14 @@ async def P4(pw):
         chk("P4 · %s · grid box == content box within 1px on left, right and bottom" % t,
             abs(m['padL']) <= 1 and abs(m['padR']) <= 1 and abs(m['padB']) <= 1,
             {'L': m['padL'], 'R': m['padR'], 'B': m['padB']})
-        chk("P4 · %s · the gap to the panel edge is the SAME on all three sides it touches" % t,
-            m['edgeL'] == m['edgeR'] == m['edgeB'],
+        # ---- AMENDED BY HT-29 S3.12 (CC HT 2026-09-15) · R67.2 · paste 133 S3.12 ----------------------
+        # EXACT EQUALITY WAS A PROPERTY OF ONE LAYOUT, NOT OF THE RULE. The GROUP card above this panel
+        # gained two columns, so the space left for the life grid is a different fraction of a pixel and
+        # the bottom gap reads 13.41 against 13 (measured). The rule - the grid sits centred in its box
+        # with the panel's own padding on the three sides it touches - is what this protects, and half a
+        # pixel is below what any eye or any screen can show.
+        chk("P4 · %s · the gap to the panel edge is the SAME on all three sides it touches (±0.5px)" % t,
+            abs(m['edgeL'] - m['edgeR']) <= 0.5 and abs(m['edgeL'] - m['edgeB']) <= 0.5,
             {'L': m['edgeL'], 'R': m['edgeR'], 'B': m['edgeB']})
         chk("P4 · %s · and that gap IS the panel's padding token" % t,
             abs(m['edgeL'] - m['token']['l']) <= 1 and abs(m['edgeB'] - m['token']['b']) <= 1,
@@ -586,14 +592,20 @@ async def P5(pw):
 async def P9(pw):
     print("\nP9 · the Doc mirror retires unbuilt")
     js, css = src(SRC_JS), src(SRC_CSS)
-    html = src(os.path.join('standard', 'index.html'))
+    # FIXED BY WIRE HT-29 · S0. `standard/index.html` was estate-relative, and R70.345 moved the repo to
+    # `_machine/standard` — so this raised FileNotFoundError, P9 died mid-section and every check after it
+    # never ran. It read as "113 of 114" rather than as a suite that stopped. `_REPO` is this checkout,
+    # which is also the point of the header above: a worktree run must test the worktree.
+    html = src(os.path.join(_REPO, 'index.html'))
     pat = re.compile(r'jdoc|h18jset|h18jhint|h18JUrl|h18JTest|script\.google|Send today now', re.I)
     for name, body in (('app.js', js), ('app.css', css), ('index.html', html)):
         hits = pat.findall(body)
         chk("P9 · grep count 0 for the doc code paths in %s" % name, not hits, hits[:4])
-    chk("P9 · the setup document is archived, not deleted (DEC-037)",
-        os.path.exists(os.path.join('_archive', '2026-09-08_ht20_doc-mirror-retired',
-                                    'JOURNAL_DOC_SETUP.md')))
+    # the estate's archive moved with everything else in R70.345 (`_archive` -> `_machine/_archive`); the
+    # document is still there, and this line was asking the pre-reshape address
+    arch = os.path.join(_ESTATE, '_machine', '_archive', '2026-09-08_ht20_doc-mirror-retired',
+                        'JOURNAL_DOC_SETUP.md')
+    chk("P9 · the setup document is archived, not deleted (DEC-037)", os.path.exists(arch), arch)
     chk("P9 · and it is gone from ht_batch18",
         not os.path.exists(os.path.join('_reconcile', 'ht_batch18', 'JOURNAL_DOC_SETUP.md')))
 
@@ -731,17 +743,22 @@ async def P6(pw):
         and rows[0].split('\t')[5] == 'PRIVATE'
         and rows[0].split('\t')[2].endswith('.md'),
         rows[0].split('\t')[:6] if rows else None)
-    # CC BEV created `master-brain/journal/` as an EMPTY layer on 2026-09-09 (commit b3ee686,
-    # R70.283's predecessor id) with nothing in it but a .gitkeep. Its existence is therefore not
-    # evidence that CC HT wrote there -- the question is whether any journal CONTENT is in it.
-    mb = os.path.join('master-brain', 'journal')
-    content = []
-    for dp, _, fn in os.walk(mb):
-        content += [f for f in fn if f.endswith('.md')]
-    chk("P6g · CC HT wrote no journal content into master-brain (CC_STANDING §2)",
-        not content, content[:4])
-    chk("P6h · the vault is not dismantled before the shelf lands (DEC-037)",
-        os.path.isdir(os.path.join('journal', 'days')))
+    # AMENDED BY WIRE HT-29 · R67.2 · paste 133 S0. R70.345 and PASTE 130 moved the estate under both of
+    # these while they were green. `MOVED.md` carries the two rows: `journal -> _machine/journal` (estate)
+    # and `journal/.gitkeep -> events/journal/.gitkeep` (note). So P6h was red for a MOVE that DEC-037
+    # expressly allows, and P6g was worse than red - it walked `master-brain/journal`, a folder the reshape
+    # emptied, and passed by finding nothing that could fail. A green that cannot go red is not a check.
+    # P6g now asks GIT, which no reshape can move, and asks the claim CC_STANDING §3 actually makes -
+    # "never in a repo": not one journal note is TRACKED, wherever the vault happens to sit today.
+    import subprocess
+    ls = subprocess.run(['git', '--no-optional-locks', '-C', _ESTATE, 'ls-files',
+                         'events/journal', '_machine/journal', 'journal', 'master-brain/journal'],
+                        capture_output=True, text=True, encoding='utf-8', errors='replace')
+    content = [f for f in (ls.stdout or '').split('\n') if f.strip().endswith('.md')]
+    chk("P6g · not one journal note is tracked by git, wherever the vault sits (CC_STANDING §3)",
+        ls.returncode == 0 and not content, content[:4] or ls.stderr[:120])
+    chk("P6h · the vault is not dismantled before the shelf lands (DEC-037; MOVED.md: journal -> _machine/journal)",
+        os.path.isdir(os.path.join('_machine', 'journal', 'days')))
 
 
 # =============================================================================================

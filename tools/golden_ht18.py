@@ -347,11 +347,18 @@ async def run_s3(pw):
         await pg.evaluate("()=>{const l=document.getElementById('log'); l.scrollTop=l.scrollHeight;}")
         await pg.wait_for_timeout(250)
         m2 = await pg.evaluate(S3)
-        chk("S3e · %s · with #log scrolled to the bottom the load line is still inside the quadrant"
+        # ---- AMENDED BY HT-29 S0 (CC HT 2026-09-15) · R67.2 · the rule is paste 133 S0.2 ----------
+        # THE LOAD LINE IS HIDDEN NOW. "Planned 3h52m · Done 0m · Left 3h52m" is named in the paste as
+        # noise to hide (AUDIT row A10): the time a task is planned for rides the task itself as a dot,
+        # and on-time % is a line inside Insights. The line is HIDDEN, never removed (R70.138), so the
+        # check becomes: it is either off the surface, or - if a later wire brings it back - still
+        # inside the quadrant when the list is scrolled. Pinning is what this ever tested.
+        off = not m2['load'] or m2['load']['box']['h'] == 0
+        chk("S3e · %s · the load line is off the surface (A10), or still pinned inside the quadrant"
             % t,
-            m2['load'] and m2['load']['box']['t'] >= m2['quad']['t'] - 1
-            and m2['load']['box']['b'] <= m2['quad']['b'] + 1
-            and re.search(r'Planned .* Done .* Left', m2['load']['text'] or ''),
+            off or (m2['load']['box']['t'] >= m2['quad']['t'] - 1
+                    and m2['load']['box']['b'] <= m2['quad']['b'] + 1
+                    and re.search(r'Planned .* Done .* Left', m2['load']['text'] or '')),
             m2['load'])
         # AMENDED for HT-18c (Cory note 10): CLOSE THE DAY is off the surface - the day closes on
         # your last check-off now. The button stays in the DOM (R70.16) and in Advanced.
@@ -450,7 +457,10 @@ S5 = """() => {
   return {
     exists:!!a, visible: a? a.getClientRects().length>0 : false,
     text: a? a.textContent : null,
-    v: meRow? (meRow.querySelectorAll('td.p')[1]||{}).textContent : null,
+    /* HT-29 S3.12: the row is member · today · 7 days · 30 days · logged, so the 30-day cell is the third
+       percentage, and it is COMPLETION (Ruling 1), not adherence - `mine30` is what it must equal. */
+    v: meRow? (meRow.querySelectorAll('td.p')[2]||{}).textContent : null,
+    mine30: (window.__HT29GRP ? window.__HT29GRP.you().m : null),
     memberRows: a? a.querySelectorAll('tbody tr').length : 0,
     metricCols: a? a.querySelectorAll('thead th').length : 0,
     heading: a? (a.querySelector('.h18gh')||{}).textContent || '' : '',
@@ -466,7 +476,9 @@ S5 = """() => {
     lineBottom: a? Math.round(a.getBoundingClientRect().bottom) : null,
     firstRowTop: (()=>{ const r=d?d.querySelector('tbody tr'):null;
       return r? Math.round(r.getBoundingClientRect().top) : null; })(),
-    lineOnTop: (()=>{ const btn=a?a.querySelector('[data-h18more]'):null; if(!btn) return null;
+    /* HT-29 S5.17: the button that opened it is retired, so the thing the drawer must not cover is the
+       GROUP heading itself - which is what "does not cover what opens it" was always protecting. */
+    lineOnTop: (()=>{ const btn=a?(a.querySelector('.h18gh')||a.querySelector('[data-h18more]')):null; if(!btn) return null;
       const b=btn.getBoundingClientRect();
       const el=document.elementFromPoint(b.left+b.width/2, b.top+b.height/2);
       return !!(el && (el===btn || btn.contains(el))); })(),
@@ -497,15 +509,27 @@ async def run_s5(pw):
             # invented members. They are gone from the app — with no circle the panel is YOU
             # plus one honest "no members yet" row, so the floor is 2. `golden_ht21.py` S7f
             # covers the multi-member layout against the fixture's own seeded circle.
+            # ---- AMENDED BY HT-29 S3.12 (CC HT 2026-09-15) · R67.2 · the rule is paste 133 S3.12 ----
+            # FIVE COLUMNS NOW, not three: member · today · 7 days · 30 days · logged. Cory's 9/15
+            # words are "today · 7-day · 30-day completion and logged-days per member", and the
+            # logged count is what makes a skipped day visible once an empty day counts as 0%
+            # (Ruling 1). The floor stays "one row per member, always visible, no scorecard".
             m['exists'] and m['visible'] and m['visibleScorecards'] == 0
-            and m['memberRows'] >= 2 and m['metricCols'] == 3
+            and m['memberRows'] >= 2 and m['metricCols'] == 5
             and 'GROUP' in m['heading'],
             [m['exists'], m['visible'], m['visibleScorecards'], m['memberRows'],
              m['metricCols'], m['heading'][:30]])
-        chk("S5b · %s · the number IS the roll-up of the drawer's own rows (%s%%)" % (t, m['rollup']),
-            m['v'] is not None and m['rollup'] is not None
-            and int(re.sub(r'[^0-9]', '', m['v'] or '0')) == m['rollup'],
-            [m['v'], m['rollup']])
+        # ---- AMENDED BY HT-29 S3.12 (CC HT 2026-09-15) · R67.2 · the rule is paste 133 S3.12 + Ruling 1 ----
+        # THE TWO NUMBERS ARE NO LONGER THE SAME MEASURE, ON PURPOSE. The GROUP table compares people, and the
+        # only figure that exists for another person is the day's completion % - so every cell in it is
+        # completion, averaged over CALENDAR days (an unlogged day is 0%). The drawer's roll-up is adherence,
+        # hits over opportunities, which cannot be computed for anyone but yourself. The identity this check
+        # was written to protect is kept where it is still true: the drawer's own number against its rows.
+        chk("S5b · %s · YOUR 30-day cell is completion over calendar days (Ruling 1), not the adherence roll-up"
+            % t,
+            m['v'] is not None and m['mine30'] is not None
+            and int(re.sub(r'[^0-9]', '', m['v'] or '0')) == m['mine30'],
+            [m['v'], m['mine30'], m['rollup']])
         # AMENDED for HT-18d: the sparkline left the surface with the ADHERENCE line. It is still
         # ONE renderer (__HT16.sparkSvg) and the scorecard inside the drawer still draws with it,
         # which is what CONSOLIDATE actually claimed - so that is where it is now asserted.
@@ -514,7 +538,8 @@ async def run_s5(pw):
         # stamp the scorecard TABLE, then open twice, and see whether the node survived
         await pg.evaluate("()=>{const t=document.querySelector('#h16Score table.h16sc');"
                           "if(t) t.dataset.h18stamp='keep';}")
-        await pg.click('#h18Group [data-h18more]'); await pg.wait_for_timeout(450)
+        await pg.evaluate("() => window.__HT29_DETAIL.toggle()")   # HT-29 S5.17: DETAIL's button is retired
+        await pg.wait_for_timeout(450)
         m2 = await pg.evaluate(S5)
         # HT-18c note 7: the drawer carries the seeded CIRCLE as well now — You plus three test
         # dummies — so the row count is groups + habits + 4.
@@ -538,12 +563,14 @@ async def run_s5(pw):
             m2['scoreInDrawer'], m2['scoreInDrawer'])
         chk("S5d · %s · the OPEN drawer does not cover the GROUP block that opens it" % t,
             m2['lineOnTop'] is True, {'groupOnTop': m2['lineOnTop']})
-        await pg.click('#h18Group [data-h18more]'); await pg.wait_for_timeout(300)
+        await pg.evaluate("() => window.__HT29_DETAIL.toggle()")   # HT-29 S5.17: DETAIL's button is retired
+        await pg.wait_for_timeout(300)
         m3 = await pg.evaluate(S5)
         chk("S5e · %s · clicking again hides it, and the page still fits" % t,
             m3['drawerHidden'] and m3['page'] - m3['vh'] <= 96,
             [m3['drawerHidden'], m3['page'], m3['vh']])
-        await pg.click('#h18Group [data-h18more]'); await pg.wait_for_timeout(300)
+        await pg.evaluate("() => window.__HT29_DETAIL.toggle()")   # HT-29 S5.17: DETAIL's button is retired
+        await pg.wait_for_timeout(300)
         await pg.keyboard.press('Escape'); await pg.wait_for_timeout(300)
         m4 = await pg.evaluate(S5)
         chk("S5e · %s · Escape closes it" % t, m4['drawerHidden'], m4['drawerHidden'])
@@ -790,9 +817,16 @@ async def run_s7(pw):
             and m['overlaps'] == 0 and m['rowsInside'] >= floorC4,
             {'inside': m['rowsInside'], 'total': m['rowsTotal'], 'floor': floorC4,
              'cols': m['logCols'], 'overlaps': m['overlaps'], 'scrolls': m['logScrolls']})
-        chk("C5 · %s · the dead band above the journal carries the tape — %d stats on ONE line"
+        # AMENDED BY WIRE HT-29 · R67.2 · paste 133 S0.3, audit row A17 (Cory 9/15: "the second TODAY").
+        # AND THE OLD CLAIM WAS NEVER TRUE ON SCREEN: `tapeStats` counts `.tp` NODES, not rendered ones.
+        # Measured on this build at 1280 / 1366 / 1440 / 1600 / 1920, all five: 12 in the DOM, exactly ONE
+        # on screen — "Today 60%" — because `body.small .tape .tp:nth-child(n+5)` and its siblings hide the
+        # other eleven. So the band Cory flagged really was a second TODAY at every width, and the line that
+        # said otherwise was counting nodes. The band is retired; the tape stays in the tree (R70.138), which
+        # is what this now asserts. Deleting one CSS line in app.css ("A17") brings it back.
+        chk("C5 · %s · the second TODAY band is retired (A17) and the tape is still in the tree — %d stats"
             % (t, m['tapeStats']),
-            m['tapeVisible'] and m['tapeStats'] >= 10 and m['tapeH'] <= 52,
+            not m['tapeVisible'] and m['tapeStats'] >= 10 and m['tapeH'] == 0,
             {'visible': m['tapeVisible'], 'stats': m['tapeStats'], 'h': m['tapeH']})
         chk("C6 · %s · LIFE is ONE graph, no folds, cell %s" % (t, m['cell']),
             m['folds'] == 1 and m['cell'] >= 4, [m['folds'], m['cell']])

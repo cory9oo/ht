@@ -23,6 +23,9 @@ window.ST = { sb: sb };
    `ST.fiveInputsOnly`. */
 var FIVE_INPUTS_ONLY = true;
 window.ST.fiveInputsOnly = FIVE_INPUTS_ONLY;
+/* HT-29 S1 (PASTE 133): HT-9a kept the brain dump in localStorage because its column did not exist yet. It does,
+   and the stopgap was overwriting the box with '' after every check-off. Retired here, kept whole below. */
+var HT9A_DUMP_STOPGAP = false;
 
 var WD    = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
 var WD2   = ['S','M','T','W','T','F','S'];
@@ -1715,7 +1718,7 @@ function openSettings(){
 
     '<div class="sh"><h2>Session</h2><span class="ln"></span><span class="c"></span></div>'+
     '<div class="tools"><button class="btn" id="bOut">Sign out</button></div>'+
-    '<div class="note" id="privNote" style="padding:14px 0 0">Your journal is yours. The app never shows it to anyone else — including Cory. Every table is row-level locked to your account; nobody in a circle can see anything but a daily percentage.</div>';
+    '<div class="note" id="privNote" style="padding:14px 0 0">Your journal is yours. The app never shows it to anyone else — including Cory. Your group sees your standards, your check-offs and the day’s number — never what you write.</div>';
 
   openOv('Settings',body,function(){
     var list=el('edList');
@@ -1807,7 +1810,17 @@ async function saveStandards(){
 async function saveProfile(){
   var n=el('pName').value.trim(), b=el('pBirth').value||null;
   S.me.display_name=n;
-  await sb.from('profiles').update({display_name:n}).eq('id',S.me.id);
+  /* HT-29 S3 (PASTE 133): the app never created a `profiles` row, so a new member's name saved to nothing and
+     the group read "member". An upsert makes the row; where the database has no insert rule for it yet (before
+     tools/sql/2026-09-15_ht29.sql), the old update still runs for accounts that already have one. */
+  var pu=await sb.from('profiles').upsert({ id:S.me.id, display_name:n }, { onConflict:'id' }).select('id');
+  if(pu && pu.error) pu=await sb.from('profiles').update({display_name:n}).eq('id',S.me.id).select('id');
+  /* AND THE NAME IS CHECKED, because the failure this replaces was silent: an update that matches no row is
+     not an error to PostgREST, so "profile saved" used to appear over a name that reached nothing and the
+     group kept reading "member". `.select('id')` makes the row count readable; zero rows is a failure. */
+  if(!pu || pu.error || !(pu.data||[]).length){
+    toast('name not saved'); warn29('profile name not saved', pu && pu.error); return;
+  }
   /* HT-13 B1: birthdate and target age are the life graph's two inputs and they live in the
      owner-only table, never in `profiles`. The field is only read when its column exists. */
   var rec={ id:S.me.id, birth_date:b };
@@ -2651,6 +2664,10 @@ function earned(k){ return committed() - remaining(k); }
         var w = r.installing; if(!w) return;
         w.addEventListener('statechange', function(){
           if(w.state === 'installed' && navigator.serviceWorker.controller){
+            /* HT-29 S8 (PASTE 133) · D16 CLOSED. The toast above could never be tapped (`.toast{pointer-events:none}`)
+               and the next toast - "saved", a check-off - erased it. A banner of its own now waits for the tap,
+               saves what is being typed, then refreshes. The toast branch stays behind HT29_UPDATE_BANNER. */
+            if(window.__HT29UPD && HT29_UPDATE_BANNER){ window.__HT29UPD.show(); return; }
             var n = el('toast'); if(!n) return;
             n.textContent = 'update available — tap to reload';
             n.classList.add('on');
@@ -2724,6 +2741,7 @@ function earned(k){ return committed() - remaining(k); }
       host.insertBefore(lab, host.firstChild);
       var ta = lab.querySelector('#iDump'), t = null;
       ta.addEventListener('input', function(){
+        if(!HT9A_DUMP_STOPGAP) return;                 /* HT-29 S1: the column exists; the row is the only home */
         clearTimeout(t);
         t = setTimeout(function(){ try{ localStorage.setItem('ht_dump_'+S.date, ta.value); }catch(e){} }, 500);
       });
@@ -2829,7 +2847,15 @@ function earned(k){ return committed() - remaining(k); }
   var _go = goDay;       goDay     = function(k){ _go.call(null, k); simplify(); loadDump(); };
   var _os = openSettings; openSettings = function(){ _os.apply(null, arguments); setTimeout(advToggle, 60); };
 
+  /* ---- HT-29 S1 (PASTE 133) · THE DEVICE STOPGAP IS RETIRED, AND THIS IS THE LINE THAT LOST TEXT --------
+     9a wrote the brain dump to localStorage because `day_private.brain_dump` did not exist yet. It has existed
+     since 2026-09-09, and HT-10's importStopgap moves any leftover keys into it and DELETES them - after which
+     this function set the box to '' on every paintMast (so: after every check-off) and on every day change.
+     MEASURED on the fixture (ht_stage\133\s1\diag_dump.txt): the row held DUMP-KEEPS, S.priv held DUMP-KEEPS,
+     and the box was blank after a reload - one keystroke away from writing that blank back over the row.
+     The stopgap is HIDDEN, NEVER REMOVED (R70.138): flip HT9A_DUMP_STOPGAP to true and 9a behaves as it did. */
   function loadDump(){
+    if(!HT9A_DUMP_STOPGAP) return;
     var ta = document.getElementById('iDump'); if(!ta) return;
     try{ ta.value = localStorage.getItem('ht_dump_' + S.date) || ''; }catch(e){}
   }
@@ -3018,7 +3044,8 @@ function earned(k){ return committed() - remaining(k); }
        else. Changing cadence or time is the sheet's job.
        STANDARDS and WEEKLY are also legacy group names, so the check is on the COMPUTED set,
        not on the string alone - and it runs first. */
-    if(['TIMED','ANYTIME','STANDARDS','WEEKLY'].indexOf(t.toUpperCase()) >= 0
+    /* HT-29 S2: the four sections are computed headers too - a drag across one sets `section`, never a group */
+    if(['TIMED','ANYTIME','STANDARDS','WEEKLY','MORNING ROUTINE','NIGHT ROUTINE'].indexOf(t.toUpperCase()) >= 0
        && document.documentElement.hasAttribute('data-ht9a')) return null;
     var hit=GROUPS.filter(function(g){ return g.toUpperCase()===t.toUpperCase(); })[0];
     if(hit) return hit;
@@ -3045,6 +3072,13 @@ function earned(k){ return committed() - remaining(k); }
     var t = await sb.from('habits').select('id,time_anchor,minutes_planned')
               .eq('user_id',S.me.id).eq('active',true).order('sort_order');
     S.hasTime = !t.error;
+    /* HT-29 S2 (PASTE 133): a fourth probe. `section` lands with tools/sql/2026-09-15_ht29.sql; absent -> every
+       standard sits where the rule places it and the sheet shows no Section field. Scoped like the others. */
+    var sc = await sb.from('habits').select('id,section')
+              .eq('user_id',S.me.id).eq('active',true).order('sort_order');
+    S.hasSection = !sc.error;
+    if(S.hasSection) (sc.data||[]).forEach(function(r){
+      var h=hby(r.id); if(h){ h.section=r.section; } });
     /* merge what exists onto the rows load() already has — HCOLS is fixed and golden-verified */
     if(S.hasWindow) (w.data||[]).forEach(function(r){
       var h=hby(r.id); if(h){ h.planned_start=r.planned_start; h.planned_end=r.planned_end; } });
@@ -3095,6 +3129,13 @@ function earned(k){ return committed() - remaining(k); }
              person makes, never on a bulk pass and never silently — and it cannot move at all
              until the `notes` column exists, which is why the offer only appears when it does. */
       fld('Name','<input id="eName" value="'+esc(h.name)+'" placeholder="standard" autocomplete="off">')+
+      /* HT-29 S2 (PASTE 133 Ruling 3): Cory places each standard in one of four sections himself. Shown only
+         when the column exists - a field that cannot save is never offered (R70.289). */
+      (S.hasSection ? (function(){
+        var cur = (isNew && window.__HT29_PRESET_SECTION) || HT29SEC.sectionOf(h);
+        return fld('Section','<select id="eSection">'+HT29SEC.ORDER.map(function(s){
+          return '<option value="'+s+'"'+(s===cur?' selected':'')+'>'+HT29SEC.NAMES[s]+'</option>'; }).join('')+'</select>');
+      })() : '')+
       fld('Group','<select id="eGroup">'+groupsFor(grp).map(function(g){
           return '<option'+(g===grp?' selected':'')+'>'+esc(g)+'</option>'; }).join('')+'</select>')+
       /* HT-24 C1: three cadences now, and the third carries a day picker that is only shown
@@ -3153,8 +3194,10 @@ function earned(k){ return committed() - remaining(k); }
       /* NOTES. When the column is missing the field is DISABLED WITH THE REASON ON IT — it never
          says "saves later", because a sheet that offers a field it cannot save is lying about
          what pressing Save will do (R70.289). */
+      /* HT-29 S2.8 (PASTE 133): Notes IS the definition of done - the one line that makes two people's check-offs
+         mean the same thing. Same column, a plainer name; it rides the name on a desktop hover. */
       (S.hasNotes
-        ? fld('Notes','<textarea id="eNotes" rows="3" placeholder="…">'+esc(h.notes||'')+'</textarea>'+
+        ? fld('Done when','<textarea id="eNotes" rows="2" placeholder="what done looks like, in one line">'+esc(h.notes||'')+'</textarea>'+
             ((h.cue && String(h.cue).trim())
               ? '<button class="btn h16adopt" id="eCueMove" data-c="'+esc(h.cue)+'">'+
                 'Move your cue into Notes?</button>' : ''))
@@ -3273,6 +3316,8 @@ function earned(k){ return committed() - remaining(k); }
     /* S5: the planned-window inputs are no longer rendered (superseded by planned time +
        planned minutes), so nothing writes those columns. */
     if(S.hasNotes)   rec.notes = str('eNotes')||null;
+    /* HT-29 S2: the section Cory chose; written only when the field was shown */
+    if(S.hasSection && document.getElementById('eSection')) rec.section = str('eSection') || null;
     /* S2: one minutes box now. It writes BOTH `minutes` (what committed()/remaining() read)
        and `minutes_planned` (what planOf() prefers), so the two can never drift apart — which is
        exactly what two separate inputs allowed. */
@@ -3434,9 +3479,9 @@ function earned(k){ return committed() - remaining(k); }
     if(row) row.classList.remove('dragging');
     if(log) log.classList.remove('reordering');
     if(!log) return;
-    var order=0, cur=null, ops=[], moved=0;
+    var order=0, cur=null, sec=null, ops=[], moved=0;
     Array.prototype.slice.call(log.children).forEach(function(k){
-      if(k.classList.contains('grp')){ cur=canonGroup(k.textContent); return; }
+      if(k.classList.contains('grp')){ cur=canonGroup(k.textContent); sec=k.getAttribute('data-sec'); return; }
       if(!k.classList.contains('li')) return;
       var hid=k.getAttribute('data-h'), h=hby(hid); if(!h) return;
       var so=order++;
@@ -3444,8 +3489,11 @@ function earned(k){ return committed() - remaining(k); }
       var chg={};
       if(h.sort_order!==so) chg.sort_order=so;
       if(grp!==null && (h.group_name||'')!==grp) chg.group_name=grp;
+      /* HT-29 S2: a drag across a section's header moves the standard into that section (Ruling 3) */
+      if(S.hasSection && sec && HT29SEC.sectionOf(h)!==sec) chg.section=sec;
       if(!Object.keys(chg).length) return;
       h.sort_order=so; if(chg.group_name!==undefined) h.group_name=grp;
+      if(chg.section!==undefined) h.section=chg.section;
       moved++;
       ops.push(sb.from('habits').update(chg).eq('id',hid).eq('user_id',S.me.id));
     });
@@ -6478,41 +6526,51 @@ function earned(k){ return committed() - remaining(k); }
      R47.3 IS UNCHANGED AND STILL STRUCTURAL: the one query that crosses users is
      `days.select('user_id,date,pct')` — adherence class only. Names come from `profiles`, which
      is the row a member publishes about themselves. No journal, no rating, no standards list. */
+  /* HT-29 S3 (PASTE 133): the same reads, and three changes. RULING 1 - a day with nothing checked is 0%, so the
+     7- and 30-day figures divide by calendar days, never by the days someone happened to log. LOGGED N/7 - with
+     empty days at 0%, a skipped day and a bad day would look the same; the count of rated days is what makes
+     skipping visible. RULING 4 - the group sees check-offs and the rating NUMBER; both arrive through functions
+     that return those columns and nothing else (tools/sql/2026-09-15_ht29.sql), never a journal field. A load
+     that FAILED says so (HT29GRP.state), instead of looking like a group of one. */
   var _circleOnce=null;
   function circleMembers(){
     if(_circleOnce) return _circleOnce;
     if(!S.me) return null;
     _circleOnce = (async function(){
       try{
+        HT29GRP.setState('loading');
         var mine=await sb.from('circle_members').select('circle_id').eq('user_id',S.me.id);
+        if(mine.error) throw mine.error;
         var ids=(mine.data||[]).map(function(r){ return r.circle_id; });
-        if(!ids.length) return [];
+        if(!ids.length){ HT29GRP.setCircle(null); HT29GRP.setState('none'); return []; }
+        var cs=await sb.from('circles').select('id,name,join_code').in('id',ids);
+        if(cs.error) throw cs.error;      /* else a failed read reads as "no group yet" and offers to make a second one */
+        HT29GRP.setCircle((cs.data||[])[0]||null);
         var mem=await sb.from('circle_members').select('circle_id,user_id').in('circle_id',ids);
+        if(mem.error) throw mem.error;
         var uids=(mem.data||[]).map(function(r){ return r.user_id; })
                    .filter(function(u){ return u!==S.me.id; });
-        if(!uids.length) return [];
+        if(!uids.length){ HT29GRP.setState('alone'); return []; }
         var pr=await sb.from('profiles').select('id,display_name,handle').in('id',uids);
+        if(pr.error) throw pr.error;      /* else every row in the table is named "member" - the bug S3 exists to kill */
         var pm={}; (pr.data||[]).forEach(function(p){ pm[p.id]=p; });
-        /* the ONLY cross-user read in the app, and it stays adherence-class (R47.3) */
+        /* the cross-user completion read (adherence class) - one of the two call sites golden_ht28 G22 counts */
         var od=await sb.from('days').select('user_id,date,pct')
                        .in('user_id',uids).gte('date',shift(today(),-29));
+        if(od.error) throw od.error;
         var by={}; (od.data||[]).forEach(function(r){ (by[r.user_id]=by[r.user_id]||{})[r.date]=r.pct; });
-        return uids.map(function(u){
-          var d=by[u]||{}, p=pm[u]||{};
-          function mean(days){
-            var a=[]; for(var i=0;i<days;i++){ var v=d[shift(today(),-i)]; if(v!=null) a.push(v); }
-            return a.length? Math.round(a.reduce(function(x,y){return x+y;},0)/a.length) : null;
-          }
-          return { id:u, n:(p.display_name||p.handle||'member'),
-                   t:(d[today()]==null?null:Math.round(d[today()])), p:mean(30), days:d };
-        });
-      }catch(e){ return []; }
-    })();
+        var rt=await HT29GRP.ratings(shift(today(),-29), today());
+        await HT29GRP.probeDay(uids[0]);                    /* a member's line opens only if their day can */
+        HT29GRP.setState('ok');
+        return uids.map(function(u){ return HT29GRP.member(u, pm[u]||{}, by[u]||{}, rt ? (rt[u]||{}) : null); });
+      }catch(e){ HT29GRP.setState('error'); warn29('group load failed', e); _circleOnce=null; return []; }
+    })();                                 /* the memo is dropped on failure: the card says it will try again, so it must */
     return _circleOnce;
   }
   /* the loaded value, or [] until the promise settles — a paint never waits on the network */
   var _circleRows=[];
   function circleRows(){ return _circleRows; }
+  window.__HT29GRP_ROWS = circleRows;                     /* HT-29 S3/S5: Insights and a member's day read the same rows */
   function loadCircle(){
     var p=circleMembers();
     if(p && p.then) p.then(function(rows){
@@ -6543,8 +6601,15 @@ function earned(k){ return committed() - remaining(k); }
       ins.insertBefore(g, ins.firstChild);
       g.addEventListener('click', function(e){
         if(e.target.closest('[data-h18more]')) toggleDrawer();
+        HT29GRP.click(e);                                   /* HT-29 S3: a member's day, the invite, join */
       });
     }
+    /* HT-29 S3 (PASTE 133): ONE renderer for the member lines - this card, and Insights' group side by side.
+       today · 7 days · 30 days · logged, Ruling 1's arithmetic, a tap opens a member's day. DETAIL is retired
+       (paste 133 S5.17): its button is hidden, never removed; its page is Insights' "More". The HT-18d rows
+       below are the old renderer, kept whole behind HT29_GROUP_OLD (R70.138). */
+    if(!HT29_GROUP_OLD){ g.innerHTML=HT29GRP.block(circleRows()); }
+    else {
     var rf=window.__HT16.rampFill, rc=window.__HT16.rampClass;
     var mine=adhAll(0,29);
     var todayPct=(function(){ var r=S.byDate[today()]; return (r&&r.pct!=null)? Math.round(r.pct) : null; })();
@@ -6566,6 +6631,7 @@ function earned(k){ return committed() - remaining(k); }
       (others.length ? '' :
         '<tr class="h18none"><td colspan="3">No members yet — share your join code to add one.</td></tr>')+
       '</tbody></table>';
+    }
     /* THE DRAWER STARTS BELOW THIS BLOCK. `inset:0` on #h18Draw covered the very control that
        opens it — the same defect HT-18b hit with the old one-line button, arriving again now that
        the control is a block of variable height. A constant cannot express "below GROUP", so the
@@ -6615,6 +6681,10 @@ function earned(k){ return committed() - remaining(k); }
     var d=document.getElementById('h18Draw');
     setDrawer(!d || d.hidden);
   }
+  /* HT-29 S5.17: DETAIL's page stays reachable from Insights' "More" once its own button is retired;
+     `.toggle` is what the goldens that used to click the button now call (R67.2, amended by name). */
+  window.__HT29_DETAIL = function(){ setDrawer(true); var d=document.getElementById('h18Draw'); if(d && d.scrollIntoView) d.scrollIntoView({ block:'start' }); };
+  window.__HT29_DETAIL.toggle = function(){ toggleDrawer(); };
 
   /* S5c - THE SURFACE LINE: a percentage, a color, a graph, and nothing else. No group rows, no
      streak, no weakest, no columns. The percent carries the ramp colour; the sparkline is HT-16's
@@ -7097,14 +7167,17 @@ function earned(k){ return committed() - remaining(k); }
     /* B3: the journal header names the day for what it is */
     var jh=document.querySelector('.colL #jIn > .blk:has(#iDump) > .sh h2');
     if(jh){
-      if(!jh.dataset.h19) jh.dataset.h19 = jh.textContent;
+      /* HT-29 S0 (A03): the CACHE IS THE MARKUP, not the text. Restoring `textContent` flattened
+         `<i class="n">3</i>Journal` into the string "3Journal" and destroyed the element - invisible while
+         the number was meant to show, and a stray "3" glued to the word the moment A03 hid `i.n` by CSS. */
+      if(!jh.dataset.h19) jh.dataset.h19 = jh.innerHTML;
       /* B4: and on any other day it names THAT day. Clicking a date on the month chart
          already moved the journal there and already saved edits against that date
          (MEASURED: typing into Sep 1 writes day_private for 2026-09-01). What was
          missing was any way to tell — the header said "Journal" whichever day you were
          on — and any way back. */
-      jh.textContent = (on && sh) ? ('SABBATH · ' + mdate(S.date))
-                     : (S.date===today() ? jh.dataset.h19 : mdate(S.date));
+      jh.innerHTML = (on && sh) ? esc('SABBATH · ' + mdate(S.date))
+                   : (S.date===today() ? jh.dataset.h19 : esc(mdate(S.date)));
     }
     var shRow=document.querySelector('.colL #jIn > .blk:has(#iDump) > .sh');
     if(shRow){
@@ -7456,9 +7529,11 @@ function earned(k){ return committed() - remaining(k); }
     return n;
   }
   function stripNums(){
+    /* HT-29 (PASTE 133 Ruling 1): a day with nothing checked is 0%, and an average never skips an unlogged day -
+       the strip's 7 days divides by seven, the same arithmetic as the group's lines */
     var t=pctOn(today());
-    var w=lastDays(7).map(pctOn).filter(function(v){ return v!=null; });
-    return { today:t, week:w.length?Math.round(mean(w)):null, streak:streak() };
+    var w=lastDays(7).map(function(k){ var v=pctOn(k); return v==null ? 0 : v; });
+    return { today:(t==null?0:t), week:Math.round(mean(w)), streak:streak() };
   }
   function perStandard(){
     var cur=lastDays(30), prev=lastDays(30, shift(today(),-30));
@@ -7606,7 +7681,9 @@ function earned(k){ return committed() - remaining(k); }
   function paintFive(){
     var p=ensurePanel('h26Ins', 'Insights', 'h26InsC',
       '<div id="c5Five"></div>'+
-      '<div class="c5priv">Private: journals, ratings and your list are never shown to anyone. A circle sees completion % only.</div>'+
+      /* Ruling 4 (paste 133) rewrote this line; HT-29's Insights repaints it too, and the source must not keep
+         the retired sentence for any paint that does not reach that repaint. */
+      '<div class="c5priv">Your journal and your why are yours alone. The group sees standards, check-offs and the day’s number.</div>'+
       '<details id="c5More" class="c5more"><summary>More</summary></details>');
     if(!p) return;
     el('c5Five').innerHTML=five().join('');
@@ -7753,6 +7830,14 @@ function earned(k){ return committed() - remaining(k); }
     var kids=q('#log > *'), rows=kids.filter(function(c){ return c.classList.contains('li'); });
     if(!rows.length) return;
     var hm=byIdMap(), sab=sabOn(S.date), B={ TIMED:[], ANYTIME:[], WEEKLY:[] }, other=[];
+    /* HT-29 S2 (PASTE 133): the four sections have the final say now, from every path that reaches here (paintAll,
+       paintLog, goDay, resize). TIMED/ANYTIME/WEEKLY below stay whole behind HT29_SECTIONS (R70.138). */
+    if(HT29_SECTIONS && window.__HT29S2){
+      window.__HT29S2.regroup();
+      q('#log .li.h28sab').forEach(function(r){ if(!sab || r.getAttribute('data-h')!==sab.id) r.classList.remove('h28sab'); });
+      if(sab){ var sr29=log.querySelector('.li[data-h="'+sab.id+'"]'); if(sr29) sr29.classList.add('h28sab'); }
+      return;
+    }
     kids.forEach(function(c, i){
       if(c.classList.contains('li')){
         var h=hm[c.getAttribute('data-h')], g=h ? bucketOf(h) : 'ANYTIME';
@@ -7934,15 +8019,23 @@ function earned(k){ return committed() - remaining(k); }
     if(S.hasWindow){ rec.planned_start = x.time||null;
                      rec.planned_end = x.time ? fmtClock(minsOf(x.time)+(x.minutes||0)) : null; }
     if(S.hasNotes && x.notes) rec.notes = x.notes;
+    if(S.hasSection && x.section) rec.section = x.section;            /* HT-29 S2.10: a link may place what it adds */
     return rec;
   }
   /* a tap can come before HT-11's column probe has run; an unknown column is asked, never assumed absent -
      otherwise a quick tap inserts the timed examples with no time (review NIT) */
+  /* A PROBE THAT DROPS ON THE NETWORK IS NOT A MISSING COLUMN - the same rule `load()` learned the hard way
+     (see its netDrop note). Latched false by a blip, `hasSection` makes every new standard insert without its
+     section and every one already there jump to a fallback heading, and the toast still says "added". So only
+     `42703 column ... does not exist` answers the question; anything else leaves it unasked for the next tap. */
+  function absentCol(e){ return !!e && /42703|column .* does not exist/i.test(String((e.code||'') + ' ' + (e.message||''))); }
+  function flagFrom(r){ return !r.error ? true : (absentCol(r.error) ? false : undefined); }
   async function ensureFlags(){
     var uid=S.me.id;
-    if(S.hasTime===undefined){ var a=await sb.from('habits').select('id,time_anchor,minutes_planned').eq('user_id',uid).limit(1); S.hasTime=!a.error; }
-    if(S.hasWindow===undefined){ var w=await sb.from('habits').select('id,planned_start,planned_end').eq('user_id',uid).limit(1); S.hasWindow=!w.error; }
-    if(S.hasNotes===undefined){ var n=await sb.from('habits').select('id,notes').eq('user_id',uid).limit(1); S.hasNotes=!n.error; }
+    if(S.hasTime===undefined){ var a=await sb.from('habits').select('id,time_anchor,minutes_planned').eq('user_id',uid).limit(1); S.hasTime=flagFrom(a); }
+    if(S.hasWindow===undefined){ var w=await sb.from('habits').select('id,planned_start,planned_end').eq('user_id',uid).limit(1); S.hasWindow=flagFrom(w); }
+    if(S.hasNotes===undefined){ var n=await sb.from('habits').select('id,notes').eq('user_id',uid).limit(1); S.hasNotes=flagFrom(n); }
+    if(S.hasSection===undefined){ var sc=await sb.from('habits').select('id,section').eq('user_id',uid).limit(1); S.hasSection=flagFrom(sc); }
   }
   async function fullReload(){
     if(window.__HT11 && window.__HT11.reload) return window.__HT11.reload();
@@ -7973,7 +8066,10 @@ function earned(k){ return committed() - remaining(k); }
         if(!n || n.length>120) return [];
         if(tm!==null && !/^([01]\d|2[0-3]):[0-5]\d$/.test(tm)) return [];
         if(d!==null && d.length>300) return [];
-        out.push({ name:n, time:tm, notes:d, cadence:(x.c==='weekly'?'weekly':'daily') });
+        /* HT-29 S2.10: `s` names a section; anything else is refused whole, like a bad time */
+        var sec=(x.s==null||x.s==='')?null:String(x.s);
+        if(sec!==null && HT29SEC.ORDER.indexOf(sec)<0) return [];
+        out.push({ name:n, time:tm, notes:d, cadence:(x.c==='weekly'?'weekly':'daily'), section:sec });
       }
       return out;
     }catch(e){ return []; }
@@ -8015,23 +8111,31 @@ function earned(k){ return committed() - remaining(k); }
     var eb=document.getElementById('h28Ex');
     if(eb) eb.onclick=function(){ dismiss(); addExamples(eb); };
   }
-  function haveNames(){ var m={}; S.habits.forEach(function(h){ m[String(h.name||'').trim().toUpperCase()]=1; }); return m; }
+  function haveNames(){ var m={}; S.habits.forEach(function(h){ m[String(h.name||'').trim().toUpperCase()]=h; }); return m; }
+  /* HT-29 S2.10: a standard already on the list is never added twice - but a link that names a section PLACES it */
+  function toPlace(items, have){
+    return S.hasSection ? items.filter(function(x){
+      var h=have[x.name.toUpperCase()]; return h && x.section && HT29SEC.sectionOf(h)!==x.section; }) : [];
+  }
   function showLink(items){
     var n=card(), b=document.getElementById('h28FirstBody'), have=haveNames();
     var todo=items.filter(function(x){ return !have[x.name.toUpperCase()]; });
+    var place=toPlace(items, have);
     b.innerHTML='<div class="eh"><h3>Add standards</h3></div>'+
       '<div class="h28seed">'+items.map(function(x){
-        var on=have[x.name.toUpperCase()];
+        var on=have[x.name.toUpperCase()], moves=on && place.indexOf(x)>=0;
+        var where=x.section ? HT29SEC.NAMES[x.section].toLowerCase() : (x.cadence==='weekly'?'weekly':(x.time?'timed':'anytime'));
         return '<div class="fl'+(on?' on':'')+'"><i>'+(x.time?esc(x.time):'')+'</i>'+
           '<span><b>'+esc(x.name)+'</b>'+(x.notes?'<em>'+esc(x.notes)+'</em>':'')+'</span>'+
-          '<u>'+(on?'on your list':(x.cadence==='weekly'?'weekly':(x.time?'timed':'anytime')))+'</u></div>'; }).join('')+
+          '<u>'+(moves?'\u2192 '+esc(where):(on?'on your list':esc(where)))+'</u></div>'; }).join('')+
       '</div>'+
       '<div class="h28ex1">From a link \u00b7 each counts once, like any standard.</div>'+
       '<div class="etools">'+
-        (todo.length?'<button class="btn pri" id="h28Seed" type="button">'+
-          (todo.length===items.length?'Add '+(items.length===1?'it':'all '+items.length):'Add the missing '+todo.length)+'</button>':'')+
+        ((todo.length||place.length)?'<button class="btn pri" id="h28Seed" type="button">'+
+          (todo.length ? (todo.length===items.length?'Add '+(items.length===1?'it':'all '+items.length):'Add the missing '+todo.length)
+                       : 'Place '+(place.length===1?'it':place.length))+'</button>':'')+
         '<span style="flex:1"></span>'+
-        '<button class="btn'+(todo.length?'':' pri')+'" id="h28SeedNo" type="button">'+(todo.length?'Not now':'Close')+'</button>'+
+        '<button class="btn'+((todo.length||place.length)?'':' pri')+'" id="h28SeedNo" type="button">'+((todo.length||place.length)?'Not now':'Close')+'</button>'+
       '</div>';
     n.setAttribute('data-kind','add'); n.classList.add('on');
     document.getElementById('h28SeedNo').onclick=function(){ linkDone=true; dropLinkParam(); closeCard(); };
@@ -8063,21 +8167,29 @@ function earned(k){ return committed() - remaining(k); }
     if(busy || !S.me || S.loadOk!==true) return;
     busy=true; if(btn){ btn.disabled=true; btn.textContent='adding\u2026'; }
     try{
-      var cur = await sb.from('habits').select('id,name,sort_order').eq('user_id',S.me.id).eq('active',true);
+      await ensureFlags();
+      var cur = await sb.from('habits').select('id,name,sort_order'+(S.hasSection?',section,cadence,group_name,planned_start,time_anchor':'')).eq('user_id',S.me.id).eq('active',true);
       if(cur.error){ toast('not added \u2014 '+errText(cur)); window.__h28Add={ failed:true }; return; }
       var have={}, top=0;
-      (cur.data||[]).forEach(function(r){ have[String(r.name||'').trim().toUpperCase()]=1; top=Math.max(top, +r.sort_order||0); });
+      (cur.data||[]).forEach(function(r){ have[String(r.name||'').trim().toUpperCase()]=r; top=Math.max(top, +r.sort_order||0); });
       var todo=items.filter(function(x){ return !have[x.name.toUpperCase()]; });
       if(todo.length){
-        await ensureFlags();
         var res=await sb.from('habits').insert(todo.map(function(x,i){
-          return recOf({ name:x.name, time:x.time, notes:x.notes, minutes:0, cadence:x.cadence, group_name:'Other' }, top+1+i); }));
+          return recOf({ name:x.name, time:x.time, notes:x.notes, minutes:0, cadence:x.cadence, group_name:'Other', section:x.section }, top+1+i); }));
         if(res && res.error){ toast('not added \u2014 '+errText(res)); window.__h28Add={ failed:true }; return; }
       }
-      window.__h28Add={ added:todo.length, skipped:items.length-todo.length };
-      try{ console.log('HT-28 F19: add-link \u00b7 added '+todo.length+' \u00b7 already there '+(items.length-todo.length)); }catch(e){}
+      /* HT-29 S2.10: the ones already there move into the section the link names - one write each, own rows only */
+      var place=toPlace(items, have), placed=0;
+      for(var pi=0; pi<place.length; pi++){
+        var row=have[place[pi].name.toUpperCase()];
+        var up=await sb.from('habits').update({ section:place[pi].section }).eq('id',row.id).eq('user_id',S.me.id);
+        if(up && up.error){ toast('not placed \u2014 '+errText(up)); window.__h28Add={ failed:true }; return; }
+        placed++;
+      }
+      window.__h28Add={ added:todo.length, skipped:items.length-todo.length, placed:placed };
+      try{ console.log('HT-28 F19: add-link \u00b7 added '+todo.length+' \u00b7 already there '+(items.length-todo.length)+' \u00b7 placed '+placed); }catch(e){}
       linkDone=true; dropLinkParam(); closeCard();
-      toast(todo.length ? todo.length+' standard'+(todo.length>1?'s':'')+' added' : 'already on your list');
+      toast(todo.length ? todo.length+' standard'+(todo.length>1?'s':'')+' added' : (placed ? placed+' placed' : 'already on your list'));
       await fullReload();
     }finally{
       busy=false;
@@ -8181,7 +8293,10 @@ function earned(k){ return committed() - remaining(k); }
    No Realtime subscription: it needs the tables in Supabase's realtime publication, a migration this wire
    does not run; the in-page pull is the whole mechanism and the named upgrade path. Nothing here runs while
    the page is hidden and nothing is scheduled outside the page - the repo's PHASE GATE reads "no automated
-   pulls", and that reading is SPEC's to rule (receipt 128, FOR SPEC). */
+   pulls", and that reading is SPEC's to rule (receipt 128, FOR SPEC).
+   HT-29 S7.27 TOOK THAT UPGRADE PATH and nothing else here changed: `tools/sql/2026-09-15_ht29.sql` runs the
+   migration, and the layer at the foot of this file subscribes and calls this pull. The pull below is still
+   the only thing that reads a row. */
 (function(){
   var POLL_MS = +(window.__SYNC_MS || 30000), MAX_BACKOFF = 300000, WINDOW_DAYS = 14;
   var TYPING_HOLD_MS = +(window.__SYNC_TYPING_MS || 60000);
@@ -8455,7 +8570,8 @@ function earned(k){ return committed() - remaining(k); }
     var uid=S.me.id, from=shift(today(), -(WINDOW_DAYS-1));
     if(S.date && S.date<from) from=S.date;
     var hc='id,name,group_name,cadence,tier,minutes,link,sort_order'+(S.hasCue?',cue':'')+
-           (S.hasWindow?',planned_start,planned_end':'')+(S.hasNotes?',notes':'')+(S.hasTime?',time_anchor,minutes_planned':'');
+           (S.hasWindow?',planned_start,planned_end':'')+(S.hasNotes?',notes':'')+(S.hasTime?',time_anchor,minutes_planned':'')+
+           (S.hasSection?',section':'');                     /* HT-29 S2: a section set on the phone reaches the desk */
     var dc='date,checked,active_set,pct,floor_pct'+(S.hasClosedAt?',closed_at':'');
     var pc='date,rating,why,tasks,prayer'+(S.hasPredict?',predict':'')+(S.hasDump?',brain_dump':'');
     try{
@@ -8470,7 +8586,7 @@ function earned(k){ return committed() - remaining(k); }
                days:(r[1].data||[]).filter(mine), priv:(r[2].data||[]).filter(mine) };
     }catch(e){ warn('pull read failed', e); return { ok:false, network:offline()||isNetErr(e) }; }
   }
-  var HF=['id','name','group_name','cadence','minutes','link','sort_order','cue','time_anchor','minutes_planned','planned_start','planned_end','notes'];
+  var HF=['id','name','group_name','cadence','minutes','link','sort_order','cue','time_anchor','minutes_planned','planned_start','planned_end','notes','section'];
   function fpH(list){ return JSON.stringify((list||[]).map(function(h){ return HF.map(function(f){ return h[f]==null?null:h[f]; }); })); }
   function fpCk(c){ c=c||{}; return JSON.stringify(Object.keys(c).sort().map(function(k){ return [k, c[k]]; })); }
   function fpP(p){ p=p||{}; return JSON.stringify(PF.map(function(f){ return norm(p[f]); })); }
@@ -8819,6 +8935,1368 @@ function earned(k){ return committed() - remaining(k); }
   if(PHONE.addEventListener) PHONE.addEventListener('change', function(){ humanizeScorecard(); });
   if(document.readyState==='complete') setTimeout(function(){ boot28d(); watchScore(); }, 700);
   else window.addEventListener('load', function(){ setTimeout(function(){ boot28d(); watchScore(); }, 700); });
+})();
+
+/* ======================= HT-29 · CLOSE THE BACKLOG, THEN THE TWELVE (PASTE 133) =======================
+   One wire, Cory's twelve items of 9/15. Every layer below is appended inside the same sealed closure and
+   wraps what came before it by name, the way every layer since HT-9a has. Seams for the goldens are
+   `window.__HT29*`, read-only. The database half is tools/sql/2026-09-15_ht29.sql; until it runs, each
+   feature that needs it stays hidden (R70.138) and says nothing - never a half-working button. */
+
+/* ---- HT-29 S1 · ONE RENDERER FOR THE JOURNAL BOXES ----------------------------------------------------------
+   MEASURED BEFORE A LINE CHANGED (ht_stage\133\s1\): with the phone keyboard up, Completed and Prayer jumped a
+   line's height each time a line wrapped (4 jumps of up to 21 px in 300 keys, each box) while the brain dump
+   never moved; and every key in those two boxes wrote a hidden DOM node ("saving…") the dump never wrote.
+   ONE CLASS, TWO CAUSES. growTo() set `height:auto` on EVERY key, so the page collapsed for an instant and a
+   box near the page's end had its scroll clamped; and the boxes were bound by different handlers (the base
+   wire() for Completed/Prayer/why, HT-10's bindDump for the dump, HT-9a's device stopgap on top of it).
+   SO ONE RENDERER OWNS THEM: a focused box only grows - nothing collapses under a caret - and settles its
+   height when it loses focus; a key writes no DOM outside the box; every box saves through one path (500 ms
+   after the last key, and on blur) through HT-28c's wrappers, so sync still records each op.
+   FOUND BY THE SAME READING, RETIRED HERE: HT-9a's loadDump() re-set the brain dump from its device stopgap
+   after every check-off and day change - '' once the stopgap was gone - so the next key could write an empty
+   dump over the server's. The box's text now only ever comes from the day's own row.
+   The desktop (>= 1024) keeps HT-18's CSS-owned boxes exactly as 128 left them. */
+(function(){
+  var BOXES = { iDump:'brain_dump', iTasks:'tasks', iPrayer:'prayer', iWhy:'why' };
+  var SAVE_MS = 500, saveT = null;
+
+  function phone(){ return window.innerWidth < 1024; }
+  function isBox(t){ return !!(t && BOXES[t.id] && String(t.tagName).toLowerCase() === 'textarea'); }
+  function fit(t){
+    if(!phone()) return;
+    var ceil = growCeil(), cur = t.offsetHeight;
+    if(document.activeElement === t){
+      if(t.scrollHeight > t.clientHeight + 1){
+        var want = Math.min(t.scrollHeight + 2, ceil);
+        if(want > cur) t.style.height = want + 'px';
+      }
+    }else{
+      t.style.height = 'auto';                                  /* nobody is typing here: safe to measure */
+      t.style.height = Math.min(t.scrollHeight + 2, ceil) + 'px';
+    }
+    t.style.overflowY = (t.scrollHeight > t.clientHeight + 1) ? 'auto' : '';
+  }
+  /* growTo stays the one home for the rule (HT-25 S2); the journal boxes take the branch that never collapses */
+  var _growTo = growTo;
+  growTo = function(t){ return isBox(t) ? fit(t) : _growTo(t); };
+  if(window.__HT25) window.__HT25.growTo = growTo;
+
+  /* ONE INPUT PATH. Registered after HT-25's capture listener, so the height is settled first; it stops the event
+     here, so the older per-box handlers (and their per-key DOM write) never run. */
+  document.addEventListener('input', function(e){
+    var t = e.target, field = t && BOXES[t.id];
+    if(!field) return;
+    e.stopImmediatePropagation();
+    S.priv = S.priv || {};
+    S.priv[field] = t.value;
+    queuePriv();                                                /* HT-28c records the op and arms a 700 ms save… */
+    clearTimeout(pvT);                                          /* …which this path replaces with one at 500 ms */
+    clearTimeout(saveT);
+    saveT = setTimeout(function(){ savePriv(); }, SAVE_MS);
+  }, true);
+  document.addEventListener('focusout', function(e){ if(isBox(e.target)) fit(e.target); }, true);
+
+  /* THE BRAIN DUMP'S TEXT COMES FROM THE DAY'S ROW, NEVER FROM THE STOPGAP. loadDump() runs inside HT-9a's own
+     paintMast and goDay wrappers; this wraps outside them and puts back what the row says, caret where it was.
+     Nothing paints between the two writes, so nothing flashes. */
+  function keepDump(fn){
+    return function(){
+      var t = el('iDump'), focused = !!t && document.activeElement === t;
+      var s = focused ? t.selectionStart : null, en = focused ? t.selectionEnd : null;
+      var out = fn.apply(null, arguments);
+      t = el('iDump');
+      if(t){
+        var own = (S.priv && S.priv.brain_dump) || '';
+        if(t.value !== own){
+          t.value = own;
+          if(focused && s != null){ try{ t.setSelectionRange(Math.min(s, own.length), Math.min(en, own.length)); }catch(err){} }
+        }
+      }
+      return out;
+    };
+  }
+  paintMast = keepDump(paintMast);
+  goDay = keepDump(goDay);
+
+  /* A09 · A SAVE SAYS NOTHING WHEN IT WORKS. "saved" popped over the lower boxes after every pause; a failure
+     still says so ("note not saved"), and Settings' Synced line carries the time (HT-28c). Deleting this one
+     wrapper brings the toast back exactly as it was (AUDIT.md A09). It matches the WORD, not the call site, so
+     it also silences `saveTomorrow()` — which is dead behind FIVE_INPUTS_ONLY (DEC-171). If that flag ever
+     flips, give that one its own word rather than loosening this. */
+  var _toast = toast;
+  toast = function(t){ if(t === 'saved') return; return _toast.apply(null, arguments); };
+
+  window.__HT29S1 = { boxes:BOXES, saveMs:SAVE_MS };
+})();
+
+/* ---- HT-29 S2 · FOUR SECTIONS, AND THE TIME ON EACH TASK ---------------------------------------------------
+   Morning routine · Night routine · Standards · Weekly, in that order, drawn by ONE function on the phone and the
+   desktop alike. A standard sits in exactly one.
+   WHERE A STANDARD SITS (Ruling 3, Cory 9/15): where HE puts it - `habits.section`, set in the sheet or by a drag
+   across a section's header. A row with no section yet sits where it shows today: weekly -> Weekly, a planned
+   time -> Morning, no time -> Standards, the Sabbath -> Night. The SAME rule places the stored rows once in the
+   SQL, and is the rule in the vault copier and the nudge sender; golden_ht29 S2 holds them together. No rule by
+   clock ever MOVES a standard: inside Morning and Night the planned time orders the rows (as TIMED did), inside
+   Standards and Weekly the drag order does.
+   THE TIME ON A TASK (S2.9) is one dot, never a number: a check-off already carries its clock (checked[id] =
+   "HH:MM", HT-21 S2); the dot compares it with the planned time - on time within 15 minutes, late within 60,
+   beyond that - and a tap says the minutes. HT-25's "✓ 08:34 +12m" label is hidden, never removed. */
+var HT29_SECTIONS = true;                         /* false brings back HT-28's TIMED · ANYTIME · WEEKLY, untouched */
+var HT29SEC = (function(){
+  var ORDER = ['morning','night','standards','weekly'];
+  var NAMES = { morning:'Morning routine', night:'Night routine', standards:'Standards', weekly:'Weekly' };
+  function sectionOf(h){
+    var s = String((h && h.section) || '').toLowerCase();
+    if(NAMES[s]) return s;
+    if(!h) return 'standards';
+    if(isSabbathStd(h)) return 'night';
+    if(isWeekly(h)) return 'weekly';
+    if(winStartMin(h) != null) return 'morning';
+    return 'standards';
+  }
+  function dotOf(m){ return m == null ? null : (m <= 15 ? 'ontime' : (m <= 60 ? 'late' : 'beyond')); }
+  return { ORDER:ORDER, NAMES:NAMES, sectionOf:sectionOf, dotOf:dotOf };
+})();
+
+(function(){
+  function advanced(){
+    try{ if(localStorage.getItem('ht_advanced')==='1') return true; }catch(e){}
+    return window.__ADVANCED===true || /[?&]advanced=1/.test(location.search);
+  }
+  function byId(){ var m = {}; (S.habits||[]).forEach(function(h){ m[h.id] = h; }); return m; }
+  function mkAdd(sec){
+    var b = document.createElement('button');
+    b.className = 'eadd'; b.type = 'button';
+    b.setAttribute('data-add', ''); b.setAttribute('data-sec', sec);
+    b.textContent = '+ Add to ' + HT29SEC.NAMES[sec].toLowerCase();
+    return b;
+  }
+
+  function regroup29(){
+    if(advanced()) return;
+    var log = document.getElementById('log'); if(!log) return;
+    var kids = Array.prototype.slice.call(log.children);
+    var rows = kids.filter(function(c){ return c.classList.contains('li'); });
+    if(!rows.length) return;
+    var hm = byId(), B = { morning:[], night:[], standards:[], weekly:[] }, other = [];
+    kids.forEach(function(c, i){
+      if(c.classList.contains('li')){
+        var h = hm[c.getAttribute('data-h')];
+        B[HT29SEC.sectionOf(h)].push({ r:c, h:h, i:i });
+      }else if(!c.classList.contains('grp') && !c.classList.contains('eadd')) other.push(c);
+    });
+    function so(x){ return (x.h && x.h.sort_order != null) ? x.h.sort_order : 1e9; }
+    function byTime(a, b){
+      var x = a.h ? winStartMin(a.h) : null, y = b.h ? winStartMin(b.h) : null;
+      return (x==null?1e9:x) - (y==null?1e9:y) || so(a) - so(b) || a.i - b.i;
+    }
+    function byOrder(a, b){ return so(a) - so(b) || a.i - b.i; }
+    B.morning.sort(byTime); B.night.sort(byTime); B.standards.sort(byOrder); B.weekly.sort(byOrder);
+    var frag = document.createDocumentFragment();
+    HT29SEC.ORDER.forEach(function(s){
+      if(!B[s].length) return;
+      var hd = document.createElement('div'); hd.className = 'grp'; hd.setAttribute('data-sec', s);
+      hd.textContent = HT29SEC.NAMES[s];
+      frag.appendChild(hd);
+      B[s].forEach(function(x){ frag.appendChild(x.r); });
+      frag.appendChild(mkAdd(s));
+    });
+    other.forEach(function(o){ frag.appendChild(o); });
+    log.innerHTML = ''; log.appendChild(frag);
+    dots(hm);
+    doneTitles(hm);
+  }
+
+  /* one dot per checked task that has a planned time; the old label is hidden and its words move into the tap */
+  function dots(hm){
+    Array.prototype.slice.call(document.querySelectorAll('#log .li')).forEach(function(r){
+      var h = hm[r.getAttribute('data-h')], dat = r.querySelector('.dat');
+      var old = r.querySelector('.dot29'); if(old) old.parentNode.removeChild(old);
+      if(dat) dat.classList.remove('dat29off');
+      if(!h || !dat) return;
+      var m = lateMin(h, S.date), cls = HT29SEC.dotOf(m);
+      /* THE LABEL IS ONLY HIDDEN WHERE A DOT REPLACES IT. Hidden for every row first, a standard with no
+         planned time lost its done-at clock ("done 08:34") and got nothing back: dotOf(null) is null, so the
+         function returned after the class was already on. Ruling 3 replaces the LATENESS label, not the clock. */
+      if(!cls) return;
+      dat.classList.add('dat29off');
+      var done = doneAt(S.date, h.id);
+      var d = document.createElement('i');
+      d.className = 'dot29 ' + cls; d.setAttribute('role', 'button'); d.setAttribute('tabindex', '0');
+      d.setAttribute('aria-label', (cls === 'ontime' ? 'on time' : m + ' minutes late') + ', done ' + done);
+      d.setAttribute('data-say', 'done ' + done + ' · ' + (m === 0 ? 'on time' : (m < 0 ? (-m) + ' min early' : '+' + m + ' min')));
+      dat.parentNode.insertBefore(d, dat);
+    });
+  }
+  function say(d){ toast(d.getAttribute('data-say')); }
+  document.addEventListener('click', function(e){
+    var d = e.target.closest && e.target.closest('.dot29');
+    if(d){ e.preventDefault(); e.stopPropagation(); say(d); return; }
+    /* "+ Add to night routine" presets the section on the sheet HT-11 is about to open */
+    var a = e.target.closest && e.target.closest('#log .eadd[data-sec]');
+    window.__HT29_PRESET_SECTION = a ? a.getAttribute('data-sec') : null;
+  }, true);
+  document.addEventListener('keydown', function(e){
+    var d = e.target.closest && e.target.closest('.dot29');
+    if(d && (e.key === 'Enter' || e.key === ' ')){ e.preventDefault(); e.stopPropagation(); say(d); }
+  }, true);
+
+  /* the definition of done rides the name on a desktop hover; on the phone a long-press opens the sheet with it */
+  function doneTitles(hm){
+    Array.prototype.slice.call(document.querySelectorAll('#log .li')).forEach(function(r){
+      var nm = r.querySelector('.nm'), h = hm[r.getAttribute('data-h')];
+      if(!nm) return;
+      var def = h && String(h.notes || '').trim();
+      if(def) nm.setAttribute('title', 'Done when: ' + def); else nm.removeAttribute('title');
+    });
+  }
+
+  /* called by HT-28's regroup28 from every path that repaints the list, so it runs last */
+  window.__HT29S2 = { regroup:regroup29, sectionOf:HT29SEC.sectionOf, dotOf:HT29SEC.dotOf,
+                      names:HT29SEC.NAMES, hasSection:function(){ return !!S.hasSection; } };
+})();
+
+/* ---- HT-29 S3 · THE GROUP, REAL AND BOTH WAYS ----------------------------------------------------------------
+   Cory 9/15: "document our inputs and hold each other accountable between group members." Andrew signed up and
+   the two of them could not see each other. The reading (WIRE HT-29, recon) found two causes and fixes both:
+     1 · NOBODY COULD REACH THE GROUP ON A PHONE. Create and join lived in a panel the simple view hides, and a
+         `?join=CODE` link was saved to the device and never read back. Now: a join card on the first open after
+         sign-in, and Settings -> Group (create · join · invite) at every width.
+     2 · IF ANDREW DID JOIN, the believed policy on circle_members showed each person only their own row - so each
+         saw a group of one. Reproduced on Postgres (tools/sql/test_privacy_pg.py B1) and fixed in the SQL.
+   What a member sees of another (Ruling 4): the standards, the check-offs and their times, the rating NUMBER -
+   through ht29_member_day and ht29_circle_ratings, which return exactly that. Never a journal field, never the
+   why. Until the SQL runs those functions do not exist: the lines still show today / 7 days / 30 days, and a
+   member's line simply does not open (hidden, never a broken door). */
+var HT29_GROUP_OLD = false;                       /* true brings back HT-18d's three-column card, untouched */
+function warn29(what, e){ try{ console.warn('HT-29: ' + what, e && (e.code || e.message || e)); }catch(x){} }
+var HT29GRP = (function(){
+  var circle = null, state = 'loading', canDay = null, canRate = null, rateErr = false;
+  /* "the function is not there yet" is one specific answer - PostgREST says PGRST202, Postgres says 42883.
+     Every other error is a real failure and must not be read as "the SQL has not run". */
+  function absentFn(e){ var c = String((e && (e.code || e.message)) || ''); return /PGRST202|42883|does not exist/i.test(c); }
+  function setCircle(c){ circle = c; }
+  function setState(s){ state = s; }
+  function calMean(map, n){
+    var sum = 0; for(var i = 0; i < n; i++){ var v = map[shift(today(), -i)]; sum += (v == null ? 0 : +v); }
+    return Math.round(sum / n);
+  }
+  /* LOGGED counts RATED days - that is what makes a skipped day visible (Ruling 1). Before the SQL runs there
+     is no ratings function, and days-with-a-row is the honest stand-in. A FAILED ratings call is NOT that case:
+     falling back there would quietly swap one measure for a larger one and print it as the same column. So a
+     failure returns null from here and the column shows a dash. */
+  function loggedN(ratingMap, dayMap, n){
+    if(!ratingMap && rateErr) return null;
+    var c = 0;
+    for(var i = 0; i < n; i++){
+      var k = shift(today(), -i);
+      if(ratingMap ? ratingMap[k] != null : dayMap[k] != null) c++;
+    }
+    return c;
+  }
+  /* the rating NUMBER of the people who share a group with me, by user and date - null when the function is absent */
+  async function ratings(d0, d1){
+    try{
+      var r = await sb.rpc('ht29_circle_ratings', { d0:d0, d1:d1 });
+      if(r.error){ canRate = false; rateErr = !absentFn(r.error); return null; }
+      canRate = true; rateErr = false;
+      var out = {};
+      (r.data || []).forEach(function(x){ (out[x.user_id] = out[x.user_id] || {})[x.date] = x.rating; });
+      return out;
+    }catch(e){ canRate = false; rateErr = true; return null; }
+  }
+  async function probeDay(uid){
+    try{ var r = await sb.rpc('ht29_member_day', { member:uid, d:today() }); canDay = !r.error; }
+    catch(e){ canDay = false; }
+    return canDay;
+  }
+  function member(uid, profile, dayMap, ratingMap){
+    return { id:uid, n:(profile.display_name || profile.handle || 'member'),
+             t:(dayMap[today()] == null ? 0 : Math.round(+dayMap[today()])),
+             w:calMean(dayMap, 7), m:calMean(dayMap, 30), logged:loggedN(ratingMap, dayMap, 7),
+             ratedBy:!!ratingMap, days:dayMap, p:calMean(dayMap, 30) };
+  }
+  function you(){
+    var dm = {}, rm = {};
+    Object.keys(S.byDate || {}).forEach(function(k){ var r = S.byDate[k]; if(r && r.pct != null) dm[k] = r.pct; });
+    Object.keys(S.privAll || {}).forEach(function(k){ var p = S.privAll[k]; if(p && p.rating != null) rm[k] = p.rating; });
+    return { id:S.me && S.me.id, n:'You', t:(dm[today()] == null ? 0 : Math.round(+dm[today()])),
+             w:calMean(dm, 7), m:calMean(dm, 30), logged:loggedN(rm, dm, 7), you:true, days:dm };
+  }
+  function pc(v){ return v + '%'; }
+  function cell(v){
+    var rf = (window.__HT16 && window.__HT16.rampFill) || function(){ return 'var(--surface)'; };
+    return '<td class="p"><i style="background:' + rf(v) + '"></i>' + pc(v) + '</td>';
+  }
+  function rows(list, opts){
+    return list.map(function(r){
+      var open = !r.you && canDay === true;
+      return '<tr' + (r.you ? ' class="h18me"' : '') + (open ? ' data-h29m="' + esc(r.id) + '" tabindex="0"' : '') + '>' +
+        '<td class="n">' + esc(r.n) + (open ? ' <span class="h29go">›</span>' : '') + '</td>' +
+        cell(r.t) + cell(r.w) + cell(r.m) + '<td class="l">' + (r.logged == null ? '—' : r.logged + '/7') + '</td></tr>';
+    }).join('');
+  }
+  function empty(){
+    if(state === 'error') return 'The group did not load — it will try again on the next open.';
+    if(state === 'none' || !circle) return 'No group yet. <button class="h29lnk" type="button" data-h29group>Start one or join one</button>';
+    return 'No one else yet. <button class="h29lnk" type="button" data-h29invite>Invite someone</button>';
+  }
+  function table(others){
+    return '<table class="h18gt h29gt"><colgroup><col class="n"><col><col><col><col></colgroup>' +
+      '<thead><tr><th>member</th><th>today</th><th>7 days</th><th>30 days</th><th>logged</th></tr></thead>' +
+      '<tbody>' + rows([you()].concat(others)) +
+      (others.length ? '' : '<tr class="h18none"><td colspan="5">' + empty() + '</td></tr>') +
+      '</tbody></table>';
+  }
+  function block(others){
+    return '<div class="h18gh">GROUP' + (circle ? ' <span class="h29gn">' + esc(circle.name || '') + '</span>' : '') +
+      '<span class="sp"></span><button class="h18more h29off" data-h18more type="button">detail</button>' +
+      '<button class="h29inv" type="button" data-h29' + (circle ? 'invite' : 'group') + '>' + (circle ? 'invite' : 'join') + '</button></div>' +
+      table(others);
+  }
+
+  /* ---- a member's day: sections, names, check marks, the time dots, the rating number - read only ---- */
+  function dayLabel(k){ var d = dnum(k); return WD[d.getDay()] + ' ' + d.getDate() + ' ' + MO[d.getMonth()]; }
+  async function openDay(uid, k){
+    var who = (circleRows29().filter(function(r){ return r.id === uid; })[0] || {}).n || 'member';
+    k = k || today();
+    var res;
+    try{ res = await sb.rpc('ht29_member_day', { member:uid, d:k }); }
+    catch(e){ res = { error:e }; }
+    if(res.error || !res.data){
+      if(res.error){ canDay = false; warn29('member day unavailable', res.error); }
+      toast(res.error ? 'not available yet' : 'nothing to show');
+      if(typeof paintAll === 'function') paintAll();
+      return;
+    }
+    canDay = true;
+    var day = res.data, rt = null;
+    if(canRate !== false){ var rr = await ratings(k, k); rt = rr && rr[uid] ? rr[uid][k] : null; }
+    openOv(who, dayHtml(uid, k, day, rt), function(){
+      var box = el('h29Day'); if(!box) return;
+      box.addEventListener('click', function(e){
+        var nav = e.target.closest('[data-h29d]'); if(!nav) return;
+        var to = shift(k, +nav.getAttribute('data-h29d'));
+        if(to > today()) return;
+        closeOv(); setTimeout(function(){ openDay(uid, to); }, 60);
+      });
+    });
+  }
+  function dayHtml(uid, k, day, rating){
+    var hs = (day.habits || []).map(function(h){ return h; });
+    var set = Array.isArray(day.active_set) && day.active_set.length ? day.active_set.map(String) : null;
+    var due = hs.filter(function(h){ return set ? set.indexOf(String(h.id)) >= 0 : (h.active !== false && (isWeekly(h) || dueOn(h, k))); });
+    var ck = day.checked || {}, done = due.filter(function(h){ return ck[h.id]; }).length;
+    var out = '<div id="h29Day" class="h29day">' +
+      '<div class="h29nav"><button class="tbtn" type="button" data-h29d="-1" aria-label="previous day">‹</button>' +
+      '<b>' + esc(dayLabel(k)) + '</b>' +
+      '<button class="tbtn" type="button" data-h29d="1" aria-label="next day"' + (k >= today() ? ' disabled' : '') + '>›</button></div>' +
+      '<div class="h29sum">' + done + ' of ' + due.length + ' · ' + (day.pct == null ? 0 : Math.round(day.pct)) + '%' +
+        (rating != null ? ' · rated ' + rating : '') + '</div>';
+    HT29SEC.ORDER.forEach(function(s){
+      var list = due.filter(function(h){ return HT29SEC.sectionOf(h) === s; });
+      if(!list.length) return;
+      list.sort(function(a, b){
+        var x = (s === 'morning' || s === 'night') ? winStartMin(a) : null, y = (s === 'morning' || s === 'night') ? winStartMin(b) : null;
+        return (x == null ? 1e9 : x) - (y == null ? 1e9 : y) || (a.sort_order || 0) - (b.sort_order || 0);
+      });
+      out += '<div class="grp" data-sec="' + s + '">' + HT29SEC.NAMES[s] + '</div>';
+      list.forEach(function(h){
+        var mark = ck[h.id], at = typeof mark === 'string' ? minsOf(mark) : null, pl = winStartMin(h);
+        var m = (at != null && pl != null) ? at - pl : null, cls = HT29SEC.dotOf(m);
+        out += '<div class="h29r' + (mark ? ' on' : '') + '"><span class="h29ck" aria-label="' + (mark ? 'done' : 'not done') + '">' +
+          (mark ? '✓' : '') + '</span><span class="nm"' + (h.done_def ? ' title="Done when: ' + esc(h.done_def) + '"' : '') + '>' +
+          esc(nameOf(h.name)) + '</span>' +
+          (cls ? '<i class="dot29 ' + cls + '" data-say="' + esc('done ' + mark + (m === 0 ? ' · on time' : (m < 0 ? ' · ' + (-m) + ' min early' : ' · +' + m + ' min'))) + '" role="button" tabindex="0"></i>' : '') +
+          '</div>';
+      });
+    });
+    return out + '<div class="note h29priv">Their check-offs and the day’s number. Nobody’s journal is ever shown here.</div></div>';
+  }
+
+  /* ---- joining, starting and inviting ---- */
+  async function join(code){
+    try{ return await join0(code); }
+    catch(e){ warn29('join failed', e); return { ok:false, why:'Could not join — try again.' }; }
+  }
+  async function join0(code){
+    code = String(code || '').trim().toUpperCase();
+    if(!code) return { ok:false, why:'enter a code' };
+    var r = await sb.rpc('ht29_join_circle', { code:code });
+    if(r.error && /PGRST202|42883|not find the function|does not exist/i.test(String(r.error.code || '') + ' ' + String(r.error.message || ''))){
+      r = await sb.rpc('join_circle', { code:code });                       /* before the SQL: the original */
+      if(r.error && /23505|duplicate/i.test(String(r.error.code || '') + ' ' + String(r.error.message || ''))) r = { data:true };
+    }
+    if(r.error) return { ok:false, why:/NO_SUCH_CIRCLE|P0002/i.test(String(r.error.message || '') + String(r.error.code || '')) ? 'No group with that code.' : 'Could not join — try again.' };
+    return { ok:true };
+  }
+  async function create(name){
+    try{ return await create0(name); }
+    catch(e){ warn29('create failed', e); return { ok:false, why:'Could not create it.' }; }
+  }
+  async function create0(name){
+    name = String(name || '').trim();
+    if(!name) return { ok:false, why:'give it a name' };
+    /* CRYPTO, AND A FIXED LENGTH. `Math.random().toString(36).slice(2,8)` is not only guessable - it returns
+       fewer than six characters whenever the float is short, and under Ruling 4 a guessed code now buys
+       someone's standards, their definitions of done, their check-off times and their rating numbers. */
+    var code = (function(){
+      var A = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789', out = '';      /* no I/L/O/0/1: a code gets read aloud */
+      var n = new Uint8Array(10);
+      if(window.crypto && crypto.getRandomValues) crypto.getRandomValues(n);
+      else for(var i = 0; i < n.length; i++) n[i] = Math.floor(Math.random() * 256);
+      for(var j = 0; j < n.length; j++) out += A[n[j] % A.length];
+      return out;
+    })();
+    var c = await sb.from('circles').insert({ name:name, join_code:code, owner:S.me.id }).select('id').single();
+    if(c.error) return { ok:false, why:'Could not create it.' };
+    var m = await sb.from('circle_members').insert({ circle_id:c.data.id, user_id:S.me.id });
+    if(m && m.error) return { ok:false, why:'Created, but not joined — enter its code: ' + code };
+    return { ok:true, code:code };
+  }
+  function inviteText(code){
+    var j = window.__HT24_JOIN;
+    return j ? j.message(code) : ('Join my group in the Habit Tracker with the code ' + code);
+  }
+  async function invite(){
+    if(!circle || !circle.join_code){ openGroup(); return; }
+    var text = inviteText(circle.join_code), url = window.__HT24_JOIN ? window.__HT24_JOIN.link(circle.join_code) : '';
+    try{
+      if(navigator.share){ await navigator.share({ title:'Habit Tracker', text:text, url:url }); return; }
+      await navigator.clipboard.writeText(text);
+      toast('invite copied — paste it to them');
+    }catch(e){ if(!e || e.name !== 'AbortError') toast('code ' + circle.join_code); }
+  }
+  function groupHtml(){
+    if(circle){
+      return '<div class="note" style="padding:4px 0 12px">You are in <b>' + esc(circle.name || 'a group') + '</b>. ' +
+        'The group sees your standards, check-offs and the day’s number — never your journal.</div>' +
+        '<div class="h29code">code <b>' + esc(circle.join_code || '') + '</b></div>' +
+        '<div class="tools"><button class="btn pri" id="g29Invite" type="button">Invite someone</button></div>';
+    }
+    return '<div class="note" style="padding:4px 0 12px">A group sees each other’s standards, check-offs and the day’s number — never a journal.</div>' +
+      '<label class="fld"><span class="lab">Join with a code</span><input id="g29Code" placeholder="ABC123" autocapitalize="characters" autocomplete="off"></label>' +
+      '<div class="tools"><button class="btn pri" id="g29Join" type="button">Join</button></div>' +
+      '<label class="fld" style="margin-top:14px"><span class="lab">Or start one</span><input id="g29Name" placeholder="Name it" autocomplete="off"></label>' +
+      '<div class="tools"><button class="btn" id="g29Make" type="button">Start</button></div>' +
+      '<div class="note" id="g29Msg" style="padding-top:12px"></div>';
+  }
+  function openGroup(){
+    openOv('Group', '<div id="g29">' + groupHtml() + '</div>', bindGroup);
+  }
+  function bindGroup(){
+    var inv = el('g29Invite'); if(inv) inv.onclick = invite;
+    var jb = el('g29Join'), mk = el('g29Make'), msg = el('g29Msg');
+    if(jb) jb.onclick = async function(){
+      jb.disabled = true;
+      var r = await join(el('g29Code').value);
+      jb.disabled = false;
+      if(!r.ok){ if(msg) msg.textContent = r.why; return; }
+      try{ localStorage.removeItem('ht_join_code'); }catch(e){}
+      toast('joined'); setTimeout(function(){ location.reload(); }, 400);
+    };
+    if(mk) mk.onclick = async function(){
+      mk.disabled = true;
+      var r = await create(el('g29Name').value);
+      mk.disabled = false;
+      if(!r.ok){ if(msg) msg.textContent = r.why; return; }
+      toast('group started · code ' + r.code); setTimeout(function(){ location.reload(); }, 600);
+    };
+  }
+  /* Settings -> Group, beside HT-28's Advanced */
+  var _os = openSettings;
+  openSettings = function(){
+    var out = _os.apply(null, arguments);
+    setTimeout(function(){
+      var ov = document.querySelector('.ov.on .inner') || document.querySelector('.ov .inner');
+      if(!ov || el('g29Set')) return;
+      var w = document.createElement('div'); w.id = 'g29Set'; w.className = 'pan'; w.style.marginTop = '14px';
+      w.innerHTML = '<div class="lab">Group</div><div id="g29">' + groupHtml() + '</div>';
+      var priv = el('privNote');
+      if(priv && priv.parentNode === ov) ov.insertBefore(w, priv); else ov.appendChild(w);
+      bindGroup();
+    }, 70);
+    return out;
+  };
+
+  /* ---- a join link, consumed after sign-in: one card, one tap ---- */
+  var joinShown = false;
+  function joinCard(){
+    if(joinShown || !S.me || S.loadOk !== true) return;
+    var code = null; try{ code = localStorage.getItem('ht_join_code'); }catch(e){}
+    if(!code) return;
+    joinShown = true;
+    var n = el('h29Join');
+    if(!n){
+      n = document.createElement('div'); n.id = 'h29Join'; n.className = 'esheet h28first';
+      n.setAttribute('role', 'dialog'); n.setAttribute('aria-modal', 'true');
+      n.innerHTML = '<div class="ebody" id="h29JoinBody"></div>';
+      document.body.appendChild(n);
+      n.addEventListener('click', function(e){ if(e.target === n) n.classList.remove('on'); });
+    }
+    el('h29JoinBody').innerHTML = '<div class="eh"><h3>Join a group</h3></div>' +
+      '<div class="note" style="padding:4px 0 12px">You opened an invite with the code <b>' + esc(code) + '</b>. ' +
+      'Your group will see your standards, check-offs and the day’s number — never your journal.</div>' +
+      '<div class="note" id="h29JoinMsg"></div>' +
+      '<div class="etools"><span style="flex:1"></span>' +
+      '<button class="btn" id="h29JoinNo" type="button">Not now</button>' +
+      '<button class="btn pri" id="h29JoinYes" type="button">Join</button></div>';
+    n.classList.add('on');
+    el('h29JoinNo').onclick = function(){ try{ localStorage.removeItem('ht_join_code'); }catch(e){} n.classList.remove('on'); };
+    el('h29JoinYes').onclick = async function(){
+      var b = el('h29JoinYes'); b.disabled = true; b.textContent = 'joining…';
+      var r = await join(code);
+      if(!r.ok){ b.disabled = false; b.textContent = 'Join'; el('h29JoinMsg').textContent = r.why; return; }
+      try{ localStorage.removeItem('ht_join_code'); }catch(e){}
+      toast('joined'); setTimeout(function(){ location.reload(); }, 400);
+    };
+  }
+
+  function click(e){
+    var m = e.target.closest('[data-h29m]');
+    if(m){ openDay(m.getAttribute('data-h29m')); return; }
+    if(e.target.closest('[data-h29invite]')){ invite(); return; }
+    if(e.target.closest('[data-h29group]')){ openGroup(); }
+  }
+  document.addEventListener('keydown', function(e){
+    if(e.key !== 'Enter') return;
+    var m = e.target.closest && e.target.closest('[data-h29m]');
+    if(m){ e.preventDefault(); openDay(m.getAttribute('data-h29m')); }
+  });
+  var _pa = paintAll;
+  paintAll = function(){ var out = _pa.apply(null, arguments); joinCard(); return out; };
+
+  return { setCircle:setCircle, setState:setState, ratings:ratings, probeDay:probeDay, member:member, you:you, block:block, table:table,
+           click:click, openDay:openDay, openGroup:openGroup, invite:invite, join:join, calMean:calMean,
+           state:function(){ return { state:state, circle:circle, canDay:canDay, canRate:canRate }; } };
+})();
+function circleRows29(){ return (window.__HT29GRP_ROWS && window.__HT29GRP_ROWS()) || []; }
+window.__HT29GRP = HT29GRP;
+
+/* ---- HT-29 S5 · ONE INSIGHTS, THREE THINGS ON ITS SURFACE ---------------------------------------------------
+   Cory's item 8: DETAIL and Insights were two doors to overlapping rooms. One room now, three things on its surface,
+   and everything HT-26 and DETAIL showed moves under its one "More" (hidden, never deleted):
+     1 · COMPLETION OVER TIME - the last 7 or 30 days, the rating line and on-time %; a member's line on a tap.
+         A day with nothing checked is 0% (Ruling 1): a line that skipped empty days would flatter.
+     2 · WHAT MAKES A GOOD DAY - ten numbers; tap one and see which check-offs travel with it, and the why you wrote
+         on those days (Cory 9/10: "what makes an 8"). Your own only - nobody's why is ever read for anyone else.
+     3 · THE GROUP SIDE BY SIDE - S3's renderer: today · 7 days · 30 days · logged, a member's day on a tap.
+   On-time % is a line inside 1, not a fourth thing (paste 133 S5.18). THE PHONE gets a bottom bar - Today ·
+   Views · Insights - where HT-13's two tabs sat under the header (paste 133 S5.17); the desktop keeps its one
+   Insights button, which opens the same three. */
+var HT29INS = (function(){
+  var range = 7, pick = null, shown = {};
+  function days(n){ var out = []; for(var i = n - 1; i >= 0; i--) out.push(shift(today(), -i)); return out; }
+  function pctOn(k){ var r = S.byDate[k]; return (r && r.pct != null) ? Math.round(+r.pct) : 0; }
+  function ratingOn(k){ var p = S.privAll && S.privAll[k]; return (p && p.rating != null && p.rating !== '') ? +p.rating : null; }
+  function onTimeOn(k){
+    var hit = 0, n = 0;
+    (S.habits || []).forEach(function(h){
+      if(winStartMin(h) == null || !dueOn(h, k)) return;
+      var m = lateMin(h, k); if(m == null) return;
+      n++; if(m <= 15) hit++;
+    });
+    return n ? Math.round(hit / n * 100) : null;
+  }
+  function mean(a){ var v = a.filter(function(x){ return x != null; }); return v.length ? Math.round(v.reduce(function(s, x){ return s + x; }, 0) / v.length * 10) / 10 : null; }
+  function trend(n){
+    var ks = days(n), p = ks.map(pctOn);
+    return { days:ks, pct:p, rating:ks.map(ratingOn), onTime:ks.map(onTimeOn),
+             avg:Math.round(p.reduce(function(s, x){ return s + x; }, 0) / n), rateAvg:mean(ks.map(ratingOn)),
+             onTimeAvg:(function(){ var m = mean(ks.map(onTimeOn)); return m == null ? null : Math.round(m); })() };
+  }
+  function explained(r){
+    var ks = days(90).filter(function(k){ return ratingOn(k) != null; });
+    var counts = {}; for(var i = 1; i <= 10; i++) counts[i] = 0;
+    ks.forEach(function(k){ var v = Math.round(ratingOn(k)); if(counts[v] != null) counts[v]++; });
+    if(r == null) return { r:null, n:0, counts:counts, rows:[], whys:[] };
+    var on = ks.filter(function(k){ return Math.round(ratingOn(k)) === r; });
+    function rate(h, set){
+      var due = set.filter(function(k){ return dueOn(h, k); });
+      if(!due.length) return null;
+      var hit = due.filter(function(k){ var c = S.byDate[k] && S.byDate[k].checked; return c && c[h.id]; }).length;
+      return Math.round(hit / due.length * 100);
+    }
+    var rows = !on.length ? [] : (S.habits || []).map(function(h){
+      var a = rate(h, on), b = rate(h, ks);
+      return (a == null || b == null) ? null : { name:nameOf(h.name), pct:a, base:b, lift:a - b };
+    }).filter(Boolean).sort(function(x, y){ return y.lift - x.lift || y.pct - x.pct; }).slice(0, 5);
+    var whys = on.slice().reverse().map(function(k){
+      var p = S.privAll[k], w = p && String(p.why || '').trim();
+      return w ? { date:k, why:w } : null;
+    }).filter(Boolean).slice(0, 5);
+    return { r:r, n:on.length, counts:counts, rows:rows, whys:whys };
+  }
+  function chart(t, members){
+    var W = 340, H = 120, P = 6, n = t.days.length, bw = (W - 2 * P) / n;
+    function y(v){ return (H - P - (H - 2 * P) * (v / 100)).toFixed(1); }
+    var rf = (window.__HT16 && window.__HT16.rampFill) || function(){ return 'var(--ink3)'; };
+    var bars = t.pct.map(function(v, i){
+      var h = Math.max(1, (H - 2 * P) * v / 100);
+      return '<rect x="' + (P + i * bw + 1).toFixed(1) + '" y="' + (H - P - h).toFixed(1) + '" width="' + Math.max(1, bw - 2).toFixed(1) +
+             '" height="' + h.toFixed(1) + '" fill="' + rf(v) + '"><title>' + t.days[i] + ' · ' + v + '%</title></rect>';
+    }).join('');
+    function line(vals, scale, cls){
+      var pts = []; vals.forEach(function(v, i){ if(v != null) pts.push((P + i * bw + bw / 2).toFixed(1) + ',' + y(v * scale)); });
+      return pts.length > 1 ? '<polyline class="' + cls + '" points="' + pts.join(' ') + '" fill="none"/>' : '';
+    }
+    var mem = (members || []).map(function(m, j){ return line(m.pct, 1, 'l29m l29m' + (j % 3)); }).join('');
+    return '<svg class="ch29" viewBox="0 0 ' + W + ' ' + H + '" preserveAspectRatio="none" role="img" aria-label="completion, last ' + n + ' days">' +
+           bars + line(t.onTime, 1, 'l29t') + line(t.rating, 10, 'l29r') + mem + '</svg>';
+  }
+  function memberLines(n){
+    return circleRows29().filter(function(r){ return shown[r.id]; }).map(function(r){
+      return { name:r.n, pct:days(n).map(function(k){ var v = r.days && r.days[k]; return v == null ? 0 : Math.round(+v); }) };
+    });
+  }
+  function card(id, title, body){ return '<div class="vins c5 h29c" data-i29="' + id + '"><div class="lab">' + title + '</div>' + body + '</div>'; }
+  function trendCard(){
+    var t = trend(range), others = circleRows29();
+    return card('trend', 'Completion over time',
+      '<div class="seg h29seg"><button type="button" data-i29r="7" class="' + (range === 7 ? 'on' : '') + '">7 days</button>' +
+      '<button type="button" data-i29r="30" class="' + (range === 30 ? 'on' : '') + '">30 days</button></div>' +
+      '<div class="vline">Average <b>' + t.avg + '%</b>' + (t.rateAvg != null ? ' · rating <b>' + t.rateAvg + '</b>' : '') +
+        (t.onTimeAvg != null ? ' · on time <b>' + t.onTimeAvg + '%</b>' : '') + '</div>' +
+      chart(t, memberLines(range)) +
+      '<div class="h29leg"><span><i class="r"></i>rating</span><span><i class="t"></i>on time</span>' +
+        (others.length ? others.map(function(r, j){
+          return '<button type="button" class="h29mb' + (shown[r.id] ? ' on' : '') + '" data-i29m="' + esc(r.id) + '" aria-pressed="' + (shown[r.id] ? 'true' : 'false') + '">' +
+                 '<i class="m' + (j % 3) + '"></i>' + esc(r.n) + '</button>'; }).join('') : '') + '</div>');
+  }
+  function rateCard(){
+    var e = explained(pick), nums = '';
+    for(var i = 1; i <= 10; i++){
+      nums += '<button type="button" data-i29n="' + i + '" class="' + (pick === i ? 'on' : '') + '"' + (e.counts[i] ? '' : ' disabled') + '>' +
+              '<b>' + i + '</b><span>' + e.counts[i] + '</span></button>';
+    }
+    var body = '<div class="h29nums">' + nums + '</div>';
+    if(pick == null){
+      body += '<div class="vline">' + (Object.keys(e.counts).some(function(k){ return e.counts[k]; })
+        ? 'Tap a number to see what those days had in common.' : 'Rate a few days and this shows what your good days share.') + '</div>';
+    }else if(!e.n){
+      body += '<div class="vline">No day rated ' + pick + ' in the last 90.</div>';
+    }else{
+      body += '<div class="vline">' + e.n + ' day' + (e.n === 1 ? '' : 's') + ' rated <b>' + pick + '</b> · checked on those days (usual)</div>' +
+        '<div class="c5rows">' + e.rows.map(function(r){
+          return '<div class="c5r"><span class="n">' + esc(r.name) + '</span><span class="v num">' + r.pct + '% <i>(' + r.base + '%)</i></span></div>';
+        }).join('') + '</div>' +
+        (e.whys.length ? '<div class="h29why">' + e.whys.map(function(w){
+          return '<div><span class="d num">' + esc(w.date.slice(5)) + '</span> ' + esc(w.why) + '</div>'; }).join('') + '</div>' : '');
+    }
+    return card('rate', 'What makes a good day', body);
+  }
+  function groupCard(){
+    return card('group', 'The group side by side', HT29GRP.table(circleRows29()));
+  }
+  function render(){
+    var ins = el('h26Ins'); if(!ins) return;
+    var box = el('ins29');
+    if(!box){
+      box = document.createElement('div'); box.id = 'ins29'; box.className = 'h29ins';
+      var head = ins.querySelector('.sh');
+      if(head && head.nextSibling) ins.insertBefore(box, head.nextSibling); else ins.appendChild(box);
+      box.addEventListener('click', onClick);
+    }
+    box.innerHTML = trendCard() + rateCard() + groupCard();
+    var cap = el('h26InsC'); if(cap) cap.textContent = '';
+    var more = el('c5More'), five = el('c5Five');
+    if(more && five && five.parentNode !== more) more.appendChild(five);            /* HT-26's five, under More */
+    if(more && !el('i29Detail')){
+      var d = document.createElement('div'); d.className = 'tools h29detail';
+      d.innerHTML = '<button class="btn" id="i29Detail" type="button">Every standard, in detail</button>';
+      more.appendChild(d);
+    }
+    var priv = ins.querySelector('.c5priv');
+    if(priv) priv.textContent = 'Your journal and your why are yours alone. The group sees standards, check-offs and the day’s number.';
+  }
+  function onClick(e){
+    var r = e.target.closest('[data-i29r]'), n = e.target.closest('[data-i29n]'), m = e.target.closest('[data-i29m]');
+    if(r){ range = +r.getAttribute('data-i29r'); render(); return; }
+    if(n && !n.disabled){ var v = +n.getAttribute('data-i29n'); pick = (pick === v) ? null : v; render(); return; }
+    if(m){ var id = m.getAttribute('data-i29m'); shown[id] = !shown[id]; render(); return; }
+    var mr = e.target.closest('[data-h29m]'); if(mr){ HT29GRP.openDay(mr.getAttribute('data-h29m')); return; }
+    if(e.target.closest('[data-h29invite]')){ HT29GRP.invite(); return; }
+    if(e.target.closest('[data-h29group]')){ HT29GRP.openGroup(); }
+  }
+  document.addEventListener('click', function(e){
+    if(!e.target.closest || !e.target.closest('#i29Detail')) return;
+    if(typeof closeOv === 'function') closeOv();
+    if(window.innerWidth < 1024 && window.__HT13_TAB) window.__HT13_TAB('views');
+    setTimeout(function(){ if(window.__HT29_DETAIL) window.__HT29_DETAIL(); }, 120);
+  });
+
+  /* ---- the phone's bottom bar ---- */
+  function simple(){ return document.documentElement.hasAttribute('data-simple'); }
+  function bar(){
+    if(!simple() || el('h29Bar')) return;
+    var b = document.createElement('nav'); b.id = 'h29Bar'; b.className = 'h29bar'; b.setAttribute('aria-label', 'sections');
+    b.innerHTML = '<button type="button" data-t29="today">Today</button><button type="button" data-t29="views">Views</button>' +
+                  '<button type="button" data-t29="insights">Insights</button>';
+    document.body.appendChild(b);
+    b.addEventListener('click', function(e){ var t = e.target.closest('[data-t29]'); if(t) go(t.getAttribute('data-t29')); });
+    mark();
+  }
+  function go(which){
+    if(which === 'insights'){
+      if(window.__HT13_TAB) window.__HT13_TAB('views');
+      document.documentElement.setAttribute('data-vtab', 'insights');
+      render();
+      window.scrollTo(0, 0);
+    }else if(window.__HT13_TAB){ window.__HT13_TAB(which); window.scrollTo(0, 0); }
+    mark();
+  }
+  function mark(){
+    var cur = document.documentElement.getAttribute('data-vtab') || 'today';
+    Array.prototype.slice.call(document.querySelectorAll('#h29Bar [data-t29]')).forEach(function(b){
+      var on = b.getAttribute('data-t29') === cur; b.classList.toggle('on', on); b.setAttribute('aria-current', on ? 'page' : 'false'); });
+  }
+  var _pa = paintAll;
+  paintAll = function(){ var out = _pa.apply(null, arguments); bar(); render(); mark(); return out; };
+  window.__HT29INS = { trend:trend, explained:explained, render:render, go:go, state:function(){ return { range:range, pick:pick }; } };
+  return window.__HT29INS;
+})();
+
+
+/* ---- HT-29 S6 (PASTE 133) · ONE JOURNAL SHAPE, THREE HOMES ---------------------------------------------
+   The day as Markdown - byte for byte the block `tools/copiers/_ht.py` writes into the BEV vault - so a
+   day reads the same in Cory's Obsidian, in another member's Google Drive, and in the Download zip.
+   `tools/golden_ht29.py` S6 renders one fixture day here and in Python and compares the bytes.
+   Pure: no DOM, no network. `zipStore()` is a STORE-only zip (no compression, CRC-32 per file) so the
+   download needs no library and no CDN. */
+var HT29MD = (function(){
+  var START = '<!-- ht:start -->', END = '<!-- ht:end -->';
+  var SECTIONS = [['morning','Morning routine'],['night','Night routine'],['standards','Standards'],['weekly','Weekly']];
+  var DAYS = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+
+  function hhmm(v){
+    var m = /^\s*(\d{1,2}):(\d{2})/.exec(String(v == null ? '' : v));
+    return m ? ('0' + (+m[1])).slice(-2) + ':' + m[2] : null;
+  }
+  function minutes(v){ var t = hhmm(v); return t ? (+t.slice(0,2)) * 60 + (+t.slice(3)) : null; }
+  function isSabbath(h){
+    return /^\s*sabbath\b/i.test(String(h.name || '')) || /^sabbath$/i.test(String(h.group_name || ''));
+  }
+  function sectionOf(h){
+    var s = String(h.section || '').toLowerCase();
+    if (s === 'morning' || s === 'night' || s === 'standards' || s === 'weekly') return s;
+    if (isSabbath(h)) return 'night';
+    if (String(h.cadence || '') === 'weekly') return 'weekly';
+    if (hhmm(h.planned_start) || hhmm(h.time_anchor)) return 'morning';
+    return 'standards';
+  }
+  function planned(h){ return hhmm(h.planned_start) || hhmm(h.time_anchor); }
+  /* "2026-09-15" -> its weekday, computed from the date alone (never the device clock or UTC) */
+  function weekdayOf(iso){
+    var p = String(iso).split('-'); return new Date(Date.UTC(+p[0], +p[1] - 1, +p[2])).getUTCDay();
+  }
+  function dueIds(habits, dayRow, iso){
+    var snap = dayRow && dayRow.active_set;
+    if (Array.isArray(snap) && snap.length) return snap.map(String);
+    var wd = weekdayOf(iso);
+    return habits.filter(function(h){
+      if (h.active === false) return false;
+      var cad = String(h.cadence || 'daily');
+      if (cad.slice(0,4) === 'dow:'){
+        var d = (cad.slice(4).match(/\d/g) || []).map(Number).filter(function(n){ return n >= 0 && n <= 6; });
+        if (d.length && d.indexOf(wd) < 0) return false;
+      }
+      return true;
+    }).map(function(h){ return String(h.id); });
+  }
+  function variance(h, mark){
+    var p = minutes(planned(h)), a = minutes(typeof mark === 'string' ? mark : null);
+    return (p == null || a == null) ? null : a - p;
+  }
+  /* 75 / 75.0 / "75" -> "75"; 75.5 -> "75.5" - the Python twin's num() */
+  function num(v){ var f = +v; return isNaN(f) ? String(v) : String(f); }
+  function rstrip(s){ return String(s == null ? '' : s).replace(/\s+$/, ''); }
+  function strip(s){ return String(s == null ? '' : s).trim(); }
+
+  function dayBlock(iso, habits, dayRow, priv){
+    if (!dayRow && !priv) return null;
+    priv = priv || {};
+    var byId = {}; habits.forEach(function(h){ byId[String(h.id)] = h; });
+    var checked = (dayRow && dayRow.checked) || {};
+    if (typeof checked === 'string') checked = JSON.parse(checked || '{}');
+    var due = dueIds(habits, dayRow, iso).filter(function(i){ return byId[i]; });
+    var done = due.filter(function(i){ return !!checked[i]; });
+    var timed = done.filter(function(i){ return variance(byId[i], checked[i]) != null; });
+    var onTime = timed.filter(function(i){ return variance(byId[i], checked[i]) <= 15; });
+    var rating = (priv.rating == null) ? null : priv.rating;
+    var written = [['brain_dump','brain dump'],['tasks','completed'],['prayer','prayer']]
+      .filter(function(f){ return strip(priv[f[0]]); }).map(function(f){ return f[1]; });
+
+    var idx = done.length + ' of ' + due.length + ' done';
+    if (dayRow && dayRow.pct != null) idx += ' (' + num(dayRow.pct) + '%)';
+    idx += ' · rating ' + (rating != null ? num(rating) : '-');
+    if (timed.length) idx += ' · on time ' + onTime.length + ' of ' + timed.length;
+    idx += ' · written: ' + (written.length ? written.join(', ') : 'nothing');
+
+    var out = ['## Habit tracker · ' + DAYS[weekdayOf(iso)] + ' ' + iso, '- **Index** · ' + idx, ''];
+    var why = strip(priv.why);
+    out.push('### Rating', (rating != null ? '**' + num(rating) + '**' : '-') + (why ? ' — ' + why : ''), '');
+    [['brain_dump','Brain dump'],['tasks','Completed'],['prayer','Prayer']].forEach(function(f){
+      var text = rstrip(priv[f[0]]);
+      out.push('### ' + f[1], strip(text) ? text : '-', '');
+    });
+    out.push('### Check-offs');
+    SECTIONS.forEach(function(sec){
+      var rows = due.map(function(i){ return byId[i]; }).filter(function(h){ return sectionOf(h) === sec[0]; });
+      if (!rows.length) return;
+      rows.sort(function(a, b){
+        var sa = a.sort_order != null ? a.sort_order : 1e9, sb = b.sort_order != null ? b.sort_order : 1e9;
+        if (sa !== sb) return sa - sb;
+        var na = String(a.name || ''), nb = String(b.name || '');
+        return na < nb ? -1 : (na > nb ? 1 : 0);
+      });
+      out.push('**' + sec[1] + '**');
+      rows.forEach(function(h){
+        var mark = checked[String(h.id)], bits = [];
+        if (planned(h)) bits.push('planned ' + planned(h));
+        if (typeof mark === 'string' && hhmm(mark)) bits.push('done ' + hhmm(mark));
+        var v = mark ? variance(h, mark) : null;
+        if (v != null) bits.push((v >= 0 ? '+' : '') + v + ' min');
+        out.push('- [' + (mark ? 'x' : ' ') + '] ' + strip(h.name) + (bits.length ? ' · ' + bits.join(' · ') : ''));
+      });
+    });
+    return rstrip(out.join('\n')) + '\n';
+  }
+
+  /* THE AUTHOR IS WHOEVER IS SIGNED IN. Hard-coded, every member's download and every member's Drive file
+     claimed to be Cory's, written by a copier that never touched it — the one line of a journal note that is
+     about the person rather than the day, and it named the wrong one. `written_by` names what actually wrote
+     the file: this app, in their browser. (The container's copier stamps its own name on its own files.) */
+  function frontmatter(iso, today){
+    var wd = DAYS[weekdayOf(iso)];
+    /* HT29MD stays a STANDALONE module - `test_md_parity` lifts it out of this file and runs it in a bare VM
+       where `S` does not exist, and the app and the container copier must write the same bytes. So the author
+       is read defensively rather than assumed: outside the app it is simply "the account". */
+    var me = (typeof S !== 'undefined' && S && S.me) || null;
+    var who = (me && (me.display_name || me.email || me.id)) || 'the account';
+    return ['---', 'id: JRN-' + iso, 'title: "Journal ' + wd + ' ' + iso + '"', 'type: journal', 'domain: "01"',
+            'sensitivity: PRIVATE', 'created: ' + today, 'updated: ' + today,
+            'author: ' + String(who).replace(/[\r\n]+/g, ' ').slice(0, 80),
+            'written_by: the habit tracker (the block between the ht markers; every other line is your own)',
+            'sources: [ht:days/' + iso + ', ht:day_private/' + iso + ']', '---', ''].join('\n');
+  }
+  /* a whole new file, exactly as merge_block(None, …) writes it */
+  function dayFile(iso, today, block){
+    return frontmatter(iso, today) + '\n' + START + '\n' + block + END + '\n';
+  }
+
+  /* ---- the zip: STORE method, one local header per file, a central directory, an end record -------- */
+  var CRC = (function(){ var t = new Uint32Array(256);
+    for (var n = 0; n < 256; n++){ var c = n; for (var k = 0; k < 8; k++) c = (c & 1) ? (0xEDB88320 ^ (c >>> 1)) : (c >>> 1); t[n] = c >>> 0; }
+    return t; })();
+  function crc32(bytes){ var c = 0xFFFFFFFF; for (var i = 0; i < bytes.length; i++) c = CRC[(c ^ bytes[i]) & 0xFF] ^ (c >>> 8); return (c ^ 0xFFFFFFFF) >>> 0; }
+  function utf8(s){ return new TextEncoder().encode(s); }
+  function zipStore(files, when){
+    var d = when || new Date(), dosTime = (d.getHours() << 11) | (d.getMinutes() << 5) | (d.getSeconds() >> 1),
+        dosDate = ((d.getFullYear() - 1980) << 9) | ((d.getMonth() + 1) << 5) | d.getDate();
+    var parts = [], central = [], offset = 0;
+    files.forEach(function(f){
+      var name = utf8(f.name), data = typeof f.data === 'string' ? utf8(f.data) : f.data, crc = crc32(data);
+      var h = new DataView(new ArrayBuffer(30));
+      h.setUint32(0, 0x04034b50, true); h.setUint16(4, 20, true); h.setUint16(6, 0x0800, true); h.setUint16(8, 0, true);
+      h.setUint16(10, dosTime, true); h.setUint16(12, dosDate, true); h.setUint32(14, crc, true);
+      h.setUint32(18, data.length, true); h.setUint32(22, data.length, true); h.setUint16(26, name.length, true); h.setUint16(28, 0, true);
+      parts.push(new Uint8Array(h.buffer), name, data);
+      var c = new DataView(new ArrayBuffer(46));
+      c.setUint32(0, 0x02014b50, true); c.setUint16(4, 20, true); c.setUint16(6, 20, true); c.setUint16(8, 0x0800, true);
+      c.setUint16(10, 0, true); c.setUint16(12, dosTime, true); c.setUint16(14, dosDate, true); c.setUint32(16, crc, true);
+      c.setUint32(20, data.length, true); c.setUint32(24, data.length, true); c.setUint16(28, name.length, true);
+      c.setUint16(30, 0, true); c.setUint16(32, 0, true); c.setUint16(34, 0, true); c.setUint16(36, 0, true);
+      c.setUint32(38, 0, true); c.setUint32(42, offset, true);
+      central.push(new Uint8Array(c.buffer), name);
+      offset += 30 + name.length + data.length;
+    });
+    var cdSize = central.reduce(function(n, p){ return n + p.length; }, 0);
+    var e = new DataView(new ArrayBuffer(22));
+    e.setUint32(0, 0x06054b50, true); e.setUint16(8, files.length, true); e.setUint16(10, files.length, true);
+    e.setUint32(12, cdSize, true); e.setUint32(16, offset, true);
+    var all = parts.concat(central, [new Uint8Array(e.buffer)]);
+    var out = new Uint8Array(all.reduce(function(n, p){ return n + p.length; }, 0)), at = 0;
+    all.forEach(function(p){ out.set(p, at); at += p.length; });
+    return out;
+  }
+
+  return { START:START, END:END, SECTIONS:SECTIONS, sectionOf:sectionOf, dueIds:dueIds, variance:variance,
+           planned:planned, hhmm:hhmm, dayBlock:dayBlock, frontmatter:frontmatter, dayFile:dayFile,
+           crc32:crc32, zipStore:zipStore, weekdayOf:weekdayOf };
+})();
+window.__HT29MD = HT29MD;
+
+/* ---- HT-29 S6.23 (PASTE 133) · A MEMBER'S JOURNAL, INTO THEIR OWN GOOGLE DRIVE -------------------------
+   Google Identity Services' token model: a browser app, no client secret, the narrowest Drive scope
+   (`drive.file` - the app sees only the files it made). The id is PUBLIC by design and lives in the database
+   (`app_config.google_client_id`, read after sign-in; set once by ht29_unlock.py --google-id), so turning the
+   route on needs no deploy. While it is empty the whole route stays hidden (R70.138) and nothing from Google
+   is loaded. Cory's own journal never takes this route - it goes to the BEV vault (paste 133 Ruling 2).
+   HONEST ABOUT "NIGHTLY": a browser-only app holds a Google token for an hour and may not open a sign-in
+   window without a tap, so it writes when the person taps, and on its own only while that hour lasts. */
+var HT29DRIVE = (function(){
+  var SCOPE = 'https://www.googleapis.com/auth/drive.file';
+  var FOLDER = 'Habit Tracker Journal';
+  var API = 'https://www.googleapis.com/drive/v3/files', UP = 'https://www.googleapis.com/upload/drive/v3/files';
+  var token = null, tokenUntil = 0, configured = '';
+
+  /* the app calls setClientId() once app_config has loaded; '' keeps the route hidden */
+  function setClientId(id){ configured = String(id || ''); }
+  function clientId(){ return configured; }
+  function available(){ return !!clientId(); }
+  function state(){ try { return JSON.parse(localStorage.getItem('ht29_drive') || '{}'); } catch (e) { return {}; } }
+  function save(s){ try { localStorage.setItem('ht29_drive', JSON.stringify(s)); } catch (e) {} }
+  function hasToken(){ return !!token && Date.now() < tokenUntil - 60000; }
+
+  function loadGis(){
+    return new Promise(function(res, rej){
+      if (window.google && google.accounts && google.accounts.oauth2) return res();
+      var s = document.createElement('script');
+      s.src = 'https://accounts.google.com/gsi/client'; s.async = true;
+      s.onload = function(){ res(); };
+      s.onerror = function(){ rej(new Error('Google sign-in did not load')); };
+      document.head.appendChild(s);
+    });
+  }
+  /* must run inside a tap: Google opens its own window */
+  function signIn(){
+    if (!available()) return Promise.reject(new Error('not set up'));
+    return loadGis().then(function(){
+      return new Promise(function(res, rej){
+        var c = google.accounts.oauth2.initTokenClient({
+          client_id: clientId(), scope: SCOPE,
+          callback: function(r){
+            if (!r || r.error) return rej(new Error((r && r.error) || 'no token'));
+            token = r.access_token; tokenUntil = Date.now() + (+r.expires_in || 3600) * 1000;
+            var s = state(); s.connected = true; save(s); res(token);
+          },
+          error_callback: function(e){ rej(new Error((e && e.type) || 'cancelled')); }
+        });
+        c.requestAccessToken();
+      });
+    });
+  }
+  function call(method, url, body, headers){
+    /* A REQUEST THAT NEVER ANSWERS MUST STILL END. Without a deadline a hung Drive call leaves the promise
+       pending for the life of the page: no toast, no error, and the button sitting there as if nothing were
+       asked. 30 s, and the failure arrives as a failure (the write chain's catch already says so). */
+    var opts = { method: method, body: body,
+                 headers: Object.assign({ Authorization: 'Bearer ' + token }, headers || {}) };
+    try{ if (AbortSignal && AbortSignal.timeout) opts.signal = AbortSignal.timeout(30000); }catch(e){}
+    return fetch(url, opts)
+      .then(function(r){
+        if (r.status === 401){ token = null; throw new Error('Google sign-in expired'); }
+        if (!r.ok) throw new Error('Drive answered ' + r.status);
+        return r.status === 204 ? null : r.json();
+      });
+  }
+  function q(s){ return encodeURIComponent(s); }
+  /* q-escaping for a Drive query string, NOT the HTML escaper of the same name at the top of this file.
+     Renamed: a 90-line scope in which esc() means the opposite of what it means everywhere else is a
+     trap for the next reader. */
+  function qesc(s){ return String(s).replace(/\\/g, '\\\\').replace(/'/g, "\\'"); }
+  function folder(){
+    var s = state();
+    var find = call('GET', API + '?spaces=drive&fields=files(id)&q=' +
+                    q("name='" + qesc(FOLDER) + "' and mimeType='application/vnd.google-apps.folder' and trashed=false"));
+    return find.then(function(j){
+      if (j && j.files && j.files[0]) return j.files[0].id;
+      return call('POST', API + '?fields=id', JSON.stringify({ name: FOLDER, mimeType: 'application/vnd.google-apps.folder' }),
+                  { 'Content-Type': 'application/json' }).then(function(x){ return x.id; });
+    }).then(function(id){ s.folder = id; save(s); return id; });
+  }
+  function put(folderId, name, text, asDoc){
+    var mime = asDoc ? 'application/vnd.google-apps.document' : 'text/markdown';
+    return call('GET', API + '?spaces=drive&fields=files(id)&q=' +
+                q("name='" + qesc(name) + "' and '" + qesc(folderId) + "' in parents and trashed=false"))
+      .then(function(j){
+        var id = j && j.files && j.files[0] && j.files[0].id;
+        if (id) return call('PATCH', UP + '/' + id + '?uploadType=media', text, { 'Content-Type': 'text/plain; charset=UTF-8' });
+        var b = 'ht29' + Math.random().toString(36).slice(2);
+        var body = '--' + b + '\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n' +
+                   JSON.stringify({ name: name, parents: [folderId], mimeType: mime }) + '\r\n--' + b +
+                   '\r\nContent-Type: text/plain; charset=UTF-8\r\n\r\n' + text + '\r\n--' + b + '--';
+        return call('POST', UP + '?uploadType=multipart&fields=id', body, { 'Content-Type': 'multipart/related; boundary=' + b });
+      });
+  }
+  /* files: [{name:'2026-09-15.md', text}] · months: [{name:'Habit Tracker Journal 2026-09', text}] */
+  function write(files, months){
+    if (!hasToken()) return Promise.reject(new Error('tap Connect first'));
+    var s = state();
+    return folder().then(function(fid){
+      var chain = Promise.resolve(), n = 0;
+      files.forEach(function(f){ chain = chain.then(function(){ return put(fid, f.name, f.text, false); }).then(function(){ n++; }); });
+      if (s.doc) (months || []).forEach(function(m){ chain = chain.then(function(){ return put(fid, m.name, m.text, true); }).then(function(){ n++; }); });
+      /* the stamp records a WRITE, so a run that wrote nothing does not get one - "Last written 21:04" over
+         zero files is the panel telling you your journal is on Drive when none of it is */
+      return chain.then(function(){ if(!n) return n; s = state(); s.last = new Date().toISOString(); save(s); return n; });
+    });
+  }
+  function disconnect(){
+    var t = token; token = null; tokenUntil = 0; save({});
+    try { if (t && window.google && google.accounts && google.accounts.oauth2) google.accounts.oauth2.revoke(t, function(){}); } catch (e) {}
+  }
+  function setDoc(on){ var s = state(); s.doc = !!on; save(s); }
+  return { available: available, setClientId: setClientId, signIn: signIn, hasToken: hasToken, write: write,
+           disconnect: disconnect, state: state, setDoc: setDoc, FOLDER: FOLDER };
+})();
+
+/* ---- HT-29 S6 · A JOURNAL GOES HOME ---------------------------------------------------------------------------
+   Cory's items 3, 4 and 9, and Ruling 2. Every person's journal belongs somewhere outside this app:
+     CORY'S goes to his BEV vault each night (tools/copiers/ht_journal.py - it never takes the Drive route; the app
+       hides that route for the account `app_config.vault_user` names, and the id lives in the database, not here);
+     EVERYONE ELSE'S can go to their own Google Drive (drive.file - the app sees only what it made), once the
+       tracker's Google sign-in id exists (`app_config.google_client_id`; until then the button does not exist);
+     ANYONE can take it with them now: Settings -> Download my journal -> one .zip, a Markdown file per day - the
+       same bytes the vault gets (golden_ht29 S6 compares them with the Python copier).
+   Only this account's rows are read (S.days, S.privAll, S.habits - the owner's own load), never a member's. */
+(function(){
+  var cfg = { loaded:false, googleId:'', vaultUser:'' };
+  function mine(){
+    var byDate = {}, dates = {};
+    (S.days || []).forEach(function(r){ if(r && r.date && (!r.user_id || !S.me || r.user_id === S.me.id)){ byDate[r.date] = r; dates[r.date] = 1; } });
+    Object.keys(S.privAll || {}).forEach(function(k){ var p = S.privAll[k]; if(p && (!p.user_id || !S.me || p.user_id === S.me.id)) dates[k] = 1; });
+    return { byDate:byDate, dates:Object.keys(dates).filter(function(k){ return k <= today(); }).sort() };
+  }
+  function files(onlyFrom){
+    var m = mine(), out = [];
+    m.dates.forEach(function(k){
+      if(onlyFrom && k < onlyFrom) return;
+      var block = HT29MD.dayBlock(k, S.habits || [], m.byDate[k] || null, (S.privAll || {})[k] || null);
+      if(block) out.push({ name:k + '.md', text:HT29MD.dayFile(k, today(), block) });
+    });
+    return out;
+  }
+  function months(list){
+    var by = {};
+    list.forEach(function(f){ var mo = f.name.slice(0, 7); (by[mo] = by[mo] || []).push(f.text); });
+    return Object.keys(by).sort().map(function(mo){ return { name:'Habit Tracker Journal ' + mo, text:by[mo].join('\n\n') }; });
+  }
+  function dlBytes(name, bytes, type){
+    var b = new Blob([bytes], { type:type }), u = URL.createObjectURL(b);
+    var a = document.createElement('a'); a.href = u; a.download = name; document.body.appendChild(a); a.click();
+    setTimeout(function(){ URL.revokeObjectURL(u); if(a.parentNode) a.parentNode.removeChild(a); }, 1500);
+  }
+  function download(){
+    var list = files();
+    if(!list.length){ toast('nothing written yet'); return 0; }
+    var zip = HT29MD.zipStore(list.map(function(f){ return { name:'journal/' + f.name, data:f.text }; }));
+    dlBytes('habit-tracker-journal-' + today() + '.zip', zip, 'application/zip');
+    toast(list.length + ' day' + (list.length === 1 ? '' : 's') + ' in the zip');
+    return list.length;
+  }
+  /* THE LATCH IS SET BY SUCCESS, NOT BY TRYING. Latched first, one failed read hid the whole Drive route for
+     the life of the page and looked exactly like "Google is not configured yet" - a journal that never left the
+     app, and nothing on screen to say why. Now a failure leaves the question open and the next open re-asks. */
+  var cfgBusy = null;
+  async function loadCfg(){
+    if(cfg.loaded || !S.me) return cfg;
+    if(cfgBusy) return cfgBusy;                               /* one read in flight, not one per caller */
+    cfgBusy = (async function(){
+      try{
+        var r = await sb.from('app_config').select('key,value');
+        if(r.error){ warn29('app_config read failed', r.error); return cfg; }
+        (r.data || []).forEach(function(x){ if(x.key === 'google_client_id') cfg.googleId = x.value || ''; if(x.key === 'vault_user') cfg.vaultUser = x.value || ''; });
+        HT29DRIVE.setClientId(driveAllowed() ? cfg.googleId : '');
+        cfg.loaded = true;
+      }catch(e){ warn29('app_config read failed', e); }
+      finally{ cfgBusy = null; }
+      return cfg;
+    })();
+    return cfgBusy;
+  }
+  function driveAllowed(){ return !!cfg.googleId && !(S.me && cfg.vaultUser && cfg.vaultUser === S.me.id); }
+  function isVaultUser(){ return !!(S.me && cfg.vaultUser && cfg.vaultUser === S.me.id); }
+
+  var HELP = [
+    ['Obsidian on your phone', ['Connect Google Drive below, once.', 'Install Obsidian and a Drive sync app (Autosync, or Obsidian Sync).',
+      'Point it at the Drive folder "Habit Tracker Journal".', 'Open that folder as a vault in Obsidian.', 'Each day is its own note, dated.']],
+    ['Google Docs', ['Connect Google Drive below, once.', 'Turn on "also as Google Doc".', 'One Doc a month appears in the same folder.',
+      'Open it in the Google Docs app on your phone.', 'The daily files stay beside it.']],
+    ['Download', ['Tap "Download my journal".', 'You get one .zip, a file per day.', 'Unzip it anywhere, or drop it into Obsidian.',
+      'Nothing is uploaded by this button.', 'Do it again any time; it holds every day.']]
+  ];
+  function panelHtml(){
+    var s = HT29DRIVE.state();
+    var drive = isVaultUser()
+      ? '<div class="note" style="padding:8px 0 0">Your journal goes to your BEV vault each night.</div>'
+      : (HT29DRIVE.available()
+        ? (s.connected
+          ? '<div class="tools"><button class="btn pri" id="j29Write" type="button">Write to Drive</button>' +
+              '<button class="btn" id="j29Disc" type="button">Disconnect</button></div>' +
+            '<label class="fld h28rest"><span class="lab">Also as Google Doc</span><span class="h28sw"><input type="checkbox" id="j29Doc"' + (s.doc ? ' checked' : '') + '> one Doc a month</span></label>' +
+            (s.last ? '<div class="note">Last written ' + esc(String(s.last).slice(0, 16).replace('T', ' ')) + '</div>' : '')
+          : '<div class="tools"><button class="btn pri" id="j29Conn" type="button">Connect Google Drive</button></div>' +
+            '<div class="note">Your journal, into a folder in YOUR Drive. The app sees only the files it makes.</div>')
+        : '');
+    return '<div class="lab">Journal</div>' +
+      '<div class="tools"><button class="btn" id="j29Zip" type="button">Download my journal</button></div>' +
+      drive +
+      '<details class="h29help"><summary>Journal on your phone</summary>' +
+        HELP.map(function(h){ return '<div class="h29hb"><b>' + esc(h[0]) + '</b><ol>' + h[1].map(function(l){ return '<li>' + esc(l) + '</li>'; }).join('') + '</ol></div>'; }).join('') +
+      '</details>';
+  }
+  function bindPanel(){
+    var z = el('j29Zip'); if(z) z.onclick = download;
+    var c = el('j29Conn'); if(c) c.onclick = async function(){
+      try{ await HT29DRIVE.signIn(); var n = await HT29DRIVE.write(files(), months(files())); toast(n + ' written to Drive'); refresh(); }
+      catch(e){ toast('Drive: ' + String(e && e.message || e).slice(0, 60)); }
+    };
+    var w = el('j29Write'); if(w) w.onclick = async function(){
+      try{ if(!HT29DRIVE.hasToken()) await HT29DRIVE.signIn();
+           var n = await HT29DRIVE.write(files(), months(files())); toast(n + ' written to Drive'); refresh(); }
+      catch(e){ toast('Drive: ' + String(e && e.message || e).slice(0, 60)); }
+    };
+    var d = el('j29Disc'); if(d) d.onclick = function(){ HT29DRIVE.disconnect(); refresh(); };
+    var doc = el('j29Doc'); if(doc) doc.onchange = function(){ HT29DRIVE.setDoc(doc.checked); };
+  }
+  function refresh(){ var p = el('j29Set'); if(p){ p.innerHTML = panelHtml(); bindPanel(); } }
+  var _os = openSettings;
+  openSettings = function(){
+    var out = _os.apply(null, arguments);
+    loadCfg().then(function(){
+      setTimeout(function(){
+        var ov = document.querySelector('.ov.on .inner') || document.querySelector('.ov .inner');
+        if(!ov || el('j29Set')) return;
+        var w = document.createElement('div'); w.id = 'j29Set'; w.className = 'pan'; w.style.marginTop = '14px';
+        w.innerHTML = panelHtml();
+        var priv = el('privNote');
+        if(priv && priv.parentNode === ov) ov.insertBefore(w, priv); else ov.appendChild(w);
+        bindPanel();
+      }, 90);
+    });
+    return out;
+  };
+  /* a connected member's first open of a day: one line, one tap writes every day since the last write */
+  function driveCard(){
+    if(!S.me || S.loadOk !== true || isVaultUser() || !HT29DRIVE.available()) return;
+    var s = HT29DRIVE.state(); if(!s.connected) return;
+    var key = 'ht29_drive_asked_' + today();
+    try{ if(localStorage.getItem(key)) return; localStorage.setItem(key, '1'); }catch(e){ return; }
+    toast('tap Settings → Journal → Write to Drive to save yesterday');
+  }
+  var _pa = paintAll;
+  paintAll = function(){ var out = _pa.apply(null, arguments); loadCfg().then(driveCard); return out; };
+  window.__HT29S6 = { files:files, months:months, download:download, cfg:function(){ return cfg; }, loadCfg:loadCfg };
+})();
+
+/* ---- HT-29 S8 · "UPDATE AVAILABLE — TAP TO REFRESH", AND IT CAN BE TAPPED ------------------------------------
+   D16 closed for good: HT-25's toast could never take a tap (`.toast{pointer-events:none}`) and the next toast erased
+   it, so every release still needed Cory to pull to refresh. A banner of its own waits at the top until it is tapped;
+   the tap saves whatever is being typed (HT-28c's flush), then refreshes. */
+var HT29_UPDATE_BANNER = true;
+(function(){
+  function show(){
+    if(el('h29Upd')) return;
+    var b = document.createElement('button');
+    b.id = 'h29Upd'; b.type = 'button'; b.className = 'h29upd';
+    b.textContent = 'Update available — tap to refresh';
+    b.onclick = function(){
+      b.disabled = true; b.textContent = 'saving, then refreshing…';
+      var done = false;
+      function go(){ if(done) return; done = true; var r = window.__HT29UPD.reload; if(typeof r === 'function') r(); else location.reload(); }
+      try{ var p = window.__HT28c && window.__HT28c.flush && window.__HT28c.flush(); if(p && p.then) p.then(go, go); else go(); }
+      catch(e){ warn29('flush before refresh failed', e); go(); }
+      setTimeout(go, 2500);
+    };
+    document.body.appendChild(b);
+  }
+  window.__HT29UPD = { show:show, reload:null };
+})();
+
+/* ---- HT-29 S9 · THE EVENING NUDGE ---------------------------------------------------------------------------------
+   Cory 9/15 15:28: fold the notifications in. Settings -> Nudges: two times (12:00 "Morning done? N of M" · 21:00
+   "N of M · Andrew X of Y · rate the day"), per person, off for a new account, set on for an account with history
+   (Cory) - and nothing is sent until that person taps Allow AND the sender is armed (R70.344: Cory's word). The
+   whole block stays hidden until the database has the tables and the sender answers with its public key, so a
+   phone never shows a switch that cannot work. The words are composed by the sender and carry numbers only. */
+(function(){
+  var FUNC = SB_URL + '/functions/v1/nudge';
+  var st = { checked:false, ready:false, pub:null, prefs:null, history:false };
+  function b64u(s){
+    var p = String(s).replace(/-/g, '+').replace(/_/g, '/'); while(p.length % 4) p += '=';
+    var bin = atob(p), out = new Uint8Array(bin.length); for(var i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+    return out;
+  }
+  function tz(){ try{ return Intl.DateTimeFormat().resolvedOptions().timeZone || 'America/Chicago'; }catch(e){ return 'America/Chicago'; } }
+  async function check(){
+    if(st.checked || !S.me) return st;
+    st.checked = true;                       /* set here on purpose: every `return st` below is a settled answer */
+    try{
+      var p = await sb.from('nudge_prefs').select('user_id,enabled,noon,evening,on_sabbath,tz').eq('user_id', S.me.id).maybeSingle();
+      /* "the table is not there yet" is 42P01 and nothing else. A 500, an expired token or a dropped connection
+         read as that used to hide the Nudges block for the page's life and call it "the SQL has not run". */
+      if(p.error && /42P01|PGRST20[0-9]|does not exist/i.test(String(p.error.code || p.error.message || ''))) return st;
+      if(p.error){ st.checked = false; warn29('nudge prefs read failed', p.error); return st; }
+      st.prefs = p.data || null;
+      st.history = (S.days || []).some(function(r){ return r.date && r.date < '2026-09-14'; });
+      var pub = window.__NUDGE_PUB || null;                              /* the harness's seam; the app asks the sender */
+      if(!pub){
+        /* the headless fixture runs from file:// and the sender lives beside the database - asking from there
+           would be a request to the live project from a test, and it can only ever 404 */
+        if(location.protocol === 'file:') return st;
+        var r = await fetch(FUNC + '?vapid=1');
+        if(!r.ok) return st;
+        var j = await r.json(); pub = j && j.publicKey;
+      }
+      if(!pub) return st;
+      st.pub = pub;
+      st.ready = !!(navigator.serviceWorker && window.PushManager && window.Notification);
+    }catch(e){ warn29('nudges unavailable', e); }
+    return st;
+  }
+  function prefs(){
+    var p = st.prefs || {};
+    return { enabled:(p.enabled != null ? !!p.enabled : st.history), noon:String(p.noon || '12:00').slice(0, 5),
+             evening:String(p.evening || '21:00').slice(0, 5), on_sabbath:!!p.on_sabbath, saved:!!st.prefs };
+  }
+  async function savePrefs(patch){
+    var cur = prefs();
+    var row = { user_id:S.me.id, enabled:(patch.enabled != null ? patch.enabled : cur.enabled),
+                noon:(patch.noon || cur.noon), evening:(patch.evening || cur.evening),
+                on_sabbath:(patch.on_sabbath != null ? patch.on_sabbath : cur.on_sabbath), tz:tz() };
+    var r = await sb.from('nudge_prefs').upsert(row, { onConflict:'user_id' });
+    if(r && r.error){ toast('nudges not saved'); return false; }
+    st.prefs = row; return true;
+  }
+  async function subscribe(){
+    /* EVERY WAY OUT OF HERE SAYS SOMETHING. Without the try, a throw from `pushManager.subscribe` (a bad key,
+       no push service, a service worker that never became ready) escaped as an unhandled rejection: the switch
+       stayed sitting in the ON position, nothing was subscribed, no prefs row was written, and no word said so. */
+    try{
+      var perm = await window.Notification.requestPermission();
+      if(perm !== 'granted'){ toast('notifications are blocked for this app in your settings'); return false; }
+      var reg = await navigator.serviceWorker.ready;
+      var sub = (await reg.pushManager.getSubscription()) ||
+                (await reg.pushManager.subscribe({ userVisibleOnly:true, applicationServerKey:b64u(st.pub) }));
+      var j = sub.toJSON ? sub.toJSON() : sub;
+      var up = await sb.from('push_subscriptions').upsert({ endpoint:j.endpoint, user_id:S.me.id, p256dh:j.keys.p256dh, auth_key:j.keys.auth },
+                                                          { onConflict:'endpoint' });
+      if(up && up.error){ toast('this phone was not saved for nudges'); return false; }
+      return true;
+    }catch(e){ warn29('nudge subscribe failed', e); toast('nudges could not be turned on'); return false; }
+  }
+  async function unsubscribe(){
+    try{
+      var reg = await navigator.serviceWorker.ready, sub = await reg.pushManager.getSubscription();
+      if(sub){ var ep = sub.endpoint; await sub.unsubscribe(); await sb.from('push_subscriptions').delete().eq('endpoint', ep).eq('user_id', S.me.id); }
+    }catch(e){ warn29('unsubscribe failed', e); }
+  }
+  async function test(){
+    try{
+      var s = await sb.auth.getSession(), tok = s && s.data && s.data.session && s.data.session.access_token;
+      var r = await fetch(FUNC, { method:'POST', headers:{ 'Content-Type':'application/json', Authorization:'Bearer ' + tok },
+                                  body:JSON.stringify({ test:true }), signal:AbortSignal.timeout(20000) });
+      /* 200 IS NOT DELIVERY. The sender answers with what it actually pushed, so a run where every endpoint
+         refused used to read "test nudge sent" over a phone that buzzed for nobody. */
+      var body = null; try{ body = await r.json(); }catch(x){}
+      toast(r.ok && body && body.sent > 0 ? 'test nudge sent'
+            : r.ok ? 'nothing to send to this phone yet' : 'the test did not send');
+    }catch(e){ toast('the test did not send'); }
+  }
+  function html(){
+    var p = prefs();
+    return '<div class="lab">Nudges</div>' +
+      '<div class="note" style="padding:4px 0 10px">A notification at noon and at 9 pm with your numbers and your group’s — never your journal.' +
+        (p.enabled && !p.saved ? ' Tap Allow once to finish.' : '') + '</div>' +
+      '<label class="fld h28rest"><span class="lab">Nudges</span><span class="h28sw"><input type="checkbox" id="n29On"' + (p.enabled ? ' checked' : '') + '> on this phone</span></label>' +
+      '<div class="h29times"><label class="fld"><span class="lab">Midday</span><input type="time" id="n29Noon" value="' + esc(p.noon) + '"></label>' +
+      '<label class="fld"><span class="lab">Evening</span><input type="time" id="n29Eve" value="' + esc(p.evening) + '"></label></div>' +
+      '<label class="fld h28rest"><span class="lab">On the Sabbath</span><span class="h28sw"><input type="checkbox" id="n29Sab"' + (p.on_sabbath ? ' checked' : '') + '> send on Saturdays too</span></label>' +
+      '<div class="tools">' + (p.enabled && !p.saved ? '<button class="btn pri" id="n29Allow" type="button">Allow</button>' : '') +
+        '<button class="btn" id="n29Test" type="button">Send a test</button></div>';
+  }
+  function bind(){
+    var on = el('n29On'), allow = el('n29Allow');
+    async function enable(){ if(await subscribe()){ await savePrefs({ enabled:true }); toast('nudges on'); } else if(on) on.checked = false; refresh(); }
+    if(on) on.onchange = async function(){ if(on.checked) await enable(); else { await unsubscribe(); await savePrefs({ enabled:false }); toast('nudges off'); refresh(); } };
+    if(allow) allow.onclick = enable;
+    var noon = el('n29Noon'), eve = el('n29Eve'), sab = el('n29Sab'), t = el('n29Test');
+    if(noon) noon.onchange = function(){ savePrefs({ noon:noon.value }); };
+    if(eve) eve.onchange = function(){ savePrefs({ evening:eve.value }); };
+    if(sab) sab.onchange = function(){ savePrefs({ on_sabbath:sab.checked }); };
+    if(t) t.onclick = test;
+  }
+  function refresh(){ var p = el('n29Set'); if(p){ p.innerHTML = html(); bind(); } }
+  var _os = openSettings;
+  openSettings = function(){
+    var out = _os.apply(null, arguments);
+    check().then(function(){
+      if(!st.ready) return;
+      setTimeout(function(){
+        var ov = document.querySelector('.ov.on .inner') || document.querySelector('.ov .inner');
+        if(!ov || el('n29Set')) return;
+        var w = document.createElement('div'); w.id = 'n29Set'; w.className = 'pan'; w.style.marginTop = '14px';
+        w.innerHTML = html();
+        var priv = el('privNote');
+        if(priv && priv.parentNode === ov) ov.insertBefore(w, priv); else ov.appendChild(w);
+        bind();
+      }, 110);
+    });
+    return out;
+  };
+  window.__HT29S9 = { check:check, state:function(){ return st; }, prefs:prefs, subscribe:subscribe, unsubscribe:unsubscribe };
+})();
+
+/* ======================= HT-29 S7.27 · THE OTHER DEVICE, WITHIN SECONDS (PASTE 133 S7.27 · D14) =======================
+   HT-28c pulls every 30 s while the page is visible, and at once on focus, return and reconnect. That covers the
+   phone you pick up; it leaves a page sitting open as much as 30 s behind the device in your hand. HT-28 named the
+   missing half itself — "No Realtime subscription: it needs the tables in Supabase's realtime publication, a
+   migration this wire does not run" — and S4's SQL runs that migration (`days`, `day_private`, `habits` into
+   `supabase_realtime`). So this subscribes to the publication and asks HT-28c for a pull the moment the server says
+   one of MY rows changed. Cory's fixture, S7.27: a check on the phone shows on the desktop within 5 s, and back.
+   NOTHING IS READ OUT OF THE EVENT. No payload reaches the app — the pull re-reads through the same user-scoped
+   queries the app always uses, so nothing arrives that this account's own policies would not hand it (R47.3 as
+   Ruling 4 amends it). Each subscription is filtered `user_id=eq.<me>` as well: defence in depth, not the fence.
+   PHASE GATE: the socket lives only while the page is visible. Hidden, it is closed; on return it is remade, and
+   HT-28c's own 'visible' pull covers the gap. Nothing holds a connection open behind the app. */
+(function(){
+  if(!sb || typeof sb.channel !== 'function') return;   /* no Realtime in this build: the 30 s pull is the whole of it */
+  var TABLES = ['days','day_private','habits'], ch = null, chFor = null, last = 0, status = null;
+  function poke(){
+    var now = Date.now();
+    if(now - last < 400) return;                        /* one pull for a burst of rows, not one per row */
+    last = now;
+    /* a throwing pull would otherwise disable this path in silence for the rest of the page */
+    try{ if(window.__HT28c && window.__HT28c.pull) window.__HT28c.pull(); }
+    catch(e){ warn29('realtime pull failed', e); }
+  }
+  function close(){
+    if(!ch) return;
+    var c = ch; ch = null; chFor = null; status = null;
+    try{ if(sb.removeChannel) sb.removeChannel(c); else if(c.unsubscribe) c.unsubscribe(); }catch(e){}
+  }
+  function open(){
+    if(!S.me || document.visibilityState === 'hidden') return;
+    /* A CHANNEL THAT ERRORED IS NOT A CHANNEL. `ch` stays non-null through CHANNEL_ERROR and TIMED_OUT (the
+       access token refreshes about once an hour and the socket's does not), so without this the subscription
+       would never be rebuilt and "within 5 s" would quietly become HT-28c's 30 s for the rest of the page -
+       a symptom that looks exactly like the fallback working. Every paint re-asks, so a rebuild costs nothing. */
+    if(ch && chFor === S.me.id && status !== 'CHANNEL_ERROR' && status !== 'TIMED_OUT' && status !== 'CLOSED') return;
+    close();                                            /* a second account on one device gets its own channel */
+    var id = S.me.id, c = sb.channel('ht29-' + id);
+    TABLES.forEach(function(t){
+      c.on('postgres_changes', { event:'*', schema:'public', table:t, filter:'user_id=eq.' + id }, poke);
+    });
+    /* THE STATUS IS READ, not assumed. `subscribe()` hands back a channel whether or not it ever joins, so
+       `live()` asking `!!ch` would answer "fine" through CHANNEL_ERROR and TIMED_OUT forever - and the only
+       symptom would be the other device taking 30 s, which is the pull doing its job unnoticed. */
+    status = 'joining';
+    /* the status is RECORDED and nothing else: joining is not an event, and a catch-up pull here is both
+       redundant (HT-28c already pulls on load, on return and on reconnect) and a real disturbance - it
+       repaired a deliberately failed load in `golden_ht28` C R9 before that test could read it. */
+    ch = c.subscribe(function(s){ status = String(s || ''); }) || c;
+    chFor = id;
+  }
+  document.addEventListener('visibilitychange', function(){
+    if(document.visibilityState === 'hidden') close(); else open();
+  });
+  window.addEventListener('pagehide', close);
+  var _pa = paintAll;
+  paintAll = function(){ var out = _pa.apply(null, arguments); open(); return out; };
+  window.__HT29RT = { open:open, close:close, status:function(){ return status; },
+                     live:function(){ return !!ch && status === 'SUBSCRIBED'; } };
 })();
 
 })();

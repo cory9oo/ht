@@ -141,11 +141,14 @@ async def s1(pw):
                      marks: s ? s.children.length : -1 }; }""")
         chk('S1e · the sleep chart is hidden and draws no series (stress 1)',
             blk['exists'] and blk['hidden'] and not blk['shown'] and blk['marks'] == 0, blk)
-        tab = await pg.query_selector('#vTabs [data-v="views"]')
-        if tab:
-            await tab.click(); await pg.wait_for_timeout(900)
+        # ---- AMENDED BY HT-29 S5.17 (CC HT 2026-09-15) · R67.2 · the rule is paste 133 S5.17 ----------
+        # HT-13's two tabs under the header are hidden: the phone has a bottom bar now (Today · Views ·
+        # Insights), and a hidden control cannot be clicked. The tab is switched the way the bar switches
+        # it - through HT-13's own exported switcher - so this still tests the VIEWS surface, not the bar.
+        if await pg.evaluate("() => !!window.__HT13_TAB"):
+            await pg.evaluate("() => window.__HT13_TAB('views')"); await pg.wait_for_timeout(900)
             seen['phone views'] = await sleep_texts(pg)
-            await (await pg.query_selector('#vTabs [data-v="today"]')).click(); await pg.wait_for_timeout(500)
+            await pg.evaluate("() => window.__HT13_TAB('today')"); await pg.wait_for_timeout(500)
         bv = await pg.query_selector('#bView')
         if bv and await bv.is_visible():
             await bv.click(); await pg.wait_for_timeout(1200)
@@ -232,17 +235,29 @@ async def s2(pw):
             strip and strip['vis'] and all(w in strip['text'].upper() for w in ('TODAY', '7 DAYS', 'STREAK')), strip)
         await pg.click('#tStrip')
         await pg.wait_for_timeout(700)
-        st = await pg.evaluate("""() => { const f=document.getElementById('c5Five'), m=document.getElementById('c5More');
+        st = await pg.evaluate("""() => { const f=document.getElementById('c5Five'), m=document.getElementById('c5More'),
+              p=document.getElementById('ins29');
             return { tab: document.documentElement.getAttribute('data-vtab'), fiveVis: !!f && f.checkVisibility(),
+              insVis: !!p && p.checkVisibility(), three: p ? p.querySelectorAll('.h29c').length : 0,
+              fiveUnderMore: !!(f && m && m.contains(f)),
               titles: [...document.querySelectorAll('#c5Five > .vins > .lab')].map(e => e.textContent),
               more: document.querySelectorAll('#c5More #vInsights .vins').length, moreOpen: m ? m.open : null,
               priv: (document.querySelector('.c5priv') || {}).innerText || '' }; }""")
-        chk('S2b · a tap on the strip opens Insights (the Views tab, on the phone)', st['tab'] == 'views' and st['fiveVis'], st)
+        # AMENDED BY WIRE HT-29 · R67.2 · paste 133 S5 (Cory, 2026-09-15): "One Insights. Three features."
+        # The five are not gone and not loosened away - S2c still reads all five, in order; they are one
+        # tap further in, inside #c5More, which is what this line now asserts as well.
+        chk('S2b · a tap on the strip opens Insights (the Views tab, on the phone)',
+            st['tab'] == 'views' and st['insVis'] and st['three'] == 3 and st['fiveUnderMore'], st)
         chk('S2c · Insights shows EXACTLY FIVE, in the order the spec names', st['titles'] == FIVE_TITLES, st['titles'])
         chk("S2d · HT-13's three cards live on under More, closed - hidden, never removed", st['more'] == 3
             and st['moreOpen'] is False, {'more': st['more'], 'open': st['moreOpen']})
-        chk('S2e · the privacy line is on screen', 'never shown to anyone' in st['priv']
-            and 'completion % only' in st['priv'], st['priv'])
+        # AMENDED BY WIRE HT-29 · R67.2 · paste 133 Ruling 4 (Cory, 2026-09-15): the group exists to
+        # "document our inputs and hold each other accountable", so it sees the standards, the check-offs
+        # and the day's number - "completion % only" was R47.3's line and is no longer true. The half this
+        # check exists to hold is unchanged and is asserted verbatim: the journal and the why are yours.
+        chk('S2e · the privacy line is on screen',
+            st['priv'].strip() == 'Your journal and your why are yours alone. '
+                                  'The group sees standards, check-offs and the day’s number.', st['priv'])
 
         j = await pg.evaluate("""() => { const v=document.getElementById('vJournal');
             return { vis: !!v && v.checkVisibility(), n: document.querySelectorAll('#vJournal .vje').length,
@@ -284,7 +299,9 @@ async def s2(pw):
         await pg.click('#tStrip')
         await pg.wait_for_timeout(500)
         d = await pg.evaluate("""() => { const v = id => { const e=document.getElementById(id); return !!e && e.checkVisibility(); };
+            const f=document.getElementById('c5Five'), m=document.getElementById('c5More');
             return { ov: document.getElementById('ov').classList.contains('on'), five: [...document.querySelectorAll('#c5Five > .vins')].filter(e => e.checkVisibility()).length,
+                     three: document.querySelectorAll('#ins29 .h29c').length, fiveUnderMore: !!(f && m && m.contains(f)),
                      journal: v('vJournal'), find: v('vJFind') }; }""")
         await pg.click('#ov [data-x]')
         await pg.wait_for_timeout(400)
@@ -292,8 +309,12 @@ async def s2(pw):
             return { back: ['h26Ins','h26Jrn'].every(i => document.getElementById(i) && document.getElementById(i).parentNode === g),
                      hidden: !document.getElementById('h26Ins').checkVisibility(),
                      legacy: !!document.querySelector('#c5More #vInsights') }; }""")
-        chk('S2j · desktop: the strip rides the masthead, and a click shows the five and the journal',
-            d0['strip'] and d0['inMast'] and d['ov'] and d['five'] == 5 and d['journal'] and d['find'], {**d0, **d})
+        # AMENDED BY WIRE HT-29 · R67.2 · paste 133 S5: the desktop opens the SAME one Insights the phone
+        # does - three on the surface, the five one tap further inside More. Same claim (the strip opens
+        # both panels), current shape.
+        chk('S2j · desktop: the strip rides the masthead, and a click shows Insights and the journal',
+            d0['strip'] and d0['inMast'] and d['ov'] and d['three'] == 3 and d['fiveUnderMore']
+            and d['journal'] and d['find'], {**d0, **d})
         chk("S2j2 · closing puts both panels back in the grid, off the quadrants, with HT-13's node inside More",
             d2['back'] and d2['hidden'] and d2['legacy'], d2)
         desk_errs = list(errs)
