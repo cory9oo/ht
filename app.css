@@ -2532,3 +2532,174 @@ html[data-simple] #vYearNav .h16leg{ display:none !important }                /*
 .h29upd:disabled{ opacity:.8; cursor:default }
 .h29times{ display:grid; grid-template-columns:1fr 1fr; gap:10px }
 .h29times input[type=time]{ font-size:16px; min-height:44px }
+
+
+/* ======================= HT-30 · QUIET AND SIMPLE, DEEP ON TAP (PASTE 137) =======================
+   Cory 2026-09-20. Nothing here adds a colour; everything here takes one away. */
+
+/* ---- S3.9 · THINNER ROWS ------------------------------------------------------------------------
+   MEASURED before: phone 49.0 px, desktop 41.0 px (mean over the rendered list, `recon137.py`).
+   Cory asked for about a quarter off both, with the TEXT the same size - so the height comes out of
+   padding and out of the control boxes, never out of `font-size`.
+   THE 44x44 TAP TARGET MOVES TO 36x36 ON THE PHONE, and that is a real change to a rule three
+   goldens pin (`golden_ht18` S3, `golden_ht23` S2d, `golden_ht28` A4). It is amended BY NAME in each,
+   never loosened away: 44 was HT-16's own comfort floor (R70.98), not a standard, and 36 still clears
+   WCAG 2.5.8's 24x24 minimum by half again. A row cannot be a quarter shorter than the control inside
+   it - the row IS the control - so one of the two had to give, and Cory's 9/20 word is the newer one. */
+html[data-simple] .li{ min-height:36px; padding:0 2px }
+html[data-simple] .li .bxw{ flex:0 0 36px; width:36px; height:36px }
+html[data-simple] .li .bx{ width:22px; height:22px }
+html[data-simple] .li .edp{ flex:0 0 36px; width:36px; height:36px; font-size:12px }
+html[data-simple] .li .drg{ flex:0 0 36px; width:36px; height:36px; font-size:12px }
+@media(min-width:1024px){
+  html[data-simple] .li{ min-height:30px; padding:0 2px }
+  html[data-simple] .li .bxw{ flex:0 0 28px; width:28px; height:28px }
+  html[data-simple] .li .bx{ width:20px; height:20px }
+  html[data-simple] .li .edp{ flex:0 0 28px; width:28px; height:28px; font-size:11px }
+  html[data-simple] .li .drg{ flex:0 0 28px; width:28px; height:28px; font-size:11px }
+}
+/* HT-28 A4's phone block carries `#log` in its selector, so it out-ranks the rules above no matter
+   which comes last. Matched here rather than raised there, because that block is HT-28's measured
+   record of what it did and why, and this is HT-30 changing the number - not HT-28 changing its mind. */
+@media (max-width:640px){
+  html[data-simple] #log .li{ min-height:36px; padding:0; gap:4px }
+}
+/* the desktop quadrant keeps HT-18's 28x28 controls exactly (`golden_ht18` S3g asserts them); what
+   comes off the row here is its spare height, nothing else. */
+html[data-simple] #h18Comp .li{ min-height:30px; padding:0 }
+html[data-simple] #h18Comp .li .bxw{ flex:0 0 28px; width:28px; height:28px }
+html[data-simple] #h18Comp .li .bx{ width:19px; height:19px }   /* HT-28 B measured this one */
+html[data-simple] #h18Comp .li .edp{ flex:0 0 28px; width:28px; height:28px }
+html[data-simple] #h18Comp .li .drg{ flex:0 0 28px; width:28px; height:28px }
+
+/* ---- S3.9 · THE AFFORDANCES REST -----------------------------------------------------------------
+   "edit the standard" and "drag to reorder" are there for the moment you want them and are shouting
+   the rest of the time - one bordered box per row, twice, down the whole list. At rest they are a
+   suggestion; under a pointer, a finger or a keyboard they are a control again.
+   `:focus-visible` is in the list on purpose: an affordance that only appears under a mouse is an
+   affordance the keyboard path cannot see. */
+html[data-simple] .li .edp,
+html[data-simple] .li .drg{ opacity:.45; border-color:var(--rule); transition:opacity .12s ease }
+html[data-simple] .li:hover .edp, html[data-simple] .li:hover .drg,
+html[data-simple] .li .edp:hover, html[data-simple] .li .drg:hover,
+html[data-simple] .li .edp:focus-visible, html[data-simple] .li .drg:focus-visible,
+html[data-simple] .li .edp:active, html[data-simple] .li .drg:active,
+html[data-simple] .li.dragging .drg{ opacity:1; border-color:var(--border) }
+
+/* ---- S1.4 · THE FOUR HEADERS ARE A THIN RULE WITH A LABEL ----------------------------------------
+   Stress 3: four headed groups on a 390px screen could cost more vertical space than they save. They
+   do not, because a header here is one line of 9.5px mono on a hairline - measured in `golden_ht30`
+   S1 against the rows it heads. */
+html[data-simple] #log > .grp{ padding:6px 0; margin:0; border-top:1px solid var(--rule);
+  color:var(--ink3); background:none }
+html[data-simple] #log > .grp:first-child{ border-top:0 }
+
+/* ---- S2.6 · THE PLANNED TIME IS A CHIP AT THE RIGHT ----------------------------------------------
+   It used to sit inside the name, in front of it, in bold - so it read as part of the name, which is
+   the whole complaint. Out of the name, to the right, and muted. */
+.li .pat30{ font:400 10.5px/1 var(--mono); color:var(--ink3); letter-spacing:.04em;
+  flex:0 0 auto; margin-left:6px; font-weight:400 }
+html[data-simple] .li .pat30{ display:block; font-size:11px; opacity:.75 }
+html[data-simple] .li .dot29{ opacity:.7 }
+
+/* ---- S4.11 · THE "WHY" LEAVES THE PHONE ----------------------------------------------------------
+   The rating strip stays; the question under it does not, on a phone. The element and the column are
+   untouched (R70.138) - the desktop still asks, and every answer ever written is still there and still
+   read by Insights' "what makes a good day". */
+@media(max-width:1023px){
+  /* HT-28 gives this row its own `html[data-simple] .h28why{...}` rule, which out-ranks a bare class
+     selector - so the TEXTAREA went and the word "Why" stayed on the screen over nothing, which the
+     first phone shot showed at a glance. Matched at the same weight, and by id as well, because two
+     layers re-host this block and a class on the label is one re-render from being gone. */
+  html[data-simple] .h30why,
+  html[data-simple] .fld:has(> #iWhy),
+  .h30why, .fld:has(> #iWhy), #iWhy{ display:none !important }
+}
+
+/* ---- S6.14 · ONE INSIGHTS PAGE -------------------------------------------------------------------
+   The View page's own format: full-width cards, one under another, everything on one scroll. */
+.h30ins{ grid-column:1 / -1; display:none; order:0 }
+html[data-vtab="views"] .h30ins,
+html[data-vtab="insights"] .h30ins{ display:block }
+/* THE DESKTOP GETS A REAL TAB. `.vtabs` was hidden above 1024 because the desktop showed everything
+   at once in quadrants; with one Insights page there is a second door, and R70.211 says a door you
+   cannot click does not exist. Cory's words were plainer: he could not find it. */
+@media(min-width:1024px){
+  html[data-simple] .vtabs{ display:flex }
+  html[data-simple][data-vtab="views"] .colR{ display:none }
+}
+/* ONE DOOR PER WIDTH. Below 1024 the bottom bar is the door, so the pair of tabs under the mast - the
+   second copy of the same two words - goes (hidden, never deleted). Above it, the tabs ARE the door and
+   the bottom bar is already display:none. */
+@media(max-width:1023px){ html[data-simple] .vtabs{ display:none } }
+html[data-simple] .mast .vtabs{ margin:0; padding:0 }
+/* ONE PAGE MEANS ONE PAGE. Everything else the grid holds stands down on this tab - the quadrants,
+   both columns, and the old hosts whose renderers now draw into HT-30's cards. Each of those hosts
+   is INSIDE `#h30Ins`'s "More" by now, so this rule cannot hide one of them twice, and Today is not
+   touched. `:not()` rather than a list, because the list is what went stale last time. */
+html[data-simple][data-vtab="views"] .grid > *:not(#h30Ins):not(.h20det):not(:has(.h20det)){ display:none }
+.h30ins .h30c{ border:1px solid var(--rule); border-radius:10px; padding:12px; margin:10px 0;
+  background:var(--surface) }
+.h30ins .h30c > .lab{ font:500 9.5px/1 var(--mono); letter-spacing:.14em; text-transform:uppercase;
+  color:var(--ink3); padding-bottom:8px; display:block }
+/* a borrowed card brings its own heading; two of them one above the other is the noise this page
+   exists to remove ("COMPLETION AND RATING OVER TIME" over "COMPLETION OVER TIME"). */
+.h30ins .h30cb > .h29c > .lab,
+.h30ins .h30cb > .h16p > .sh,
+.h30ins .h30cb > section > .sh{ display:none }
+.h30ins .h30cb > .h29c{ border:0; padding:0; margin:0; background:none }
+/* HT-15's allow-list hides `#vMonthC`, `#vMonthR` and `#vLife` with `display:none !important` in
+   simple mode - Cory cut the old Views page and they went with it (R70.16: hidden, never removed).
+   His 2026-09-20 ruling puts exactly these back, on ONE page: month completion by colour, month
+   rating by colour, the life grid. They are allowed HERE and nowhere else, so the allow-list still
+   governs every other screen. Without this the three cards were headed boxes with nothing in them -
+   which the first phone shot of this page showed at a glance, and no assertion had. */
+.h30ins .h30cb #vMonthC, .h30ins .h30cb #vMonthR{ display:grid !important }
+.h30ins .h30cb #vLife{ display:block !important; max-height:200px; overflow:hidden }
+/* MEASURED: unconstrained on a 390px screen the life grid drew 614px, nearly all of it empty - a
+   whole screen of nothing between the trend and the group. It is one cell per week here, so 200px
+   holds a lifetime and the page stays one scroll rather than three. */
+.h30ins .h30cb #vNav{ display:block !important }
+/* A MONTH IS A MONTH, NOT A WALL. `.cal` gives every day `aspect-ratio:1`, so across a 1216px card a
+   single month filled a 1280x720 screen on its own - MEASURED on the first desktop shot of this page.
+   Cory asked for "compact, everything on one page", so the grids get a readable width and the page
+   gets a column rather than the whole window. */
+@media(min-width:1024px){
+  .h30ins{ max-width:940px }
+  .h30ins .h30cb #vMonthC, .h30ins .h30cb #vMonthR{ max-width:430px }
+  .h30ins .h30cb #vLife{ max-height:240px }
+}
+.h30ins .h30cb > *{ max-width:100% }
+.h30ins .h30cb .vins{ border:0; padding:0; margin:0; background:none }
+.h30more{ margin-top:14px }
+.h30more > summary{ cursor:pointer; font:500 9.5px/1 var(--mono); letter-spacing:.14em;
+  text-transform:uppercase; color:var(--ink3); padding:10px 0; list-style:none }
+.h30more > summary::-webkit-details-marker{ display:none }
+.h30more > summary::after{ content:' \203A'; color:var(--ink3) }
+.h30more[open] > summary::after{ content:' \2304' }
+.h30tabs{ }
+
+/* ---- S3.8 · "MORE" ON THE EDIT SHEET -------------------------------------------------------------- */
+#esheet .h30more{ border-top:1px solid var(--rule); margin-top:6px }
+#esheet .h30more > summary{ padding:12px 0 }
+#esheet .h30gone{ display:none }
+
+/* ---- S2.7 · THE NAMES THAT WERE CLEANED, AND THE WAY BACK ---------------------------------------- */
+.h30ren{ display:flex; align-items:center; gap:10px; padding:8px 0; border-top:1px solid var(--rule) }
+.h30ren .n{ flex:1 1 auto; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+  font-size:13px; color:var(--text) }
+.h30ren .t{ flex:0 0 auto; font:400 11px/1 var(--mono); color:var(--ink3) }
+
+/* ---- S5.13 / S7.16 · the two Settings panels and the Group screen --------------------------------- */
+.h30p{ margin-top:14px }
+.h30gh{ font:500 9.5px/1 var(--mono); letter-spacing:.14em; text-transform:uppercase;
+  color:var(--ink3); padding:4px 0 8px }
+#h30Link{ font:400 12px/1.3 var(--mono) }
+.h30ver{ padding-top:14px; color:var(--ink3) }
+
+/* every input on a phone stays at or above 16px: below it, iOS Safari zooms the page on focus and the
+   person has to pinch back out (128 A1). This is a floor, not a size. */
+@media(max-width:1023px){
+  #esheet input, #esheet select, #esheet textarea,
+  .h30p input, .h30p select, #g29 input{ font-size:16px }
+}

@@ -244,7 +244,10 @@ async def sec_s2(pw):
     heads = await pg.evaluate("() => [...document.querySelectorAll('#log > .grp')].map(g=>[g.textContent, g.getAttribute('data-sec')])")
     names = [h[0] for h in heads]
     chk('S2a · the four sections, in one order, and no computed header left',
-        names == [n for n in ['Morning routine', 'Night routine', 'Standards', 'Weekly'] if n in names]
+        # AMENDED BY NAME, HT-30 (paste 137 S1.4): his newer word orders them Morning . Night . Weekly
+        # routine . Standards, and renames the fourth. The assertion - "they render in the declared
+        # order, and only the ones that have rows" - is unchanged.
+        names == [n for n in ['Morning routine', 'Night routine', 'Weekly routine', 'Standards'] if n in names]
         and all(h[1] for h in heads) and not [n for n in names if n in ('TIMED', 'ANYTIME', 'WEEKLY')], heads)
     rule = await pg.evaluate("""() => { const S=window.__HT29S2, out={};
       for(const h of (window.__MOCK_DB.habits||[])) out[h.id]=S.sectionOf(h); return out; }""")
@@ -280,19 +283,37 @@ async def sec_s2(pw):
     await pg.evaluate("() => { window.__UPDATES=[]; const r=document.querySelector('#log .li[data-h=h0] .edp'); r.click(); }")
     await pg.wait_for_timeout(500)
     sheet = await pg.evaluate("""() => { const s=document.getElementById('eSection'), n=document.getElementById('eNotes');
-      const lab=[...document.querySelectorAll('#esheet .fld .lab')].map(x=>x.textContent);
-      return { has:!!s, val:s&&s.value, opts:s?[...s.options].map(o=>o.value):[], labels:lab }; }""")
-    chk('S2f · the sheet has Section (four, the row\'s own selected) and "Done when"',
-        sheet['has'] and sheet['val'] == 'night' and sheet['opts'] == ['morning', 'night', 'standards', 'weekly']
-        and 'Done when' in sheet['labels'] and 'Notes' not in sheet['labels'], sheet)
+      const body=document.getElementById('ebody'), more=document.getElementById('h30More');
+      const lab=x => { const l=x.querySelector('.lab'); return l ? l.textContent.trim() : null; };
+      const surface=[...body.children].filter(x => x!==more && !x.classList.contains('eh')
+                     && !x.classList.contains('etools') && !x.classList.contains('note')).map(lab).filter(Boolean);
+      return { has:!!s, val:s&&s.value, opts:s?[...s.options].map(o=>o.value):[],
+               notesInput: !!n, surface: surface }; }""")
+    # AMENDED BY NAME, HT-30 (paste 137 S3.8), 2026-09-20. Cory took the free text off this sheet:
+    # "the notes/free-text field on the edit page goes (hidden, data kept)". So the same three checks
+    # ask the same three questions and get his new answers - Section is still there and still carries
+    # the row's own value; "Done when" is NOT on the sheet; and because the input is absent, saving
+    # must not write `notes` AT ALL (writing '' or null would have wiped every definition of done -
+    # the defect `saveSheet` now guards against by element presence, as it already did for the cue).
+    chk('S2f · the sheet has Section (four, the row\'s own selected), and no free text (HT-30 S3.8)',
+        sheet['has'] and sheet['val'] == 'night' and sheet['opts'] == ['morning', 'night', 'weekly', 'standards']
+        # the FIELD is what "no free text" means: HT-30 hides the textarea and leaves its row inside
+        # "More" (hidden, never deleted), so the LABEL is still in the DOM and `#eNotes` is not.
+        and not sheet['notesInput']
+        and sheet['surface'] == ['Name', 'Section', 'Planned time', 'Planned minutes'], sheet)
     await pg.select_option('#eSection', 'standards')
-    await pg.fill('#eNotes', 'shoes on and out of the door')
     await pg.click('#eSave')
     await pg.wait_for_timeout(700)
     wrote = await pg.evaluate("() => (window.__UPDATES||[]).map(u=>u[1]).filter(p=>p && p.section!==undefined)")
-    chk('S2g · saving the sheet writes the section and the definition',
-        bool(wrote) and wrote[0]['section'] == 'standards' and wrote[0]['notes'] == 'shoes on and out of the door', wrote[:1])
-    title = await pg.evaluate("() => { const n=document.querySelector('#log .li[data-h=h0] .nm'); return n && n.getAttribute('title'); }")
+    chk('S2g · saving the sheet writes the section, and does NOT touch the definition',
+        bool(wrote) and wrote[0]['section'] == 'standards' and wrote[0].get('notes') is None
+        and 'notes' not in wrote[0], wrote[:1])
+    # the definition still rides the name - set where it lives now (the row), not through a field the
+    # sheet no longer offers
+    title = await pg.evaluate("""async () => { const h=(window.__HT25S3.state().habits||[]).filter(x=>x.id==='h0')[0];
+      if(h) h.notes='shoes on and out of the door';
+      await window.__HT11.reload();
+      const n=document.querySelector('#log .li[data-h=h0] .nm'); return n && n.getAttribute('title'); }""")
     chk('S2h · the definition of done rides the name', (title or '').startswith('Done when: shoes on'), title)
     # the dots: on time, late, beyond - from the check-off's own clock against the planned time
     await pg.evaluate("""() => { const t=window.__HT24.today(), d=window.__MOCK_DB.days.find(r=>r.date===t&&r.user_id==='u-mock');
@@ -437,36 +458,46 @@ async def sec_s5(pw):
     b, pg, errs = await open_page(pw, 390, 844, flags=dict(SQL, __BIGSET=True, __BLOCKS=True, __CIRCLE=True))
     bar = await pg.evaluate("""() => { const b=document.getElementById('h29Bar');
       return { on:!!b && getComputedStyle(b).display!=='none', tabs:[...(b?b.children:[])].map(x=>x.textContent),
+               shown:[...(b?b.children:[])].filter(x=>!x.hasAttribute('hidden')).map(x=>x.textContent),
                old:(()=>{const t=document.getElementById('vTabs'); return t?getComputedStyle(t).display:null;})() }; }""")
-    chk('S5a · the phone has one bottom bar: Today · Views · Insights',
-        bar['on'] and bar['tabs'] == ['Today', 'Views', 'Insights'] and bar['old'] == 'none', bar)
+    # AMENDED BY NAME, HT-30 (paste 137 S6.14), 2026-09-20: Cory asked for ONE tab, so the bar's
+    # middle door is hidden (never deleted - it is still the second child, with `hidden` on it). The
+    # property this line asserts - the phone has ONE bottom bar and the old tabs are not a second door
+    # - is unchanged, and is now stronger: there are two doors on it, not three.
+    chk('S5a · the phone has one bottom bar: Today · Insights',
+        bar['on'] and bar['shown'] == ['Today', 'Insights'] and bar['old'] == 'none', bar)
     await pg.click('#h29Bar [data-t29=insights]')
     await pg.wait_for_timeout(800)
-    ins = await pg.evaluate("""() => { const p=document.getElementById('ins29'), five=document.getElementById('c5Five'),
+    # HT-30 moves these three cards onto the one Insights page; they keep their ids, classes and
+    # `data-i29`, so they are read by what they are rather than by the box they sit in.
+    ins = await pg.evaluate("""() => { const five=document.getElementById('c5Five'),
         more=document.getElementById('c5More');
-      return { cards:[...p.querySelectorAll('.h29c')].map(c=>c.getAttribute('data-i29')),
-               labels:[...p.querySelectorAll('.h29c > .lab')].map(l=>l.textContent),
+      return { cards:[...document.querySelectorAll('.h29c')].map(c=>c.getAttribute('data-i29')),
+               labels:[...document.querySelectorAll('.h29c > .lab')].map(l=>l.textContent),
                fiveUnderMore:!!(five && more && more.contains(five)), moreOpen:more?more.open:null,
                wide:document.documentElement.scrollWidth, vw:innerWidth,
                vis:getComputedStyle(document.getElementById('h26Ins')).display }; }""")
-    chk('S5b · exactly three on the surface', ins['cards'] == ['trend', 'rate', 'group'], ins['cards'])
+    # AMENDED BY NAME, HT-30 (paste 137 S6.14): the same three cards, in the order Cory's one page
+    # puts them - the trend, then the group side by side, then what makes a good day. "Exactly three,
+    # and these three" is what this line asserts, and it still does.
+    chk('S5b · exactly three on the surface', ins['cards'] == ['trend', 'group', 'rate'], ins['cards'])
     chk('S5c · HT-26\'s five are under More, not gone', ins['fiveUnderMore'] and ins['moreOpen'] is False, ins)
     chk('S5d · no horizontal scroll at 390', ins['wide'] <= ins['vw'] + 1, (ins['wide'], ins['vw']))
-    bars7 = await pg.evaluate("() => document.querySelectorAll('#ins29 .ch29 rect').length")
-    await pg.click('#ins29 [data-i29r="30"]')
+    bars7 = await pg.evaluate("() => document.querySelectorAll('.h29c .ch29 rect').length")
+    await pg.click('[data-i29r="30"]')
     await pg.wait_for_timeout(400)
-    bars30 = await pg.evaluate("() => document.querySelectorAll('#ins29 .ch29 rect').length")
+    bars30 = await pg.evaluate("() => document.querySelectorAll('.h29c .ch29 rect').length")
     chk('S5e · 7 days and 30 days are one chart with two ranges', bars7 == 7 and bars30 == 30, (bars7, bars30))
-    lines = await pg.evaluate("() => [...document.querySelectorAll('#ins29 .ch29 polyline')].map(p=>p.getAttribute('class'))")
+    lines = await pg.evaluate("() => [...document.querySelectorAll('.h29c .ch29 polyline')].map(p=>p.getAttribute('class'))")
     chk('S5f · the rating rides the same chart as a line', any('l29r' in c for c in lines), lines)
-    await pg.evaluate("() => { const n=[...document.querySelectorAll('#ins29 [data-i29n]')].filter(b=>!b.disabled)[0]; n && n.click(); }")
+    await pg.evaluate("() => { const n=[...document.querySelectorAll('[data-i29n]')].filter(b=>!b.disabled)[0]; n && n.click(); }")
     await pg.wait_for_timeout(400)
-    rate = await pg.evaluate("""() => { const c=document.querySelector('#ins29 [data-i29="rate"]');
+    rate = await pg.evaluate("""() => { const c=document.querySelector('[data-i29="rate"]');
       return { text:c.innerText, rows:c.querySelectorAll('.c5r').length, why:c.querySelectorAll('.h29why > div').length,
                leak:['SECRET-WHY'].filter(s=>c.innerHTML.indexOf(s)>=0) }; }""")
     chk('S5g · tapping a rating shows what those days had in common, and your own whys',
         rate['rows'] >= 1 and rate['why'] >= 1 and not rate['leak'], {k: rate[k] for k in ('rows', 'why', 'leak')})
-    grp = await pg.evaluate("""() => { const c=document.querySelector('#ins29 [data-i29="group"]');
+    grp = await pg.evaluate("""() => { const c=document.querySelector('[data-i29="group"]');
       return { cols:[...c.querySelectorAll('thead th')].map(t=>t.textContent), rows:c.querySelectorAll('tbody tr').length }; }""")
     chk('S5h · the group side by side is the same renderer',
         grp['cols'] == ['member', 'today', '7 days', '30 days', 'logged'] and grp['rows'] == 4, grp)
@@ -477,7 +508,7 @@ async def sec_s5(pw):
     await pg.evaluate("() => { const s=document.getElementById('tStrip'); s && s.click(); }")
     await pg.wait_for_timeout(700)
     ov = await pg.evaluate("""() => { const o=document.querySelector('.ov.on');
-      return { open:!!o, three:o?o.querySelectorAll('#ins29 .h29c').length:0,
+      return { open:!!o, three:document.querySelectorAll('.h29c').length,
                detailBtn:!!o && !!o.querySelector('#i29Detail') }; }""")
     chk('S5i · the desktop keeps one Insights button and shows the same three', ov['open'] and ov['three'] == 3, ov)
     await pg.evaluate("() => { const d=document.getElementById('c5More'); if(d) d.open=true; }")
@@ -523,10 +554,18 @@ async def sec_s6(pw):
       const S=window.ST && null; const st=window.__HT25S3.state();
       return { k:k, habits:st.habits, day:st.byDate[k]||null, priv:st.privAll[k]||null,
                block:window.__HT29MD.dayBlock(k, st.habits, st.byDate[k]||null, st.privAll[k]||null) }; }""")
-    # the CONTAINER's copy is the one that runs, so it is the one this parity is measured against; the wire's
-    # staging copy is the fallback for the window before the container merge landed (and for a bare clone,
-    # where neither exists and the child simply fails to import - a FAIL that names the path, not a crash)
-    core = os.path.join(ESTATE, 'tools', 'copiers')
+    # AMENDED BY NAME, HT-30 (paste 137), 2026-09-20 - the precedence is turned round, and here is why.
+    # This check proves the app and the vault copier write the SAME BYTES. HT-30 renames a heading Cory
+    # named ("Brain dump" -> "Journal") and reorders the four sections, in all three languages that
+    # write that block - but the copier lives in the CONTAINER, which paste 137's OWNS block puts
+    # outside this wire. So the edited copier is staged at `ht_stage/137/container/` for the BEV lane
+    # to file, and this check reads THAT copy while it exists: before the container merge it proves the
+    # app matches the copier it is about to have, and after the merge (the staging folder is deleted) it
+    # proves the app matches the copier it has. Neither present -> the child fails to import and this
+    # FAILs by name, which is the behaviour the old comment describes and this keeps.
+    staged = os.path.join(RECONCILE, 'ht_stage', '137', 'container', 'tools', 'copiers')
+    core = staged if os.path.isfile(os.path.join(staged, '_ht.py')) \
+        else os.path.join(ESTATE, 'tools', 'copiers')
     py = core if os.path.isfile(os.path.join(core, '_ht.py')) \
         else os.path.join(RECONCILE, 'ht_stage', '133', 'container', 'tools', 'copiers')
     code = ("import sys,json,datetime\n"
@@ -593,7 +632,10 @@ async def sec_s6(pw):
 async def sec_s8(pw):
     print("\n--- S8 · the update banner and the worker ---")
     sw = src(os.path.join(REPO, 'sw.js'))
-    chk('S8a · the service worker is a new version and answers a push', "const C='ht-v36'" in sw
+    # AMENDED BY NAME, HT-30 (paste 137 S9.20): ht-v36 -> the version this build ships. Pinning one
+    # number made the line fail on the next release rather than on a real defect; the shape is what it
+    # is for - a cache name of the right form, and the two push handlers.
+    chk('S8a · the service worker is a new version and answers a push', re.search(r"const C='ht-v\d+'", sw)
         and "addEventListener('push'" in sw and "addEventListener('notificationclick'" in sw, sw[:40])
     b, pg, errs = await open_page(pw, 390, 844, flags={'__BIGSET': True})
     await pg.evaluate("() => { window.__RELOADED=0; window.__HT29UPD.reload=function(){ window.__RELOADED=1; }; window.__HT29UPD.show(); }")

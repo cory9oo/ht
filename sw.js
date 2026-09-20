@@ -1,4 +1,4 @@
-const C='ht-v36';
+const C='ht-v37';
 self.addEventListener('install',e=>{self.skipWaiting()});
 self.addEventListener('activate',e=>{e.waitUntil(caches.keys().then(k=>Promise.all(k.filter(x=>x!==C).map(x=>caches.delete(x)))).then(()=>self.clients.claim()))});
 self.addEventListener('fetch',e=>{
@@ -28,4 +28,10 @@ self.addEventListener('notificationclick',e=>{
     for(const w of ws){ if('focus' in w) return w.focus(); }
     return self.clients.openWindow(url);
   }));
+});
+/* HT-30 S0.3 (PASTE 137): the page asks the WAITING worker what it is, so the banner can name the
+   build it is offering instead of asking for blind faith. One message, no state, no fetch. */
+self.addEventListener('message', e => {
+  const p = e.ports && e.ports[0];
+  if(e.data && e.data.type === 'version' && p) p.postMessage({ version: C });
 });

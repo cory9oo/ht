@@ -291,7 +291,9 @@ async def s3(pw):
         # ---- AMENDED BY HT-29 S2 (CC HT 2026-09-15) · R67.2 · paste 133 Ruling 3 ----------------------
         # Four sections, placed by the person, in one fixed order. Lateness is still only a label (S3g
         # above), which is what this section is really about; the header names are the part that moved.
-        SECS29 = ['Morning routine', 'Night routine', 'Standards', 'Weekly']
+        # AMENDED BY NAME, HT-30 (paste 137 S1.4), 2026-09-20: the last two swap and the fourth
+        # is renamed. S3h and S3i assert the same two properties about the same four names.
+        SECS29 = ['Morning routine', 'Night routine', 'Weekly routine', 'Standards']
         chk('S3h · the headers read the four sections and nothing else',
             heads and all(h in SECS29 for h in heads), heads)
         chk('S3i · and they appear in that order',

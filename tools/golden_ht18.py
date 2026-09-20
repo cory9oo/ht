@@ -341,8 +341,12 @@ async def run_s3(pw):
         # AMENDED for HT-18b: the root font went 14 -> 13 (Cory's note 1, "zoom the entire screen
         # out"), so the row went 36 -> 34 with it. Relative to the type it GREW: 36/14 = 2.57em
         # against 34/13 = 2.62em. The floor follows the root, it does not shrink against it.
-        chk("S3d · %s · every .li min-height >= 34 and every name wraps (white-space normal, clip)"
-            % t, m['minRow'] >= 34 and not m['nmWrap'], [m['minRow'], m['nmWrap'][:3]])
+        # AMENDED BY NAME, HT-30 (paste 137 S3.9), 2026-09-20: 34 -> 30 on the desktop. Cory asked for
+        # rows about a quarter thinner on both widths (41 px -> 31 measured). The second half of this
+        # line - every name wraps rather than being clipped - is what the check is really for, and it
+        # is untouched; 30 still holds HT-18's 28x28 control with a pixel to spare.
+        chk("S3d · %s · every .li min-height >= 30 and every name wraps (white-space normal, clip)"
+            % t, m['minRow'] >= 30 and not m['nmWrap'], [m['minRow'], m['nmWrap'][:3]])
         # e · the load line is pinned: scroll the list to its bottom and look again
         await pg.evaluate("()=>{const l=document.getElementById('log'); l.scrollTop=l.scrollHeight;}")
         await pg.wait_for_timeout(250)
@@ -370,11 +374,15 @@ async def run_s3(pw):
             and m['edp'] and m['edp']['w'] == 28 and m['edp']['h'] == 28, [m['bxw'], m['edp']])
         chk("S3  · %s · zero page errors" % t, not errs, errs)
         await b.close()
-    # the phone keeps its 44x44 tap target by construction: every S3 rule is desktop-only
+    # AMENDED BY NAME, HT-30 (paste 137 S3.9), 2026-09-20: 44 -> 36 on the phone. Cory asked for rows
+    # about a quarter thinner on both widths, and a row cannot be a quarter shorter than the control
+    # inside it. 44 was HT-16's comfort floor (R70.98), not a standard; 36 clears WCAG 2.5.8's 24x24
+    # minimum by half again. The assertion is the same assertion - the phone's target is a SQUARE of a
+    # named size, asserted on both controls - and only the number moved.
     b3, pg3, e3 = await open_page(pw, 390, 844, {'__BIGSET': True})
     m3 = await pg3.evaluate(S3)
-    chk("S3g · 390x844 · the phone keeps 44x44 (the whole S3 block is @media min-width:1024)",
-        m3['bxw'] and m3['bxw']['w'] == 44 and m3['edp'] and m3['edp']['w'] == 44,
+    chk("S3g · 390x844 · the phone's tap target is 36x36 (HT-30 S3.9; it was 44x44 through HT-29)",
+        m3['bxw'] and m3['bxw']['w'] == 36 and m3['edp'] and m3['edp']['w'] == 36,
         [m3['bxw'], m3['edp']])
     chk("S3  · 390x844 · zero page errors", not e3, e3)
     await b3.close()

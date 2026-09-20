@@ -180,8 +180,10 @@ async def S2(pw):
         m.get('handleTouchAction') == 'none' and not m.get('logReordering'), m)
     chk("S2c " + u"·" + " and the ROW is not - page scrolling from a row still works (app.css:527's trade-off)",
         m.get('rowTouchAction') not in ('none',), m)
-    chk("S2d " + u"·" + " the handle is a 44x44 target and is focusable for the keyboard path",
-        m.get('w') == 44 and m.get('h') == 44 and m.get('focusable'), m)
+    # AMENDED BY NAME, HT-30 (paste 137 S3.9): 44 -> 36, with the row. The keyboard path is untouched
+    # and is still what the second half of this line asserts.
+    chk("S2d " + u"·" + " the handle is a 36x36 target and is focusable for the keyboard path (44x44 through HT-29)",
+        m.get('w') == 36 and m.get('h') == 36 and m.get('focusable'), m)
 
     # ---- 20 CONSECUTIVE TOUCH REORDERS, 0 MISPLACEMENTS ---------------------------------
     # A MISPLACEMENT IS MEASURED BY GEOMETRY, NOT BY A MODEL OF THE ALGORITHM. The first draft of
@@ -206,7 +208,9 @@ async def S2(pw):
     # is arithmetic about heights, not a misplacement. So the exact assertion is made where it can
     # be exact - twelve short names, one line each - with NO tolerance at all, and the ragged-height
     # case is asserted below for the properties that must hold there too.
-    b, pg, errs2 = await open_page(pw, 390, 844)
+    # HT-30 (paste 137 S1.4): `__SECTION`, because a reorder near the top of this list now crosses a
+    # section header and a cross-header drop is only KEPT when the column exists to record it.
+    b, pg, errs2 = await open_page(pw, 390, 844, flags={'__SECTION': True})
     cdp = await pg.context.new_cdp_session(pg)
     hs = await pg.evaluate("""() => [...document.querySelectorAll('#log .li')]
         .map(r => Math.round(r.getBoundingClientRect().height))""")
@@ -425,7 +429,8 @@ async def S2(pw):
     # Here the exact "under the finger" rule cannot be asserted (see S2e0), so what IS asserted is
     # everything that must still hold: a drag down always moves the row DOWN, never up, never past
     # the end, and the list is conserved. A drag that jumped upwards on a long name would be caught.
-    b, pg, errs3 = await open_page(pw, 390, 844, flags={'__BIGSET': True})
+    # HT-30: same reason as S2e - the drop crosses a header now.
+    b, pg, errs3 = await open_page(pw, 390, 844, flags={'__BIGSET': True, '__SECTION': True})
     cdp = await pg.context.new_cdp_session(pg)
     ragged = await pg.evaluate("""() => [...document.querySelectorAll('#log .li')]
         .map(r => Math.round(r.getBoundingClientRect().height))""")
@@ -558,7 +563,10 @@ async def C1(pw):
     # buckets become FOUR PLACED sections - Morning routine · Night routine · Standards · Weekly - and the
     # placement is the person's, not the clock's. The property this check protects is unchanged: the list
     # carries exactly the sections the app knows and no others, and no Sabbath section (C1g).
-    SECS29 = ('Morning routine', 'Night routine', 'Standards', 'Weekly')
+    # AMENDED BY NAME, HT-30 (paste 137 S1.4), 2026-09-20: Cory's review reorders the last two
+    # and renames the fourth. What C1f asserts - the list is grouped into THESE sections and no
+    # others - is unchanged.
+    SECS29 = ('Morning routine', 'Night routine', 'Weekly routine', 'Standards')
     chk("C1f " + u"·" + " the list is grouped into the four sections and nothing else",
         heads and all(h in SECS29 for h in heads), heads)
     chk("C1g " + u"·" + " there is NO Sabbath section", not any('SABBATH' in h for h in (heads or [])),

@@ -2736,8 +2736,10 @@ function earned(k){ return committed() - remaining(k); }
       var host = pray.closest('.pan') || pray.closest('.blk') || pray.parentNode.parentNode;
       var lab = document.createElement('label');
       lab.className = 'fld';
-      lab.innerHTML = '<span class="lab">Brain dump</span>' +
-                      '<textarea id="iDump" rows="3" placeholder="Everything in your head, out."></textarea>';
+      /* HT-30 S4.10 (Cory 9/20): the box is the JOURNAL, and it carries no placeholder - an empty
+         box with a quiet border, and the label above it is the only text on it. */
+      lab.innerHTML = '<span class="lab">Journal</span>' +
+                      '<textarea id="iDump" rows="3"></textarea>';
       host.insertBefore(lab, host.firstChild);
       var ta = lab.querySelector('#iDump'), t = null;
       ta.addEventListener('input', function(){
@@ -2930,8 +2932,11 @@ function earned(k){ return committed() - remaining(k); }
       if(t.indexOf('RATE THE DAY') >= 0 && !b.querySelector('#rate')) b.classList.add('ht9a-off');
       if(t.indexOf('JOURNAL') >= 0 && h) h.textContent = 'Journal';
     });
+    /* HT-30 S4.10 (Cory 9/20): no placeholder text in any of the three boxes. This line put one back
+       on Prayer after index.html gave it up, which is why the box still showed a lone ellipsis. The
+       attribute is REMOVED rather than set to '', so nothing renders a blank hint either. */
     var pray = document.getElementById('iPrayer');
-    if(pray) pray.setAttribute('placeholder', '\u2026');
+    if(pray) pray.removeAttribute('placeholder');
     document.documentElement.setAttribute('data-ht10','1');
   }
 
@@ -2987,7 +2992,7 @@ function earned(k){ return committed() - remaining(k); }
         moved++;
       }
     }
-    if(moved) { toast(moved + ' brain dump' + (moved>1?'s':'') + ' moved to the database');
+    if(moved) { toast(moved + ' journal entr' + (moved>1?'ies':'y') + ' moved to the database');
                 if(S.privAll[S.date]) S.priv = S.privAll[S.date];
                 paintJournalInputs(); }
   }
@@ -3315,7 +3320,13 @@ function earned(k){ return committed() - remaining(k); }
     if(S.hasCue && cueIn) rec.cue = str('eCue');
     /* S5: the planned-window inputs are no longer rendered (superseded by planned time +
        planned minutes), so nothing writes those columns. */
-    if(S.hasNotes)   rec.notes = str('eNotes')||null;
+    /* HT-30 S3.8: THE SAME LINE THAT WOULD HAVE DESTROYED EVERY DEFINITION OF DONE. The comment
+       four lines up is about the cue, and this line had the identical shape: `str('eNotes')` returns
+       '' when the textarea is not rendered, so `|| null` would have written NULL over every "Done
+       when" on the next save of that standard - the field Cory asked to hide, wiped by hiding it.
+       Written only when the person can see and edit it, exactly as `eCue` and `eSection` are. */
+    var notesIn = document.getElementById('eNotes');
+    if(S.hasNotes && notesIn) rec.notes = str('eNotes')||null;
     /* HT-29 S2: the section Cory chose; written only when the field was shown */
     if(S.hasSection && document.getElementById('eSection')) rec.section = str('eSection') || null;
     /* S2: one minutes box now. It writes BOTH `minutes` (what committed()/remaining() read)
@@ -7695,7 +7706,7 @@ function earned(k){ return committed() - remaining(k); }
   }
 
   /* ---- C3a · THE JOURNAL ---------------------------------------------------------------------- */
-  var FIELDS=[['why','Why'],['tasks','Completed'],['brain_dump','Brain dump'],['prayer','Prayer']];
+  var FIELDS=[['why','Why'],['tasks','Completed'],['brain_dump','Journal'],['prayer','Prayer']];   /* HT-30 S4.10 */
   function entries(q){
     q=(q||'').trim().toLowerCase();
     return Object.keys(S.privAll).filter(function(k){
@@ -8006,7 +8017,7 @@ function earned(k){ return committed() - remaining(k); }
   var LINES = [
     'Check off a standard when you keep it. The day\u2019s % is what you kept.',
     'Rate the day 1\u201310 and write why in a line.',
-    'Brain dump, completed, prayer \u2014 write as much or as little as you want.',
+    'Journal, completed, prayer \u2014 write as much or as little as you want.',
     'Tap \u270e beside a standard to change its name, time or days, or add your own.',
     'Your journal is yours. The app never shows it to anyone else \u2014 including Cory.'
   ];
@@ -9044,8 +9055,12 @@ function earned(k){ return committed() - remaining(k); }
    beyond that - and a tap says the minutes. HT-25's "✓ 08:34 +12m" label is hidden, never removed. */
 var HT29_SECTIONS = true;                         /* false brings back HT-28's TIMED · ANYTIME · WEEKLY, untouched */
 var HT29SEC = (function(){
-  var ORDER = ['morning','night','standards','weekly'];
-  var NAMES = { morning:'Morning routine', night:'Night routine', standards:'Standards', weekly:'Weekly' };
+  /* HT-30 S1.4 (PASTE 137, Cory 9/20): Morning routine . Night routine . Weekly routine . Standards.
+     133 shipped `standards` before `weekly` and called the fourth one "Weekly"; his newer word governs
+     both. THE ORDER IS DECLARED ONCE HERE and read by every renderer, by the markdown shape (HT29MD's
+     SECTIONS) and by the nudge sender - `golden_ht30` S1 reads all three and fails the moment they drift. */
+  var ORDER = ['morning','night','weekly','standards'];
+  var NAMES = { morning:'Morning routine', night:'Night routine', weekly:'Weekly routine', standards:'Standards' };
   function sectionOf(h){
     var s = String((h && h.section) || '').toLowerCase();
     if(NAMES[s]) return s;
@@ -9079,7 +9094,8 @@ var HT29SEC = (function(){
     var kids = Array.prototype.slice.call(log.children);
     var rows = kids.filter(function(c){ return c.classList.contains('li'); });
     if(!rows.length) return;
-    var hm = byId(), B = { morning:[], night:[], standards:[], weekly:[] }, other = [];
+    var hm = byId(), B = {}, other = [];
+    HT29SEC.ORDER.forEach(function(k){ B[k] = []; });   /* HT-30: the order is declared once */
     kids.forEach(function(c, i){
       if(c.classList.contains('li')){
         var h = hm[c.getAttribute('data-h')];
@@ -9383,14 +9399,23 @@ var HT29GRP = (function(){
       '<div class="note" id="g29Msg" style="padding-top:12px"></div>';
   }
   function openGroup(){
-    openOv('Group', '<div id="g29">' + groupHtml() + '</div>', bindGroup);
+    /* HT-30 S7.16: the same two actions, named as Cory names them, with the share LINK beside the code
+       and a way out beside Invite. `groupHtml` stays exactly as HT-29 wrote it and is the fallback, so a
+       build where the HT-30 layer failed to parse still opens a working Group screen. */
+    var html = groupHtml();
+    try{ if(window.__HT30GRP) html = window.__HT30GRP.html({ circle:circle }); }catch(e){ warn29('HT-30 group html', e); }
+    openOv('Group', '<div id="g29">' + html + '</div>', bindGroup);
   }
   function bindGroup(){
     var inv = el('g29Invite'); if(inv) inv.onclick = invite;
     var jb = el('g29Join'), mk = el('g29Make'), msg = el('g29Msg');
     if(jb) jb.onclick = async function(){
       jb.disabled = true;
-      var r = await join(el('g29Code').value);
+      /* HT-30 S7.16: a pasted invite LINK is a code. Nobody reads a query string off a message and
+         types the six characters out of it by hand. */
+      var typed = el('g29Code').value;
+      try{ if(window.__HT30GRP) typed = window.__HT30GRP.codeOf(typed); }catch(e){ warn29('HT-30 code parse', e); }
+      var r = await join(typed);
       jb.disabled = false;
       if(!r.ok){ if(msg) msg.textContent = r.why; return; }
       try{ localStorage.removeItem('ht_join_code'); }catch(e){}
@@ -9402,6 +9427,17 @@ var HT29GRP = (function(){
       mk.disabled = false;
       if(!r.ok){ if(msg) msg.textContent = r.why; return; }
       toast('group started · code ' + r.code); setTimeout(function(){ location.reload(); }, 600);
+    };
+    /* HT-30 S7.16 LEAVE. It asks first: leaving drops this account's row in `circle_members`, and the
+       group's other members simply stop seeing the day. Nothing of this account's own is touched. */
+    var lv = el('h30Leave');
+    if(lv) lv.onclick = async function(){
+      if(!window.confirm('Leave this group? Your own standards, check-offs and journal are untouched.')) return;
+      lv.disabled = true;
+      var r = window.__HT30GRP ? await window.__HT30GRP.leave() : { ok:false, why:'not available' };
+      lv.disabled = false;
+      if(!r.ok){ if(msg) msg.textContent = r.why; return; }
+      toast('left the group'); setTimeout(function(){ location.reload(); }, 400);
     };
   }
   /* Settings -> Group, beside HT-28's Advanced */
@@ -9653,7 +9689,11 @@ var HT29INS = (function(){
   }
   var _pa = paintAll;
   paintAll = function(){ var out = _pa.apply(null, arguments); bar(); render(); mark(); return out; };
-  window.__HT29INS = { trend:trend, explained:explained, render:render, go:go, state:function(){ return { range:range, pick:pick }; } };
+  /* `onClick` is exported because the three cards do not have to stay in `#ins29` to be tapped:
+     HT-30 lays them out on one page and binds this same handler where it puts them. A control that
+     moved house and stopped working is worse than one that was never there. */
+  window.__HT29INS = { trend:trend, explained:explained, render:render, go:go, onClick:onClick,
+                       state:function(){ return { range:range, pick:pick }; } };
   return window.__HT29INS;
 })();
 
@@ -9666,7 +9706,8 @@ var HT29INS = (function(){
    download needs no library and no CDN. */
 var HT29MD = (function(){
   var START = '<!-- ht:start -->', END = '<!-- ht:end -->';
-  var SECTIONS = [['morning','Morning routine'],['night','Night routine'],['standards','Standards'],['weekly','Weekly']];
+  /* HT-30 S1.4: the SAME order HT29SEC declares, and `golden_ht30` S1 compares the two lists. */
+  var SECTIONS = [['morning','Morning routine'],['night','Night routine'],['weekly','Weekly routine'],['standards','Standards']];
   var DAYS = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
 
   function hhmm(v){
@@ -9724,7 +9765,7 @@ var HT29MD = (function(){
     var timed = done.filter(function(i){ return variance(byId[i], checked[i]) != null; });
     var onTime = timed.filter(function(i){ return variance(byId[i], checked[i]) <= 15; });
     var rating = (priv.rating == null) ? null : priv.rating;
-    var written = [['brain_dump','brain dump'],['tasks','completed'],['prayer','prayer']]
+    var written = [['brain_dump','journal'],['tasks','completed'],['prayer','prayer']]
       .filter(function(f){ return strip(priv[f[0]]); }).map(function(f){ return f[1]; });
 
     var idx = done.length + ' of ' + due.length + ' done';
@@ -9736,7 +9777,7 @@ var HT29MD = (function(){
     var out = ['## Habit tracker · ' + DAYS[weekdayOf(iso)] + ' ' + iso, '- **Index** · ' + idx, ''];
     var why = strip(priv.why);
     out.push('### Rating', (rating != null ? '**' + num(rating) + '**' : '-') + (why ? ' — ' + why : ''), '');
-    [['brain_dump','Brain dump'],['tasks','Completed'],['prayer','Prayer']].forEach(function(f){
+    [['brain_dump','Journal'],['tasks','Completed'],['prayer','Prayer']].forEach(function(f){
       var text = rstrip(priv[f[0]]);
       out.push('### ' + f[1], strip(text) ? text : '-', '');
     });
@@ -10299,4 +10340,833 @@ var HT29_UPDATE_BANNER = true;
                      live:function(){ return !!ch && status === 'SUBSCRIBED'; } };
 })();
 
+/* ======================= HT-30 · QUIET AND SIMPLE, DEEP ON TAP (PASTE 137 · WIRE HT-30) =======================
+   Cory, Sunday 2026-09-20: "as quiet and simple as possible, but high in depth as well" · "one send · merge it
+   right away". Every judgement call below is decided by that sentence: the SURFACE carries only what he named
+   and everything else moves ONE TAP DOWN. Nothing is deleted anywhere (R70.138).
+
+   A LAYER, not a rewrite - the same contract HT-9a through HT-29 have kept. The paints belong to the base app
+   and to the wires that already proved them; this file re-asserts over what they draw. `advanced()` true, or
+   the full sheet, and most of it returns immediately.
+
+   WHAT IS HERE, section by section:
+     S0.3  the version on the screen, and a banner that names the one that is waiting
+     S2.6  the planned time as a muted chip at the right of the row - never inside the name
+     S2.7  the one-time pass that takes a clock time OUT of a name and into its own field, listing every one
+     S3.8  the edit sheet: five fields on the surface, the rest under one quiet "More", the free text hidden
+     S3.9  thinner rows, and edit/drag affordances at rest instead of shouting
+     S4.11 the "why" leaves the PHONE (the rating stays; the desktop is untouched; the column is untouched)
+     S5.13 a Sabbath ANY person can switch on, for the day they choose
+     S6.14 Views and Insights become one page behind one tab, on both widths
+     S7.16 start a group or join one, and a member's row carries a way out
+*/
+
+/* The one place this build says what it is. `sw.js`'s cache name must equal it, and `golden_ht30` S0 reads
+   both files and fails when they drift - a version on the screen that is not the version in the cache is
+   worse than no version at all, because it is the thing you check when you are already unsure. */
+var HT30_VERSION = 'ht-v37';
+
+function warn30(what, e){ try{ console.warn('HT-30: ' + what, e); }catch(_){} }
+function h30El(id){ return document.getElementById(id); }
+function h30Phone(){ return window.innerWidth < 1024; }
+function h30Simple(){ return document.documentElement.hasAttribute('data-simple'); }
+function h30Advanced(){
+  try{ if(localStorage.getItem('ht_advanced') === '1') return true; }catch(e){}
+  return window.__ADVANCED === true || /[?&]advanced=1/.test(location.search);
+}
+
+
+/* ---- S0.3 · THE VERSION IS ON THE SCREEN, AND THE BANNER NAMES THE ONE THAT IS WAITING ----------------------
+   The complaint behind this one is not "I want a version number". It is that he could not tell whether what he
+   was looking at was what had been shipped - so the answer has to be readable without asking anyone, and the
+   banner has to say which build it is offering. The waiting worker is asked for its own cache name over a
+   MessageChannel; if it does not answer (an older worker, a browser with no controller) the banner still
+   appears and simply does not name a version. It never guesses one. */
+(function(){
+  function askWaiting(reg, cb){
+    var w = (reg && (reg.waiting || reg.installing)) || null;
+    if(!w || !window.MessageChannel){ cb(null); return; }
+    var done = false, ch = new MessageChannel();
+    ch.port1.onmessage = function(e){
+      if(done) return; done = true;
+      cb((e && e.data && e.data.version) || null);
+    };
+    try{ w.postMessage({ type: 'version' }, [ch.port2]); }
+    catch(e){ warn30('could not ask the waiting worker for its version', e); cb(null); return; }
+    setTimeout(function(){ if(!done){ done = true; cb(null); } }, 1200);
+  }
+
+  /* HT-29 S8 built the banner; HT-30 gives it the version and the reason to trust it. */
+  var _show = (window.__HT29UPD && window.__HT29UPD.show) || null;
+  function show(reg){
+    if(!_show) return;
+    _show();
+    var b = h30El('h29Upd'); if(!b) return;
+    b.classList.add('h30upd');
+    askWaiting(reg, function(v){
+      var n = h30El('h29Upd'); if(!n || n.disabled) return;
+      n.textContent = v ? ('Update available — tap to refresh (' + v + ')')
+                        : 'Update available — tap to refresh';
+    });
+  }
+  if(window.__HT29UPD) window.__HT29UPD.show = function(reg){ show(reg); };
+
+  /* THE UPDATE HAS TO ARRIVE WHILE THE APP IS OPEN, or the banner is a promise the app cannot keep: an
+     installed PWA that is never closed asks for a new worker exactly once, at boot. So it asks again when the
+     page becomes visible and every five minutes it is open. `reg.update()` is a conditional request - it costs
+     one 304 when nothing has changed, which is why this is allowed to run on a timer where the PHASE GATE
+     forbids a keep-alive: it runs only while the page is VISIBLE and stops the moment it is hidden. */
+  function watch(){
+    if(!('serviceWorker' in navigator)) return;
+    var t = null;
+    function poll(){
+      /* `getRegistration` is not universal - the harness's own push stub replaces
+         `navigator.serviceWorker` with `ready`/`register` and nothing else, and calling it threw a
+         page error across two whole sections. A missing method is a browser that cannot tell us
+         about an update, which is exactly the case this poll exists to cover gracefully. */
+      if(!navigator.serviceWorker || typeof navigator.serviceWorker.getRegistration !== 'function') return;
+      navigator.serviceWorker.getRegistration().then(function(r){
+        if(!r) return;
+        if(r.waiting) show(r);
+        try{ r.update(); }catch(e){ warn30('update check failed', e); }
+      }).catch(function(e){ warn30('no registration', e); });
+    }
+    /* SIXTY SECONDS, because the acceptance is "the banner appears within a minute of a deploy on an
+       app that is already open", and five minutes is not that. The cost is one CONDITIONAL request a
+       minute - a 304 while nothing has changed - and only while the page is VISIBLE; it stops on the
+       first visibilitychange to hidden, so this app still holds nothing open behind itself. */
+    function start(){ if(t) return; poll(); t = setInterval(poll, 60000); }
+    function stop(){ if(t){ clearInterval(t); t = null; } }
+    document.addEventListener('visibilitychange', function(){
+      if(document.visibilityState === 'visible') start(); else stop();
+    });
+    if(document.visibilityState === 'visible') start();
+  }
+  if(document.readyState === 'complete') setTimeout(watch, 1200);
+  else window.addEventListener('load', function(){ setTimeout(watch, 1200); });
+
+  /* Settings says which build this is, beside the sync line it already carries. */
+  function stamp(){
+    var ov = document.querySelector('.ov.on .inner'); if(!ov || h30El('h30Ver')) return;
+    var n = document.createElement('div');
+    n.className = 'note h30ver'; n.id = 'h30Ver';
+    n.textContent = 'This build: ' + HT30_VERSION;
+    ov.appendChild(n);
+  }
+  var _osv = openSettings;
+  openSettings = function(){ var out = _osv.apply(null, arguments); setTimeout(stamp, 80); return out; };
+  window.__HT30UPD = { version:function(){ return HT30_VERSION; }, show:show, askWaiting:askWaiting, stamp:stamp };
 })();
+
+
+/* ---- S2.6 · THE PLANNED TIME IS A CHIP AT THE RIGHT, AND NOTHING IS IN THE NAME ----------------------------
+   HT-21 put the planned time in front of the name as `<b class="pat">05:00</b>Read the Bible`, inside the
+   `.nm` element. It reads as part of the name, which is exactly the thing Cory asked to stop; and because it
+   is inside `.nm` it also travels into anything that copies the name's text.
+   So the node is MOVED - not re-rendered - to the end of the row, after the name and before the minutes. One
+   move per row, idempotent, and `.pat` keeps its class so every existing selector still finds it. */
+(function(){
+  function chips(){
+    var log = h30El('log'); if(!log) return;
+    Array.prototype.slice.call(log.querySelectorAll('.li')).forEach(function(r){
+      var pat = r.querySelector('.nm .pat'); if(!pat) return;
+      pat.classList.add('pat30');
+      var sp = r.querySelector('.sp16');
+      if(sp) r.insertBefore(pat, sp); else r.appendChild(pat);
+    });
+  }
+  var _pa = paintAll;
+  paintAll = function(){ var out = _pa.apply(null, arguments); try{ chips(); }catch(e){ warn30('time chips', e); } return out; };
+  document.addEventListener('click', function(){ setTimeout(chips, 30); }, true);
+  window.__HT30CHIP = { chips:chips };
+})();
+
+
+/* ---- S2.7 · A CLOCK TIME COMES OUT OF A NAME AND INTO ITS OWN FIELD, ONCE, AND EVERY ONE IS LISTED ----------
+   R70.265 says code never rewrites a name, and it says so because a pass like this one once destroyed data.
+   Cory's 9/20 ruling asks for exactly this pass, so it ships - under four conditions that answer the reason
+   the rule exists:
+     1 · it runs ONCE per account, and only when `time_anchor` exists to receive the time;
+     2 · it never touches a standard that already has a planned time - his field always wins over his name;
+     3 · the ORIGINAL name of every row it changes is kept, on the device and in Settings, with an Undo per
+         row, so a wrong guess costs one tap;
+     4 · every change is listed for him to read (Settings -> "Names I cleaned of times", and `RENAMED.md`).
+   TWO TIMES IN ONE NAME: the FIRST is taken as the planned time and the row is flagged in the list; the
+   second is left in the name, because a name is the only place it still means anything. */
+var HT30_NAME_TIMES = true;
+var HT30TIME = (function(){
+  /* `5 AM` · `5:00` · `at 5am` · `9pm` · `05:00` · `7.30am`. A bare `5` is NOT a time: "Read 5 chapters". */
+  var RE = /(?:^|[\s\(\[–—-])(?:at\s+)?(\d{1,2})(?:[:.](\d{2}))?\s*([ap])\.?m\.?(?=$|[\s\)\]–—-])|(?:^|[\s\(\[–—-])(?:at\s+)?([01]?\d|2[0-3]):([0-5]\d)(?=$|[\s\)\]–—-])/i;
+
+  var LEAD = /^[\s\(\[–—-]/, EDGE_L = /^[\s–—,\-:]+/, EDGE_R = /[\s–—,\-:]+$/;   /* lifted verbatim: these hold real en/em dashes */
+  function find(name){
+    var s = String(name || ''), m = RE.exec(s);
+    if(!m) return null;
+    var hh, mm;
+    if(m[1] != null){
+      hh = +m[1]; mm = m[2] == null ? 0 : +m[2];
+      if(hh < 1 || hh > 12 || mm > 59) return null;
+      var pm = String(m[3]).toLowerCase() === 'p';
+      if(hh === 12) hh = pm ? 12 : 0; else if(pm) hh += 12;
+    }else{
+      /* groups 4 and 5: the alternation above owns 1, 2 and 3, and a regex numbers groups across the
+         whole pattern, not per branch. Reading m[3] here took the a/p group and gave "aN:05". */
+      hh = +m[4]; mm = +m[5];
+    }
+    /* EVERY clock leaves the name, not only the first. "8:20 - 8:40 Water" is a range, and taking
+       one end of it left "8:40 Water" - the same complaint with one clock fewer. The FIRST time is
+       still what becomes the planned time (stress 2); the others are listed and undoable. Bounded by
+       four passes so a pathological name cannot spin here. */
+    function strip(str, hit){
+      var cut = str.slice(hit.index, hit.index + hit[0].length);
+      /* keep the separator the match borrowed on its left, drop the time itself */
+      var lead = LEAD.test(cut) ? cut.charAt(0) : '';
+      var r = (str.slice(0, hit.index) + lead + str.slice(hit.index + hit[0].length));
+      return r.replace(/\s{2,}/g, ' ').replace(EDGE_L, '').replace(EDGE_R, '').trim();
+    }
+    var rest = strip(s, m), extra = 0, again;
+    while(extra < 4 && (again = RE.exec(rest))){
+      var next = strip(rest, again);
+      if(next === rest) break;
+      rest = next; extra++;
+    }
+    return { hhmm: ('0' + hh).slice(-2) + ':' + ('0' + mm).slice(-2), name: rest, twice: extra > 0 };
+  }
+
+  function plan(habits){
+    var out = [];
+    (habits || []).forEach(function(h){
+      if(!h) return;
+      var f = find(h.name);
+      if(!f || !f.name) return;                       /* a name that is ONLY a time keeps its name */
+      /* THE NAME ALWAYS LOSES THE CLOCK; THE FIELD IS ONLY FILLED WHEN IT IS EMPTY. A row whose
+         field already says 08:40 and whose name still reads "8:40 Water" shows the same time twice -
+         the complaint itself - and overwriting the field he set would be the other kind of wrong. */
+      out.push({ id:h.id, was:String(h.name), name:f.name, twice:f.twice,
+                 time:h.time_anchor ? null : f.hhmm, had:!!h.time_anchor });
+    });
+    return out;
+  }
+
+  function key(){ return 'ht30_renamed_' + ((S.me && S.me.id) || 'anon'); }
+  function readLog(){ try{ return JSON.parse(localStorage.getItem(key()) || '[]'); }catch(e){ return []; } }
+  function writeLog(rows){ try{ localStorage.setItem(key(), JSON.stringify(rows)); }catch(e){ warn30('rename log', e); } }
+  function done(){ try{ return localStorage.getItem(key() + '_ran') === '1'; }catch(e){ return true; } }
+  function markDone(){ try{ localStorage.setItem(key() + '_ran', '1'); }catch(e){} }
+
+  async function run(){
+    if(!HT30_NAME_TIMES || done()) return { ran:false, rows:[] };
+    if(!S.me || !S.loadOk || !S.hasTime) return { ran:false, rows:[] };
+    var rows = plan(S.habits);
+    markDone();                                        /* once per account per device, pass or empty */
+    if(!rows.length) return { ran:true, rows:[] };
+    var okd = [];
+    for(var i = 0; i < rows.length; i++){
+      var r = rows[i];
+      var patch = r.time ? { name:r.name, time_anchor:r.time } : { name:r.name };
+      try{
+        var res = await sb.from('habits').update(patch).eq('id', r.id).eq('user_id', S.me.id);
+        if(res && res.error){ warn30('rename refused for one standard', res.error); continue; }
+      }catch(e){ warn30('rename failed for one standard', e); continue; }
+      var h = (S.habits || []).filter(function(x){ return x.id === r.id; })[0];
+      if(h){ h.name = r.name; if(r.time) h.time_anchor = r.time; }
+      okd.push(r);
+    }
+    if(okd.length){ writeLog(readLog().concat(okd)); try{ paintAll(); }catch(e){} }
+    return { ran:true, rows:okd };
+  }
+
+  async function undo(id){
+    var rows = readLog(), hit = null;
+    rows = rows.filter(function(r){ if(r.id === id && !hit){ hit = r; return false; } return true; });
+    if(!hit) return false;
+    try{
+      /* only what this pass wrote is undone: a row that already had a planned time keeps it. */
+      var back = hit.time ? { name:hit.was, time_anchor:null } : { name:hit.was };
+      var res = await sb.from('habits').update(back).eq('id', id).eq('user_id', S.me.id);
+      if(res && res.error){ warn30('undo refused', res.error); return false; }
+    }catch(e){ warn30('undo failed', e); return false; }
+    var h = (S.habits || []).filter(function(x){ return x.id === id; })[0];
+    if(h){ h.name = hit.was; if(hit.time) h.time_anchor = null; }
+    writeLog(rows);
+    try{ paintAll(); }catch(e){}
+    return true;
+  }
+
+  function markdown(rows){
+    rows = rows || readLog();
+    var out = ['# RENAMED — every name HT-30 took a clock time out of', ''];
+    if(!rows.length){ out.push('Nothing was changed: no standard carried a clock time in its name.'); }
+    else{
+      out.push('| was | is now | planned time | note |', '|---|---|---|---|');
+      rows.forEach(function(r){
+        var note = [];
+        if(r.twice) note.push('a second time is still in the name \u2014 the first was taken');
+        if(r.had) note.push('the planned time it already had was kept');
+        out.push('| ' + r.was + ' | ' + r.name + ' | ' + (r.time || 'kept') + ' | ' + note.join(' \u00b7 ') + ' |');
+      });
+    }
+    return out.join('\n') + '\n';
+  }
+
+  /* Settings -> the list, with an Undo per row. Only rendered when the pass changed something. */
+  function settings(){
+    var ov = document.querySelector('.ov.on .inner'); if(!ov || h30El('h30Ren')) return;
+    var rows = readLog(); if(!rows.length) return;
+    var n = document.createElement('div');
+    n.id = 'h30Ren'; n.className = 'h16p h30p';
+    n.innerHTML = '<div class="sh"><h2>Names I cleaned of times</h2><span class="ln"></span>' +
+      '<span class="c">' + rows.length + '</span></div>' +
+      '<div class="note" style="padding:4px 0 10px">The time moved into the standard’s own Planned time field. ' +
+      'If one is wrong, Undo puts the name back exactly as it was.</div>' +
+      rows.map(function(r){
+        return '<div class="h30ren"><span class="n">' + esc(r.was) + '</span>' +
+               '<span class="t num">' + esc(r.time) + '</span>' +
+               '<button class="btn" type="button" data-h30undo="' + esc(String(r.id)) + '">Undo</button></div>';
+      }).join('');
+    ov.appendChild(n);
+  }
+  document.addEventListener('click', function(e){
+    var b = e.target.closest && e.target.closest('[data-h30undo]');
+    if(!b) return;
+    b.disabled = true;
+    undo(b.getAttribute('data-h30undo')).then(function(ok){
+      if(!ok){ b.disabled = false; toast('could not undo that one'); return; }
+      var row = b.closest('.h30ren'); if(row && row.parentNode) row.parentNode.removeChild(row);
+      toast('name put back');
+    });
+  });
+  var _os = openSettings;
+  openSettings = function(){ var out = _os.apply(null, arguments); setTimeout(settings, 90); return out; };
+
+  var _pa = paintAll, tried = false;
+  paintAll = function(){
+    var out = _pa.apply(null, arguments);
+    if(!tried && S.me && S.loadOk){ tried = true; setTimeout(function(){ run(); }, 900); }
+    return out;
+  };
+
+  return { find:find, plan:plan, run:run, undo:undo, log:readLog, markdown:markdown, settings:settings };
+})();
+window.__HT30TIME = HT30TIME;
+
+
+/* ---- S3.8 · THE EDIT SHEET: FIVE FIELDS ON THE SURFACE, THE REST ONE TAP DOWN -------------------------------
+   Cory's words for this page are "name · section · planned time · duration · delete".
+   TAKEN LITERALLY AND ALONE THAT BREAKS THE WIRE'S OWN S1: `Days` is what makes a standard weekly or
+   Sabbath-resting (DEC-172, Ruling 3's Weekly section), so hiding it outright would make every new standard a
+   daily one and quietly empty the Weekly routine this same wire is building. So the five he named are the
+   SURFACE and `Group · Days · Which days · Rests on Sabbath · Link` sit under one quiet "More" - the pattern
+   his own S6 orders for Insights, and the literal reading of "quiet and simple, deep on tap".
+   THE FREE TEXT IS HIDDEN OUTRIGHT, because that part of the ruling is unambiguous: the "Done when" textarea
+   is not rendered and `notes` is NOT WRITTEN while it is absent, so every definition of done survives exactly
+   as it is (R70.138). It comes back by setting HT30_SHEET_NOTES to true. */
+var HT30_SHEET_NOTES = false;
+var HT30_SHEET_MORE = true;
+(function(){
+  var SURFACE = ['Name', 'Section', 'Planned time', 'Planned minutes'];
+  function labOf(f){ var s = f.querySelector('.lab'); return s ? s.textContent.trim() : ''; }
+
+  function fold(){
+    if(!HT30_SHEET_MORE) return;
+    var body = h30El('ebody'); if(!body || body.querySelector('#h30More')) return;
+    var tools = body.querySelector('.etools'); if(!tools) return;
+
+    var kids = Array.prototype.slice.call(body.children);
+    var deep = [];
+    kids.forEach(function(f){
+      if(f === tools || f.classList.contains('eh') || f.classList.contains('note')) return;
+      var lab = labOf(f);
+      if(!lab) return;
+      if(lab === 'Done when' || lab === 'Notes'){
+        /* hidden, never deleted - and `saveSheet` reads `#eNotes`, so removing the element is what
+           stops `notes` being written at all. The textarea is detached, not emptied. */
+        if(!HT30_SHEET_NOTES){ f.setAttribute('hidden', ''); f.classList.add('h30gone');
+                               var ta = f.querySelector('textarea'); if(ta) ta.id = 'eNotesHidden';
+                               deep.push(f); }          /* hidden AND off the surface, never removed */
+        return;
+      }
+      if(SURFACE.indexOf(lab) < 0) deep.push(f);
+    });
+    if(!deep.length) return;
+
+    var d = document.createElement('details');
+    d.id = 'h30More'; d.className = 'h30more';
+    d.innerHTML = '<summary>More</summary>';
+    body.insertBefore(d, tools);
+    deep.forEach(function(f){ d.appendChild(f); });
+  }
+
+  /* THE SHEET ANNOUNCES ITSELF; nothing here wraps `openSheet`, which lives two scopes down inside
+     HT-11's own IIFE and is not reachable from here. `#esheet` gains `.on` when it opens and `#ebody`
+     is rewritten on every open, so watching both catches every path that can put a sheet on screen -
+     the pencil, "+ Add to ...", the keyboard - without any of them having to know this exists. */
+  function watch(){
+    var n = h30El('esheet'); if(!n || n.__h30obs || !window.MutationObserver) return;
+    n.__h30obs = new MutationObserver(function(){
+      if(n.classList.contains('on')) try{ fold(); }catch(e){ warn30('sheet fold', e); }
+    });
+    n.__h30obs.observe(n, { attributes:true, attributeFilter:['class'], childList:true, subtree:true });
+    if(n.classList.contains('on')) try{ fold(); }catch(e){ warn30('sheet fold', e); }
+  }
+  document.addEventListener('click', function(){ setTimeout(watch, 0); setTimeout(watch, 120); }, true);
+  var _pa = paintAll;
+  paintAll = function(){ var out = _pa.apply(null, arguments); watch(); return out; };
+  window.__HT30SHEET = { fold:fold, watch:watch, surface:SURFACE };
+})();
+
+
+/* ---- S5.13 · A SABBATH ANYONE CAN KEEP, ON THE DAY THEY CHOOSE ---------------------------------------------
+   HT-19 narrowed Saturday to the Sabbath alone; 128 F took the narrowing out again because it was Cory's day
+   imposed on everybody, including a brand-new account that had never asked for one. Cory's 9/20 ruling brings
+   it back the only way it can be right: OFF by default, ON per person, for the day THAT person picks.
+     · the day's list shows the Sabbath check-off and nothing else, so the day is what it says it is;
+     · DEC-172's arithmetic is untouched - one ordinary due item, weight 1, no boost, no cap. `active_set` is
+       still written per day (P4), so no past grade moves;
+     · an account with a Sabbath standard and no stored preference starts ON for the day that standard is due,
+       which is how Cory's own account keeps the day it already keeps without his name appearing in this file.
+   WHERE IT IS STORED: `profile_private.sabbath_dow`, probed the way `cue`, `target_age`, `notes` and `section`
+   are probed. Until that column exists the choice lives on the device and Settings says so in one line - the
+   same build has to work before and after the migration (`tools/sql/2026-09-20_ht30.sql`). */
+var HT30_SABBATH = true;
+var HT30SAB = (function(){
+  var DOW = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+  var LINE = 'No other standards take place on your Sabbath — only the Sabbath check-off shows that day.';
+  var dow = null, loaded = false, hasCol = false;
+
+  function lkey(){ return 'ht30_sab_' + ((S.me && S.me.id) || 'anon'); }
+  function fromDevice(){
+    try{ var v = localStorage.getItem(lkey()); return v == null || v === '' ? null : +v; }catch(e){ return null; }
+  }
+  function toDevice(v){ try{ if(v == null) localStorage.removeItem(lkey()); else localStorage.setItem(lkey(), String(v)); }catch(e){} }
+
+  /* the account's own answer when it has never been asked: the day its Sabbath standard is due */
+  function inferred(){
+    var h = (S.habits || []).filter(isSabbathStd)[0];
+    if(!h) return null;
+    var d = dowOf(h);
+    if(d && d.length === 1) return d[0];
+    return 6;                                  /* a Sabbath standard with no day grammar is the seventh day */
+  }
+
+  async function load(){
+    if(loaded) return dow;
+    loaded = true;
+    var stored = null;
+    try{
+      var r = await sb.from('profile_private').select('sabbath_dow').eq('id',S.me.id).maybeSingle();
+      if(r && !r.error){ hasCol = true; stored = (r.data && r.data.sabbath_dow != null) ? +r.data.sabbath_dow : null; }
+    }catch(e){ warn30('sabbath column probe', e); }
+    if(!hasCol) stored = fromDevice();
+    else if(stored == null && fromDevice() != null){
+      stored = fromDevice();                    /* the device answered first; the column takes it over */
+      await save(stored, true);
+    }
+    dow = (stored == null) ? inferred() : stored;
+    if(stored == null && dow != null) await save(dow, true);
+    return dow;
+  }
+
+  async function save(v, quiet){
+    dow = (v == null || v === '') ? null : +v;
+    toDevice(dow);
+    if(hasCol){
+      try{
+        var r = await sb.from('profile_private').upsert({ id:S.me.id, sabbath_dow:dow }, { onConflict:'id' });   /* own row only */
+        if(r && r.error) warn30('sabbath save refused', r.error);
+      }catch(e){ warn30('sabbath save failed', e); }
+    }
+    if(!quiet){ try{ paintAll(); paint(); }catch(e){} }
+    return dow;
+  }
+
+  function on(){ return HT30_SABBATH && dow != null; }
+  function isDay(k){
+    if(!on()) return false;
+    var d = dnum(k || S.date);
+    return !!d && !isNaN(d) && d.getDay() === dow;
+  }
+  function theStd(){ return (S.habits || []).filter(isSabbathStd)[0] || null; }
+
+  /* THE DUE SET, on that day, is the Sabbath standard alone - which is both what is drawn and what the
+     denominator counts, so the day cannot read 0% for standards the person was told not to keep. */
+  var _daily = daily;
+  daily = function(){
+    var all = _daily.apply(null, arguments);
+    if(h30Advanced() || !on() || !isDay(S.date)) return all;
+    var only = all.filter(isSabbathStd);
+    return only.length ? only : all;            /* no Sabbath standard yet: change nothing (HT-18e) */
+  };
+
+  /* THE LIST SAYS THE SAME THING THE SCORE SAYS. `daily()` above is the denominator; `paintLog`
+     builds the rows from `S.habits` and never calls it, so narrowing one without the other would
+     write a Saturday that reads 4% for standards the person was told to rest from. Rows, headers
+     and the add-buttons are HIDDEN, never removed (R70.138), and the pass is idempotent.
+     HT-19's own `sabbathList()` is left exactly as 128 F set it (`SABBATH_ONLY_SATURDAY` false):
+     that one is global and Saturday-only, which is the thing this replaces. */
+  function paint(){
+    var log = h30El('log'); if(!log) return;
+    var narrow = on() && isDay(S.date) && !h30Advanced() && !!theStd();
+    var keep = narrow ? theStd().id : null;
+    Array.prototype.slice.call(log.querySelectorAll('.li')).forEach(function(li){
+      var b = li.querySelector('[data-tog]'), id = b ? b.getAttribute('data-tog') : null;
+      li.hidden = narrow ? (id !== keep) : false;
+    });
+    Array.prototype.slice.call(log.querySelectorAll('.grp, .eadd, [data-add]')).forEach(function(e){
+      e.hidden = narrow; });
+    log.classList.toggle('h30sab', narrow);
+  }
+
+  function settings(){
+    var ov = document.querySelector('.ov.on .inner'); if(!ov || h30El('h30Sab')) return;
+    var n = document.createElement('div');
+    n.id = 'h30Sab'; n.className = 'h16p h30p';
+    n.innerHTML = '<div class="sh"><h2>Sabbath</h2><span class="ln"></span>' +
+      '<span class="c">' + (on() ? DOW[dow] : 'off') + '</span></div>' +
+      '<label class="fld"><span class="lab">Keep a Sabbath</span>' +
+      '<span class="h28sw"><input type="checkbox" id="h30SabOn"' + (on() ? ' checked' : '') + '> ' +
+      'one day a week, set apart</span></label>' +
+      '<label class="fld" id="h30SabDayF"' + (on() ? '' : ' hidden') + '><span class="lab">Which day</span>' +
+      '<select id="h30SabDay">' + DOW.map(function(d, i){
+        return '<option value="' + i + '"' + (i === dow ? ' selected' : '') + '>' + d + '</option>'; }).join('') +
+      '</select></label>' +
+      '<div class="note" style="padding:6px 0 0">' + esc(LINE) + '</div>' +
+      (hasCol ? '' : '<div class="note" style="padding:6px 0 0">Kept on this device until one migration lands; ' +
+                     'everything else about the day already syncs.</div>');
+    ov.appendChild(n);
+    var sw = h30El('h30SabOn'), sel = h30El('h30SabDay'), fld = h30El('h30SabDayF');
+    sw.onchange = function(){
+      if(sw.checked){ if(fld) fld.hidden = false; save(sel ? +sel.value : 6); }
+      else{ if(fld) fld.hidden = true; save(null); }
+    };
+    if(sel) sel.onchange = function(){ save(+sel.value); };
+  }
+  var _os = openSettings;
+  openSettings = function(){ var out = _os.apply(null, arguments); setTimeout(settings, 95); return out; };
+
+  var _pa = paintAll, booted = false;
+  paintAll = function(){
+    var out = _pa.apply(null, arguments);
+    try{ paint(); }catch(e){ warn30('sabbath list', e); }
+    if(!booted && S.me && S.loadOk){
+      booted = true;
+      /* the OUTERMOST paintAll, not the one this wrapper captured: `_pa()` would repaint the chain
+         below this layer and skip every layer added after it - Insights among them. `booted` is
+         already true here, so this cannot recurse. */
+      load().then(function(){ try{ paintAll(); }catch(e){} }).catch(function(e){ warn30('sabbath load', e); });
+    }
+    return out;
+  };
+
+  return { DOW:DOW, LINE:LINE, load:load, save:save, on:on, isDay:isDay, theStd:theStd, paint:paint,
+           inferred:inferred, state:function(){ return { dow:dow, hasCol:hasCol, loaded:loaded }; } };
+})();
+window.__HT30SAB = HT30SAB;
+
+
+/* ---- S6.14 · VIEWS AND INSIGHTS ARE ONE PAGE, BEHIND ONE TAB ------------------------------------------------
+   DETAIL, Views and Insights were three doors into overlapping rooms; 133 closed one of them and left two.
+   This closes the last one. ONE page, in the View page's own format, holding exactly Cory's five outputs plus
+   the card that explains a rating - and the panels are MOVED, never re-rendered: every chart on it is still
+   drawn by the renderer that already owns it (R70.306), so nothing here can drift from what Views showed.
+     order: month completion · month rating · completion + rating trend · the life grid · the group side by side
+            · what makes a good day
+   NO ENTRY LIST OF ANY KIND is on this page - the journal ledger moves under "more" with everything else that
+   used to live on Views. Hidden, never deleted (R70.138). */
+var HT30_ONE_INSIGHTS = true;
+var HT30INS = (function(){
+  /* [ the node to move, where it comes from ] - a missing one is skipped, never an error: a panel that a
+     migration has not created yet must not stop the page that holds the other five. */
+  var ORDER = ['h30MonthC', 'h30MonthR', 'h30Trend', 'h30Life', 'h30Group', 'h30Rate'];
+
+  function host(){
+    var n = h30El('h30Ins'); if(n) return n;
+    var grid = document.querySelector('.grid'); if(!grid) return null;
+    n = document.createElement('section');
+    n.id = 'h30Ins'; n.className = 'h30ins';
+    n.innerHTML = '<div class="sh"><h2>Insights</h2><span class="ln"></span><span class="c" id="h30InsC"></span></div>' +
+                  '<div id="h30InsBody" class="h29ins"></div>' +
+                  '<details id="h30InsMore" class="h30more"><summary>More</summary><div id="h30InsMoreBody"></div></details>';
+    grid.appendChild(n);
+    return n;
+  }
+  /* A CARD HOLDS EXACTLY WHAT IT IS GIVEN. HT-29's `render()` rebuilds `#ins29`'s innerHTML on every
+     paint, so the card this page borrowed last time is a DEAD node the moment a new one is made -
+     and leaving it behind put two charts on the page at once (`golden_ht29` S5e read 7 + 30 = 37
+     bars). Anything in the box that is not in this call's list goes. */
+  function card(id, title, nodes){
+    var list = [].concat(nodes || []).filter(Boolean);
+    var c = h30El(id);
+    if(!c){
+      c = document.createElement('div');
+      c.id = id; c.className = 'h30c';
+      c.innerHTML = '<div class="lab">' + title + '</div><div class="h30cb"></div>';
+    }
+    var box = c.querySelector('.h30cb');
+    Array.prototype.slice.call(box.children).forEach(function(k){
+      if(list.indexOf(k) < 0) box.removeChild(k);
+    });
+    list.forEach(function(n){ if(n.parentNode !== box) box.appendChild(n); });
+    return c;
+  }
+  /* WHERE EACH BORROWED NODE CAME FROM, recorded once, the first time it moves. `next` is a live
+     reference: if the sibling it was in front of is itself borrowed, `restore()` puts them back in the
+     order they were recorded, so the pair lands the right way round. */
+  var HOME = [];
+  function remember(node){
+    if(!node || node.__h30home) return;
+    node.__h30home = true;
+    HOME.push({ n:node, p:node.parentNode, next:node.nextSibling });
+  }
+  function moveTo(host, node){
+    if(!node || node.parentNode === host) return;
+    remember(node);
+    host.appendChild(node);
+  }
+  function restore(){
+    for(var i = HOME.length - 1; i >= 0; i--){
+      var h = HOME[i];
+      if(!h.p || h.n.parentNode === h.p) continue;
+      try{ h.p.insertBefore(h.n, (h.next && h.next.parentNode === h.p) ? h.next : null); }
+      catch(e){ warn30('putting a panel back', e); }
+    }
+  }
+
+  function build(){
+    if(!HT30_ONE_INSIGHTS || h30Advanced()) return null;
+    var h = host(); if(!h) return null;
+    var body = h30El('h30InsBody'), more = h30El('h30InsMoreBody');
+    if(!body || !more) return null;
+    /* the cards are HT-29's and so is their behaviour - carried, not re-implemented (R70.306) */
+    if(!body.__h30click && window.__HT29INS && window.__HT29INS.onClick){
+      body.__h30click = true;
+      body.addEventListener('click', function(e){
+        try{ window.__HT29INS.onClick(e); }catch(err){ warn30('insights click', err); }
+        /* HT-29's handler answers by RE-RENDERING `#ins29`, which makes three new cards and leaves
+           the three on this page dead. Adopt the new ones straight away, or the page shows the old
+           chart beside the new one - which is exactly what `golden_ht29` S5e measured (7 + 30 bars). */
+        setTimeout(function(){ try{ build(); }catch(err){ warn30('insights rebuild', err); } }, 0);
+      });
+    }
+
+    /* the five outputs, each still drawn by its own renderer */
+    var vNav = h30El('vNav'), vMonthC = h30El('vMonthC'), vMonthR = h30El('vMonthR');
+    if(vMonthC){ remember(vMonthC); if(vNav) remember(vNav);
+                 var cc = card('h30MonthC', 'Month · completion', [vNav, vMonthC]);
+                 if(cc.parentNode !== body) body.appendChild(cc); }
+    if(vMonthR){ remember(vMonthR); var cr = card('h30MonthR', 'Month · rating', vMonthR); if(cr.parentNode !== body) body.appendChild(cr); }
+
+    /* HT-29's own trend card and rating card are already the 7d/30d shape Cory asked for */
+    var i29 = h30El('ins29');
+    if(i29){
+      var t = i29.querySelector('[data-i29="trend"]'), r = i29.querySelector('[data-i29="rate"]'),
+          g = i29.querySelector('[data-i29="group"]');
+      if(t){ remember(t); var ct = card('h30Trend', 'Completion and rating over time', t); if(ct.parentNode !== body) body.appendChild(ct); }
+      var vLife = h30El('vLife');
+      if(vLife){ remember(vLife); var cl = card('h30Life', 'The life', vLife); if(cl.parentNode !== body) body.appendChild(cl); }
+      if(g){ remember(g); var cg = card('h30Group', 'The group, side by side', g); if(cg.parentNode !== body) body.appendChild(cg); }
+      if(r){ remember(r); var cq = card('h30Rate', 'What makes a good day', r); if(cq.parentNode !== body) body.appendChild(cq); }
+    }else{
+      var vLife2 = h30El('vLife');
+      if(vLife2){ remember(vLife2); var cl2 = card('h30Life', 'The life', vLife2); if(cl2.parentNode !== body) body.appendChild(cl2); }
+    }
+
+    /* everything else that lived on Views or Insights - one tap down, never deleted. THE JOURNAL LEDGER IS
+       THE NAMED ONE: no entry list of any kind appears on this page (Cory 9/20). */
+    /* ONLY WHAT IS A GRID CHILD IN ITS OWN RIGHT. `c5Five` and `vInsights` live inside `#c5More`,
+       and `vTrends`/`vGroups` inside `#vViews` - borrowing them by name pulled each one OUT of the
+       box that is meant to hold it, and `golden_ht26` S2d read `#c5More #vInsights .vins` as zero.
+       Their hosts are on this list, so they travel with them. */
+    /* IN THE ORDER VIEWS HAD. `golden_ht28` A6 asserts the sequence month, year, insights, weeks,
+       HT-26's panel, the journal - so "everything else, one tap down" keeps it rather than reshuffling
+       the room on the way out. `#h16Score` leads because HT-29 already put it behind a tap. */
+    /* NOT `h16Score`: HT-29's audit (A28) already hid the group scorecard from this tab and put it
+       one tap inside DETAIL. Borrowing it here put it BACK on the page - inside the More, but visible
+       - and `golden_ht28` A6 read it as a seventh panel in an order that names six. */
+    ['h16Month', 'h16Year', 'h16Ins'].forEach(function(id){ moveTo(more, h30El(id)); });
+    var wk = document.querySelector('.vWeeksSec'); if(wk) moveTo(more, wk);
+    ['h26Ins', 'h26Jrn', 'vViews'].forEach(function(id){ moveTo(more, h30El(id)); });
+    var det = h30El('i29Detail'); if(det && det.parentNode) moveTo(more, det.parentNode);
+    var vRange = h30El('vRange'); if(vRange) moveTo(more, vRange);
+
+    var cap = h30El('h30InsC'); if(cap) cap.textContent = '';
+    return h;
+  }
+
+  /* ---- the one tab, on both widths -------------------------------------------------------------------
+     PHONE: the bottom bar loses "Views" and keeps Today · Insights.
+     DESKTOP: a real tab beside Today in the top bar - not a link, and not a button that opens an overlay,
+     because R70.211 says a page reached only by a URL does not exist and Cory said the same thing in plainer
+     words: he could not find it. */
+  function bar(){
+    var b = h30El('h29Bar'); if(!b) return;
+    var v = b.querySelector('[data-t29="views"]');
+    if(v && !v.hasAttribute('hidden')) v.setAttribute('hidden', '');       /* hidden, never deleted */
+  }
+  function deskTab(){
+    var t = h30El('vTabs'); if(!t) return;
+    var v = t.querySelector('[data-v="views"]');
+    if(v) v.textContent = 'Insights';
+    t.classList.add('h30tabs');
+    /* INSIDE the masthead, which is what "a real tab beside Today in the top bar" means and also what
+       HT-18's gutter contract requires: sitting BETWEEN the mast and the grid, it added 25 px to the
+       mast->grid gap and `golden_ht18` S1c read 49 where 24 was the rule. Inside the mast it costs the
+       layout nothing, and the phone hides it because the bottom bar is that width's door. */
+    var mast = document.querySelector('.mast');
+    if(mast && t.parentNode !== mast) mast.appendChild(t);
+  }
+  function go(which){
+    if(which === 'insights' || which === 'views'){
+      /* "views" IS the Insights state now - every rule in app.css that makes this page a page hangs
+         off it. HT-29 set "insights" here, which nothing in the stylesheet matches. */
+      if(window.__HT13_TAB) window.__HT13_TAB('views');
+      document.documentElement.setAttribute('data-vtab', 'views');
+      if(window.__HT29INS && window.__HT29INS.render) try{ window.__HT29INS.render(); }catch(e){ warn30('ins render', e); }
+      if(window.__HT13_REPAINT) try{ window.__HT13_REPAINT(); }catch(e){ warn30('views repaint', e); }
+      build();
+      window.scrollTo(0, 0);
+    }else if(window.__HT13_TAB){
+      document.documentElement.setAttribute('data-vtab', 'today');
+      try{ restore(); }catch(e){ warn30('restore', e); }
+      window.__HT13_TAB(which); window.scrollTo(0, 0);
+    }
+    mark();
+  }
+  /* the bar and the tab say where you are, whichever of the two words the state is carrying */
+  function mark(){
+    var on = (document.documentElement.getAttribute('data-vtab') || 'today') !== 'today';
+    Array.prototype.slice.call(document.querySelectorAll('#h29Bar [data-t29]')).forEach(function(btn){
+      var mine = btn.getAttribute('data-t29') === (on ? 'insights' : 'today');
+      btn.classList.toggle('on', mine); btn.setAttribute('aria-current', mine ? 'page' : 'false'); });
+    Array.prototype.slice.call(document.querySelectorAll('#vTabs [data-v]')).forEach(function(btn){
+      btn.classList.toggle('on', btn.getAttribute('data-v') === (on ? 'views' : 'today')); });
+  }
+  document.addEventListener('click', function(e){
+    var b = e.target.closest && e.target.closest('#vTabs [data-v], #h29Bar [data-t29]');
+    if(!b) return;
+    var w = b.getAttribute('data-v') || b.getAttribute('data-t29');
+    setTimeout(function(){ go(w === 'today' ? 'today' : 'insights'); }, 0);
+  });
+
+  function onInsights(){ return (document.documentElement.getAttribute('data-vtab') || 'today') !== 'today'; }
+  /* THE BORROWED PANELS ARE EMPTY UNTIL THEIR OWN PAINTER RUNS. `#vMonthC`, `#vMonthR` and `#vLife`
+     are drawn by HT-13, which draws them when ITS tab repaints - and a node that has been moved has
+     not been repainted. Without this the month-rating card and the life grid were headed boxes with
+     nothing in them, which the first phone shot showed at a glance. */
+  function repaintBorrowed(){
+    if(window.__HT13_REPAINT) try{ window.__HT13_REPAINT(); }catch(e){ warn30('views repaint', e); }
+  }
+  /* EVERY DOOR, NOT JUST THE TAB. `data-vtab` is what makes this a page, and three other things set
+     it - the strip under Today ("Insights >"), HT-26's `openInsights()`, and HT-13 restoring the tab
+     a person left on. Building only from the tab's own click meant those doors opened an EMPTY page:
+     the stylesheet had stood everything else down and nothing had been put in its place.
+     `golden_ht26` S2b found it by tapping the strip. */
+  (function(){
+    if(!window.MutationObserver) return;
+    new MutationObserver(function(){
+      try{ if(onInsights()){ build(); repaintBorrowed(); } else restore(); mark(); }
+      catch(e){ warn30('vtab watch', e); }
+    }).observe(document.documentElement, { attributes:true, attributeFilter:['data-vtab'] });
+  })();
+  var _pa = paintAll;
+  paintAll = function(){
+    /* GIVE THEM BACK FIRST. Today's quadrants are drawn from these very nodes, so the paint has to
+       find them where they live, not inside a page that is not on screen. */
+    if(!onInsights()) try{ restore(); }catch(e){ warn30('restore', e); }
+    var out = _pa.apply(null, arguments);
+    try{
+      bar(); deskTab();
+      if(onInsights()){ build(); repaintBorrowed(); } else restore();
+      mark();
+    }catch(e){ warn30('one insights', e); }
+    return out;
+  };
+  return { build:build, restore:restore, go:go, bar:bar, deskTab:deskTab, mark:mark,
+           onInsights:onInsights, borrowed:function(){ return HOME.length; }, ORDER:ORDER };
+})();
+window.__HT30INS = HT30INS;
+
+
+/* ---- S7.16 · START A GROUP, OR JOIN ONE ---------------------------------------------------------------------
+   HT-29 built create, join, the deep link and the five columns. What it did not build is the one screen where
+   a person meets all of it, and the two things Cory named: starting a group hands back a LINK he can send (a
+   code read aloud is not an invitation), and a member's row carries a way OUT.
+   The deep link already joins a signed-in person directly - HT-29's join card reads `ht_join_code` and calls
+   `join()` with no sign-up step - so stress 5 is a test here, not a build. */
+var HT30GRP = (function(){
+  function link(code){
+    return (window.__HT24_JOIN && window.__HT24_JOIN.link) ? window.__HT24_JOIN.link(code) : '';
+  }
+  async function leave(){
+    if(!S.me) return { ok:false, why:'not signed in' };
+    /* SCOPED TO THE GROUP HE IS LOOKING AT, never to every row this account has. An unscoped delete
+       reads the same on an account with one group and empties the account of a person who has two -
+       the shape of defect that only shows up on somebody else's data. */
+    var cid = null;
+    try{ var st = window.__HT29GRP && window.__HT29GRP.state(); cid = st && st.circle && st.circle.id; }
+    catch(e){ warn30('which group', e); }
+    if(!cid) return { ok:false, why:'Not in a group to leave.' };
+    try{
+      var r = await sb.from('circle_members').delete().eq('user_id', S.me.id).eq('circle_id', cid);
+      if(r && r.error) return { ok:false, why:'Could not leave — try again.' };
+      return { ok:true };
+    }catch(e){ warn30('leave failed', e); return { ok:false, why:'Could not leave — try again.' }; }
+  }
+  /* the Group screen, rewritten as two named actions and a way out */
+  function html(st){
+    var c = st && st.circle;
+    if(c){
+      var url = link(c.join_code || '');
+      return '<div class="note" style="padding:4px 0 12px">You are in <b>' + esc(c.name || 'a group') + '</b>. ' +
+        'The group sees your standards, check-offs and the day’s number — never your journal.</div>' +
+        '<div class="h29code">code <b>' + esc(c.join_code || '') + '</b></div>' +
+        (url ? '<label class="fld"><span class="lab">Share link</span>' +
+               '<input id="h30Link" readonly value="' + esc(url) + '"></label>' : '') +
+        '<div class="tools"><button class="btn pri" id="g29Invite" type="button">Invite someone</button>' +
+        '<span style="flex:1"></span><button class="btn" id="h30Leave" type="button">Leave</button></div>' +
+        '<div class="note" id="g29Msg" style="padding-top:12px"></div>';
+    }
+    return '<div class="note" style="padding:4px 0 12px">A group sees each other’s standards, check-offs and ' +
+      'the day’s number — never a journal.</div>' +
+      '<div class="h30gh">Start a group</div>' +
+      '<label class="fld"><span class="lab">Name it</span><input id="g29Name" autocomplete="off"></label>' +
+      '<div class="tools"><button class="btn pri" id="g29Make" type="button">Start a group</button></div>' +
+      '<div class="h30gh" style="margin-top:18px">Join a group</div>' +
+      '<label class="fld"><span class="lab">Code, or the link they sent you</span>' +
+      '<input id="g29Code" autocapitalize="characters" autocomplete="off"></label>' +
+      '<div class="tools"><button class="btn" id="g29Join" type="button">Join a group</button></div>' +
+      '<div class="note" id="g29Msg" style="padding-top:12px"></div>';
+  }
+  /* a pasted LINK is a code: nobody reads a query string off a message and types the six characters out */
+  function codeOf(v){
+    var s = String(v || '').trim();
+    var m = /[?&]join=([^&#\s]+)/.exec(s);
+    return (m ? decodeURIComponent(m[1]) : s).trim().toUpperCase();
+  }
+  /* ---- THE LINK LANDS ------------------------------------------------------------------------
+     One paint, once, as soon as there is a code AND an account that finished loading. It gives up
+     after twelve seconds rather than polling forever: a code with no session is a person who has not
+     signed in yet, and HT-29's own paint path picks it up the moment they do. */
+  (function(){
+    var tries = 0, t = null;
+    function stored(){ try{ return localStorage.getItem('ht_join_code'); }catch(e){ return null; } }
+    function tick(){
+      tries++;
+      if(tries > 40){ clearInterval(t); return; }
+      if(h30El('h29Join')){ clearInterval(t); return; }
+      if(!stored() || !S.me || S.loadOk !== true) return;
+      clearInterval(t);
+      try{ paintAll(); }catch(e){ warn30('join repaint', e); }
+    }
+    function start(){ if(t) return; t = setInterval(tick, 300); tick(); }
+    if(document.readyState === 'complete') setTimeout(start, 300);
+    else window.addEventListener('load', function(){ setTimeout(start, 300); });
+  })();
+
+  window.__HT30GRP = { link:link, leave:leave, html:html, codeOf:codeOf };
+  return window.__HT30GRP;
+})();
+
+})();
+
+

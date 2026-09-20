@@ -235,10 +235,18 @@ async def s2(pw):
             strip and strip['vis'] and all(w in strip['text'].upper() for w in ('TODAY', '7 DAYS', 'STREAK')), strip)
         await pg.click('#tStrip')
         await pg.wait_for_timeout(700)
+        # HT-30 (paste 137 S6.14): HT-26's five and the journal ledger are ONE TAP DOWN now - Cory's
+        # Insights page carries his five outputs and no entry list of any kind. Opening the "More" is
+        # what a person does; nothing this block asserts has been weakened.
+        await pg.evaluate("() => { const d=document.getElementById('h30InsMore'); if(d) d.open = true; }")
+        await pg.wait_for_timeout(500)
         st = await pg.evaluate("""() => { const f=document.getElementById('c5Five'), m=document.getElementById('c5More'),
               p=document.getElementById('ins29');
             return { tab: document.documentElement.getAttribute('data-vtab'), fiveVis: !!f && f.checkVisibility(),
-              insVis: !!p && p.checkVisibility(), three: p ? p.querySelectorAll('.h29c').length : 0,
+              insVis: !!p && p.checkVisibility(),
+              /* HT-30 (paste 137 S6.14): the three cards are laid out on the ONE Insights page now,
+                 so they are counted by what they are, not by the box they were born in. */
+              three: document.querySelectorAll('.h29c').length,
               fiveUnderMore: !!(f && m && m.contains(f)),
               titles: [...document.querySelectorAll('#c5Five > .vins > .lab')].map(e => e.textContent),
               more: document.querySelectorAll('#c5More #vInsights .vins').length, moreOpen: m ? m.open : null,

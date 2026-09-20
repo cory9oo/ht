@@ -136,12 +136,20 @@ async def sec_a(pw):
         tpfx: [...document.querySelectorAll('#log .li .tpfx')].filter(vis).length,
         journalH: Math.round(jb.getBoundingClientRect().height),
         dumpMin: getComputedStyle(document.getElementById('iDump')).minHeight }; }""")
-    chk("A1 · every visible text field on phone Today is >= 16px (%d fields)" % m['n'], m['n'] >= 4 and not m['small'], m['small'])
+    # AMENDED BY NAME, HT-30 (paste 137 S4.11): four visible fields -> three. The rating's why left
+    # the phone on Cory's 9/20 word; the three that remain - Journal, Completed, Prayer - are still
+    # asserted to be at or above 16px, which is the whole point of the line (128 A1).
+    chk("A1 · every visible text field on phone Today is >= 16px (%d fields)" % m['n'], m['n'] >= 3 and not m['small'], m['small'])
     chk("A1 · the viewport keeps pinch-zoom (no maximum-scale, no user-scalable=no)",
         'maximum-scale' not in m['meta'] and 'user-scalable=no' not in m['meta'].replace(' ', ''), m['meta'])
     chk("A2 · no X beside the rating on the phone", not m['clr'], m['clr'])
     chk("D  · no Close-the-day control on the phone (#bClose, #tClose)", m['close'] == [False, False], m['close'])
-    chk("D7 · the rating's why is visible on the phone", m['why'], m['why'])
+    # AMENDED BY NAME, HT-30 (paste 137 S4.11), 2026-09-20. 128 D7 brought the why back to the
+    # phone; Cory's 9/20 review takes it off again - "the 'why that number' field is removed from the
+    # phone layout (desktop unchanged)". The element and the column are untouched (R70.138), which is
+    # why this asserts NOT VISIBLE rather than NOT PRESENT, and the desktop's own D7 below is
+    # unchanged and now carries the whole weight of "the why is still an input".
+    chk("D7 · the rating's why is OFF the phone (128 D7 superseded by Cory 2026-09-20)", not m['why'], m['why'])
     # A2 · tap the chosen number again clears it
     await pg.click('#rate button[data-r="6"]'); await pg.wait_for_timeout(300)
     on1 = await pg.evaluate("() => [...document.querySelectorAll('#rate button.on')].map(b=>b.getAttribute('data-r'))")
@@ -150,10 +158,16 @@ async def sec_a(pw):
     chk("A2 · tapping the chosen number again clears the rating (the X's job, without the X)", on1 == ['6'] and on2 == [], [on1, on2])
     # A4 · compact, measured against 2,891px / 56px / 15px before (ht_stage/128/measure_phone_before.txt)
     chk("A4 · Today is shorter: scrollHeight %d < 2,891 before, by at least 10%%" % m['scrollH'], m['scrollH'] <= 2601, m['scrollH'])
-    chk("A4 · every row is still a >= 44px tap target and the checkbox target is 44x44", m['rowMin'] >= 44 and m['bxw'] == [44, 44], [m['rowMin'], m['bxw']])
+    # AMENDED BY NAME, HT-30 (paste 137 S3.9): 44 -> 36. Same assertion, same two subjects, one number.
+    chk("A4 · every row is still a >= 36px tap target and the checkbox target is 36x36 (44 through HT-29)", m['rowMin'] >= 36 and m['bxw'] == [36, 36], [m['rowMin'], m['bxw']])
     chk("A4 · standard names are 14px (15px before) and the duplicate time prefix is gone", m['nmFont'] == '14px' and m['tpfx'] == 0, [m['nmFont'], m['tpfx']])
-    chk("A5 · the journal keeps its size and spacing (block 584px, brain dump min-height 150px, as before)",
-        m['journalH'] == 584 and m['dumpMin'] == '150px', [m['journalH'], m['dumpMin']])
+    # AMENDED BY NAME, HT-30 (paste 137 S3.9 + S4.11): 584 -> 523 px. A measurement replaced by a
+    # measurement: the rows above it are a quarter thinner, and the why's field AND its label are off
+    # the phone (the first cut hid the field and left the word "Why" standing over nothing - the shot
+    # showed it, 545 px was that half-fix measured). The part that matters - the JOURNAL box keeps its
+    # 150px floor - is untouched.
+    chk("A5 · the journal keeps its size and spacing (block 523px after HT-30's thinner rows and the why leaving the phone, brain dump min-height 150px)",
+        m['journalH'] == 523 and m['dumpMin'] == '150px', [m['journalH'], m['dumpMin']])
     chk("A  · zero page errors on phone Today", not errs, errs[:2])
     # the edit sheet's fields are 16px too
     await pg.click('#log .li .edp'); await pg.wait_for_timeout(600)
@@ -172,11 +186,19 @@ async def sec_a(pw):
     # A6 + A3 · Views
     b, pg, errs = await open_page(pw, 390, 844, flags={'__BIGSET': True, '__CIRCLE': True})
     await pg.evaluate("() => window.__HT13_TAB('views')"); await pg.wait_for_timeout(1000)
+    # HT-30 (paste 137 S6.14): this tab is Cory's ONE Insights page now - his five outputs and the
+    # card that explains a rating. Everything A6 and A3 read is one tap down, IN THE SAME ORDER, so
+    # the "More" is opened and both checks assert exactly what they asserted before.
+    await pg.evaluate("() => { const d=document.getElementById('h30InsMore'); if(d) d.open = true; }")
+    await pg.wait_for_timeout(600)
     v = await pg.evaluate("() => { " + VIS + """
       const ids=['h16Month','h16Year','h16Score','h16Ins','vWeeksSec','h26Ins','h26Jrn'];
       const els=ids.map(i=>document.getElementById(i)||document.querySelector('.'+i)).filter(vis);
       const cs=e=>{ const c=getComputedStyle(e); return [c.borderTopWidth,c.borderTopStyle,c.backgroundColor,c.paddingLeft,c.paddingRight].join(' '); };
-      const heads=[...document.querySelectorAll('.grid > .h16p > .sh h2, #h18Group .h18gh')].filter(vis)
+      /* HT-30 (paste 137 S6.14): the panels sit one level down now, inside the Insights page's
+         "More", so they are found by WHAT THEY ARE (`.h16p`) rather than by being a direct child of
+         the grid. What A6 asserts - every card header reads the same - is unchanged. */
+      const heads=[...document.querySelectorAll('.h16p > .sh h2, #h18Group .h18gh')].filter(vis)
         .map(h=>{ const c=getComputedStyle(h); return [c.fontFamily,c.fontSize,c.letterSpacing,c.textTransform,c.color].join('|'); });
       return { order: els.slice().sort((a,b)=>a.getBoundingClientRect().top-b.getBoundingClientRect().top).map(e=>e.id||'vWeeksSec'),
         widths: [...new Set(els.map(e=>Math.round(e.getBoundingClientRect().width)))],
@@ -274,7 +296,11 @@ async def sec_b(pw):
         shrink = 1 - m['scrollH'] / be['logScrollH']
         rowd = 1 - m['single'] / be['single']
         chk("B · %d · the list is shorter by >= 10%% (%d -> %d, %.0f%%)" % (w, be['logScrollH'], m['scrollH'], shrink * 100), shrink >= 0.10, m)
-        chk("B · %d · a one-line row is 10-15%% lower (%d -> %d)" % (w, be['single'], m['single']), 0.10 <= rowd <= 0.15, m['single'])
+        # AMENDED BY NAME, HT-30 (paste 137 S3.9): HT-28 took a 47px row to 40; HT-30 takes it to 30
+        # on Cory's "rows thinner". The band is replaced by the exact measurement, which is a stronger
+        # check than the band it replaces - and HT-28's own floor is kept beside it.
+        chk("B · %d · a one-line row is 30px (47 before HT-28, 40 after it, %d now)" % (w, m['single']),
+            m['single'] == 30 and rowd >= 0.10, m['single'])
         chk("B · %d · text 14 -> 12.5px (-11%%), drawn box 22 -> 19px (-14%%), line-height still >= 1.35" % w,
             m['nm'] == '12.5px' and m['bx'] == [19, 19] and m['lh'] >= 1.35, m)
         chk("B · %d · the hit targets stay 28x28 (golden_ht18 S3g)" % w, m['bxw'] == [28, 28] and m['edp'] == [28, 28], m)
@@ -373,7 +399,15 @@ async def sec_c(pw):
     await A.click('#log .li[data-h="%s"]' % h); await A.wait_for_timeout(1300)
     await Bp.evaluate("() => window.__HT28c.pull()"); await Bp.wait_for_timeout(700)
     chk("C · two sessions: A's check-off reaches B on B's next pull", await Bp.evaluate(CK, h) is True, await Bp.evaluate("() => window.__HT28c.state()"))
-    h2 = await Bp.evaluate("(h) => [...document.querySelectorAll('#log .li.on')].find(r=>r.getAttribute('data-h')!==h).getAttribute('data-h')", h)
+    # HT-30 (paste 137 S1.4): "the second row that is on" is now a WEEKLY standard, because Weekly
+    # routine sits above Standards - and a weekly's `on` is period-based (`doneOn` -> `weekDone`), so
+    # unchecking it TODAY correctly leaves it on. This walk is about sync, not about weekly semantics,
+    # so it picks a daily row and asserts exactly what it always asserted.
+    h2 = await Bp.evaluate("""(h) => { const ids = window.__HT25S3.state().habits
+          .filter(x => x.cadence !== 'weekly').map(x => String(x.id));
+        return [...document.querySelectorAll('#log .li.on')]
+          .find(r => r.getAttribute('data-h') !== h && ids.indexOf(r.getAttribute('data-h')) >= 0)
+          .getAttribute('data-h'); }""", h)
     h3 = await A.evaluate("(h) => [...document.querySelectorAll('#log .li')].find(r=>!r.classList.contains('on') && r.getAttribute('data-h')!==h).getAttribute('data-h')", h)
     await Bp.click('#log .li[data-h="%s"]' % h2); await Bp.wait_for_timeout(1300)
     await A.click('#log .li[data-h="%s"]' % h3); await A.wait_for_timeout(1300)
@@ -615,7 +649,12 @@ async def sec_c_review(pw):
 # =============================================================================================
 async def sec_d(pw):
     print("\n--- D · close-the-day gone; all five inputs still write ---")
-    b, pg, errs = await open_page(pw, 390, 844)
+    # HT-30 (paste 137 S4.11): 390 -> 1280. What this walk asserts is that all FIVE inputs still
+    # write - the check-offs, the rating, its why, the journal, completed and prayer. Cory's 9/20
+    # ruling takes the WHY off the phone's layout (the column and the desktop are untouched), so the
+    # phone is the one width where a person cannot type into it any more. The walk moves to where
+    # all five are on screen; not one of its assertions changed.
+    b, pg, errs = await open_page(pw, 1280, 900, touch=False)
     k = (await dates(pg))['today']
     await pg.evaluate("() => { window.__WRITES=[]; }")
     h = await pg.evaluate("() => [...document.querySelectorAll('#log .li')].find(r=>!r.classList.contains('on')).getAttribute('data-h')")
@@ -681,8 +720,10 @@ async def sec_e(pw):
     chk("E14 · Saturday: the Sabbath leads its section as one check mark (no time, chip, minutes or percent)",
         sat['firstAnytime'] == 'h1' and sat['sab'] and sat['shown'] == 0, sat)
     # AMENDED BY HT-29 S2 · R67.2 · paste 133 Ruling 3: four placed sections, in this order.
-    SECS29 = ['Morning routine', 'Night routine', 'Standards', 'Weekly']
-    chk("E14 · the sections are Morning routine, Night routine, Standards, Weekly",
+    # AMENDED BY NAME, HT-30 (paste 137 S1.4), 2026-09-20: Cory's review swaps the last two and
+    # renames the fourth. E14 asserts the same property about the same four names.
+    SECS29 = ['Morning routine', 'Night routine', 'Weekly routine', 'Standards']
+    chk("E14 · the sections are Morning routine, Night routine, Weekly routine, Standards",
         sat['heads'] == [s for s in SECS29 if s in sat['heads']] and sat['heads'], sat['heads'])
     chk("F16 · Saturday: the Sabbath is one ordinary due item (in the denominator, weight 1)", 'h1' in sat['daily'], sat['daily'])
     await pg.evaluate("() => { window.__WRITES=[]; }")
@@ -714,6 +755,7 @@ async def sec_e(pw):
     # E15 + F18 · the editor's Days control and the rests-on-Sabbath switch
     b, pg, errs = await open_page(pw, 390, 844, flags={'__BIGSET': True})
     await pg.click('#log .li[data-h="h0"] .edp'); await pg.wait_for_timeout(700)
+    await pg.evaluate("() => { const d=document.getElementById('h30More'); if(d) d.open = true; }")  # HT-30 S3.8: the depth is one tap down
     ed = await pg.evaluate("() => ({ opts:[...document.querySelectorAll('#eCad option')].map(o=>o.value), q:[...document.querySelectorAll('#eDowQ .dowqb')].map(b=>b.textContent.trim()), rest: !!document.getElementById('eRest') })")
     chk("E15 · Days: Every day · Certain days · Once a week, with Weekdays and Weekends presets",
         ed['opts'] == ['daily', 'dow', 'weekly'] and [x.lower() for x in ed['q']] == ['weekdays', 'weekends'] and ed['rest'], ed)
@@ -724,11 +766,15 @@ async def sec_e(pw):
     u1 = await pg.evaluate("() => (window.__UPDATES||[]).filter(u=>u[0]==='habits').map(u=>u[1].cadence)")
     chk("E15 · Weekdays saves as dow:1,2,3,4,5", u1[-1:] == ['dow:1,2,3,4,5'], u1)
     await pg.click('#log .li[data-h="h2"] .edp'); await pg.wait_for_timeout(700)
+    await pg.evaluate("() => { const d=document.getElementById('h30More'); if(d) d.open = true; }")  # HT-30 S3.8: the depth is one tap down
     await pg.check('#eRest'); await pg.evaluate("() => { window.__UPDATES=[]; }")
     await pg.click('#eSave'); await pg.wait_for_timeout(900)
     u2 = await pg.evaluate("() => (window.__UPDATES||[]).filter(u=>u[0]==='habits').map(u=>u[1].cadence)")
     chk("F18 · Rests on Sabbath (default off) saves as every day but Saturday", u2[-1:] == ['dow:0,1,2,3,4,5'], u2)
     await pg.click('#log .li[data-h="h11"] .edp'); await pg.wait_for_timeout(700)
+    await pg.evaluate("() => { const d=document.getElementById('h30More'); if(d) d.open = true; }")  # HT-30 S3.8: the depth is one tap down
+    # the depth is OPEN for this read on purpose: inside a closed <details> `vis()` is false for the
+    # wrong reason, and this line would pass while proving nothing.
     wk = await pg.evaluate("() => { " + VIS + " return { cad: document.getElementById('eCad').value, restShown: vis(document.getElementById('eRestFld')), restOff: !document.getElementById('eRest').checked }; }")
     chk("F18 · a weekly standard shows no rests switch", wk['cad'] == 'weekly' and not wk['restShown'], wk)
     await b.close()
@@ -832,12 +878,16 @@ async def sec_g(pw):
     # still asserted name for name; only the headers they land under moved, because the sections did: a row
     # with no section of its own shows where Ruling 3 places it - a planned time in Morning routine (07:00
     # and 22:30), no time in Standards, weekly in Weekly. Cory moves them from there; the clock never does.
-    chk("G21 · one tap starts from four EXAMPLES across Morning routine, Standards and Weekly",
-        e['rows'] == 4 and e['heads'] == ['Morning routine', 'Standards', 'Weekly'] and not e['card']
+    # AMENDED BY NAME, HT-30 (paste 137 S1.4): the four examples are unchanged and are still asserted
+    # name for name, cadence for cadence, planned time for planned time. Only the ORDER of the headers
+    # they land under moved, because Cory's 9/20 review moved it.
+    chk("G21 · one tap starts from four EXAMPLES across Morning routine, Weekly routine and Standards",
+        e['rows'] == 4 and e['heads'] == ['Morning routine', 'Weekly routine', 'Standards'] and not e['card']
         and e['ins'] == [['Move for 20 minutes|daily|07:00', 'Read 10 pages|daily|', 'Lights out|daily|22:30', 'Plan the week|weekly|']], e)
     # edit: rename + Days + delete, all in the app
     rid = await pg.evaluate("() => [...document.querySelectorAll('#log .li')].find(r=>/Read 10 pages/.test(r.textContent)).getAttribute('data-h')")
     await pg.click('#log .li[data-h="%s"] .edp' % rid); await pg.wait_for_timeout(700)
+    await pg.evaluate("() => { const d=document.getElementById('h30More'); if(d) d.open = true; }")
     await pg.fill('#eName', 'Read 20 pages'); await pg.select_option('#eCad', 'dow')
     await pg.click('#eDowQ .dowqb[data-q="0,6"]'); await pg.wait_for_timeout(100)
     await pg.evaluate("() => { window.__UPDATES=[]; }")
