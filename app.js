@@ -7657,7 +7657,10 @@ function earned(k){ return committed() - remaining(k); }
     var s=stripNums();
     b.innerHTML='<span class="k">Today</span><b>'+(s.today==null?'—':s.today+'%')+'</b>'+
       '<span class="k">7 days</span><b>'+(s.week==null?'—':s.week+'%')+'</b>'+
-      '<span class="k">Streak</span><b>'+s.streak+'</b><span class="go">Insights ›</span>';
+      '<span class="k">Streak</span><b>'+s.streak+'</b>'+
+      /* HT-31 S4.15: the desktop's door to a page that is no longer there (Cory 9/21). The phone,
+         where Insights still is, keeps it. */
+      ((!HT31_DESK_INSIGHTS && !h31Phone()) ? '' : '<span class="go">Insights ›</span>');
   }
   /* PHONE: Insights and the Journal are panels on the Views tab. DESKTOP: the quadrants are full, so they
      open in the app's own overlay - the panel NODES are moved in (HT-13's #vInsights rides inside
@@ -10995,6 +10998,17 @@ var HT30INS = (function(){
 
   function build(){
     if(!HT30_ONE_INSIGHTS || h30Advanced()) return null;
+    /* HT-31 S4.15 (Cory, 9/21): "the insights on the desktop - remove that completely". The page is
+       not built there at all, and every panel it had borrowed goes straight home - which is what puts
+       THE MONTH, THE YEAR, LIFE and GROUP back on the main view where they were before HT-30 moved
+       them one tap down. Gated here, at the one place that makes the page, rather than undone
+       afterwards by a second renderer: two renderers fighting over one list is S1's defect. */
+    if(!HT31_DESK_INSIGHTS && !h31Phone()){
+      try{ restore(); }catch(e){ warn31('putting the desktop panels back', e); }
+      var gone = h30El('h30Ins');
+      if(gone && gone.parentNode) gone.parentNode.removeChild(gone);
+      return null;
+    }
     var h = host(); if(!h) return null;
     var body = h30El('h30InsBody'), more = h30El('h30InsMoreBody');
     if(!body || !more) return null;
@@ -11044,7 +11058,12 @@ var HT30INS = (function(){
     /* NOT `h16Score`: HT-29's audit (A28) already hid the group scorecard from this tab and put it
        one tap inside DETAIL. Borrowing it here put it BACK on the page - inside the More, but visible
        - and `golden_ht28` A6 read it as a seventh panel in an order that names six. */
-    ['h16Month', 'h16Year', 'h16Ins'].forEach(function(id){ moveTo(more, h30El(id)); });
+    /* HT-31 S4.13: when the phone's page is Cory's four blocks, THE MONTH and THE YEAR are two of
+       them - so they are not absorbed into More on the way past. Decided here, where the absorbing
+       happens, because the alternative is this renderer putting them away on every paint while
+       HT-31's puts them back: two renderers fighting over one list, which is S1's whole lesson. */
+    var absorb = (!HT31_INSIGHTS_EXTRAS && h31Phone()) ? ['h16Ins'] : ['h16Month', 'h16Year', 'h16Ins'];
+    absorb.forEach(function(id){ moveTo(more, h30El(id)); });
     var wk = document.querySelector('.vWeeksSec'); if(wk) moveTo(more, wk);
     ['h26Ins', 'h26Jrn', 'vViews'].forEach(function(id){ moveTo(more, h30El(id)); });
     var det = h30El('i29Detail'); if(det && det.parentNode) moveTo(more, det.parentNode);
@@ -11067,6 +11086,17 @@ var HT30INS = (function(){
   function deskTab(){
     var t = h30El('vTabs'); if(!t) return;
     var v = t.querySelector('[data-v="views"]');
+    /* HT-31 S4.15: the tab goes, and a bar with one tab left in it is noise, so the bar goes with it.
+       Hidden, never deleted (R70.138) - `HT31_DESK_INSIGHTS = true` brings both back unchanged. */
+    if(!HT31_DESK_INSIGHTS && !h31Phone()){
+      if(v && !v.hasAttribute('hidden')) v.setAttribute('hidden', '');
+      var live = Array.prototype.slice.call(t.querySelectorAll('[data-v]'))
+                   .filter(function(b){ return !b.hasAttribute('hidden'); });
+      if(live.length <= 1 && !t.hasAttribute('hidden')) t.setAttribute('hidden', '');
+      return;
+    }
+    if(t.hasAttribute('hidden')) t.removeAttribute('hidden');
+    if(v && v.hasAttribute('hidden')) v.removeAttribute('hidden');
     if(v) v.textContent = 'Insights';
     t.classList.add('h30tabs');
     /* INSIDE the masthead, which is what "a real tab beside Today in the top bar" means and also what
@@ -11077,6 +11107,10 @@ var HT30INS = (function(){
     if(mast && t.parentNode !== mast) mast.appendChild(t);
   }
   function go(which){
+    /* S4.15: with no Insights page on this width, every door into it - the tab, the strip, HT-26's
+       openInsights(), a `#insights` link, a tab a person left on - lands on Today rather than on a
+       page that is not there. R70.211 in reverse: a door that opens on nothing is worse than no door. */
+    if(!HT31_DESK_INSIGHTS && !h31Phone() && (which === 'insights' || which === 'views')) which = 'today';
     if(which === 'insights' || which === 'views'){
       /* "views" IS the Insights state now - every rule in app.css that makes this page a page hangs
          off it. HT-29 set "insights" here, which nothing in the stylesheet matches. */
@@ -11142,7 +11176,10 @@ var HT30INS = (function(){
     }catch(e){ warn30('one insights', e); }
     return out;
   };
-  return { build:build, restore:restore, go:go, bar:bar, deskTab:deskTab, mark:mark,
+  /* HT-31 S4.13 borrows `card` rather than writing a second card builder (R70.306, one renderer per
+     kind) - and borrowing it is also what keeps every Insights golden's `#h30InsBody > .h30c > .lab`
+     reading the same shape whoever made the card. */
+  return { build:build, restore:restore, go:go, bar:bar, deskTab:deskTab, mark:mark, card:card,
            onInsights:onInsights, borrowed:function(){ return HOME.length; }, ORDER:ORDER };
 })();
 window.__HT30INS = HT30INS;
@@ -11684,6 +11721,98 @@ var HT31_GHOST_CHIP_SECTIONS = ['morning', 'night'];
 
   window.__HT31TIME = { chips: chips, show: show, close: close, value: value, to24: to24, parts: parts,
                         isOpen: function(){ return !!open; } };
+})();
+
+
+/* ---- S4.13 / S4.14 · FOUR THINGS ON THE PHONE'S INSIGHTS, AND NOTHING ELSE ----------------------
+   Cory, 9/21: "phone insights: only the month line chart, the year line chart, the full life graph
+   and the group circle details". So: four cards, in that order, and no More drawer under them.
+   THE TWO LINE CHARTS ARE THE DESKTOP'S OWN PANELS, moved, not re-implemented - `#h16Month` and
+   `#h16Year`, drawn by `paintMonth16()` / `paintYear16()` wherever they happen to live. One renderer
+   per kind (R70.306): the phone and the desktop show the same chart because it IS the same chart.
+   Everything HT-29 and HT-30 put on this page - the two colour grids, the trend card, "what makes a
+   good day", the More drawer - goes off behind one flag, hidden and never deleted (R70.138). The
+   data is untouched; `HT31_INSIGHTS_EXTRAS = true` brings the page straight back. */
+var HT31_INSIGHTS_EXTRAS = false;
+var HT31_DESK_INSIGHTS = false;
+var HT31_INS_ORDER = ['h31Month', 'h31Year', 'h30Life', 'h30Group'];
+var HT31_INS_HIDE = ['h30MonthC', 'h30MonthR', 'h30Trend', 'h30Rate'];
+function h31Phone(){ return window.innerWidth < 1024; }
+(function(){
+  /* HT-30's own card builder, borrowed rather than copied: one renderer per kind (R70.306), and it is
+     also what keeps the `#h30InsBody > .h30c > .lab` shape every Insights golden reads. */
+  function cardFor(id, title, node){
+    if(!node || !window.__HT30INS || !window.__HT30INS.card) return null;
+    return window.__HT30INS.card(id, title, node);
+  }
+
+  function four(){
+    if(HT31_INSIGHTS_EXTRAS || !h31Phone()) return;
+    var body = h31El('h30InsBody'); if(!body) return;
+    /* the desktop's two line charts, brought over whole */
+    var m = cardFor('h31Month', 'The month', h31El('h16Month'));
+    var y = cardFor('h31Year', 'The year', h31El('h16Year'));
+    if(m && m.parentNode !== body) body.appendChild(m);
+    if(y && y.parentNode !== body) body.appendChild(y);
+    /* the four, in his order; everything else off */
+    HT31_INS_ORDER.forEach(function(id){ var n = h31El(id); if(n && n.parentNode === body) body.appendChild(n); });
+    HT31_INS_HIDE.forEach(function(id){
+      var n = h31El(id); if(n && !n.hasAttribute('hidden')) n.setAttribute('hidden', '');
+    });
+    var more = h31El('h30InsMore');
+    if(more && !more.hasAttribute('hidden')) more.setAttribute('hidden', '');
+    /* NO REPAINT FROM HERE. The first draft called `__HT16.repaintCharts()` to be sure the two charts
+       had been drawn - and that call put `.vWeeksSec` back in the grid every time, out of the drawer
+       HT-30's build had just put it in (`golden_ht28` A6 caught it). The panels carry their own drawn
+       SVG with them when they move, and HT-30's build already runs `repaintBorrowed()` for the nodes
+       that do need re-drawing. Two renderers, one list, again - and the answer is the same one S1
+       reached: only one of them may own it. */
+  }
+
+  var _pa = paintAll;
+  paintAll = function(){ var out = _pa.apply(null, arguments); try{ four(); }catch(e){ warn31('four insights', e); } return out; };
+  if(window.MutationObserver){
+    new MutationObserver(function(){ try{ four(); }catch(e){ warn31('four insights', e); } })
+      .observe(document.documentElement, { attributes: true, attributeFilter: ['data-vtab'] });
+  }
+  document.addEventListener('click', function(){ setTimeout(function(){ try{ four(); }catch(e){} }, 60); }, true);
+
+  window.__HT31INS = { four: four, order: HT31_INS_ORDER, hidden: HT31_INS_HIDE };
+})();
+
+
+/* ---- S5.16 · THE WHY LEAVES THE DESKTOP TOO -----------------------------------------------------
+   Cory, 9/21: "on the desktop remove the why journal box as well". HT-30 took it off the phone; this
+   takes it off the last width it was on. THE COLUMN AND EVERY WORD IN IT ARE UNTOUCHED (R70.138): the
+   textarea is detached from the layout, `why` is still exported, still read by Insights' "what makes
+   a good day", and still in the vault day file. Nothing new is collected, and nothing is collected
+   less honestly - the 1-10 rating stays exactly where it was.
+   S5.16b: with the why gone, COMPLETED and PRAYER take the freed width as two EQUAL boxes whose outer
+   edges line up with the journal above them (R70.306 - clean quarters, no uneven edges). That is CSS;
+   what this does is make sure the why is not in that row to be laid out. */
+var HT31_DESK_WHY = false;
+(function(){
+  function off(){
+    if(HT31_DESK_WHY) return;
+    var f = h31El('whyFld') || (h31El('iWhy') && h31El('iWhy').closest ? h31El('iWhy').closest('.fld') : null);
+    if(f && !f.hasAttribute('hidden')){ f.setAttribute('hidden', ''); f.classList.add('h31gone'); }
+    rateRow();
+  }
+  /* S5.16b · AN EMPTY BOX TAKES NO WIDTH. `#in3a` hosts the three inputs DEC-171 retired, so it is
+     empty and has been holding the right-hand third of the rate row ever since. Measured, not assumed:
+     it is stood down only when it has no VISIBLE child, so the day anything is put back in it the row
+     makes room again by itself. */
+  function rateRow(){
+    var host = h31El('in3a'); if(!host) return;
+    var live = Array.prototype.slice.call(host.children).filter(function(n){ return n.offsetParent; });
+    host.classList.toggle('h31empty', live.length === 0 && !String(host.textContent || '').trim());
+  }
+  var _pa = paintAll;
+  paintAll = function(){ var out = _pa.apply(null, arguments); try{ off(); }catch(e){ warn31('why off', e); } return out; };
+  document.addEventListener('click', function(){ setTimeout(function(){ try{ off(); }catch(e){} }, 60); }, true);
+  if(document.readyState === 'complete') setTimeout(off, 400);
+  else window.addEventListener('load', function(){ setTimeout(off, 400); });
+  window.__HT31WHY = { off: off, rateRow: rateRow };
 })();
 
 })();

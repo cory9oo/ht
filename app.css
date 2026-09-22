@@ -2791,3 +2791,38 @@ html[data-simple] .li .ht31ghost:focus-visible, html[data-simple] .li .ht31ghost
 .ht31ap button.on{ color:var(--text); background:var(--rule); border-color:var(--text) }
 .ht31pa{ display:flex; gap:8px; justify-content:flex-end; margin-top:10px }
 .ht31pa .btn{ min-height:36px; padding:0 14px }
+
+/* ---- S4 / S5 · WHAT IS HIDDEN IS ACTUALLY HIDDEN --------------------------------------------------
+   `[hidden]` is a UA rule and ANY class rule that sets `display` outranks it - this file already
+   carries three lines that say so (#h18Draw, #h18Comp #log, #sSlpBlk), each written after something
+   was "hidden" and stayed on the screen. HT-31 hides four more things, so it writes the fourth line
+   rather than discovering the same fact a fourth time. Hidden, never deleted (R70.138): every one of
+   these comes straight back by flipping its flag, with its data untouched. */
+html[data-simple] #whyFld[hidden],
+html[data-simple] #rateWrap .fld[hidden],
+html[data-simple] #h18Btm .fld[hidden],
+html[data-simple] #h30InsBody > .h30c[hidden],
+html[data-simple] #h30InsMore[hidden],
+html[data-simple] #vTabs[hidden],
+html[data-simple] #vTabs [data-v][hidden]{ display:none !important }
+
+/* ---- S5.16b · THE RATE-THE-DAY ROW FILLS ITS PANEL, AND THE BOTTOM ROW SQUARES UP ------------------
+   Measured on Cory's live desktop, 9/21 07:04: the ten buttons stopped about halfway across the
+   JOURNAL panel and left the right half of the row empty. They are ten EQUAL columns now, from the
+   label to the panel's content edge, so the right edge of `10` lands on the right edge of the journal
+   box above it. With the why gone (S5.16) the bottom row is COMPLETED and PRAYER as two equal boxes
+   sharing that same pair of edges - three rows, one left edge, one right edge (R70.306). */
+@media(min-width:1024px){
+  html[data-simple] #rate{ display:grid; grid-template-columns:repeat(10, 1fr); gap:3px; width:100% }
+  html[data-simple] #rate button{ width:100%; min-width:0 }
+  html[data-simple] #rateWrap{ align-items:stretch }
+  /* HT-18 gave the strip `flex:1 1 300px` so it could not be squeezed to nothing. It shares the row
+     with `#in3a`, the host the three extra inputs used to sit in - and since DEC-171 left five inputs
+     that host is EMPTY, so on a wide screen it held ~270px of nothing and the ten buttons stopped
+     halfway. That is the empty right half in Cory's 9/21 screenshot. Same specificity as HT-18's rule,
+     later in the file, so the strip grows; the empty host is stood down in the same pass. */
+  html[data-simple] #jIn #rateWrap .rate{ flex:1 1 auto }
+  html[data-simple] #jIn #rateWrap > .h31empty{ display:none !important }
+  html[data-simple] #h18Btm{ display:flex; gap:12px; align-items:stretch; width:100% }
+  html[data-simple] #h18Btm > .fld{ flex:1 1 0; min-width:0; width:auto }
+}

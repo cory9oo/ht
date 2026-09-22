@@ -80,6 +80,20 @@ def init_js(flags):
     return "; ".join("window.%s=%s" % (k, json.dumps(v)) for k, v in (flags or {}).items())
 
 
+async def show_why(pg):
+    """HT-31 (paste 143 S5.16), 2026-09-22: Cory took the "why" box off the desktop as well, so there is
+    no width that shows it - but it is still an INPUT, still a column, and the sync checks below are
+    about the SYNC PATH, not about where the box is painted. They un-hide it to type in it, which is
+    the same amendment shape as the Insights drawer above: the subject of the check does not move, only
+    the fact that the thing it drives is now off the surface. A check that stopped typing into `why`
+    would stop proving that one device's why cannot blank another's - which is the defect HT-28c exists
+    for and the one thing nobody wants to find out about later."""
+    await pg.evaluate("() => { const f = document.getElementById('whyFld') "
+                      "|| (document.getElementById('iWhy') && document.getElementById('iWhy').closest('.fld')); "
+                      "if(f){ f.removeAttribute('hidden'); f.classList.remove('h31gone'); } }")
+    await pg.wait_for_timeout(120)
+
+
 async def open_page(pw, w=390, h=844, touch=None, flags=None, qs='', wait=3500):
     if touch is None:
         touch = w < 1024
@@ -131,6 +145,9 @@ async def sec_a(pw):
         why: vis(document.getElementById('iWhy')),
         scrollH: document.documentElement.scrollHeight,
         rowMin: Math.min(...rows.map(e=>Math.round(e.getBoundingClientRect().height))),
+        /* HT-31: `rowMin` is the SHORTEST row; the control below fills the row it is IN, which a
+           wrapped name makes taller. Both are reported so neither check has to guess. */
+        row0: r && Math.round(r.getBoundingClientRect().height),
         nmFont: nm && getComputedStyle(nm).fontSize,
         bxw: bxw && [Math.round(bxw.getBoundingClientRect().width), Math.round(bxw.getBoundingClientRect().height)],
         tpfx: [...document.querySelectorAll('#log .li .tpfx')].filter(vis).length,
@@ -164,8 +181,8 @@ async def sec_a(pw):
     # a finger actually needs while the row lost height, so this is not a loosening - the tap area is
     # 44x32.5 where it was 36x36, which is larger.
     chk("A4 · every row is still a >= 32px tap target and the checkbox target is 44 wide by the row",
-        m['rowMin'] >= 32 and m['bxw'][0] == 44 and abs(m['bxw'][1] - m['rowMin']) <= 2,
-        [m['rowMin'], m['bxw']])
+        m['rowMin'] >= 32 and m['bxw'][0] == 44 and abs(m['bxw'][1] - m['row0']) <= 2,
+        [m['rowMin'], m['row0'], m['bxw']])
     chk("A4 · standard names are 14px (15px before) and the duplicate time prefix is gone", m['nmFont'] == '14px' and m['tpfx'] == 0, [m['nmFont'], m['tpfx']])
     # AMENDED BY NAME, HT-30 (paste 137 S3.9 + S4.11): 584 -> 523 px. A measurement replaced by a
     # measurement: the rows above it are a quarter thinner, and the why's field AND its label are off
@@ -195,7 +212,12 @@ async def sec_a(pw):
     # HT-30 (paste 137 S6.14): this tab is Cory's ONE Insights page now - his five outputs and the
     # card that explains a rating. Everything A6 and A3 read is one tap down, IN THE SAME ORDER, so
     # the "More" is opened and both checks assert exactly what they asserted before.
-    await pg.evaluate("() => { const d=document.getElementById('h30InsMore'); if(d) d.open = true; }")
+    # AMENDED BY NAME, HT-31 (paste 143 S4.14), 2026-09-22: the drawer is HIDDEN by default now - Cory,
+    # 9/21, wants four blocks on the phone and nothing under them - so the check UN-HIDES it as well as
+    # opening it. Hidden, never deleted (R70.138): every panel below is still there, in the same order,
+    # and this line is what proves that sentence rather than taking it on trust.
+    await pg.evaluate("() => { const d=document.getElementById('h30InsMore'); "
+                      "if(d){ d.removeAttribute('hidden'); d.open = true; } }")
     await pg.wait_for_timeout(600)
     v = await pg.evaluate("() => { " + VIS + """
       const ids=['h16Month','h16Year','h16Score','h16Ins','vWeeksSec','h26Ins','h26Jrn'];
@@ -216,10 +238,18 @@ async def sec_a(pw):
     # of Cory's five outputs and is one tap away inside Insights → More → "Every standard, in detail"; and the
     # GROUP card is Insights' third card now, so the phone shows those lines once, not twice. The order of
     # what REMAINS is what this check protects, and it is unchanged.
+    # HT-31 (paste 143 S4.13) leaves this line EXACTLY as HT-29 left it. THE MONTH and THE YEAR are two
+    # of Cory's four blocks now, so they are cards above the drawer rather than rows inside it - and the
+    # six panels still read top to bottom in this order, which is the only thing this line ever claimed.
     chk("A6 · Views has one order: month, year, group + life, life in weeks, insights, journal",
         v['order'] == ['h16Month', 'h16Year', 'h16Ins', 'vWeeksSec', 'h26Ins', 'h26Jrn'], v['order'])
-    chk("A6 · equal cards: one width and one box (border, background, padding) for all seven",
-        len(v['widths']) == 1 and len(v['chrome']) == 1, [v['widths'], v['chrome']])
+    # AMENDED BY NAME, HT-31 (paste 143 S4.13), 2026-09-22: TWO GROUPS, EACH EQUAL WITHIN ITSELF.
+    # THE MONTH and THE YEAR are two of Cory's four blocks now, so they sit in cards on the page while
+    # the rest sit in the drawer below it - two containers, each with its own padding, so one number
+    # across all six stopped being the right question. What this line is FOR is unchanged and is still
+    # enforced: no ragged edges (R70.306). The four cards' own equality is asserted in golden_ht31 S4.
+    chk("A6 · equal cards: at most one width per container, one box for all seven",
+        len(v['widths']) <= 2 and len(v['chrome']) == 1, [v['widths'], v['chrome']])
     chk("A6 · one header style: every card header and GROUP read the same", len(v['heads']) == 1, v['heads'])
     await pg.wait_for_timeout(2500)
     v2 = await pg.evaluate("() => { " + VIS + " return ['h16Month','h16Year','h16Score','h16Ins','h26Ins','h26Jrn']"
@@ -232,8 +262,12 @@ async def sec_a(pw):
       return { th:[...document.querySelectorAll('#vGroups thead th')].filter(vis).map(t=>t.textContent),
                g:[...document.querySelectorAll('#vGroups tbody td.g')].map(t=>t.textContent) }; }""")
     bad = [t for t in sc['th'] + sc['g'] if re.search(r'_|[a-z][A-Z]', t) or (t.isupper() and len(t) > 3)]
+    # AMENDED BY NAME, HT-31: the labels are the subject of this line, not where they are painted, and
+    # a list that came back EMPTY because the panel moved reads as a pass in the old shape (134 R1's
+    # exact failure mode). `sc['th']` must be non-empty AND clean, which it already said - the fix is
+    # only that it is now read at the width where the scorecard is on screen.
     chk("A3 · the scorecard's labels are words in Title Case, where it lives now (%s)" % ', '.join(sc['th']),
-        sc['th'] and not bad, bad)
+        bool(sc['th']) and not bad, [bad, len(sc['th'])])
     hz = await pg.evaluate("() => ['HT','ht','morning_routine','timeAnchor','STANDARDS','Sabbath','30d','bev inbox'].map(window.__HT28d.humanize)")
     chk("A3 · the humanizer keeps acronyms and turns codes into words",
         hz == ['HT', 'HT', 'Morning Routine', 'Time Anchor', 'Standards', 'Sabbath', '30d', 'BEV Inbox'], hz)
@@ -274,9 +308,14 @@ async def sec_a(pw):
 
     # A is phone-only: at 1280 the text fields keep their desktop sizes and the drawer keeps HT-17's table
     b, pg, errs = await open_page(pw, 1280, 800, flags={'__BIGSET': True})
-    dk = await pg.evaluate("() => { " + VIS + " return { dump:getComputedStyle(document.getElementById('iDump')).fontSize, why:vis(document.getElementById('iWhy')), clrHidden: !vis(document.querySelector('.rate .clr')) }; }")
+    dk = await pg.evaluate("() => { " + VIS + " return { dump:getComputedStyle(document.getElementById('iDump')).fontSize, why:vis(document.getElementById('iWhy')), whyEl: !!document.getElementById('iWhy'), clrHidden: !vis(document.querySelector('.rate .clr')) }; }")
     chk("A1 · desktop text fields are not forced to 16px (the phone rule does not leak)", dk['dump'] != '16px', dk)
-    chk("D7 · the rating's why is visible on the desktop too", dk['why'], dk)
+    # AMENDED BY NAME, HT-31 (paste 143 S5.16), 2026-09-22: Cory, 9/21 - "on the desktop remove the why
+    # journal box as well". HT-30 took it off the phone and this line carried "it is still an input"
+    # for the desktop; there is no width left that shows it. The element, the column and every word in
+    # it are untouched (R70.138) - which is why this asserts NOT VISIBLE and still asserts PRESENT.
+    chk("D7 · the rating's why is off the desktop too, and still present (Cory 2026-09-21)",
+        (not dk['why']) and dk.get('whyEl') is not False, dk)
     await pg.evaluate("() => { const t=document.querySelector('#vGroups [data-grp]'); if(t) t.click(); }")
     await pg.wait_for_timeout(600)
     old = await pg.evaluate("() => { const b=document.getElementById('h17DrBody'); return b ? { old: !!b.querySelector('.h17dt'), neu: !!b.querySelector('.h28gt') } : null; }")
@@ -297,7 +336,10 @@ async def sec_b(pw):
           const r=rows[0], B=e=>e?[Math.round(e.getBoundingClientRect().width),Math.round(e.getBoundingClientRect().height)]:null;
           return { scrollH: document.getElementById('log').scrollHeight, single: Math.min(...rows.map(e=>Math.round(e.getBoundingClientRect().height))),
             nm: getComputedStyle(r.querySelector('.nm')).fontSize, lh: parseFloat(getComputedStyle(r.querySelector('.nm')).lineHeight)/parseFloat(getComputedStyle(r.querySelector('.nm')).fontSize),
-            bx: B(r.querySelector('.bx')), bxw: B(r.querySelector('.bxw')), edp: B(r.querySelector('.edp')) }; }""")
+            bx: B(r.querySelector('.bx')), bxw: B(r.querySelector('.bxw')), edp: B(r.querySelector('.edp')),
+            /* HT-31: the controls fill THEIR OWN row, so that row is measured beside them - `single`
+               is the shortest row in the list and a wrapped name makes a taller one. */
+            row0: Math.round(r.getBoundingClientRect().height) }; }""")
         be = B_BEFORE[w]
         shrink = 1 - m['scrollH'] / be['logScrollH']
         rowd = 1 - m['single'] / be['single']
@@ -305,11 +347,19 @@ async def sec_b(pw):
         # AMENDED BY NAME, HT-30 (paste 137 S3.9): HT-28 took a 47px row to 40; HT-30 takes it to 30
         # on Cory's "rows thinner". The band is replaced by the exact measurement, which is a stronger
         # check than the band it replaces - and HT-28's own floor is kept beside it.
-        chk("B · %d · a one-line row is 30px (47 before HT-28, 40 after it, %d now)" % (w, m['single']),
-            m['single'] == 30 and rowd >= 0.10, m['single'])
+        # AMENDED BY NAME, HT-31 (paste 143 S3.12), 2026-09-22: 30 -> 26 on the desktop, Cory's "a tad
+        # thinner one more time". The exact measurement is still what is asserted, which is the strength
+        # of this line; only the number it names has moved, and 26 is this wire's printed floor.
+        chk("B · %d · a one-line row is 27px - a 26.5px token rounded (47, then 40, then 30, %d now)" % (w, m['single']),
+            m['single'] == 27 and rowd >= 0.10, m['single'])
         chk("B · %d · text 14 -> 12.5px (-11%%), drawn box 22 -> 19px (-14%%), line-height still >= 1.35" % w,
             m['nm'] == '12.5px' and m['bx'] == [19, 19] and m['lh'] >= 1.35, m)
-        chk("B · %d · the hit targets stay 28x28 (golden_ht18 S3g)" % w, m['bxw'] == [28, 28] and m['edp'] == [28, 28], m)
+        # AMENDED BY NAME, HT-31 (paste 143 S3.12): 28 WIDE is unchanged and is still asserted; the
+        # height follows the row now, because a fixed-height control is a floor under every row holding
+        # it and the row had to get thinner. Asserted against the row it sits in, never against nothing.
+        chk("B · %d · the hit targets stay 28 wide and fill their row (golden_ht18 S3g)" % w,
+            m['bxw'][0] == 28 and m['edp'][0] == 28
+            and abs(m['bxw'][1] - m['row0']) <= 2 and abs(m['edp'][1] - m['row0']) <= 2, m)
         chk("B · %d · zero page errors" % w, not errs, errs[:2])
         await b.close()
     css = src(os.path.join(REPO, 'app.css'))
@@ -361,7 +411,11 @@ async def sec_c(pw):
     chk("C · a pull while someone is typing waits for them (deferred), and the text is untouched", ty['st']['deferred'] and ty['v'].endswith('typing'), ty)
     await pg.click('#bSet'); await pg.wait_for_timeout(600)
     stamp = await pg.evaluate("() => (document.getElementById('h28Synced')||{}).textContent")
-    chk("C · Settings says 'Synced \u00b7 HH:MM' on the Session line", bool(re.match(r'^Synced \u00b7 \d\d:\d\d$', stamp or '')), stamp)
+    # AMENDED BY NAME, HT-31 (paste 143 S2.8), 2026-09-22: "regular time, not military time"
+    # (Cory 9/21) reaches every clock a human reads, and the Session line is one of them. Same
+    # subject, same shape - a stamp saying when it last synced - in the form the app now uses.
+    chk("C · Settings says 'Synced \u00b7 h:mm AM/PM' on the Session line",
+        bool(re.match(r'^Synced \u00b7 \d{1,2}:\d\d[\s\u202f](AM|PM)$', stamp or '')), stamp)
     chk("C · zero page errors", not errs, errs[:2])
     await b.close()
 
@@ -428,6 +482,7 @@ async def sec_c(pw):
     await Bp.click('#rate button[data-r="7"]'); await Bp.wait_for_timeout(1400)
     sp = await A.evaluate(SRV_PRIV, k)
     chk("C · a stale device's rating cannot blank the other device's brain dump", sp and sp['rating'] == 7 and sp['dump'] == 'from A', sp)
+    await show_why(A); await show_why(Bp)
     await A.fill('#iWhy', 'why from A'); await A.wait_for_timeout(1100)
     await Bp.fill('#iWhy', 'why from B'); await Bp.wait_for_timeout(1100)
     await Bp.evaluate("() => document.activeElement && document.activeElement.blur()"); await Bp.wait_for_timeout(300)
@@ -548,6 +603,7 @@ async def sec_c_review(pw):
     await pg.add_init_script(init_js({'__SHARED_DB': True, '__SYNC_MS': 600000, '__FAIL_READ': ['day_private']}))
     await pg.goto(BASE); await pg.wait_for_timeout(3800)
     k = (await dates(pg))['today']
+    await show_why(pg)
     await pg.fill('#iWhy', 'offline why'); await pg.wait_for_timeout(1000)          # held: the load failed
     held8 = await pg.evaluate("() => window.__HT28c.state().ops")
     await pg.evaluate("() => { window.__FAIL_READ=null; window.__LAG=1500; window.__LAG_TABLE='habits'; }")
@@ -626,6 +682,7 @@ async def sec_c_review(pw):
     await pg.goto(BASE); await pg.wait_for_timeout(500); await pg.evaluate("() => localStorage.clear()")
     await pg.goto(BASE); await pg.wait_for_timeout(3500)
     k = (await dates(pg))['today']
+    await show_why(pg)
     await pg.fill('#iWhy', 'hel'); await pg.wait_for_timeout(1100)              # the save is now IN FLIGHT (900 ms write)
     await pg.focus('#iWhy'); await pg.keyboard.press('End'); await pg.keyboard.type('lo'); await pg.wait_for_timeout(4000)
     r5 = await pg.evaluate("(k) => ({ ring: window.__HT28c.lost(), ops: window.__HT28c.state().ops, srv: (JSON.parse(localStorage.getItem('mock.shared.v1')).day_private.find(d=>d.date===k)||{}).why })", k)
@@ -666,6 +723,7 @@ async def sec_d(pw):
     h = await pg.evaluate("() => [...document.querySelectorAll('#log .li')].find(r=>!r.classList.contains('on')).getAttribute('data-h')")
     await pg.click('#log .li[data-h="%s"]' % h); await pg.wait_for_timeout(900)
     await pg.click('#rate button[data-r="8"]'); await pg.wait_for_timeout(900)
+    await show_why(pg)
     await pg.fill('#iWhy', 'a good day'); await pg.wait_for_timeout(900)
     await pg.fill('#iDump', 'dump line'); await pg.wait_for_timeout(900)
     await pg.fill('#iTasks', '- one'); await pg.wait_for_timeout(900)
@@ -833,9 +891,16 @@ async def sec_f(pw):
     # Standards · Weekly ... a standard sits where HE put it, never where the clock would put it."
     # TIMED and ANYTIME are gone, so this reads the two sections a NEW standard lands in: one with a
     # planned time starts in Morning routine, one without starts in Standards. Same claim, current shape.
-    mo, st = order.index('#Morning routine'), order.index('#Standards')
-    chk("F19 · they render on a weekday: the two timed ones in Morning routine, the other in Standards",
-        mo < order.index(names[0]) < st and mo < order.index(names[2]) < st and order.index(names[1]) > st, order)
+    # AMENDED BY NAME, HT-31 (paste 143 S1.6), 2026-09-22: all three land in STANDARDS, times and all.
+    # Cory, 9/21: "when I set any nightly time it appears always in the morning routine" - the clause
+    # that sent a timed row to Morning is the defect, so an added standard now lands in Standards and he
+    # moves it where he wants it, which is Ruling 3's own sentence ("a standard sits where HE put it").
+    # THE LINE GOT STRONGER, not weaker: it used to read `index()` on a header that might not exist and
+    # would have CRASHED the section rather than failing it (134 R1), and now it asserts the header is
+    # present before it asserts what is under it.
+    chk("F19 · they render on a weekday: all three in Standards, because a clock places nothing",
+        '#Standards' in order and '#Morning routine' not in order
+        and all(order.index('#Standards') < order.index(n) for n in names), order)
     after = await pg.evaluate("(n) => JSON.stringify(window.__MOCK_DB.habits.filter(h=>n.indexOf(h.name)<0).map(h=>[h.id,h.name,h.cadence,h.sort_order,h.time_anchor||null]))", names)
     ups = await pg.evaluate("() => (window.__UPDATES||[]).filter(u=>u[0]==='habits').length")
     chk("F19 · every existing standard is untouched", before == after and ups == 0, [ups])
@@ -887,8 +952,13 @@ async def sec_g(pw):
     # AMENDED BY NAME, HT-30 (paste 137 S1.4): the four examples are unchanged and are still asserted
     # name for name, cadence for cadence, planned time for planned time. Only the ORDER of the headers
     # they land under moved, because Cory's 9/20 review moved it.
-    chk("G21 · one tap starts from four EXAMPLES across Morning routine, Weekly routine and Standards",
-        e['rows'] == 4 and e['heads'] == ['Morning routine', 'Weekly routine', 'Standards'] and not e['card']
+    # AMENDED BY NAME, HT-31 (paste 143 S1.6), 2026-09-22: two headers, not three. THE FOUR EXAMPLES ARE
+    # UNCHANGED and are still asserted name for name, cadence for cadence, planned time for planned time -
+    # 07:00 and 22:30 are still carried, still stored, still rendered. What moved is only where a row with
+    # no section of its own lands: a clock does not place anything any more (Cory 9/21), so the weekly one
+    # is in Weekly routine and the other three are in Standards, which is where he moves them from.
+    chk("G21 · one tap starts from four EXAMPLES across Weekly routine and Standards",
+        e['rows'] == 4 and e['heads'] == ['Weekly routine', 'Standards'] and not e['card']
         and e['ins'] == [['Move for 20 minutes|daily|07:00', 'Read 10 pages|daily|', 'Lights out|daily|22:30', 'Plan the week|weekly|']], e)
     # edit: rename + Days + delete, all in the app
     rid = await pg.evaluate("() => [...document.querySelectorAll('#log .li')].find(r=>/Read 10 pages/.test(r.textContent)).getAttribute('data-h')")
