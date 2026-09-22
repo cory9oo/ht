@@ -8067,6 +8067,12 @@ function earned(k){ return committed() - remaining(k); }
     'Rate the day 1\u201310 and write why in a line.',
     'Journal, completed, prayer \u2014 write as much or as little as you want.',
     'Tap \u270e beside a standard to change its name, time or days, or add your own.',
+    /* HT-31 S6.20 (paste 143): the four sections, in one sentence, to the person meeting them for the
+       first time. Before this the headers were the only explanation of themselves, and a new account
+       met four of them with nothing said - which is the moment someone decides an app is fussy. It
+       also says the thing Cory's 9/15 ruling turns on: HE places them, and nothing else does. */
+    'Your day has four parts \u2014 Morning routine, Night routine, Weekly routine and Standards \u2014 ' +
+      'and you put each standard where you want it; nothing moves it on its own.',
     'Your journal is yours. The app never shows it to anyone else \u2014 including Cory.'
   ];
 

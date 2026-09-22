@@ -939,7 +939,11 @@ async def sec_g(pw):
     s = await pg.evaluate("() => { const c=document.getElementById('h28First'); return { kind: c && c.classList.contains('on') ? c.getAttribute('data-kind') : null, lines:[...document.querySelectorAll('#h28First .h28l li')].map(l=>l.textContent), auth: JSON.parse(localStorage.getItem('mock.auth')||'[]'), rows: document.querySelectorAll('#log .li').length, ex: !!document.querySelector('#log .h28ex'), add: !!document.querySelector('#log .h28add') }; }")
     chk("G21 · Create signs up (the confirmation link returns to the app)",
         s['auth'] and s['auth'][0]['kind'] == 'signUp' and (s['auth'][0]['redirect'] or '').endswith('index.html'), s['auth'])
-    chk("G23 · a new account opens on the five-line card", s['kind'] == 'first' and len(s['lines']) == 5, s)
+    # AMENDED BY NAME, HT-31 (paste 143 S6.20), 2026-09-22: five lines -> six. The new one names the four
+    # sections and says the person places them - the one thing a new account cannot work out from four
+    # bare headers, and the sentence Cory's 9/15 ruling turns on. The card's SHAPE is what this line
+    # claims and that is unchanged; G22 below still pins the LAST line, so the statement stays last.
+    chk("G23 · a new account opens on the six-line card", s['kind'] == 'first' and len(s['lines']) == 6, s)
     chk("G22 · the card's fifth line is the statement, verbatim", s['lines'][-1:] == [PRIV_LINE], s['lines'][-1:])
     chk("G21 · no standards and no examples are written until a tap (the list offers them, plus + Add standard)",
         s['rows'] == 0 and s['ex'] and s['add'] and await pg.evaluate("() => (window.__INSERTS||[]).length") == 0, s)

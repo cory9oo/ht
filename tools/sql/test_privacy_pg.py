@@ -417,6 +417,26 @@ def main() -> int:
         chk("S6.19 · ht29_member_day's RESULT TYPE cannot carry a journal column - not one of five",
             shape and not leaks, [leaks, shape[:120]])
 
+        # ht_pending.sql's PREAMBLE is the only line of SQL in this estate that no single migration
+        # carries, so it is the only one the per-migration proofs above cannot reach. It is proven here,
+        # on the same database, both ways round: silent when every table is protected, and raising by
+        # name when one is not. "One paste, forever" rests on it refusing rather than half-applying.
+        print("HT-31 · the one-paste preamble")
+        pending = read("ht_pending.sql")
+        pre = pending[pending.index("do $ht_pending$"):pending.index("$ht_pending$;") + len("$ht_pending$;")]
+        run_script(c, pre)
+        chk("S6.18 · with row level security on everywhere, the preamble passes in silence", True)
+        run_script(c, "alter table public.circle_members disable row level security")
+        raised = ""
+        try:
+            run_script(c, pre)
+        except Exception as e:                       # noqa: BLE001 - the message IS the assertion
+            raised = str(e)
+        c.rollback()
+        chk("S6.18 · with it OFF on one table the whole paste REFUSES, and names the table",
+            "row level security is OFF" in raised and "circle_members" in raised, raised[:140] or "IT RAN")
+        run_script(c, "alter table public.circle_members enable row level security")
+
         print("AGAIN · a second run changes nothing")
         run_script(c, migration)
         chk("S4 · second run: the policy set is identical",
