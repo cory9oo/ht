@@ -698,6 +698,13 @@ async def P10(pw):
     pg = await b.new_page(viewport={'width': 1280, 'height': 800})
     errs = []
     pg.on('pageerror', lambda e: errs.append(str(e)))
+    # HT-31 (paste 143 S4.14), 2026-09-22: this check is about the DETAIL page's LAYOUT at 390 - "at most
+    # two across, and no sideways scroll" - and it reaches it the way HT-21 documented, through the
+    # Insights page, because the DETAIL door is desktop-only. HT-31 hides that page's More drawer on the
+    # phone (Cory asked for four blocks and nothing under them), and DETAIL lives inside it. Hidden,
+    # never deleted - so the check asks for the extras and goes on measuring the same page. What it
+    # asserts has not moved a millimetre.
+    await pg.add_init_script("window.__HT31_EXTRAS=true")
     await pg.goto(BASE); await pg.wait_for_timeout(3300)
     await pg.evaluate(OPEN_DETAIL)
     await pg.set_viewport_size({'width': 390, 'height': 844}); await pg.wait_for_timeout(1200)

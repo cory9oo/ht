@@ -414,7 +414,12 @@ async def sec_s4(pw):
             chk('S4d . phone . the "why" field is off the layout', why['exists'] and not why['shown'], why)
             chk('S4e . phone . the 1-10 rating stays', why['rating'], why)
         else:
-            chk('S4d . desktop . the "why" field is untouched', why['shown'], why)
+            # AMENDED BY NAME, HT-31 (paste 143 S5.16), 2026-09-22: Cory, 9/21 - "on the desktop
+            # remove the why journal box as well". HT-30 took it off the phone and this branch carried
+            # the desktop; there is no width left that shows it. UNTOUCHED still means untouched - the
+            # element, the column and every word in it - so that is what is asserted, plus not shown.
+            chk('S4d . desktop . the "why" field is off the layout and still present',
+                why['exists'] and not why['shown'], why)
         await no_errors(pg, errs, 'S4 (%s)' % tag)
         await b.close()
     js = src(os.path.join(REPO, 'app.js'))
@@ -484,8 +489,12 @@ async def sec_s5(pw):
 # =============================================================================================
 # S6 . ONE INSIGHTS PAGE, ONE TAB
 # =============================================================================================
-CARDS = ['Month . completion', 'Month . rating', 'Completion and rating over time',
-         'The life', 'The group, side by side', 'What makes a good day']
+CARDS_HT30 = ['Month . completion', 'Month . rating', 'Completion and rating over time',
+              'The life', 'The group, side by side', 'What makes a good day']
+# HT-31 (paste 143 S4.13): Cory's four, in his order. The six above are what HT-30 put there and are
+# kept as a record of what the drawer now holds - S6e reads them back out of it.
+CARDS_HT31 = ['The month', 'The year', 'The life', 'The group, side by side']
+CARDS = CARDS_HT31
 
 
 async def sec_s6(pw):
@@ -496,15 +505,44 @@ async def sec_s6(pw):
         b, pg, errs = await open_page(pw, w, h, flags=flags)
         tabs = await pg.eval_on_selector_all(
             sel, 'ns => ns.filter(n => !n.hasAttribute("hidden")).map(n => n.textContent.trim())')
+        # AMENDED BY NAME, HT-31 (paste 143 S4.15), 2026-09-22: on the DESKTOP there is one door and
+        # no Insights page at all - "the insights on the desktop, remove that completely" - so this
+        # section asserts the removal there and keeps every one of its original checks on the phone,
+        # which is where Cory's four blocks live. The old `await pg.click(door)` on a tab that no longer
+        # exists is why this section CRASHED before it was amended, taking 20 later assertions with it
+        # (134 R1: a crashed suite is not a passing one).
+        if tag == 'desktop':
+            chk('S6a . desktop . ONE door, and no Insights page behind a second',
+                tabs == ['Today'], tabs)
+            gone = await pg.evaluate("""() => { const n=document.getElementById('h30Ins');
+                const vis=e => !!(e && e.offsetParent);
+                return { page: !!(n && getComputedStyle(n).display !== 'none' && n.offsetParent),
+                         bar: vis(document.getElementById('vTabs')),
+                         strip: vis(document.querySelector('#tStrip .go')),
+                         month: vis(document.getElementById('h16Month')),
+                         year: vis(document.getElementById('h16Year')),
+                         life: vis(document.getElementById('h16Ins')),
+                         group: vis(document.getElementById('h18Group')) }; }""")
+            chk('S6b . desktop . no page, no tab bar, no header link',
+                not gone['page'] and not gone['bar'] and not gone['strip'], gone)
+            chk('S6c . desktop . and the four panels it used to hold are on the main view',
+                gone['month'] and gone['year'] and gone['life'] and gone['group'], gone)
+            await no_errors(pg, errs, 'S6 (%s)' % tag)
+            await b.close()
+            continue
         chk('S6a . %s . two doors, and the second one is Insights' % tag,
             tabs == ['Today', 'Insights'], tabs)
         # R70.211 . reached BY CLICKING, never by a URL
-        door = '#vTabs [data-v="views"]' if tag == 'desktop' else '#h29Bar [data-t29="insights"]'
+        door = '#h29Bar [data-t29="insights"]'
         await pg.click(door)
         await pg.wait_for_timeout(1400)
         page = await pg.evaluate("""() => { const n=document.getElementById('h30Ins');
             const vis = n && getComputedStyle(n).display !== 'none';
-            const cards = n ? [...n.querySelectorAll('#h30InsBody > .h30c > .lab')].map(x => x.textContent.trim()) : [];
+            /* HT-31: VISIBLE cards. What left this page is hidden and never deleted, so a probe that
+               counts nodes would report no change at all - and S6e below is the line that proves the
+               hidden ones are still there, which is the other half of the same sentence. */
+            const cards = n ? [...n.querySelectorAll('#h30InsBody > .h30c')].filter(c => c.offsetParent)
+                               .map(c => { const l = c.querySelector(':scope > .lab'); return l ? l.textContent.trim() : c.id; }) : [];
             const more = document.getElementById('h30InsMoreBody');
             return { vis: !!vis, cards: cards,
                      ledgerOnPage: !!(n && n.querySelector('#h30InsBody #h26Jrn')),
@@ -512,8 +550,13 @@ async def sec_s6(pw):
                      moreKeeps: more ? [...more.children].map(x => x.id).filter(Boolean) : [],
                      sw: document.documentElement.scrollWidth, cw: document.documentElement.clientWidth }; }""")
         chk('S6b . %s . the page is on screen' % tag, page['vis'], page)
-        chk('S6c . %s . and holds exactly his five outputs plus the card that explains a rating' % tag,
-            [c.replace(u'\u00b7', '.') for c in page['cards']] == CARDS, page['cards'])
+        # AMENDED BY NAME, HT-31 (paste 143 S4.13), 2026-09-22: Cory, 9/21 - "phone insights: only the
+        # month line chart, the year line chart, the full life graph and the group circle details". Four,
+        # in that order, and the ones that left are HIDDEN not deleted, which S6e below already proves by
+        # reading them out of the drawer. The old six are kept in `CARDS_HT30` so the list this replaces
+        # is still written down rather than forgotten.
+        chk('S6c . %s . and holds exactly his four, in his order' % tag,
+            [c.replace(u'\u00b7', '.') for c in page['cards']] == CARDS_HT31, page['cards'])
         chk('S6d . %s . NO entry list of any kind is on it' % tag, not page['ledgerOnPage'], page)
         chk('S6e . %s . the journal ledger is kept, one tap down (R70.138)' % tag, page['ledgerKept'], page['moreKeeps'])
         chk('S6f . %s . nothing else that used to live on Views was deleted' % tag,

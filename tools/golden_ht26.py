@@ -69,6 +69,13 @@ async def open_page(pw, w=390, h=844, touch=True, flags=None):
     pg.on('pageerror', lambda e: errs.append(str(e)))
     pg.on('console', lambda m: errs.append('console:' + m.text)
           if m.type == 'error' and 'net::' not in m.text else None)
+    # HT-31 (paste 143 S4.14), 2026-09-22: this suite is HT-26's, and the page it is about - HT-26's
+    # Insights panel and the journal ledger with its search and export - is hidden on the phone now,
+    # because Cory asked for four blocks and nothing under them. Hidden, NEVER DELETED (R70.138), and
+    # the difference between those two words is a suite that still runs: every page this file opens asks
+    # for the extras, so all 27 of its assertions keep proving the panel works the day anyone turns it
+    # back on. `golden_ht31` S4 proves the other half - that it is off by default.
+    flags = dict(flags or {}, __HT31_EXTRAS=True)
     if flags:
         await pg.add_init_script("; ".join("window.%s=%s" % (k, json.dumps(v)) for k, v in flags.items()))
     await pg.goto(BASE)

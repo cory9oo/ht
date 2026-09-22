@@ -535,14 +535,19 @@ async def sec_s6(pw):
     b, pg, errs = await open_page(pw, 390, 844, flags=dict(SQL, __NO_HABITS=True))
     t0 = time.time()
     card = await pg.evaluate("""() => { const c=document.getElementById('h28First');
-      return c ? { on:c.classList.contains('on'), lines:[...c.querySelectorAll('li,p,.fl')].length,
-                   text:(c.innerText||'').slice(0, 400) } : null; }""")
+      return c ? { on:c.classList.contains('on'), lines:c.querySelectorAll('.h28l li').length,
+                   ex: !!document.getElementById('h28Ex'),
+                   text:(c.innerText||'') } : null; }""")
     chk('S6f . a new account opens on the card, and it names the four sections',
         card and card['on'] and 'Morning routine' in card['text'] and 'Standards' in card['text'],
         card and card['text'][:140])
     chk('S6g . the starter list is EXAMPLES - not blank, and not anyone else\'s standards',
-        card and 'Move for 20 minutes' in card['text'] and 'Read 10 pages' in card['text'], card and card['text'][:120])
-    await pg.click('#h28Seed')
+        card and card['ex'] and 'Move for 20 minutes' in card['text'] and 'Read 10 pages' in card['text'],
+        card and card['text'][:160])
+    # `#h28Ex` ("Start with 4 examples") is the FIRST-RUN card's button. `#h28Seed` belongs to the
+    # add-LINK card, which a new account never sees - clicking for it waited thirty seconds and then
+    # took the whole section down with it, which is how this one assertion cost 15 others.
+    await pg.click('#h28Ex')
     await pg.wait_for_timeout(1500)
     await pg.click('#log .li .bxw')
     await pg.wait_for_timeout(800)
