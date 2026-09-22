@@ -97,7 +97,37 @@ def lint():
     if not text_ok:
         offences.append((TOKENS, 0, '--ht-text', 'text must be #D6DCE6 (the wire says never #FFF)'))
 
+    offences += braces(checked)
     return offences, checked, ground
+
+
+def braces(checked):
+    """HT-31 (paste 143), 2026-09-22: A STYLESHEET THAT DOES NOT BALANCE IS ONE WHERE SOME RULES DO NOT
+    APPLY, AND NOTHING SAYS SO.
+
+    This wire removed a block and left its closing brace behind. One stray `}` at the top level, and
+    every rule written after it was discarded in silence - including the one putting the journal
+    archive back on the desktop, which then read as "the feature does not work" for half an hour.
+    The browser recovers from it; a person reading the file does not see it; and the colour lint above
+    had nothing to say about it.
+
+    Comments and strings are stripped first, because a brace inside either is not a brace."""
+    out = []
+    for name in checked:
+        path = os.path.join(APP, name)
+        try:
+            src = io.open(path, encoding='utf-8').read()
+        except OSError:
+            continue
+        clean = re.sub(r'/\*.*?\*/', '', src, flags=re.S)
+        clean = re.sub(r'"[^"\n]*"', '', clean)
+        clean = re.sub(r"'[^'\n]*'", '', clean)
+        d = clean.count('{') - clean.count('}')
+        if d:
+            out.append((name, 0, '%d { vs %d }' % (clean.count('{'), clean.count('}')),
+                        'the braces do not balance (%+d) - every rule after the stray one is silently '
+                        'discarded by the browser' % d))
+    return out
 
 
 def main():

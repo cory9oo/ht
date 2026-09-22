@@ -527,6 +527,23 @@ async def sec_s6(pw):
                 not gone['page'] and not gone['bar'] and not gone['strip'], gone)
             chk('S6c . desktop . and the four panels it used to hold are on the main view',
                 gone['month'] and gone['year'] and gone['life'] and gone['group'], gone)
+            # THE DESKTOP BRANCH ASSERTS AS MUCH AS THE ONE IT REPLACES, which is not a nicety: the
+            # merge gate reads a lost PASS as a regression, and it is right to - a section that checks
+            # three things where it used to check six has quietly stopped watching half the room.
+            kept = await pg.evaluate("""() => { const vis=e => !!(e && e.offsetParent);
+                const j=document.getElementById('h26Jrn');
+                return { ledger: vis(j),
+                         find: !!(j && j.querySelector('input,[data-c5find]')),
+                         inDom: ['h16Month','h16Year','h16Ins','h26Ins','h26Jrn','vViews']
+                                  .filter(i => !!document.getElementById(i)).length,
+                         sw: document.documentElement.scrollWidth,
+                         cw: document.documentElement.clientWidth }; }""")
+            chk('S6d . desktop . the journal ledger came back with the tab, it did not go with it',
+                kept['ledger'], kept)
+            chk('S6e . desktop . and nothing that lived on Views was deleted - all six are in the DOM',
+                kept['inDom'] == 6, kept)
+            chk('S6f . desktop . no horizontal scroll with the tab gone',
+                kept['sw'] <= kept['cw'] + 1, kept)
             await no_errors(pg, errs, 'S6 (%s)' % tag)
             await b.close()
             continue
