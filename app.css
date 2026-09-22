@@ -2837,15 +2837,16 @@ html[data-simple] #vTabs [data-v][hidden]{ display:none !important }
 .h31inv{ display:flex; gap:8px; padding-top:10px }
 #h29JoinWho{ color:var(--text) }
 
-/* ---- S4.15's OTHER CASUALTY · THE JOURNAL ARCHIVE KEEPS A DOOR ------------------------------------
+/* ---- S4.15's OTHER CASUALTY · THE JOURNAL ARCHIVE KEEPS A DOOR, AND IT IS SETTINGS ----------------
    HT-26's journal ledger - every day you have written, with SEARCH and EXPORT - was reachable on the
-   desktop only through the Insights tab, and on the phone only inside that page's More. This wire
-   removes the tab (Cory 9/21) and the More (his four blocks), which between them were the ledger's
-   only two doors: it became unreachable on BOTH widths, and nothing on screen would have said so.
-   That is not what he asked for - he asked for the INSIGHTS to go - and S4.15's own instruction covers
-   it: "if any lived only in the tab, move it to the main view first". So on the desktop, where there
-   is no tab any more, the ledger sits on the main view. It was one tap away before; it is none now.
-   `golden_ht30` S6d asserts it, so it cannot go quiet again. */
-@media(min-width:1024px){
-  html[data-simple] #h26Jrn{ display:block }
-}
+   desktop only through the Insights tab and on the phone only inside that page's More. This wire
+   removes the tab (Cory 9/21) and the More (his four blocks): those were its only two doors, so it
+   became unreachable on BOTH widths and nothing on screen would have said so. He asked for the
+   INSIGHTS to go, not the archive.
+   IT DOES NOT GO IN THE GRID. Tried that first: as a grid child it took a quadrant's place and cost
+   HT-18's "COMPLETION and LIFE are FULL height" contract 24px at both widths (`golden_ht18` S1b), and
+   that evenness is the thing Cory asked for (R70.306). Spanning the row did not help - an extra row is
+   still an extra row.
+   So it goes where the stylesheet already expected it: `#ov #h26Jrn` two hundred lines up shows it
+   inside an overlay, and Settings -> Journal is where "download my journal" already lives. One door,
+   the right one, and the four quarters are untouched. `golden_ht30` S6d asserts it. */

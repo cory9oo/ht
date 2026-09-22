@@ -11913,12 +11913,28 @@ var HT31_DESK_WHY = false;
     var live = Array.prototype.slice.call(host.children).filter(function(n){ return n.offsetParent; });
     host.classList.toggle('h31empty', live.length === 0 && !String(host.textContent || '').trim());
   }
+  /* S4.15's other casualty, answered: the journal ARCHIVE follows "download my journal" into
+     Settings -> Journal, because this wire took away both of the doors it used to have. It is moved
+     once, when Settings opens, and `#ov #h26Jrn` (app.css, HT-26's own rule) is what shows it there. */
+  function jrnToSettings(){
+    if(HT31_DESK_INSIGHTS) return;                 // the tab is back: leave the archive where it was
+    var j = h31El('h26Jrn'), host = h31El('j29Set');
+    if(!j || !host || j.parentNode === host) return;
+    host.appendChild(j);
+  }
+  var _osJ = openSettings;
+  openSettings = function(){
+    var out = _osJ.apply(null, arguments);
+    setTimeout(function(){ try{ jrnToSettings(); }catch(e){ warn31('journal archive', e); } }, 260);
+    return out;
+  };
+
   var _pa = paintAll;
   paintAll = function(){ var out = _pa.apply(null, arguments); try{ off(); }catch(e){ warn31('why off', e); } return out; };
   document.addEventListener('click', function(){ setTimeout(function(){ try{ off(); }catch(e){} }, 60); }, true);
   if(document.readyState === 'complete') setTimeout(off, 400);
   else window.addEventListener('load', function(){ setTimeout(off, 400); });
-  window.__HT31WHY = { off: off, rateRow: rateRow };
+  window.__HT31WHY = { off: off, rateRow: rateRow, jrnToSettings: jrnToSettings };
 })();
 
 

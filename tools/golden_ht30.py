@@ -530,16 +530,22 @@ async def sec_s6(pw):
             # THE DESKTOP BRANCH ASSERTS AS MUCH AS THE ONE IT REPLACES, which is not a nicety: the
             # merge gate reads a lost PASS as a regression, and it is right to - a section that checks
             # three things where it used to check six has quietly stopped watching half the room.
+            # THE ARCHIVE'S DOOR IS SETTINGS, and this is the line that proves it is a door at all.
+            # It had two - the desktop tab and the phone's More - and this wire closes both, so a check
+            # that only asked "is it still in the DOM" would have passed while the feature became
+            # unreachable on every width. It is opened the way a person opens it.
+            await pg.evaluate("() => { const b=document.getElementById('bSet'); if(b) b.click(); }")
+            await pg.wait_for_timeout(1400)
             kept = await pg.evaluate("""() => { const vis=e => !!(e && e.offsetParent);
                 const j=document.getElementById('h26Jrn');
-                return { ledger: vis(j),
+                return { ledger: vis(j), inSettings: !!(j && j.closest('.ov')),
                          find: !!(j && j.querySelector('input,[data-c5find]')),
                          inDom: ['h16Month','h16Year','h16Ins','h26Ins','h26Jrn','vViews']
                                   .filter(i => !!document.getElementById(i)).length,
                          sw: document.documentElement.scrollWidth,
                          cw: document.documentElement.clientWidth }; }""")
-            chk('S6d . desktop . the journal ledger came back with the tab, it did not go with it',
-                kept['ledger'], kept)
+            chk('S6d . desktop . the journal archive is reachable - Settings -> Journal, with its search',
+                kept['ledger'] and kept['inSettings'] and kept['find'], kept)
             chk('S6e . desktop . and nothing that lived on Views was deleted - all six are in the DOM',
                 kept['inDom'] == 6, kept)
             chk('S6f . desktop . no horizontal scroll with the tab gone',
