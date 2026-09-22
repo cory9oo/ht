@@ -5671,8 +5671,16 @@ function earned(k){ return committed() - remaining(k); }
        tasks above it. Measured both ways in `_reconcile/ht_stage/143/recon143.py`.
        While the sections are on they own the order; this renderer stays whole behind
        HT29_SECTIONS=false (R70.138) and re-asserts the sections instead of fighting them. */
-    if(typeof HT29_SECTIONS !== 'undefined' && HT29_SECTIONS && window.__HT29S2){
-      try{ window.__HT29S2.regroup(); }catch(e){ if(typeof warn31==='function') warn31('regroup from reorderToday', e); }
+    if(typeof HT29_SECTIONS !== 'undefined' && HT29_SECTIONS){
+      /* THE RETURN IS OUTSIDE THE SEAM CHECK ON PURPOSE. Written as `HT29_SECTIONS && window.__HT29S2`,
+         a missing seam fell through to the body below - which rebuilds the list as "timed rows, then
+         one ANYTIME header", the exact thing in Cory's 9/21 screenshot. A defect this wire removed must
+         not be one broken reference away from coming back. With sections on, this renderer does not
+         run: it re-asserts them if it can, and does nothing at all if it cannot. */
+      if(window.__HT29S2){
+        try{ window.__HT29S2.regroup(); }
+        catch(e){ if(typeof warn31==='function') warn31('regroup from reorderToday', e); }
+      }else if(typeof warn31==='function'){ warn31('sections are on but __HT29S2 is missing', 1); }
       return;
     }
     var order=sortToday(S.habits.slice());
@@ -9722,8 +9730,8 @@ var HT29INS = (function(){
        appears - the GROUP panel is the other, and there is no third. Same control, same three routes
        (`__HT31GRP.share`), reached by the same `data-h29invite`. */
     var body = HT29GRP.table(circleRows29());
-    if(HT31_INVITE) body += '<div class="tools h31inv"><button class="btn pri" data-h29invite="1" ' +
-                            'type="button">Invite</button></div>';
+    if(HT31_INVITE && h31CanInvite(circle)) body += '<div class="tools h31inv"><button class="btn pri" ' +
+                            'data-h29invite="1" type="button">Invite</button></div>';
     return card('group', 'The group side by side', body);
   }
   function render(){
@@ -11272,8 +11280,11 @@ var HT30GRP = (function(){
         /* HT-31 S7.21: ONE control, named Invite - "Invite someone" reads as a description of a
            place rather than a button. S7.23: Reset link kills the old one the moment the new one is
            written, which is the only honest answer to "I sent that link to the wrong person". */
-        '<div class="tools"><button class="btn pri" id="g29Invite" data-h29invite="1" type="button">Invite</button>' +
-        '<button class="btn" id="h31Reset" type="button">Reset link</button>' +
+        '<div class="tools">' +
+        (h31CanInvite(c)
+          ? '<button class="btn pri" id="g29Invite" data-h29invite="1" type="button">Invite</button>' +
+            '<button class="btn" id="h31Reset" type="button">Reset link</button>'
+          : '<span class="note">Only the person who started this group can send the link.</span>') +
         '<span style="flex:1"></span><button class="btn" id="h30Leave" type="button">Leave</button></div>' +
         '<div class="note" id="g29Msg" style="padding-top:12px"></div>';
     }
@@ -11506,9 +11517,18 @@ var HT31_SECTIONS_LOCAL = true;
       if(!h){ forget(id); return; }
       if(String(h.section || '') === String(m[id])){ forget(id); return; }
       if(h.section){ forget(id); return; }
+      /* AN UPDATE THAT MATCHES NO ROW IS NOT AN ERROR TO PostgREST - this file learned that at
+         app.js:1833 and HT-31 nearly paid for it again. This `forget()` deletes the ONLY copy of a
+         placement Cory made, so it may not run on anything weaker than a row coming back: `.select('id')`
+         makes the count readable, and an RLS refusal, a check constraint or a zero-row match all land
+         here as "not written" instead of as success. The device keeps its copy and tries again. */
       try{
-        window.sb.from('habits').update({section: m[id]}).eq('id', id).eq('user_id', S.me.id)
-          .then(function(){ h.section = m[id]; forget(id); }, function(e){ warn31('section push', e); });
+        window.sb.from('habits').update({section: m[id]}).eq('id', id).eq('user_id', S.me.id).select('id')
+          .then(function(res){
+            if(res && res.error){ warn31('section push refused', res.error); return; }
+            if(!res || !res.data || !res.data.length){ warn31('section push matched no row', id); return; }
+            h.section = m[id]; forget(id);
+          }, function(e){ warn31('section push', e); });
       }catch(e){ warn31('section push', e); }
     });
   }
@@ -11564,11 +11584,22 @@ var HT31_SECTIONS_LOCAL = true;
   function move(id, sec){
     var h = (S.habits || []).filter(function(x){ return String(x.id) === String(id); })[0];
     if(!h) return Promise.resolve(false);
+    /* THE ROW IS DISMISSED ONLY ONCE THE MOVE IS REAL. Hiding it first meant a failed write left the
+       task where the bug put it AND took away the one tap that would have fixed it - permanently,
+       because `hide()` is remembered. Same reason as the two above: no error is not the same as a row. */
     h.section = sec;
-    hide(String(id));
-    if(!S.hasSection || !window.sb || !S.me){ if(window.__HT31SEC) window.__HT31SEC.place(id, sec); return Promise.resolve(true); }
-    return window.sb.from('habits').update({section: sec}).eq('id', id).eq('user_id', S.me.id)
-      .then(function(){ return true; }, function(e){ warn31('moved undo', e); return false; });
+    if(!S.hasSection || !window.sb || !S.me){
+      if(window.__HT31SEC) window.__HT31SEC.place(id, sec);
+      hide(String(id));
+      return Promise.resolve(true);
+    }
+    return window.sb.from('habits').update({section: sec}).eq('id', id).eq('user_id', S.me.id).select('id')
+      .then(function(res){
+        if(res && res.error){ warn31('moved undo refused', res.error); return false; }
+        if(!res || !res.data || !res.data.length){ warn31('moved undo matched no row', id); return false; }
+        hide(String(id));
+        return true;
+      }, function(e){ warn31('moved undo', e); return false; });
   }
   window.__HT31MOVED = { list: list, move: move, hide: hide, suspect: suspect };
 })();
@@ -11653,10 +11684,16 @@ var HT31_GHOST_CHIP_SECTIONS = ['morning', 'night'];
     try{ paintAll(); }catch(e){ warn31('repaint after time', e); }
     if(HT29SEC.sectionOf(h) !== before) warn31('section moved by a time - that is a defect', before);
     try{
-      var res = await sb.from('habits').update(rec).eq('id', h.id).eq('user_id', S.me.id);
+      var res = await sb.from('habits').update(rec).eq('id', h.id).eq('user_id', S.me.id).select('id');
       if(res && res.error){ toast('not saved — ' + String(res.error.message || '').slice(0, 60)); return; }
+      if(!res || !res.data || !res.data.length){ toast('not saved — the standard was not found'); return; }
       toast(t ? 'time set ' + fmtTime(t) : 'time cleared');
-    }catch(e){ warn31('time save', e); }
+    }catch(e){
+      /* THE CHIP HAS ALREADY BEEN REPAINTED with the new time, so silence here is a lie on screen: it
+         would read 9:45 PM until the next load and then not. A dropped network is the ordinary case. */
+      warn31('time save', e);
+      toast('not saved — no connection. The time will be gone when this page reloads.');
+    }
   }
 
   function close(save){
@@ -11902,6 +11939,17 @@ var HT31_DESK_WHY = false;
 var HT31_INVITE = true;
 var HT31_CODE_CHARS = 26;                       /* 26 x log2(31) = 128.8 bits */
 var HT31_MEMBERS_CAN_INVITE = true;             /* SPEC default; the column overrides it when it exists */
+/* THE COLUMN IS READ, OR THE MIGRATION DOCUMENTS A SWITCH THAT DOES NOT EXIST. `circles.members_can_invite`
+   defaults to true, so this changes nothing for anybody until a group's starter turns it off - and then it
+   has to actually turn it off. A group with no column, or a circle we cannot see, reads as true: the
+   default is the permissive one and a missing answer must not lock a member out of inviting. */
+function h31CanInvite(circle){
+  if(!circle) return HT31_MEMBERS_CAN_INVITE;
+  if(circle.members_can_invite === false){
+    return !!(S && S.me && String(circle.owner || '') === String(S.me.id));
+  }
+  return true;
+}
 (function(){
   var ALPHA = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';   /* no I/L/O/0/1 - a code gets read aloud */
 
@@ -11963,8 +12011,16 @@ var HT31_MEMBERS_CAN_INVITE = true;             /* SPEC default; the column over
     var c = (st && st.circle) || (window.__HT31GRP && window.__HT31GRP.circle);
     if(!c || !c.id) return { ok: false, why: 'no group' };
     var code = newCode();
-    var r = await sb.from('circles').update({ join_code: code }).eq('id', c.id);
+    /* THIS ONE MATTERS MORE THAN THE OTHERS. The person is told "the one you sent before stops working
+       straight away", and until this write lands the old 128-bit code still buys a stranger the whole
+       group's standards, times and rating numbers. A PostgREST update that matches no row - which is
+       what an RLS refusal looks like - returns no error, so a bare `if(r.error)` would report a
+       revocation that did not happen. Nothing is reported as done that cannot be read back. */
+    var r = await sb.from('circles').update({ join_code: code }).eq('id', c.id).select('join_code');
     if(r && r.error) return { ok: false, why: 'Could not reset the link.' };
+    if(!r || !r.data || !r.data.length || r.data[0].join_code !== code){
+      return { ok: false, why: 'The link was NOT reset - the old one still works. Try again.' };
+    }
     c.join_code = code;
     return { ok: true, code: code };
   }

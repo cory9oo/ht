@@ -501,10 +501,34 @@ async def sec_s6(pw):
         'row level security is OFF' in pend and 'raise exception' in pend)
     chk('S6d . a rollback sits beside it',
         'drop function if exists public.ht31_circle_peek' in src(os.path.join(REPO, 'tools', 'sql', 'ht_pending_rollback.sql')))
-    import subprocess
+    import subprocess, time
     r = subprocess.run([sys.executable, os.path.join(REPO, 'tools', 'sql', 'build_pending.py'), '--check'],
                        capture_output=True, text=True)
     chk('S6e . and it is GENERATED, and committed in step with its parts (131 R1)', r.returncode == 0, r.stdout[-200:])
+
+    # S6.20 . A BRAND-NEW ACCOUNT, TIMED. Not "is there an onboarding" but "how long until the first
+    # check-off", measured on a phone profile with the clock running - which is the only form of that
+    # question a person would recognise. Everything before the first tick is a cost they did not choose.
+    b, pg, errs = await open_page(pw, 390, 844, flags=dict(SQL, __NO_HABITS=True))
+    t0 = time.time()
+    card = await pg.evaluate("""() => { const c=document.getElementById('h28First');
+      return c ? { on:c.classList.contains('on'), lines:[...c.querySelectorAll('li,p,.fl')].length,
+                   text:(c.innerText||'').slice(0, 400) } : null; }""")
+    chk('S6f . a new account opens on the card, and it names the four sections',
+        card and card['on'] and 'Morning routine' in card['text'] and 'Standards' in card['text'],
+        card and card['text'][:140])
+    chk('S6g . the starter list is EXAMPLES - not blank, and not anyone else\'s standards',
+        card and 'Move for 20 minutes' in card['text'] and 'Read 10 pages' in card['text'], card and card['text'][:120])
+    await pg.click('#h28Seed')
+    await pg.wait_for_timeout(1500)
+    await pg.click('#log .li .bxw')
+    await pg.wait_for_timeout(800)
+    secs = round(time.time() - t0, 1)
+    ticked = await pg.evaluate("""() => [...document.querySelectorAll('#log .li')].filter(r => r.classList.contains('on')).length""")
+    chk('S6h . and the first check-off is done in %ss - under sixty, on a phone, from a standing start' % secs,
+        ticked >= 1 and secs < 60, {'ticked': ticked, 'seconds': secs})
+    chk('S6i . zero page errors', not errs, errs[:2])
+    await b.close()
 
 
 # =============================================================================================
