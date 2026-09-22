@@ -11322,6 +11322,11 @@ var HT31_VERSION_EVERY_MS = 60000;
   function check(){
     if(!HT31_VERSION_WATCH) return;
     if(document.visibilityState === 'hidden') return;
+    /* A PAGE OPENED FROM DISK HAS NO DEPLOY BEHIND IT. `fetch` on a `file://` URL does not merely
+       fail, it logs a console error the caller cannot catch - which is a page error in the headless
+       harness and a red line in a real console. The harness runs the app from `file://`, so this is
+       not a test convenience: there is nothing to ask and nothing to ask it of. */
+    if(!/^https?:$/.test(location.protocol)) return;
     var url = 'version.json?t=' + Date.now();
     try{
       fetch(url, {cache: 'no-store'}).then(function(r){ return r.ok ? r.json() : null; })
@@ -11638,6 +11643,11 @@ var HT31_GHOST_CHIP_SECTIONS = ['morning', 'night'];
   function chips(){
     if(!HT31_TIME_PICKER) return;
     var log = h31El('log'); if(!log) return;
+    /* NEVER WHILE A DRAG IS IN FLIGHT. Inserting a ghost chip mid-drag changes the row the drag is
+       measuring, and the drop then lands somewhere the preview never showed - `golden_ht23` S2e
+       caught exactly that, 1 misplacement in 20 touch reorders, and it is the kind of defect a
+       person would report as "it put it back in the wrong place" without ever knowing why. */
+    if(log.classList.contains('reordering') || log.querySelector('.li.dragging')) return;
     Array.prototype.slice.call(log.querySelectorAll('.li')).forEach(function(r){
       var id = r.getAttribute('data-h'); if(!id) return;
       var pat = r.querySelector('.pat30') || r.querySelector('.pat');

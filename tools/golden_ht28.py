@@ -159,7 +159,13 @@ async def sec_a(pw):
     # A4 · compact, measured against 2,891px / 56px / 15px before (ht_stage/128/measure_phone_before.txt)
     chk("A4 · Today is shorter: scrollHeight %d < 2,891 before, by at least 10%%" % m['scrollH'], m['scrollH'] <= 2601, m['scrollH'])
     # AMENDED BY NAME, HT-30 (paste 137 S3.9): 44 -> 36. Same assertion, same two subjects, one number.
-    chk("A4 · every row is still a >= 36px tap target and the checkbox target is 36x36 (44 through HT-29)", m['rowMin'] >= 36 and m['bxw'] == [36, 36], [m['rowMin'], m['bxw']])
+    # AMENDED BY NAME, HT-31 (paste 143 S3.12), 2026-09-22: the row floor is 32 and the checkbox is
+    # 44 WIDE by the row's height. Cory asked for thinner rows again; the target got wider on the axis
+    # a finger actually needs while the row lost height, so this is not a loosening - the tap area is
+    # 44x32.5 where it was 36x36, which is larger.
+    chk("A4 · every row is still a >= 32px tap target and the checkbox target is 44 wide by the row",
+        m['rowMin'] >= 32 and m['bxw'][0] == 44 and abs(m['bxw'][1] - m['rowMin']) <= 2,
+        [m['rowMin'], m['bxw']])
     chk("A4 · standard names are 14px (15px before) and the duplicate time prefix is gone", m['nmFont'] == '14px' and m['tpfx'] == 0, [m['nmFont'], m['tpfx']])
     # AMENDED BY NAME, HT-30 (paste 137 S3.9 + S4.11): 584 -> 523 px. A measurement replaced by a
     # measurement: the rows above it are a quarter thinner, and the why's field AND its label are off

@@ -304,6 +304,10 @@ S3 = """() => {
       const cs=getComputedStyle(n); return cs.whiteSpace+'/'+cs.textOverflow;})
       .filter(v=>v && v!=='normal/clip'),
     bxw:B(bx), edp:B(ed),
+    /* HT-31 S3.12: the control fills ITS OWN row now, so the row it sits in is measured beside it.
+       `minRow` is the SHORTEST row in the list and a row whose name wraps is taller, so comparing a
+       control against `minRow` asks the wrong row. */
+    row0: B(r0),
     load: ld? {text:ld.textContent, box:B(ld)} : null,
     quad:{t:Math.round(qb.top), b:Math.round(qb.bottom)},
     logBox:{t:Math.round(lb.top), b:Math.round(lb.bottom)},
@@ -345,8 +349,13 @@ async def run_s3(pw):
         # rows about a quarter thinner on both widths (41 px -> 31 measured). The second half of this
         # line - every name wraps rather than being clipped - is what the check is really for, and it
         # is untouched; 30 still holds HT-18's 28x28 control with a pixel to spare.
-        chk("S3d · %s · every .li min-height >= 30 and every name wraps (white-space normal, clip)"
-            % t, m['minRow'] >= 30 and not m['nmWrap'], [m['minRow'], m['nmWrap'][:3]])
+        # AMENDED BY NAME, HT-31 (paste 143 S3.12), 2026-09-22: 30 -> 26 on the desktop. Cory asked
+        # for rows "a tad thinner one more time"; the desktop row is now ONE token (`--row-h-desk`,
+        # 26.5px measured, against 30.0px before) and 26 is the floor this wire sets. The other half of
+        # the assertion - that a name WRAPS rather than clips - is untouched, which is the half that
+        # protects his long standard names.
+        chk("S3d · %s · every .li min-height >= 26 and every name wraps (white-space normal, clip)"
+            % t, m['minRow'] >= 26 and not m['nmWrap'], [m['minRow'], m['nmWrap'][:3]])
         # e · the load line is pinned: scroll the list to its bottom and look again
         await pg.evaluate("()=>{const l=document.getElementById('log'); l.scrollTop=l.scrollHeight;}")
         await pg.wait_for_timeout(250)
@@ -368,10 +377,14 @@ async def run_s3(pw):
         # your last check-off now. The button stays in the DOM (R70.16) and in Advanced.
         chk("S3f · %s · CLOSE THE DAY is off the surface and still in the DOM (note 10)" % t,
             m['tClose'] is not None and m['tClose']['h'] == 0, m['tClose'])
-        chk("S3g · %s · the checkbox and the edit are 28x28 on the desktop (R70.186 supersedes the "
-            "44x44 golden_ht16 asserts)" % t,
-            m['bxw'] and m['bxw']['w'] == 28 and m['bxw']['h'] == 28
-            and m['edp'] and m['edp']['w'] == 28 and m['edp']['h'] == 28, [m['bxw'], m['edp']])
+        # AMENDED BY NAME, HT-31 (paste 143 S3.12), 2026-09-22: the WIDTH is still 28 and is still
+        # asserted; the HEIGHT is now the row's, because that is what let the row get thinner - a
+        # control with a fixed height is a floor under every row that holds it. So the height is
+        # asserted against the row it sits in (it fills it, within a pixel) rather than against 28.
+        chk("S3g · %s · the checkbox and the edit are 28 wide and fill the row's height" % t,
+            m['bxw'] and m['bxw']['w'] == 28 and abs(m['bxw']['h'] - m['row0']['h']) <= 2
+            and m['edp'] and m['edp']['w'] == 28 and abs(m['edp']['h'] - m['row0']['h']) <= 2,
+            [m['bxw'], m['edp'], m['row0']])
         chk("S3  · %s · zero page errors" % t, not errs, errs)
         await b.close()
     # AMENDED BY NAME, HT-30 (paste 137 S3.9), 2026-09-20: 44 -> 36 on the phone. Cory asked for rows
@@ -381,8 +394,13 @@ async def run_s3(pw):
     # named size, asserted on both controls - and only the number moved.
     b3, pg3, e3 = await open_page(pw, 390, 844, {'__BIGSET': True})
     m3 = await pg3.evaluate(S3)
-    chk("S3g · 390x844 · the phone's tap target is 36x36 (HT-30 S3.9; it was 44x44 through HT-29)",
-        m3['bxw'] and m3['bxw']['w'] == 36 and m3['edp'] and m3['edp']['w'] == 36,
+    # AMENDED BY NAME, HT-31 (paste 143 S3.12), 2026-09-22: 36 -> 44 WIDE on the phone, and the edit
+    # affordance to 32. HT-30 traded HT-16's 44px comfort floor (R70.98) for thinness because a square
+    # control is a floor under the row. It does not have to be a square: a finger needs the WIDTH, the
+    # row does not need the height. So the target got wider while the row got shorter, which is the
+    # rare change that is better on both counts, and the assertion follows it by name.
+    chk("S3g · 390x844 · the phone's tap target is 44 wide (HT-31 S3.12; 36 under HT-30, 44 before)",
+        m3['bxw'] and m3['bxw']['w'] == 44 and m3['edp'] and m3['edp']['w'] == 32,
         [m3['bxw'], m3['edp']])
     chk("S3  · 390x844 · zero page errors", not e3, e3)
     await b3.close()

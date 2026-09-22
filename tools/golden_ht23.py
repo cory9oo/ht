@@ -171,6 +171,7 @@ async def S2(pw):
                logReordering: log.classList.contains('reordering'),
                w: Math.round(g.getBoundingClientRect().width),
                h: Math.round(g.getBoundingClientRect().height),
+               rowH: Math.round(row.getBoundingClientRect().height),
                handles: document.querySelectorAll('#log .li .drg').length,
                rows: document.querySelectorAll('#log .li').length,
                focusable: g.tabIndex === 0, label: g.getAttribute('aria-label') }; }""")
@@ -182,8 +183,13 @@ async def S2(pw):
         m.get('rowTouchAction') not in ('none',), m)
     # AMENDED BY NAME, HT-30 (paste 137 S3.9): 44 -> 36, with the row. The keyboard path is untouched
     # and is still what the second half of this line asserts.
-    chk("S2d " + u"·" + " the handle is a 36x36 target and is focusable for the keyboard path (44x44 through HT-29)",
-        m.get('w') == 36 and m.get('h') == 36 and m.get('focusable'), m)
+    # AMENDED AGAIN BY NAME, HT-31 (paste 143 S3.12), 2026-09-22: the handle is 36 WIDE and fills its
+    # row's height. The width is the number a thumb needs and it is unchanged; the height stopped being
+    # a fixed square because a fixed-height control is a floor under every row that holds it, and the
+    # row had to get thinner. This row is 48px tall in the BIGSET fixture (a name that wraps), which is
+    # why the height is asserted against the row rather than against a constant.
+    chk("S2d " + u"·" + " the handle is 36 wide, fills its row, and is focusable for the keyboard path",
+        m.get('w') == 36 and abs(m.get('h', 0) - m.get('rowH', -99)) <= 2 and m.get('focusable'), m)
 
     # ---- 20 CONSECUTIVE TOUCH REORDERS, 0 MISPLACEMENTS ---------------------------------
     # A MISPLACEMENT IS MEASURED BY GEOMETRY, NOT BY A MODEL OF THE ALGORITHM. The first draft of

@@ -2727,8 +2727,10 @@ html[data-simple] .li .edp,
 html[data-simple] .li .drg{ height:auto; min-height:0; align-self:stretch }
 html[data-simple] .li .bxw{ flex:0 0 44px; width:44px }
 html[data-simple] .li .bx{ width:22px; height:22px }
-html[data-simple] .li .edp{ flex:0 0 32px; width:32px; font-size:12px }
-html[data-simple] .li .drg{ flex:0 0 32px; width:32px; font-size:12px }
+/* the edit and the drag handle KEEP their 36px width: a drag target is a target too, and
+   `golden_ht23` S2d measures it. Only their height follows the row. */
+html[data-simple] .li .edp{ flex:0 0 36px; width:36px; font-size:12px }
+html[data-simple] .li .drg{ flex:0 0 36px; width:36px; font-size:12px }
 @media (max-width:640px){
   html[data-simple] #log .li{ min-height:var(--row-h); padding:0; gap:4px }
   html[data-simple] #log .li .bxw{ flex:0 0 44px; width:44px; height:auto; min-height:0 }

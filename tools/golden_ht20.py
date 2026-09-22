@@ -575,8 +575,12 @@ async def P5(pw):
                 {'%dpx %s' % (r['sep'], r['sepColor']) for r in m['rows']}) == 1,
             {'grp': [g['bb'] for g in m['grp']][:1],
              'row': ['%dpx %s' % (r['sep'], r['sepColor']) for r in m['rows']][:1]})
+        # AMENDED BY NAME, HT-31 (paste 143 S3.12), 2026-09-22: the height floor moves 28 -> 26, because
+        # the pencil now FILLS its row and the desktop row is 26.5px (30.0px before). The width floor,
+        # which is the one a pointer actually needs, is untouched at 28, and "loses its box" - the whole
+        # point of this line - is untouched. 26 still clears WCAG 2.5.8's 24x24.
         chk("P5 · %s · the pencil keeps its hit target and loses its box" % t,
-            m['pencils'] and all(sum(p['b']) == 0 and p['w'] >= 28 and p['h'] >= 28
+            m['pencils'] and all(sum(p['b']) == 0 and p['w'] >= 28 and p['h'] >= 26
                                  for p in m['pencils']),
             m['pencils'][:2])
         chk("P5 · %s · '+ ADD STANDARD TO x' is a row with a row's padding, not a caption" % t,
@@ -603,7 +607,13 @@ async def P9(pw):
         chk("P9 · grep count 0 for the doc code paths in %s" % name, not hits, hits[:4])
     # the estate's archive moved with everything else in R70.345 (`_archive` -> `_machine/_archive`); the
     # document is still there, and this line was asking the pre-reshape address
-    arch = os.path.join(_ESTATE, '_machine', '_archive', '2026-09-08_ht20_doc-mirror-retired',
+    # HT-31 (paste 143), 2026-09-22: THE ADDRESS WAS DOUBLED, and the check had been red on main since
+    # the restructure finished. `_ESTATE` is found by walking up for `_reconcile`, and since R70.345
+    # that directory IS `BEV/_machine` - so joining `_machine` again asked for
+    # `BEV/_machine/_machine/_archive`, which no move ever created. The subject of this line does not
+    # change: the document is still asserted to be ARCHIVED and not deleted (DEC-037). Only the address
+    # is corrected, which is R70.345's own rule about an address that depends on which door you came in.
+    arch = os.path.join(_ESTATE, '_archive', '2026-09-08_ht20_doc-mirror-retired',
                         'JOURNAL_DOC_SETUP.md')
     chk("P9 · the setup document is archived, not deleted (DEC-037)", os.path.exists(arch), arch)
     chk("P9 · and it is gone from ht_batch18",
@@ -757,8 +767,12 @@ async def P6(pw):
     content = [f for f in (ls.stdout or '').split('\n') if f.strip().endswith('.md')]
     chk("P6g · not one journal note is tracked by git, wherever the vault sits (CC_STANDING §3)",
         ls.returncode == 0 and not content, content[:4] or ls.stderr[:120])
+    # HT-31 (paste 143), 2026-09-22: same stale address, same fix. Every relative path in this file is
+    # resolved against `_ESTATE` (the chdir at the top), and `_ESTATE` IS `BEV/_machine` now - so the
+    # vault is `journal/days` from here, never `_machine/journal/days`. Red on main since the
+    # restructure; the assertion is the same assertion.
     chk("P6h · the vault is not dismantled before the shelf lands (DEC-037; MOVED.md: journal -> _machine/journal)",
-        os.path.isdir(os.path.join('_machine', 'journal', 'days')))
+        os.path.isdir(os.path.join('journal', 'days')))
 
 
 # =============================================================================================

@@ -215,8 +215,14 @@ async def sec_s1(pw):
                  timed: f({ id:'z', name:'Read', cadence:'daily', time_anchor:'05:00' }),
                  sabbath: f({ id:'s', name:'Sabbath rest', cadence:'daily' }),
                  his: f({ id:'q', name:'Anything', section:'weekly' }) }; }""")
+    # AMENDED BY NAME, HT-31 (paste 143 S1.6), 2026-09-22: `timed` moves 'morning' -> 'standards'.
+    # Cory, 9/21: "when I set any nightly time it appears always in the morning routine". The clause
+    # that put a timed row in Morning IS that defect - with `habits.section` absent it made a 21:30
+    # task a morning task at every hour - and it is gone from all four languages in one wire. The
+    # assertion keeps its five subjects; only the word the clock used to produce has moved, and `his`
+    # still proves a stored section beats everything.
     chk('S1i . an unplaceable row lands in Standards, and 133 still places the rest',
-        placed == {'none': 'standards', 'weekly': 'weekly', 'timed': 'morning', 'sabbath': 'night', 'his': 'weekly'},
+        placed == {'none': 'standards', 'weekly': 'weekly', 'timed': 'standards', 'sabbath': 'night', 'his': 'weekly'},
         placed)
     await b.close()
 
@@ -353,13 +359,17 @@ async def sec_s3(pw):
                      moreOpen: more ? more.hasAttribute('open') : null,
                      notes: !!document.getElementById('eNotes'),
                      del: !!document.getElementById('eArch') }; }""")
-        chk('S3e . %s . the surface is name, section, planned time, duration' % tag,
-            surf['surface'] == ['Name', 'Section', 'Planned time', 'Planned minutes'], surf['surface'])
+        # AMENDED BY NAME, HT-31 (paste 143 S2.11), 2026-09-22: 'Planned time' leaves the SURFACE.
+        # The chip on the row is where a time is set now (S2.10), so a second door on this sheet is two
+        # answers to one question. The field is not deleted - S3h below now proves it is one tap down
+        # under More, the same treatment Group, Days and Link already get.
+        chk('S3e . %s . the surface is name, section and duration; the time is set on the row' % tag,
+            surf['surface'] == ['Name', 'Section', 'Planned minutes'], surf['surface'])
         chk('S3f . %s . and Delete, which is the fifth thing he named' % tag, surf['del'], surf)
         chk('S3g . %s . the free-text field is GONE from the sheet' % tag, not surf['notes'], surf)
         chk('S3h . %s . the rest is one tap down, closed until it is asked for' % tag,
             surf['more'] is not None and surf['moreOpen'] is False and
-            set(['Group', 'Days', 'Link']) <= set(surf['more']), surf['more'])
+            set(['Group', 'Days', 'Link', 'Planned time']) <= set(surf['more']), surf['more'])
         if tag == 'phone':
             sizes = await pg.evaluate("""() => [...document.querySelectorAll('#esheet input, #esheet select, #esheet textarea')]
                 .map(n => parseFloat(getComputedStyle(n).fontSize))""")
