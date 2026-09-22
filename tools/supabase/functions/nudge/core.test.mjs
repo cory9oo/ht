@@ -35,8 +35,16 @@ test('counts use the day\'s own snapshot, and the Sabbath is not due on a Tuesda
   assert.deepEqual(dueIds(habits, null, 2), ['a', 'b', 'c']);
   assert.deepEqual(counts(habits, { checked: { a: '06:10', c: true } }, 2), { done: 2, due: 3 });
   assert.deepEqual(counts(habits, { checked: { a: '06:10' }, active_set: ['a', 'b'] }, 2), { done: 1, due: 2 });
-  assert.deepEqual(counts(habits, { checked: { a: '06:10' } }, 2, 'morning'), { done: 1, due: 1 });
+  // AMENDED BY NAME, HT-31 (paste 143 S1.6), 2026-09-22: `a` has a 06:00 planned time and NO stored
+  // section, so it is a STANDARD now - a clock does not place anything, in any of the four languages
+  // that carry this rule (Cory 9/21). The claim is the same claim and is asserted on both sides of the
+  // move: nothing is in `morning`, and the one counted under `standards` is the one that used to be
+  // counted under `morning`. `c` keeps `night` because its section is STORED, which is the whole point.
+  assert.deepEqual(counts(habits, { checked: { a: '06:10' } }, 2, 'morning'), { done: 0, due: 0 });
+  assert.deepEqual(counts(habits, { checked: { a: '06:10' } }, 2, 'standards'), { done: 1, due: 2 });
+  assert.deepEqual(counts(habits, { checked: { c: true } }, 2, 'night'), { done: 1, due: 1 });
   assert.equal(sectionOf(habits[3]), 'night');
+  assert.equal(sectionOf(habits[0]), 'standards');
 });
 
 test('the words are the paste\'s, numbers only', () => {

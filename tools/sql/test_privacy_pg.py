@@ -87,6 +87,14 @@ def run_script(conn, sql):
         cur.execute(sql)
 
 
+def run_value(conn, sql, params=None):
+    """One row, as the database owner. HT-31: the tests above read as a PERSON; a couple of setup facts
+    (a join code, a column's default) are the database's own and are read as the database."""
+    with conn.cursor() as cur:
+        cur.execute(sql, params or ())
+        return cur.fetchone()
+
+
 def as_user(conn, uid, sql, params=None, write=False):
     """(rows, error) for one statement under `authenticated` with that person's JWT subject.
     Rolled back unless write=True, so a probe never changes what the next probe sees."""
@@ -356,6 +364,58 @@ def main() -> int:
             cur.execute("select tablename from pg_publication_tables where pubname = 'supabase_realtime' order by 1")
             chk("S7.27 · days, day_private and habits are in the realtime publication",
                 [r[0] for r in cur.fetchall()] == ["day_private", "days", "habits"])
+
+        # =========================================================================================
+        # HT-31 (paste 143 S6.19, as NUDGE N2 kept it) - THE STACK'S LAST MIGRATION, AND THE HALF OF
+        # PRIVACY NOBODY TESTS: not "can A READ B's journal" but "can A COUNT it, or ask whether it
+        # EXISTS". A policy that returns no rows still answers a yes/no question if a count comes back
+        # non-zero, and "0 rows" and "row hidden" look identical only until someone counts.
+        # =========================================================================================
+        print("HT-31 · 2026-09-22_ht31.sql, and what a member cannot infer")
+        run_script(c, read("2026-09-22_ht31.sql"))
+        with c.cursor() as cur:
+            cur.execute("select count(*) from information_schema.columns where table_schema='public' "
+                        "and table_name='circles' and column_name='members_can_invite'")
+            chk("S6.18 · circles.members_can_invite exists", cur.fetchone()[0] == 1)
+            cur.execute("select members_can_invite from public.circles where id = %s", (circle,))
+            chk("S7.21 · and any member may invite by default", cur.fetchone()[0] is True)
+
+        code, = run_value(c, "select join_code from public.circles where id = %s", (circle,))
+        rows, err = as_user(c, STRANGER, "select * from public.ht31_circle_peek(%s)", (code,))
+        chk("S7.23 · a person holding the code is told the group's name and how many are in it",
+            err is None and rows is not None and len(rows) == 1 and rows[0][1] == 2, (rows, err))
+        with c.cursor() as cur:
+            cur.execute("select string_agg(a.attname, ',' order by a.attnum) from pg_proc p "
+                        "join pg_namespace n on n.oid = p.pronamespace "
+                        "join unnest(p.proargnames) with ordinality a0(attname, ord) on true "
+                        "join lateral (select a0.attname, a0.ord as attnum) a on true "
+                        "where n.nspname='public' and p.proname='ht31_circle_peek'")
+            names = (cur.fetchone() or [None])[0] or ""
+        chk("S7.23 · and it answers with TWO things and no third (%s)" % names,
+            sorted(x for x in names.split(",") if x and x != "code") == ["members", "name"], names)
+        rows, err = as_user(c, STRANGER, "select * from public.ht31_circle_peek(%s)", ("NOSUCHCODE",))
+        chk("S7.23 · a dead code returns nothing at all", err is None and rows == [], (rows, err))
+
+        # THE COUNT AND THE INFERENCE, one probe each, from the member who CAN see the owner's day
+        for who, what, sql in (
+            ("count", "day_private", "select count(*) from public.day_private where user_id = %s"),
+            ("count", "profile_private", "select count(*) from public.profile_private where id = %s"),
+        ):
+            rows, err = as_user(c, MEMBER, sql, (OWNER,))
+            chk("S6.19 · a co-member cannot %s the owner's %s (got %s)"
+                % (who, what, rows and rows[0][0]), rows is not None and rows[0][0] == 0, (rows, err))
+        rows, err = as_user(c, MEMBER,
+                            "select exists(select 1 from public.day_private where user_id = %s and why is not null)",
+                            (OWNER,))
+        chk("S6.19 · and cannot ask whether a why EXISTS", rows is not None and rows[0][0] is False, (rows, err))
+        with c.cursor() as cur:
+            cur.execute("select pg_get_function_result(p.oid) from pg_proc p "
+                        "join pg_namespace n on n.oid = p.pronamespace "
+                        "where n.nspname='public' and p.proname='ht29_member_day'")
+            shape = (cur.fetchone() or [""])[0] or ""
+        leaks = [col for col in ("why", "brain_dump", "tasks", "prayer", "predict") if col in shape]
+        chk("S6.19 · ht29_member_day's RESULT TYPE cannot carry a journal column - not one of five",
+            shape and not leaks, [leaks, shape[:120]])
 
         print("AGAIN · a second run changes nothing")
         run_script(c, migration)

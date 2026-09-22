@@ -2826,3 +2826,13 @@ html[data-simple] #vTabs [data-v][hidden]{ display:none !important }
   html[data-simple] #h18Btm{ display:flex; gap:12px; align-items:stretch; width:100% }
   html[data-simple] #h18Btm > .fld{ flex:1 1 0; min-width:0; width:auto }
 }
+
+/* ---- S7 · INVITE ----------------------------------------------------------------------------------
+   The last route, the one that always works: when the share sheet is absent AND the clipboard is
+   blocked, the link appears in a field, selected, so a person can copy it by hand. It is >= 16px on a
+   phone like every other input here (128 A1). */
+.ht31link{ display:block; width:100%; margin-top:8px; font:400 12px/1.3 var(--mono);
+  background:var(--bg); color:var(--text); border:1px solid var(--border); border-radius:4px; padding:8px }
+@media(max-width:1023px){ .ht31link{ font-size:16px } }
+.h31inv{ display:flex; gap:8px; padding-top:10px }
+#h29JoinWho{ color:var(--text) }

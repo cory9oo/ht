@@ -9414,7 +9414,10 @@ var HT29GRP = (function(){
     /* CRYPTO, AND A FIXED LENGTH. `Math.random().toString(36).slice(2,8)` is not only guessable - it returns
        fewer than six characters whenever the float is short, and under Ruling 4 a guessed code now buys
        someone's standards, their definitions of done, their check-off times and their rating numbers. */
-    var code = (function(){
+    /* HT-31 S7.23: ONE generator, and it makes a 128-bit code. Ten characters of this alphabet is
+       49 bits and `byte % 31` favoured the first ten letters - both fixed in `__HT31GRP.newCode`,
+       which is also what Reset link uses, so a reset code and a first code are the same strength. */
+    var code = (window.__HT31GRP && window.__HT31GRP.newCode) ? window.__HT31GRP.newCode() : (function(){
       var A = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789', out = '';      /* no I/L/O/0/1: a code gets read aloud */
       var n = new Uint8Array(10);
       if(window.crypto && crypto.getRandomValues) crypto.getRandomValues(n);
@@ -9432,8 +9435,16 @@ var HT29GRP = (function(){
     var j = window.__HT24_JOIN;
     return j ? j.message(code) : ('Join my group in the Habit Tracker with the code ' + code);
   }
-  async function invite(){
+  async function invite(e){
+    /* HT-31 S7.24: a person with no group who taps Invite gets "Start a group" in the SAME sheet -
+       one flow, never a dead control. */
     if(!circle || !circle.join_code){ openGroup(); return; }
+    /* HT-31 S7.22: the three routes live in one place now (`__HT31GRP.share`), so the phone's own
+       share sheet, the clipboard and the selected field behave identically wherever Invite is shown. */
+    if(window.__HT31GRP && window.__HT31GRP.share){
+      await window.__HT31GRP.share(circle.join_code, (e && e.target) || null);
+      return;
+    }
     var text = inviteText(circle.join_code), url = window.__HT24_JOIN ? window.__HT24_JOIN.link(circle.join_code) : '';
     try{
       if(navigator.share){ await navigator.share({ title:'Habit Tracker', text:text, url:url }); return; }
@@ -9487,6 +9498,15 @@ var HT29GRP = (function(){
     };
     /* HT-30 S7.16 LEAVE. It asks first: leaving drops this account's row in `circle_members`, and the
        group's other members simply stop seeing the day. Nothing of this account's own is touched. */
+    var rs = el('h31Reset');
+    if(rs) rs.onclick = async function(){
+      if(!window.confirm('Reset the link? The one you sent before stops working straight away.')) return;
+      rs.disabled = true;
+      var r = (window.__HT31GRP && window.__HT31GRP.reset) ? await window.__HT31GRP.reset() : { ok:false, why:'not available' };
+      rs.disabled = false;
+      if(!r.ok){ if(msg) msg.textContent = r.why; return; }
+      toast('new link'); openGroup();
+    };
     var lv = el('h30Leave');
     if(lv) lv.onclick = async function(){
       if(!window.confirm('Leave this group? Your own standards, check-offs and journal are untouched.')) return;
@@ -9529,6 +9549,9 @@ var HT29GRP = (function(){
       n.addEventListener('click', function(e){ if(e.target === n) n.classList.remove('on'); });
     }
     el('h29JoinBody').innerHTML = '<div class="eh"><h3>Join a group</h3></div>' +
+      /* HT-31 S7.23: WHOSE group, and how many people are already in it - before you agree, not after.
+         It comes from one function that returns those two facts and nothing else. */
+      '<div class="note" id="h29JoinWho" style="padding:4px 0 0">…</div>' +
       '<div class="note" style="padding:4px 0 12px">You opened an invite with the code <b>' + esc(code) + '</b>. ' +
       'Your group will see your standards, check-offs and the day’s number — never your journal.</div>' +
       '<div class="note" id="h29JoinMsg"></div>' +
@@ -9536,6 +9559,15 @@ var HT29GRP = (function(){
       '<button class="btn" id="h29JoinNo" type="button">Not now</button>' +
       '<button class="btn pri" id="h29JoinYes" type="button">Join</button></div>';
     n.classList.add('on');
+    (async function(){
+      var who = el('h29JoinWho'); if(!who) return;
+      var got = (window.__HT31GRP && window.__HT31GRP.peek) ? await window.__HT31GRP.peek(code) : null;
+      /* A CONTROL THAT CANNOT ANSWER SAYS SO (S6.18). Until `ht31_circle_peek` is in the database this
+         card cannot name the group - so it says that in one quiet line, and the Join button still works.
+         What it never does is show an empty space where a group's name should be. */
+      who.textContent = got ? (got.name + ' · ' + got.members + ' member' + (got.members === 1 ? '' : 's'))
+                            : 'The group’s name will show here once the database update is run.';
+    })();
     el('h29JoinNo').onclick = function(){ try{ localStorage.removeItem('ht_join_code'); }catch(e){} n.classList.remove('on'); };
     el('h29JoinYes').onclick = async function(){
       var b = el('h29JoinYes'); b.disabled = true; b.textContent = 'joining…';
@@ -9549,7 +9581,7 @@ var HT29GRP = (function(){
   function click(e){
     var m = e.target.closest('[data-h29m]');
     if(m){ openDay(m.getAttribute('data-h29m')); return; }
-    if(e.target.closest('[data-h29invite]')){ invite(); return; }
+    if(e.target.closest('[data-h29invite]')){ invite(e); return; }
     if(e.target.closest('[data-h29group]')){ openGroup(); }
   }
   document.addEventListener('keydown', function(e){
@@ -9680,7 +9712,13 @@ var HT29INS = (function(){
     return card('rate', 'What makes a good day', body);
   }
   function groupCard(){
-    return card('group', 'The group side by side', HT29GRP.table(circleRows29()));
+    /* HT-31 S7.21: the group block on the phone's Insights is the SECOND of the two places Invite
+       appears - the GROUP panel is the other, and there is no third. Same control, same three routes
+       (`__HT31GRP.share`), reached by the same `data-h29invite`. */
+    var body = HT29GRP.table(circleRows29());
+    if(HT31_INVITE) body += '<div class="tools h31inv"><button class="btn pri" data-h29invite="1" ' +
+                            'type="button">Invite</button></div>';
+    return card('group', 'The group side by side', body);
   }
   function render(){
     var ins = el('h26Ins'); if(!ins) return;
@@ -9840,7 +9878,12 @@ var HT29MD = (function(){
       var text = rstrip(priv[f[0]]);
       out.push('### ' + f[1], strip(text) ? text : '-', '');
     });
+    /* HT-31 S8.27: the SAME line the copier writes - `golden_ht29` S6f compares these two programs
+       byte for byte, so a sentence that only one of them says is a broken parity check. It is here
+       because a person editing this file in Obsidian needs to know which half is theirs. */
     out.push('### Check-offs');
+    out.push('<!-- these are written from the app and are rewritten every run; the three headings ' +
+             'above are yours to edit -->');
     SECTIONS.forEach(function(sec){
       var rows = due.map(function(i){ return byId[i]; }).filter(function(h){ return sectionOf(h) === sec[0]; });
       if (!rows.length) return;
@@ -11062,7 +11105,7 @@ var HT30INS = (function(){
        them - so they are not absorbed into More on the way past. Decided here, where the absorbing
        happens, because the alternative is this renderer putting them away on every paint while
        HT-31's puts them back: two renderers fighting over one list, which is S1's whole lesson. */
-    var absorb = (!HT31_INSIGHTS_EXTRAS && h31Phone()) ? ['h16Ins'] : ['h16Month', 'h16Year', 'h16Ins'];
+    var absorb = (!h31Extras() && h31Phone()) ? ['h16Ins'] : ['h16Month', 'h16Year', 'h16Ins'];
     absorb.forEach(function(id){ moveTo(more, h30El(id)); });
     var wk = document.querySelector('.vWeeksSec'); if(wk) moveTo(more, wk);
     ['h26Ins', 'h26Jrn', 'vViews'].forEach(function(id){ moveTo(more, h30El(id)); });
@@ -11220,7 +11263,11 @@ var HT30GRP = (function(){
         '<div class="h29code">code <b>' + esc(c.join_code || '') + '</b></div>' +
         (url ? '<label class="fld"><span class="lab">Share link</span>' +
                '<input id="h30Link" readonly value="' + esc(url) + '"></label>' : '') +
-        '<div class="tools"><button class="btn pri" id="g29Invite" type="button">Invite someone</button>' +
+        /* HT-31 S7.21: ONE control, named Invite - "Invite someone" reads as a description of a
+           place rather than a button. S7.23: Reset link kills the old one the moment the new one is
+           written, which is the only honest answer to "I sent that link to the wrong person". */
+        '<div class="tools"><button class="btn pri" id="g29Invite" data-h29invite="1" type="button">Invite</button>' +
+        '<button class="btn" id="h31Reset" type="button">Reset link</button>' +
         '<span style="flex:1"></span><button class="btn" id="h30Leave" type="button">Leave</button></div>' +
         '<div class="note" id="g29Msg" style="padding-top:12px"></div>';
     }
@@ -11738,6 +11785,13 @@ var HT31_DESK_INSIGHTS = false;
 var HT31_INS_ORDER = ['h31Month', 'h31Year', 'h30Life', 'h30Group'];
 var HT31_INS_HIDE = ['h30MonthC', 'h30MonthR', 'h30Trend', 'h30Rate'];
 function h31Phone(){ return window.innerWidth < 1024; }
+/* THE FLAG, AND A SEAM TO FLIP IT AT RUNTIME. `HT31_INSIGHTS_EXTRAS = true` brings HT-29's and
+   HT-30's whole Insights page back, unchanged, with its data - and `window.__HT31_EXTRAS = true`
+   does the same for one page load without a deploy. That is not a test convenience: `golden_ht29`
+   S0 and S5 exist to prove those cards still work, and a card that is hidden is still a card that
+   has to work the day anyone turns it back on. The same seam every other layer here uses
+   (`__ADVANCED`, `__MOCK_SB`): one switch, read in one function. */
+function h31Extras(){ return HT31_INSIGHTS_EXTRAS || window.__HT31_EXTRAS === true; }
 (function(){
   /* HT-30's own card builder, borrowed rather than copied: one renderer per kind (R70.306), and it is
      also what keeps the `#h30InsBody > .h30c > .lab` shape every Insights golden reads. */
@@ -11747,7 +11801,7 @@ function h31Phone(){ return window.innerWidth < 1024; }
   }
 
   function four(){
-    if(HT31_INSIGHTS_EXTRAS || !h31Phone()) return;
+    if(h31Extras() || !h31Phone()) return;
     var body = h31El('h30InsBody'); if(!body) return;
     /* the desktop's two line charts, brought over whole */
     var m = cardFor('h31Month', 'The month', h31El('h16Month'));
@@ -11813,6 +11867,108 @@ var HT31_DESK_WHY = false;
   if(document.readyState === 'complete') setTimeout(off, 400);
   else window.addEventListener('load', function(){ setTimeout(off, 400); });
   window.__HT31WHY = { off: off, rateRow: rateRow };
+})();
+
+
+/* ---- S7 · INVITE IS ONE TAP, AND ANY MEMBER CAN DO IT --------------------------------------------
+   Cory, 9/21: "a quick link I or any other user can send to other people to allow them to join".
+   ONE control named Invite, in TWO places and no others - the GROUP panel on the desktop and the
+   group block on the phone's Insights. Tap it and the phone's own share sheet opens; where there is
+   no share sheet the link goes to the clipboard and says so for two seconds; where the clipboard is
+   blocked the link appears SELECTED in a text field, which is the last route that always works.
+   ANY MEMBER MAY INVITE (`members_can_invite`, default true - SPEC's default, reverses in one line):
+   a circle of four where only one person can add the fifth is a circle that grows at one person's
+   pace. The group's starter can switch it off in Group settings once the column exists.
+   THE CODE IS A SECRET, so it is sized like one: 26 characters of a 31-letter alphabet is 128.8 bits,
+   drawn from `crypto.getRandomValues` WITHOUT modulo bias (the old ten characters were 49 bits, and
+   `byte % 31` quietly favoured the first ten letters). A code buys a person's standards, their
+   definitions of done, their check-off times and their rating numbers - never a journal - so it is
+   guessed at 2^128 or not at all. Reset kills the old link the moment the new one is written. */
+var HT31_INVITE = true;
+var HT31_CODE_CHARS = 26;                       /* 26 x log2(31) = 128.8 bits */
+var HT31_MEMBERS_CAN_INVITE = true;             /* SPEC default; the column overrides it when it exists */
+(function(){
+  var ALPHA = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';   /* no I/L/O/0/1 - a code gets read aloud */
+
+  function newCode(n){
+    n = n || HT31_CODE_CHARS;
+    var out = '', lim = 256 - (256 % ALPHA.length);   /* reject the tail, or the first ten letters win */
+    while(out.length < n){
+      var b = new Uint8Array(n);
+      if(window.crypto && crypto.getRandomValues) crypto.getRandomValues(b);
+      else for(var i = 0; i < b.length; i++) b[i] = Math.floor(Math.random() * 256);
+      for(var j = 0; j < b.length && out.length < n; j++) if(b[j] < lim) out += ALPHA[b[j] % ALPHA.length];
+    }
+    return out;
+  }
+
+  function link(code){
+    var j = window.__HT24_JOIN;
+    if(j && j.link) return j.link(code);
+    if(window.__HT30GRP && window.__HT30GRP.link) return window.__HT30GRP.link(code);
+    return 'https://cory9oo.github.io/ht/?join=' + encodeURIComponent(code);
+  }
+  function text(code){
+    var j = window.__HT24_JOIN;
+    return (j && j.message) ? j.message(code) : ('Join my group in the Habit Tracker: ' + link(code));
+  }
+
+  /* THE THREE ROUTES, IN ORDER, AND THE LAST ONE CANNOT FAIL. */
+  function field(url, near){
+    var host = (near && near.parentNode) || h31El('g29') || document.body;
+    var old = h31El('ht31link'); if(old && old.parentNode) old.parentNode.removeChild(old);
+    var i = document.createElement('input');
+    i.id = 'ht31link'; i.className = 'ht31link'; i.readOnly = true; i.value = url;
+    i.setAttribute('aria-label', 'the invite link - copy it');
+    host.appendChild(i);
+    try{ i.focus(); i.select(); i.setSelectionRange(0, url.length); }catch(e){ warn31('select link', e); }
+    return i;
+  }
+  async function share(code, near){
+    var url = link(code), msg = text(code);
+    try{
+      if(navigator.share){ await navigator.share({ title: 'Habit Tracker', text: msg, url: url }); return 'shared'; }
+    }catch(e){ /* a cancelled share is not a failure, and it is not a reason to copy behind his back */
+      if(String(e && e.name) === 'AbortError') return 'cancelled';
+      warn31('share', e);
+    }
+    try{
+      if(navigator.clipboard && navigator.clipboard.writeText){
+        await navigator.clipboard.writeText(url);
+        toast('Link copied');
+        return 'copied';
+      }
+    }catch(e){ warn31('clipboard', e); }
+    field(url, near);
+    return 'field';
+  }
+
+  async function reset(){
+    var st = (window.__HT29GRP && window.__HT29GRP.state) ? window.__HT29GRP.state() : null;
+    var c = (st && st.circle) || (window.__HT31GRP && window.__HT31GRP.circle);
+    if(!c || !c.id) return { ok: false, why: 'no group' };
+    var code = newCode();
+    var r = await sb.from('circles').update({ join_code: code }).eq('id', c.id);
+    if(r && r.error) return { ok: false, why: 'Could not reset the link.' };
+    c.join_code = code;
+    return { ok: true, code: code };
+  }
+
+  /* WHAT THE JOINER SEES BEFORE THEY AGREE: the group's name and how many people are in it. It comes
+     from one function that returns those two things and nothing else (`ht31_circle_peek`, in
+     tools/sql/ht_pending.sql). Until that SQL is run the card says so in ONE quiet line and the join
+     still works - a control that cannot answer says so; it never shows an empty panel (S6.18). */
+  async function peek(code){
+    try{
+      var r = await sb.rpc('ht31_circle_peek', { code: String(code || '').trim().toUpperCase() });
+      if(r.error) return null;
+      var row = Array.isArray(r.data) ? r.data[0] : r.data;
+      return row ? { name: row.name, members: row.members } : null;
+    }catch(e){ return null; }
+  }
+
+  window.__HT31GRP = { newCode: newCode, link: link, text: text, share: share, reset: reset,
+                       peek: peek, field: field, alphabet: ALPHA };
 })();
 
 })();

@@ -1,0 +1,36 @@
+{
+  "_what": "THE DAY FILE'S SHAPE, DECLARED ONCE (WIRE HT-31, paste 143 S8.25).",
+  "_why": "Three programs write or read this block - the app (HT29MD in app.js), the vault copier (the container's tools/copiers/_ht.py) and the nudge sender (core.js) - and they live in two repositories owned by two lanes. Before this file each of them carried its own copy of the section list, the labels and the markers, and HT-30 had to change three of them by hand in two repos to rename one heading. This file is the declaration; `golden_ht29` S6f still proves the two writers produce the same BYTES, and `golden_ht31` S8 proves both of them agree with what is written here. A declaration nobody checks is a comment.",
+  "version": 1,
+  "markers": {
+    "start": "<!-- ht:start -->",
+    "end": "<!-- ht:end -->",
+    "also_read": ["<!-- ht:begin -->"],
+    "_note": "The WRITER uses `start`; the READER accepts anything in `also_read` as the same marker. Paste 143 S8.26 wrote `ht:begin`; the app and the copier have shipped `ht:start` since HT-29 and `golden_ht29` S6f compares those bytes, so the reader widened instead of the writer moving - strictly the safer half."
+  },
+  "dump_heading": "## Dump",
+  "_dump": "Cory's own zone, below the markers. Created empty once and never written to again by any program (S8.26). A file that has his text but no markers and no Dump heading is adopted by making his text the Dump zone (N1 item 34).",
+  "sections": [
+    {"key": "morning", "label": "Morning routine"},
+    {"key": "night", "label": "Night routine"},
+    {"key": "weekly", "label": "Weekly routine"},
+    {"key": "standards", "label": "Standards"}
+  ],
+  "fields": [
+    {"key": "brain_dump", "heading": "Journal", "index_word": "journal"},
+    {"key": "tasks", "heading": "Completed", "index_word": "completed"},
+    {"key": "prayer", "heading": "Prayer", "index_word": "prayer"}
+  ],
+  "time": {
+    "stored": "HH:MM 24-hour",
+    "rendered": "h:mm AM/PM",
+    "separator": "\u202f",
+    "_note": "HT-31 S2.8, Cory 2026-09-21: 'regular time, not military time'. Storage does not move; the day file reads the way the screen reads. The separator before AM/PM is a NARROW NO-BREAK SPACE (U+202F)."
+  },
+  "writeback": {
+    "vault_to_app": ["brain_dump", "tasks", "prayer"],
+    "app_to_vault_only": ["check-offs", "rating"],
+    "on_conflict": "keep both - the vault's text wins the field and the app's is appended beneath it as a quote line",
+    "flag": "HT31_VAULT_CHECKOFF_WRITEBACK=false"
+  }
+}

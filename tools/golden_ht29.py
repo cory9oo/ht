@@ -126,6 +126,12 @@ async def open_page(pw, w=390, h=844, touch=None, flags=None, qs='', wait=3600, 
     pg.on('console', lambda m: errs.append('console:' + m.text)
           if m.type == 'error' and 'net::' not in m.text else None)
     pg.on('dialog', lambda d: asyncio.ensure_future(d.accept()))
+    # HT-31 (paste 143 S4.14), 2026-09-22: this suite is HT-29's, and HT-29's Insights page is hidden
+    # on the phone now - Cory asked for four blocks and no More under them. Hidden, NEVER DELETED
+    # (R70.138), and the difference between those two words is a test that still runs: every page this
+    # file opens asks for the extras, so all 113 of its assertions keep proving the cards work the day
+    # anyone turns them back on. `golden_ht31` S4 proves the other half - that they are off by default.
+    flags = dict(flags or {}, __HT31_EXTRAS=True)
     if flags:
         await pg.add_init_script(init_js(flags))
     if init:
@@ -257,8 +263,14 @@ async def sec_s2(pw):
         else if(c.classList.contains('li')) o[c.getAttribute('data-h')]=cur; } return o; }""")
     chk('S2b · every row sits under the section the rule gives it',
         all(place[k] == rule[k] for k in place), [(k, place[k], rule[k]) for k in place if place[k] != rule[k]][:4])
-    chk('S2c · the rule: a planned time -> morning, weekly -> weekly, the Sabbath -> night, else standards',
-        rule.get('h0') == 'morning' and rule.get('h11') == 'weekly' and rule.get('h1') == 'night', rule)
+    # AMENDED BY NAME, HT-31 (paste 143 S1.6), 2026-09-22: the first clause is GONE. Cory, 9/21: "when
+    # I set any nightly time it appears always in the morning routine" - a planned time placing a row in
+    # Morning is that defect, and with `habits.section` absent it placed every timed row there at every
+    # hour. The other two terms are FIELDS, not clocks, and they stand: weekly by cadence, the Sabbath by
+    # what it is. `h0` carries a 05:00 and is now a Standard until Cory moves it, which he can do from
+    # the row or the sheet in one tap.
+    chk('S2c · the rule: weekly -> weekly, the Sabbath -> night, else standards - and NEVER by the clock',
+        rule.get('h0') == 'standards' and rule.get('h11') == 'weekly' and rule.get('h1') == 'night', rule)
     # THE SHEET IS OPENED FIRST. Asked with the sheet shut, `#eSection` is absent because nothing is on
     # screen - the check passed with the column present, and would pass with the field always shown.
     await pg.click('#log .li .edp')
@@ -266,8 +278,15 @@ async def sec_s2(pw):
     sheet = await pg.evaluate("""() => ({ open: !!document.querySelector('#esheet'),
       section: !!document.getElementById('eSection'),
       fields: document.querySelectorAll('#esheet input, #esheet select, #esheet textarea').length })""")
-    chk('S2d · with no section column the OPEN sheet offers no Section field',
-        sheet['open'] and sheet['fields'] > 0 and not sheet['section'], sheet)
+    # AMENDED BY NAME, HT-31 (paste 143 S1.6), 2026-09-22: REVERSED, deliberately, and this is the
+    # other half of the defect above. HT-29 withheld the field when the column was missing, on the sound
+    # rule that a field which cannot save is a lie (R70.289) - but the consequence was that Cory could
+    # not place a task at all, so the CLOCK placed it for him, which is what he reported. The field is
+    # offered now whatever the database has: without the column the choice is kept on the device
+    # (`__HT31SEC`, localStorage) and written up the moment the column exists. It saves, so it is not a
+    # lie; it just saves somewhere smaller until the migration lands.
+    chk('S2d · with no section column the OPEN sheet STILL offers Section - it saves to the device',
+        sheet['open'] and sheet['fields'] > 0 and sheet['section'], sheet)
     await no_errors(pg, errs, 'S2 (no column)')
     await b.close()
 
@@ -300,7 +319,9 @@ async def sec_s2(pw):
         # the FIELD is what "no free text" means: HT-30 hides the textarea and leaves its row inside
         # "More" (hidden, never deleted), so the LABEL is still in the DOM and `#eNotes` is not.
         and not sheet['notesInput']
-        and sheet['surface'] == ['Name', 'Section', 'Planned time', 'Planned minutes'], sheet)
+        # AMENDED BY NAME, HT-31 (paste 143 S2.11): 'Planned time' leaves the SURFACE - the chip on the
+        # row is where a time is set now - and folds under More with Group, Days and Link. Not deleted.
+        and sheet['surface'] == ['Name', 'Section', 'Planned minutes'], sheet)
     await pg.select_option('#eSection', 'standards')
     await pg.click('#eSave')
     await pg.wait_for_timeout(700)
@@ -392,7 +413,11 @@ async def sec_s3(pw):
                dots:o?[...o.querySelectorAll('.dot29')].map(d=>d.className):[],
                secs:o?[...o.querySelectorAll('.grp')].map(g=>g.textContent):[] }; }""")
     chk('S3g · a member\'s day shows their sections and check marks, read only',
-        day['open'] and day['rows'] >= 2 and day['ticks'] == 1 and 'Morning routine' in day['secs'], {k: day[k] for k in ('rows', 'ticks', 'secs')})
+        # AMENDED BY NAME, HT-31 (paste 143 S1.6): 'Morning routine' -> 'Standards'. This fixture's rows
+        # have no stored section, and a clock no longer places one, so the member's day heads the same
+        # rows under the section they are actually in. What the line asserts - that a co-member's day
+        # comes with ITS SECTIONS and its check marks, and is read-only - is untouched.
+        day['open'] and day['rows'] >= 2 and day['ticks'] == 1 and 'Standards' in day['secs'], {k: day[k] for k in ('rows', 'ticks', 'secs')})
     chk('S3h · the late dot is computed from their own clock (06:40 against 06:00)',
         any('late' in c for c in day['dots']), day['dots'])
     chk('S3i · the rating NUMBER shows', re.search(r'rated \d', day['text']) is not None, day['text'][:120])
@@ -563,11 +588,21 @@ async def sec_s6(pw):
     # app matches the copier it is about to have, and after the merge (the staging folder is deleted) it
     # proves the app matches the copier it has. Neither present -> the child fails to import and this
     # FAILs by name, which is the behaviour the old comment describes and this keeps.
-    staged = os.path.join(RECONCILE, 'ht_stage', '137', 'container', 'tools', 'copiers')
-    core = staged if os.path.isfile(os.path.join(staged, '_ht.py')) \
-        else os.path.join(ESTATE, 'tools', 'copiers')
-    py = core if os.path.isfile(os.path.join(core, '_ht.py')) \
-        else os.path.join(RECONCILE, 'ht_stage', '133', 'container', 'tools', 'copiers')
+    # HT-31 (paste 143 S8.25), 2026-09-22: THE FALLBACK CHAIN HAD BEEN POINTING AT A COPY FROM HT-29.
+    # `ESTATE` here is whatever directory holds `_reconcile`, and since R70.345 that is `BEV/_machine` -
+    # so `ESTATE/tools/copiers` asked for a path that does not exist, the chain fell through to the
+    # HT-29-era staged copy under `ht_stage/133/`, and this check has been comparing the app against a
+    # file nobody has edited since. It said PASS the whole time. A parity check aimed at a stale copy is
+    # worse than no parity check, because it is believed.
+    # The container is the BEV root - `_machine`'s parent when the bus sits under `_machine`, and
+    # `ESTATE` itself otherwise - and its copy is the one the app must match. HT-31 owns both sides of
+    # this format, so there is no staging folder to prefer any more: 137's is landed and archived.
+    container = os.path.dirname(ESTATE) if os.path.basename(ESTATE).lower() == '_machine' else ESTATE
+    core = os.path.join(container, 'tools', 'copiers')
+    py = core
+    if not os.path.isfile(os.path.join(core, '_ht.py')):
+        raise SystemExit('golden_ht29 S6f: no copier at %s - the check cannot run, and a check that '
+                         'cannot run is not a pass (134 R1)' % core)
     code = ("import sys,json,datetime\n"
             "sys.path.insert(0, r'%s')\nsys.path.insert(0, r'%s')\n"
             "import _ht as H\n"
