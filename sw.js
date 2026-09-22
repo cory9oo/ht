@@ -1,10 +1,13 @@
-const C='ht-v37';
+const C='ht-v38';
 self.addEventListener('install',e=>{self.skipWaiting()});
 self.addEventListener('activate',e=>{e.waitUntil(caches.keys().then(k=>Promise.all(k.filter(x=>x!==C).map(x=>caches.delete(x)))).then(()=>self.clients.claim()))});
 self.addEventListener('fetch',e=>{
   const r=e.request; if(r.method!=='GET') return;
   const u=new URL(r.url);
   if(u.origin!==location.origin) return;
+  /* HT-31 S0.3: version.json is the one file a cache may never answer for - it is how the running
+     build learns it is behind. Straight to the network, never stored. */
+  if(u.pathname.endsWith('/version.json')){ e.respondWith(fetch(r,{cache:'no-store'})); return; }
   e.respondWith(
     fetch(r,{cache:'no-cache'}).then(res=>{
       if(res&&res.status===200){const c=res.clone();caches.open(C).then(k=>k.put(r,c));}

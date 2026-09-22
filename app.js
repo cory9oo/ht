@@ -3136,11 +3136,15 @@ function earned(k){ return committed() - remaining(k); }
       fld('Name','<input id="eName" value="'+esc(h.name)+'" placeholder="standard" autocomplete="off">')+
       /* HT-29 S2 (PASTE 133 Ruling 3): Cory places each standard in one of four sections himself. Shown only
          when the column exists - a field that cannot save is never offered (R70.289). */
-      (S.hasSection ? (function(){
+      /* HT-31 S1.6: the field is offered WHETHER OR NOT the column exists. Withholding it was the
+         reason the clock got to decide at all - Cory could not place a task, so code placed it for
+         him. Without the column the choice is kept on the device (`__HT31SEC`) and written up the
+         moment the column arrives, so his placement is never the thing that waits for a migration. */
+      (function(){
         var cur = (isNew && window.__HT29_PRESET_SECTION) || HT29SEC.sectionOf(h);
         return fld('Section','<select id="eSection">'+HT29SEC.ORDER.map(function(s){
           return '<option value="'+s+'"'+(s===cur?' selected':'')+'>'+HT29SEC.NAMES[s]+'</option>'; }).join('')+'</select>');
-      })() : '')+
+      })()+
       fld('Group','<select id="eGroup">'+groupsFor(grp).map(function(g){
           return '<option'+(g===grp?' selected':'')+'>'+esc(g)+'</option>'; }).join('')+'</select>')+
       /* HT-24 C1: three cadences now, and the third carries a day picker that is only shown
@@ -3327,8 +3331,19 @@ function earned(k){ return committed() - remaining(k); }
        Written only when the person can see and edit it, exactly as `eCue` and `eSection` are. */
     var notesIn = document.getElementById('eNotes');
     if(S.hasNotes && notesIn) rec.notes = str('eNotes')||null;
-    /* HT-29 S2: the section Cory chose; written only when the field was shown */
-    if(S.hasSection && document.getElementById('eSection')) rec.section = str('eSection') || null;
+    /* HT-29 S2: the section Cory chose; written only when the field was shown.
+       HT-31 S1.6: the field is always shown now, so when the COLUMN is absent the choice goes to the
+       device instead of nowhere - `rec.section` is still never sent to a column that does not exist. */
+    if(document.getElementById('eSection')){
+      var secPick = str('eSection') || null;
+      if(S.hasSection) rec.section = secPick;
+      else if(secPick && window.__HT31SEC){
+        /* a NEW row has no id until the insert returns, so the pick waits by NAME and is claimed
+           by the row that comes back on the next paint - never by a row that already has one */
+        if(isNew) window.__HT31SEC.pendingNew(rec.name, secPick);
+        else window.__HT31SEC.place(h.id, secPick);
+      }
+    }
     /* S2: one minutes box now. It writes BOTH `minutes` (what committed()/remaining() read)
        and `minutes_planned` (what planOf() prefers), so the two can never drift apart — which is
        exactly what two separate inputs allowed. */
@@ -3500,8 +3515,12 @@ function earned(k){ return committed() - remaining(k); }
       var chg={};
       if(h.sort_order!==so) chg.sort_order=so;
       if(grp!==null && (h.group_name||'')!==grp) chg.group_name=grp;
-      /* HT-29 S2: a drag across a section's header moves the standard into that section (Ruling 3) */
-      if(S.hasSection && sec && HT29SEC.sectionOf(h)!==sec) chg.section=sec;
+      /* HT-29 S2: a drag across a section's header moves the standard into that section (Ruling 3).
+         HT-31 S1.6: without the column the move is kept on the device instead of being dropped. */
+      if(sec && HT29SEC.sectionOf(h)!==sec){
+        if(S.hasSection) chg.section=sec;
+        else if(window.__HT31SEC){ window.__HT31SEC.place(h.id, sec); }
+      }
       if(!Object.keys(chg).length) return;
       h.sort_order=so; if(chg.group_name!==undefined) h.group_name=grp;
       if(chg.section!==undefined) h.section=chg.section;
@@ -5630,6 +5649,17 @@ function earned(k){ return committed() - remaining(k); }
   }
 
   function reorderToday(log){
+    /* HT-31 S1.6 · ONE OWNER PER LIST. This rebuilt #log as "the timed rows, then one header
+       reading ANYTIME" - and `repaint()` / `repaintCharts()` reach it WITHOUT going through
+       paintLog, so a day change or a month arrow wiped the four section headers and hoisted every
+       timed row to the top. That is the ANYTIME header in Cory's 9/21 screenshot, with his night
+       tasks above it. Measured both ways in `_reconcile/ht_stage/143/recon143.py`.
+       While the sections are on they own the order; this renderer stays whole behind
+       HT29_SECTIONS=false (R70.138) and re-asserts the sections instead of fighting them. */
+    if(typeof HT29_SECTIONS !== 'undefined' && HT29_SECTIONS && window.__HT29S2){
+      try{ window.__HT29S2.regroup(); }catch(e){ if(typeof warn31==='function') warn31('regroup from reorderToday', e); }
+      return;
+    }
     var order=sortToday(S.habits.slice());
     if(!order.split) return;
     var byId={}; q('.li',log).forEach(function(r){ byId[r.getAttribute('data-h')]=r; });
@@ -9065,9 +9095,17 @@ var HT29SEC = (function(){
     var s = String((h && h.section) || '').toLowerCase();
     if(NAMES[s]) return s;
     if(!h) return 'standards';
+    /* HT-31 S1.6 · THE LAW: nothing but the section field decides the section.
+       The line that used to sit at the foot of this function - `if(winStartMin(h) != null) return
+       'morning';` - is the defect Cory reported on 9/21: with `habits.section` absent (the HT-29 SQL
+       is not run yet) a 21:30 task was a MORNING task, because the only thing left deciding was the
+       clock, which his 9/15 ruling forbids outright. A placement the PERSON made is kept on the
+       device until the column exists to hold it, and it is read here first. Cadence and the Sabbath
+       stay: they are fields, not clocks. Everything else is Standards, where he can move it. */
+    var own = (window.__HT31SEC && window.__HT31SEC.local(h.id)) || '';
+    if(NAMES[own]) return own;
     if(isSabbathStd(h)) return 'night';
     if(isWeekly(h)) return 'weekly';
-    if(winStartMin(h) != null) return 'morning';
     return 'standards';
   }
   function dotOf(m){ return m == null ? null : (m <= 15 ? 'ontime' : (m <= 60 ? 'late' : 'beyond')); }
@@ -9719,11 +9757,13 @@ var HT29MD = (function(){
     return /^\s*sabbath\b/i.test(String(h.name || '')) || /^sabbath$/i.test(String(h.group_name || ''));
   }
   function sectionOf(h){
+    /* HT-31 S1.6: the clock does not place a task, here or anywhere (Cory 9/21). This is the second
+       of the three languages that must agree - HT29SEC.sectionOf, this, the copier's section_of and
+       the sender's core.js - and all four moved in the same wire. */
     var s = String(h.section || '').toLowerCase();
     if (s === 'morning' || s === 'night' || s === 'standards' || s === 'weekly') return s;
     if (isSabbath(h)) return 'night';
     if (String(h.cadence || '') === 'weekly') return 'weekly';
-    if (hhmm(h.planned_start) || hhmm(h.time_anchor)) return 'morning';
     return 'standards';
   }
   function planned(h){ return hhmm(h.planned_start) || hhmm(h.time_anchor); }
@@ -10364,7 +10404,7 @@ var HT29_UPDATE_BANNER = true;
 /* The one place this build says what it is. `sw.js`'s cache name must equal it, and `golden_ht30` S0 reads
    both files and fails when they drift - a version on the screen that is not the version in the cache is
    worse than no version at all, because it is the thing you check when you are already unsure. */
-var HT30_VERSION = 'ht-v37';
+var HT30_VERSION = 'ht-v38';
 
 function warn30(what, e){ try{ console.warn('HT-30: ' + what, e); }catch(_){} }
 function h30El(id){ return document.getElementById(id); }
@@ -11165,6 +11205,256 @@ var HT30GRP = (function(){
 
   window.__HT30GRP = { link:link, leave:leave, html:html, codeOf:codeOf };
   return window.__HT30GRP;
+})();
+
+
+/* ==============================================================================================
+   HT-31 (PASTE 143, Cory Monday 2026-09-21) - WRITE IN THE VAULT, EVERYONE GETS EVERYTHING,
+   TIME FROM THE ROW.  One block, the file's convention: flags first, then one IIFE per subject,
+   each exporting a seam the goldens read.
+   ============================================================================================== */
+function warn31(what, e){ try{ console.warn('HT-31: ' + what, e); }catch(_){} }
+function h31El(id){ return document.getElementById(id); }
+
+/* ---- S0.3 · THE BUILD KEEPS ITSELF CURRENT ------------------------------------------------------
+   Three of the twelve complaints in receipt 137 were CACHED: the deploy was current and the device
+   was not, and the only thing standing between Cory and a two-day-old build was a banner he had to
+   notice. `version.json` is served no-store, so it is the one file a cache cannot lie about; the
+   running build compares itself to it and, when it is behind, brings itself forward ONCE.
+   IT NEVER RELOADS UNDER HIS HANDS. A focused text box, or text typed and not yet written, means the
+   banner and nothing else - the reload waits for the blur. Whatever was typed is stashed for the
+   length of the reload and put back if the field comes up empty, so an auto-refresh cannot eat a
+   sentence. One reload per version, remembered in localStorage, so a wrong answer cannot loop. */
+var HT31_VERSION_WATCH = true;
+var HT31_VERSION_EVERY_MS = 60000;
+(function(){
+  var KEY = 'ht31_reloaded', STASH = 'ht31_unsent', FIELDS = ['iDump', 'iTasks', 'iPrayer', 'iWhy'];
+  var pending = null;
+
+  function running(){ return (typeof HT30_VERSION === 'string' && HT30_VERSION) || ''; }
+  function did(v){ try{ return localStorage.getItem(KEY) === v; }catch(e){ return false; } }
+  function mark(v){ try{ localStorage.setItem(KEY, v); }catch(e){} }
+
+  /* TYPING BEATS FRESHNESS, ALWAYS. */
+  function typing(){
+    var a = document.activeElement;
+    if(!a) return false;
+    var t = (a.tagName || '').toLowerCase();
+    return t === 'textarea' || t === 'input' || a.isContentEditable === true;
+  }
+  function unsent(){
+    for(var i = 0; i < FIELDS.length; i++){
+      var n = h31El(FIELDS[i]);
+      if(n && n.dataset && n.dataset.ht31Dirty === '1' && String(n.value || '').length) return true;
+    }
+    return false;
+  }
+  function watchDirty(){
+    FIELDS.forEach(function(id){
+      var n = h31El(id); if(!n || n.dataset.ht31Watch === '1') return;
+      n.dataset.ht31Watch = '1';
+      n.addEventListener('input', function(){ n.dataset.ht31Dirty = '1'; });
+      n.addEventListener('blur', function(){ n.dataset.ht31Dirty = ''; ready(); });
+    });
+  }
+  function stash(){
+    var out = {};
+    FIELDS.forEach(function(id){ var n = h31El(id); if(n && String(n.value || '').length) out[id] = n.value; });
+    try{ sessionStorage.setItem(STASH, JSON.stringify(out)); }catch(e){}
+  }
+  function unstash(){
+    var raw = null;
+    try{ raw = sessionStorage.getItem(STASH); sessionStorage.removeItem(STASH); }catch(e){}
+    if(!raw) return;
+    var o = {};
+    try{ o = JSON.parse(raw) || {}; }catch(e){ return; }
+    Object.keys(o).forEach(function(id){
+      var n = h31El(id);
+      if(n && !String(n.value || '').length){ n.value = o[id]; n.dataset.ht31Dirty = '1';
+        try{ n.dispatchEvent(new Event('input', {bubbles: true})); }catch(e){} }
+    });
+  }
+
+  function flush(){
+    try{ if(window.__HT28c && window.__HT28c.flush) window.__HT28c.flush(); }catch(e){ warn31('flush', e); }
+  }
+  function go(v){
+    mark(v); stash(); flush();
+    setTimeout(function(){ try{ location.reload(); }catch(e){ warn31('reload', e); } }, 60);
+  }
+  /* A pending update takes the first safe moment: a blur, a visibility change, or the next poll. */
+  function ready(){
+    if(!pending || typing() || unsent()) return;
+    var v = pending; pending = null; go(v);
+  }
+  function banner(v){
+    try{
+      if(window.__HT29UPD && window.__HT29UPD.show){ window.__HT29UPD.show(); return; }
+    }catch(e){ warn31('banner', e); }
+  }
+
+  function found(v){
+    if(!v || v === running() || did(v)) return;
+    if(typing() || unsent()){ pending = v; banner(v); return; }
+    go(v);
+  }
+  function check(){
+    if(!HT31_VERSION_WATCH) return;
+    if(document.visibilityState === 'hidden') return;
+    var url = 'version.json?t=' + Date.now();
+    try{
+      fetch(url, {cache: 'no-store'}).then(function(r){ return r.ok ? r.json() : null; })
+        .then(function(j){ if(j && j.version) found(String(j.version)); })
+        .catch(function(){});
+    }catch(e){ warn31('version fetch', e); }
+  }
+
+  function start(){
+    watchDirty(); unstash();
+    setTimeout(check, 1500);
+    setInterval(check, HT31_VERSION_EVERY_MS);
+    document.addEventListener('visibilitychange', function(){ if(document.visibilityState === 'visible'){ ready(); check(); } });
+    document.addEventListener('focusout', function(){ setTimeout(ready, 120); }, true);
+  }
+  if(document.readyState === 'complete') setTimeout(start, 300);
+  else window.addEventListener('load', function(){ setTimeout(start, 300); });
+
+  window.__HT31UPD = { check: check, running: running, typing: typing, unsent: unsent,
+                       pendingVersion: function(){ return pending; }, watchDirty: watchDirty };
+})();
+
+
+/* ---- S1 · NOTHING BUT THE SECTION FIELD DECIDES THE SECTION -------------------------------------
+   THE DEFECT, in Cory's words: "when I set any nightly time it appears always in the morning
+   routine". Reproduced on the fixture (`_reconcile/ht_stage/143/recon143.py`), and it is TWO
+   renderers disagreeing about who owns the list:
+
+     a · `HT29SEC.sectionOf()` derived the section from the CLOCK whenever `habits.section` held
+         nothing - "has a planned time -> morning" - so with the HT-29 SQL not yet run (his live
+         shape: `S.hasSection` false) EVERY timed task is a morning task, at 05:00 and at 21:30
+         alike. Measured: h0 at 21:30 renders under "Morning routine", at every hour tested.
+     b · HT-16's `reorderToday()` re-grouped `#log` into "the timed rows, then one header reading
+         ANYTIME" on every `repaint()` / `repaintCharts()` - a day change, a month arrow, boot -
+         because those paths never call `paintLog`, and so never reach HT-29's section grouper.
+         Measured: after `repaintCharts()` the four section headers are replaced by one ANYTIME.
+         That is the header in Cory's 9/21 screenshot, with his night tasks hoisted above it.
+
+   THE LAW (S1.6): setting or changing a time never changes a task's section; nothing but the
+   section field decides the section; "Add to <section>" creates the task in that section.
+   (a) is fixed in `sectionOf` itself, (b) inside `reorderToday`, and this block adds the third
+   piece: while the COLUMN is absent the person still has to be able to place a task, so his
+   placement is kept on the device and pushed to the column the moment it exists. A placement the
+   person made always beats anything code would derive. */
+var HT31_SECTIONS_LOCAL = true;
+(function(){
+  var KEY = 'ht31_sections';
+  var map = null;
+
+  function load(){
+    if(map) return map;
+    map = {};
+    try{ map = JSON.parse(localStorage.getItem(KEY) || '{}') || {}; }catch(e){ map = {}; }
+    return map;
+  }
+  function save(){ try{ localStorage.setItem(KEY, JSON.stringify(load())); }catch(e){ warn31('sections save', e); } }
+  function local(id){ return id ? (load()[String(id)] || '') : ''; }
+  function place(id, sec){
+    if(!id || !sec) return;
+    load()[String(id)] = String(sec);
+    save();
+  }
+  function forget(id){ if(!id) return; delete load()[String(id)]; save(); }
+
+  /* A new standard is inserted without `.select()`, so its id arrives with the next load. The pick
+     waits under its NAME and is claimed once, by a row that has no placement of its own. */
+  var waiting = null;
+  function pendingNew(name, sec){ waiting = (name && sec) ? {name: String(name), sec: String(sec)} : null; }
+  function claim(){
+    if(!waiting) return;
+    var m = (S.habits || []).filter(function(h){
+      return String(h.name || '') === waiting.name && !h.section && !local(h.id); });
+    if(!m.length) return;
+    place(m[m.length - 1].id, waiting.sec);
+    waiting = null;
+  }
+
+  /* Once the column exists, the device's copy is written up and then dropped - one direction, and
+     only for rows the column has nothing for, so a placement made on another device is never
+     overwritten by an older one kept here. */
+  function push(){
+    if(!S || !S.hasSection || !S.me || !window.sb) return;
+    var m = load(), ids = Object.keys(m);
+    if(!ids.length) return;
+    ids.forEach(function(id){
+      var h = (S.habits || []).filter(function(x){ return String(x.id) === id; })[0];
+      if(!h){ forget(id); return; }
+      if(String(h.section || '') === String(m[id])){ forget(id); return; }
+      if(h.section){ forget(id); return; }
+      try{
+        window.sb.from('habits').update({section: m[id]}).eq('id', id).eq('user_id', S.me.id)
+          .then(function(){ h.section = m[id]; forget(id); }, function(e){ warn31('section push', e); });
+      }catch(e){ warn31('section push', e); }
+    });
+  }
+
+  window.__HT31SEC = { local: local, place: place, forget: forget, push: push, claim: claim,
+                       pendingNew: pendingNew,
+                       all: function(){ return JSON.parse(JSON.stringify(load())); } };
+
+  var _pa = paintAll;
+  paintAll = function(){ var out = _pa.apply(null, arguments);
+                         try{ claim(); push(); }catch(e){ warn31('section push', e); } return out; };
+})();
+
+
+/* ---- S1.7 · THE TASKS THE DEFECT MAY HAVE MOVED, WITH AN UNDO PER ROW ---------------------------
+   The render-time half moved nothing in the database - it only drew rows in the wrong place. The
+   DURABLE half is the sheet: with the section select defaulting to `sectionOf(h)`, opening a 21:30
+   task and saving ANY other change wrote `section:'morning'` for good. So the list is computed from
+   his own rows, in his own browser, with no key and no server pass: a task stored `morning` whose
+   planned time is outside the morning (before 04:00 or at/after 12:00). It is SHOWN, never applied -
+   "never silently move a user's task, in either direction" - and each row has one tap that puts it
+   where the clock says he meant, or dismisses the row for good. */
+(function(){
+  var SEEN = 'ht31_moved_seen';
+  function seen(){ try{ return JSON.parse(localStorage.getItem(SEEN) || '[]') || []; }catch(e){ return []; } }
+  function hide(id){ var s = seen(); if(s.indexOf(id) < 0){ s.push(id); try{ localStorage.setItem(SEEN, JSON.stringify(s)); }catch(e){} } }
+
+  /* the planned time in minutes, read the way every renderer reads it */
+  function pm(h){
+    var t = h && (h.time_anchor || h.planned_start);
+    if(!t) return null;
+    var s = String(t).slice(0, 5);
+    if(!/^\d{2}:\d{2}$/.test(s)) return null;
+    return (+s.slice(0, 2)) * 60 + (+s.slice(3, 5));
+  }
+  function suspect(h){
+    if(!h || String(h.section || '').toLowerCase() !== 'morning') return false;
+    var m = pm(h);
+    if(m == null) return false;
+    return m >= 12 * 60 || m < 4 * 60;          /* a "morning" task planned for the afternoon or the small hours */
+  }
+  function suggestion(h){ var m = pm(h); return (m != null && m >= 18 * 60) ? 'night' : 'standards'; }
+  function rows(){
+    var s = seen();
+    return (S.habits || []).filter(function(h){ return suspect(h) && s.indexOf(String(h.id)) < 0; });
+  }
+  function list(){
+    return rows().map(function(h){
+      return { id: String(h.id), name: String(h.name || ''), time: String(h.time_anchor || h.planned_start || '').slice(0, 5),
+               section: 'morning', suggest: suggestion(h) };
+    });
+  }
+  function move(id, sec){
+    var h = (S.habits || []).filter(function(x){ return String(x.id) === String(id); })[0];
+    if(!h) return Promise.resolve(false);
+    h.section = sec;
+    hide(String(id));
+    if(!S.hasSection || !window.sb || !S.me){ if(window.__HT31SEC) window.__HT31SEC.place(id, sec); return Promise.resolve(true); }
+    return window.sb.from('habits').update({section: sec}).eq('id', id).eq('user_id', S.me.id)
+      .then(function(){ return true; }, function(e){ warn31('moved undo', e); return false; });
+  }
+  window.__HT31MOVED = { list: list, move: move, hide: hide, suspect: suspect };
 })();
 
 })();

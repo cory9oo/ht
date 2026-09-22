@@ -60,7 +60,10 @@ export function sectionOf(h) {
   if (['morning', 'night', 'standards', 'weekly'].includes(s)) return s;
   if (/^\s*sabbath\b/i.test(String(h.name || '')) || /^sabbath$/i.test(String(h.group_name || ''))) return 'night';
   if (h.cadence === 'weekly') return 'weekly';
-  if (minutesOf(h.planned_start) != null || minutesOf(h.time_anchor) != null) return 'morning';
+  // HT-31 S1.6 (Cory 9/21): a planned time never decides a section. The line that read
+  // `if (minutesOf(h.planned_start) != null || ...) return 'morning';` is the defect he reported -
+  // it made every timed task a morning task. The app, the markdown, the copier and this sender all
+  // carry the identical rule and all four moved in the same wire.
   return 'standards';
 }
 

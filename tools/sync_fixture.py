@@ -52,7 +52,9 @@ def fixture_dir(estate):
 
 
 DST = fixture_dir(find_estate(SRC))
-COPY = ['app.js', 'app.css', 'tokens.css', 'manifest.webmanifest']
+# HT-31 S0.3: `version.json` joins the copy list. It is how a running build learns it is behind,
+# so a fixture without it cannot exercise the self-update at all.
+COPY = ['app.js', 'app.css', 'tokens.css', 'manifest.webmanifest', 'version.json']
 
 FONT_LINE = re.compile(
     r'^<link rel="(?:preconnect|stylesheet)" href="https://fonts\.(?:googleapis|gstatic)\.com.*$',
