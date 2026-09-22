@@ -400,7 +400,7 @@ async def run_s3(pw):
     # row does not need the height. So the target got wider while the row got shorter, which is the
     # rare change that is better on both counts, and the assertion follows it by name.
     chk("S3g · 390x844 · the phone's tap target is 44 wide (HT-31 S3.12; 36 under HT-30, 44 before)",
-        m3['bxw'] and m3['bxw']['w'] == 44 and m3['edp'] and m3['edp']['w'] == 32,
+        m3['bxw'] and m3['bxw']['w'] == 44 and m3['edp'] and m3['edp']['w'] == 36,
         [m3['bxw'], m3['edp']])
     chk("S3  · 390x844 · zero page errors", not e3, e3)
     await b3.close()

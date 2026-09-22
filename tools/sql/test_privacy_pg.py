@@ -424,8 +424,15 @@ def main() -> int:
         print("HT-31 · the one-paste preamble")
         pending = read("ht_pending.sql")
         pre = pending[pending.index("do $ht_pending$"):pending.index("$ht_pending$;") + len("$ht_pending$;")]
-        run_script(c, pre)
-        chk("S6.18 · with row level security on everywhere, the preamble passes in silence", True)
+        ran = True
+        try:
+            run_script(c, pre)
+        except Exception as e:                       # noqa: BLE001
+            ran = str(e)
+        # NOT `chk(..., True)`. A hardcoded pass is a sentence, not a check - 134 R1's own shape, and a
+        # reviewer found this one in this wire's first draft. It now asserts what actually happened.
+        chk("S6.18 · with row level security on everywhere, the preamble passes in silence",
+            ran is True, ran)
         run_script(c, "alter table public.circle_members disable row level security")
         raised = ""
         try:
@@ -436,6 +443,19 @@ def main() -> int:
         chk("S6.18 · with it OFF on one table the whole paste REFUSES, and names the table",
             "row level security is OFF" in raised and "circle_members" in raised, raised[:140] or "IT RAN")
         run_script(c, "alter table public.circle_members enable row level security")
+
+        # AND THE THIRD CASE, which is the one a missing table would have walked straight through: a
+        # guarded name that is not in the schema at all contributes no row to a "which of these has RLS
+        # off" query, so the old preamble passed in silence for exactly the table it could not see.
+        pre_missing = pre.replace("'circle_members'", "'circle_members', 'no_such_table_ht31'")
+        raised2 = ""
+        try:
+            run_script(c, pre_missing)
+        except Exception as e:                       # noqa: BLE001
+            raised2 = str(e)
+        c.rollback()
+        chk("S6.18 · and a guarded table that does not EXIST stops it too, by name",
+            "do not exist" in raised2 and "no_such_table_ht31" in raised2, raised2[:140] or "IT RAN")
 
         print("AGAIN · a second run changes nothing")
         run_script(c, migration)

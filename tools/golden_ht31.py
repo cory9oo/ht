@@ -55,7 +55,8 @@ def fixture_dir(estate):
     for d in (os.path.join(estate, '_machine', 'ht3'), os.path.join(estate, 'ht3')):
         if os.path.isdir(d):
             return d
-    return os.path.join(estate, 'ht3')
+    raise SystemExit('golden_ht31: no fixture under %s - looked for _machine/ht3 and ht3. Returning a '
+                     'path that does not exist only moves the failure somewhere less readable.' % estate)
 
 
 FIX = fixture_dir(ESTATE)
@@ -76,10 +77,15 @@ def chk(name, ok, got=""):
 
 
 def src(p):
+    """READ IT OR STOP. This file's law checks are NEGATIVE - "the clock term is not in app.js", "no
+    owner id is in app.js" - and a placeholder string satisfies every one of them. Returning
+    'NOT READABLE: ...' would turn a moved or unreadable file into a clean bill of health, which is
+    134 R1's exact shape: a true sentence about a check that never ran."""
     try:
         return io.open(p, encoding='utf-8', errors='replace').read()
     except OSError as e:
-        return u'NOT READABLE: %s (%s)' % (p, type(e).__name__)
+        raise SystemExit('golden_ht31: cannot read %s (%s). A check that cannot run is not a pass.'
+                         % (p, type(e).__name__))
 
 
 def init_js(flags):
@@ -297,13 +303,30 @@ async def sec_s2(pw):
     await pg.keyboard.press('Escape')
     await pg.wait_for_timeout(200)
     chk('S2k . Esc closes it without saving', await pg.evaluate("() => !document.getElementById('ht31pick')"))
-    chk('S2l . a ghost + time is offered in Morning and Night only', await pg.evaluate(
-        """() => { const g=[...document.querySelectorAll('#log .ht31ghost')];
-          const secs=g.map(n => { let p=n.closest('.li'); let h='';
-            while(p){ if(p.classList && p.classList.contains('grp')){ h=p.textContent.trim(); break; } p=p.previousElementSibling; }
-            return h; });
-          return secs.every(s => s === 'Morning routine' || s === 'Night routine'); }"""))
-    chk('S2m . zero page errors', not errs, errs[:2])
+    await b.close()
+    # S2l NEEDS A ROW THAT CAN HAVE A GHOST, which the fixture above does not contain: both placed rows
+    # already carry a time, so the ghost list came back EMPTY and `[].every(...)` is true - an assertion
+    # that could not fail, counted as a pass, which is 134 R1's own failure mode inside this wire's own
+    # golden. It was caught by a fresh-context review of this diff, not by the suite. The fixture here
+    # places FOUR rows across the four sections and gives NONE of them a time, so there are ghosts to
+    # find, ghosts that must NOT be there, and a number on both.
+    b, pg, errs = await open_page(pw, 390, 844, flags=dict(SQL, **PLACED))
+    ghosts = await pg.evaluate("""() => { const out={in:[], out:[]};
+      for (const r of document.querySelectorAll('#log .li')){
+        let p=r.previousElementSibling, h='';
+        while(p){ if(p.classList && p.classList.contains('grp')){ h=p.textContent.trim(); break; } p=p.previousElementSibling; }
+        const wants = (h === 'Morning routine' || h === 'Night routine');
+        const has = !!r.querySelector('.ht31ghost');
+        if (has) out.in.push(h);
+        if (wants && !has && !r.querySelector('.pat30')) out.out.push(r.getAttribute('data-h'));
+      }
+      return out; }""")
+    chk('S2l . every ghost + time is in Morning or Night, and there IS at least one (%d)' % len(ghosts['in']),
+        len(ghosts['in']) >= 1
+        and all(h in ('Morning routine', 'Night routine') for h in ghosts['in']), ghosts)
+    chk('S2m . and no timeless row in those two sections was left without one',
+        not ghosts['out'], ghosts['out'][:4])
+    chk('S2n . zero page errors', not errs, errs[:2])
     await b.close()
 
 

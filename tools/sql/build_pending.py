@@ -47,8 +47,23 @@ HEAD = """-- ht_pending.sql - EVERYTHING THE TRACKER IS WAITING FOR, IN ONE PAST
 
 do $ht_pending$
 declare
-  bad text;
+  bad  text;
+  miss text;
 begin
+  -- A TABLE THAT IS NOT THERE CONTRIBUTES NO ROW, and a guard that reads "no rows with RLS off" would
+  -- therefore pass in silence for exactly the table it cannot see - a rename, a wrong schema, or one
+  -- character wrong in the builder's own list. So the list is checked for PRESENCE first: what is
+  -- missing is named, and nothing is applied. (Found by a review of this wire's diff, not by a test.)
+  select string_agg(t, ', ' order by t) into miss
+    from unnest(array[%s]) as t
+   where not exists (select 1 from pg_class c join pg_namespace n on n.oid = c.relnamespace
+                      where n.nspname = 'public' and c.relname = t);
+  if miss is not null then
+    raise exception 'REFUSING: this file guards tables that do not exist in schema public: %%. Nothing '
+                    'was applied. Either the database is not the one this stack was written for, or '
+                    'tools/sql/build_pending.py names a table wrongly.', miss;
+  end if;
+
   select string_agg(c.relname, ', ' order by c.relname) into bad
     from pg_class c join pg_namespace n on n.oid = c.relnamespace
    where n.nspname = 'public'
@@ -100,7 +115,7 @@ def undo_of(name):
 
 def build():
     quoted = ', '.join("'%s'" % t for t in GUARDED)
-    body = [HEAD % (', '.join(ORDER), len(ORDER), quoted)]
+    body = [HEAD % (', '.join(ORDER), len(ORDER), quoted, quoted)]
     for name in ORDER:
         body.append('\n-- ============================================================================\n'
                     '-- %s\n'
