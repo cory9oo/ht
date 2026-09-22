@@ -11823,47 +11823,24 @@ function h31Extras(){ return HT31_INSIGHTS_EXTRAS || window.__HT31_EXTRAS === tr
        reached: only one of them may own it. */
   }
 
-  /* S4.15's OTHER HALF, and it is the half the wire tells you to check: "if any lived only in the tab,
-     move it to the main view first". THE MONTH, THE YEAR and GROUP were already on the desktop's main
-     view - the life graph was NOT, on main or before it. Measured, not assumed: `#vLife` is invisible on
-     the desktop Today view at 1280 and 1920 in the build this wire started from. So removing the tab
-     would have taken it away from the desktop altogether, which is a thing Cory did not ask for and
-     would not have noticed until he looked for it. It joins the two charts it belongs with.
-     It runs AFTER HT-30's restore() - this wrapper is the outer one - and it is idempotent, so the two
-     do not fight: restore puts it home, this puts it where the desktop shows it. */
-  function deskLife(){
-    if(HT31_DESK_INSIGHTS || h31Phone()) return;
-    var life = h31El('vLife'), host = h31El('h18Charts');
-    if(!life || !host) return;
-    var panel = h31El('h31Life');
-    if(!panel){
-      panel = document.createElement('div');
-      panel.id = 'h31Life'; panel.className = 'h16p';
-    }
-    /* the panel is built the way HT-16 builds the two beside it - a `.h16p` carrying the section's own
-       heading and its body - so it inherits their box, their padding and their header style rather than
-       inventing a third look (R70.306, one renderer per kind). */
-    var head = life.previousElementSibling;
-    var moved = false;
-    if(head && head.classList && head.classList.contains('sh') && head.parentNode !== panel){ panel.appendChild(head); moved = true; }
-    if(life.parentNode !== panel){ panel.appendChild(life); moved = true; }
-    if(panel.parentNode !== host){ host.appendChild(panel); moved = true; }
-    /* A MOVED NODE HAS NOT BEEN PAINTED - the lesson HT-30 wrote down when its borrowed cards came up
-       empty. HT-13 draws the life grid, and it is asked ONCE, only when something actually moved, so
-       this cannot turn into a repaint on every paint. */
-    if(moved && window.__HT13_REPAINT) try{ window.__HT13_REPAINT(); }catch(e){ warn31('life repaint', e); }
-  }
+  /* S4.15 SAYS TO CHECK THAT THE FOUR ARE STILL ON THE DESKTOP'S MAIN VIEW, and they are - measured at
+     1280 and 1920 with the tab gone: THE MONTH and THE YEAR in the charts quadrant, GROUP and the LIFE
+     grid (`#h16Ins`, HT-16's own panel) in the right-hand column. So nothing had to move.
+     THE FIRST DRAFT MOVED ONE ANYWAY. `#vLife` - HT-13's life grid, a DIFFERENT element from the one
+     the desktop shows - is hidden there by HT-15's allow-list, and reading that as "LIFE is missing"
+     put a second, near-empty life panel under the two charts. The DOM probe was happy; the screenshot
+     was not, which is why S9.31 takes shots and R70.211 says a page is what a person sees. Removed. */
 
   var _pa = paintAll;
   paintAll = function(){ var out = _pa.apply(null, arguments);
-                         try{ four(); deskLife(); }catch(e){ warn31('four insights', e); } return out; };
+                         try{ four(); }catch(e){ warn31('four insights', e); } return out; };
   if(window.MutationObserver){
-    new MutationObserver(function(){ try{ four(); deskLife(); }catch(e){ warn31('four insights', e); } })
+    new MutationObserver(function(){ try{ four(); }catch(e){ warn31('four insights', e); } })
       .observe(document.documentElement, { attributes: true, attributeFilter: ['data-vtab'] });
   }
   document.addEventListener('click', function(){ setTimeout(function(){ try{ four(); }catch(e){} }, 60); }, true);
 
-  window.__HT31INS = { four: four, deskLife: deskLife, order: HT31_INS_ORDER, hidden: HT31_INS_HIDE };
+  window.__HT31INS = { four: four, order: HT31_INS_ORDER, hidden: HT31_INS_HIDE };
 })();
 
 

@@ -2837,16 +2837,4 @@ html[data-simple] #vTabs [data-v][hidden]{ display:none !important }
 .h31inv{ display:flex; gap:8px; padding-top:10px }
 #h29JoinWho{ color:var(--text) }
 
-/* ---- S4.15 · THE LIFE GRAPH JOINS THE TWO CHARTS ON THE DESKTOP ----------------------------------
-   Measured before this wire: `#vLife` is INVISIBLE on the desktop's Today view - it lived only on the
-   Views/Insights tab, which S4.15 removes. "If any lived only in the tab, move it to the main view
-   first" is the wire's own instruction, and this is the stylesheet half of it: inside the charts
-   quadrant the grid is shown, wherever the tab rules would otherwise stand it down.
-   HT-15's allow-list hides `#vLife` with `display:none !important` (app.css:662), so showing it needs
-   the same weight - which is exactly what HT-30's own `.h30ins .h30cb #vLife` rule does two hundred
-   lines up. Matched, not out-thought. */
-@media(min-width:1024px){
-  html[data-simple] #h18Charts #h31Life{ display:block }
-  html[data-simple] #h18Charts #vLife{ display:block !important; max-height:220px; overflow:hidden }
-  html[data-simple] #h18Charts #h31Life .sh{ display:flex }
 }

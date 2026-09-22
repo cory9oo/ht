@@ -429,12 +429,20 @@ async def sec_s4(pw):
           return { tabBar: vis(t), tabs:[...document.querySelectorAll('#vTabs [data-v]')].filter(vis).length,
                    strip: vis(document.querySelector('#tStrip .go')),
                    page: vis(document.getElementById('h30Ins')),
-                   month:on('h16Month'), year:on('h16Year'), life:on('vLife'), group:on('h18Group') }; }""")
+                   /* THE LIFE ON THE DESKTOP IS `#h16Ins` - HT-16's own panel, in the right-hand
+                      column under GROUP. `#vLife` is HT-13's separate grid and is hidden here by
+                      HT-15's allow-list, which is not the same thing as LIFE being missing. Reading
+                      one for the other cost this wire a duplicate panel that only the screenshot
+                      caught, so the element is named here with the reason beside it. */
+                   month:on('h16Month'), year:on('h16Year'), life:on('h16Ins'), group:on('h18Group'),
+                   lifePanels: [...document.querySelectorAll('h2')]
+                     .filter(h => /^(the )?life$/i.test((h.textContent||'').trim()) && h.offsetParent).length }; }""")
         chk('S4g . %d . the Insights tab and its bar are gone' % w, not d['tabBar'] and d['tabs'] == 0, d)
         chk('S4h . %d . the "Insights >" header link is gone' % w, not d['strip'], d)
         chk('S4i . %d . and there is no Insights page to reach' % w, not d['page'], d)
         chk('S4j . %d . THE MONTH, THE YEAR, LIFE and GROUP are on the main view' % w,
             d['month'] and d['year'] and d['life'] and d['group'], d)
+        chk('S4j . %d . and there is exactly ONE life panel, not two' % w, d['lifePanels'] == 1, d)
         await pg.evaluate("() => { location.hash = '#insights'; if(window.__HT30INS) window.__HT30INS.go('insights'); }")
         await pg.wait_for_timeout(700)
         chk('S4k . %d . a #insights link lands on Today, not on an empty page' % w,
