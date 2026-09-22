@@ -97,6 +97,21 @@ function fmtClock(min){
   var m=Math.max(0, Math.round(min));
   return ('0'+Math.floor(m/60)).slice(-2)+':'+('0'+(m%60)).slice(-2);
 }
+/* ---- HT-31 S2.8 . ONE FUNCTION RENDERS EVERY TIME A HUMAN READS ------------------------------
+   Cory, 9/21: "regular time, not military time". STORAGE DOES NOT MOVE - every column stays HH:MM
+   24-hour and there is no migration - and this is the only place in the app where a stored clock
+   becomes words. Form: `9:30 PM`, no leading zero, and a NARROW NO-BREAK SPACE (U+202F) before
+   AM/PM so a chip can never wrap between the number and its half of the day. Midnight is 12:00 AM
+   and noon is 12:00 PM, which is the one place a 12-hour clock trips and the one case a test must
+   name. Anything that is not a clock comes back untouched, so a caller may wrap a value that can
+   be null. `golden_ht31` S2 reads this file and fails if a clock is rendered anywhere else. */
+function fmtTime(t){
+  if(t==null || t==='') return t;
+  var m=/^\s*(\d{1,2}):([0-5]\d)/.exec(String(t));
+  if(!m) return String(t);
+  var h=(+m[1])%24, ap=h<12?'AM':'PM', hh=h%12; if(hh===0) hh=12;
+  return hh+':'+m[2]+'\u202f'+ap;
+}
 function planMins(h){
   if(!h) return null;
   if(h.minutes_planned!=null && h.minutes_planned!=='') return +h.minutes_planned;
@@ -638,7 +653,7 @@ function paintOneThing(){
       '" title="the one thing"><span class="bx"></span></button>'+
     '<span class="onek">ONE THING</span>'+
     '<span class="onev">'+esc(t)+'</span>'+
-    (at?'<i class="dat">\u2713 '+esc(at)+'</i>':'')+
+    (at?'<i class="dat">\u2713 '+esc(fmtTime(at))+'</i>':'')+
     '</div>';
 }
 function ratingOf(k){ var p=S.privAll[k]; var v=p&&p.rating; return (v==null||v==='')?null:+v; }
@@ -808,9 +823,9 @@ function paintLog(){
        answer, and a list of them reads as a fault. */
     var pAt = winStart(h);
     var dAt = doneAt(S.date, h.id);
-    var nmIn = (pAt ? '<b class="pat">'+esc(pAt)+'</b>' : '') +
+    var nmIn = (pAt ? '<b class="pat">'+esc(fmtTime(pAt))+'</b>' : '') +
       esc(nameOf(h.name)) +
-      (dAt ? '<i class="dat'+lateCls(h,S.date)+'">\u2713 '+esc(dAt)+esc(lateTxt(h,S.date))+'</i>' : '') +
+      (dAt ? '<i class="dat'+lateCls(h,S.date)+'">\u2713 '+esc(fmtTime(dAt))+esc(lateTxt(h,S.date))+'</i>' : '') +
       ((S.hasCue && h.cue)?'<i class="cue">'+esc(h.cue)+'</i>':'');
     /* ---- HT-21 S3 · LINKS WITHOUT NOISE (R70.287) ------------------------------------
        Cory: "I still need links available but I do not like the icon next to the end of the
@@ -929,7 +944,7 @@ function sleepFact(k){
   var p = (k===S.date ? S.priv : S.privAll[k]) || {};
   var span = sleepSpan(p.bed_time, p.wake_time);
   if(span!=null) return { hours:span, how:'derived',
-                          why:'bed '+p.bed_time.slice(0,5)+' → up '+p.wake_time.slice(0,5) };
+                          why:'bed '+fmtTime(p.bed_time)+' → up '+fmtTime(p.wake_time) };
   if(p.sleep_hours!=null && p.sleep_hours!=='')
     return { hours:+p.sleep_hours, how:'self', why:'you entered this' };
   var est = sleepFromCheckins(k);
@@ -3188,10 +3203,10 @@ function earned(k){ return committed() - remaining(k); }
              if(fromName){
                var t=('0'+fromName[1]).slice(-2)+':'+fromName[2];
                out+='<button class="btn h16adopt" id="eFromName" data-t="'+t+'">'+
-                    'Set planned time '+t+' from the name?</button>';
+                    'Set planned time '+fmtTime(t)+' from the name?</button>';
              }
              var m = (window.__HT16 && window.__HT16.medianClose) ? window.__HT16.medianClose(h.id) : null;
-             if(m) out+='<button class="btn h16adopt" id="eAdopt" data-t="'+m+'">usually done ~'+m+
+             if(m) out+='<button class="btn h16adopt" id="eAdopt" data-t="'+m+'">usually done ~'+fmtTime(m)+
                         '</button>';
              return out;
            })()+
@@ -5630,7 +5645,7 @@ function earned(k){ return committed() - remaining(k); }
       var old=row.querySelector('.tpfx');
       if(a){
         anySplit=true;
-        var txt=a+(pm?' \u00b7 '+pm+'m':'');
+        var txt=fmtTime(a)+(pm?' \u00b7 '+pm+'m':'');
         if(old) old.textContent=txt;
         else{
           var sp=document.createElement('span');
@@ -6005,7 +6020,7 @@ function earned(k){ return committed() - remaining(k); }
   /* HT-19 B0.1: it wanted the formatted string all along. The division was the bug. */
   function usualTime(h){
     var s=window.__HT16.medianClose ? window.__HT16.medianClose(h.id) : null;
-    return s || '—';
+    return s ? fmtTime(s) : '—';
   }
 
   function drawerEl(){
@@ -6453,7 +6468,7 @@ function earned(k){ return committed() - remaining(k); }
     var mc = d10().medianClose;
     var usual = '<ul class="h20list">'+S.habits.slice(0,8).map(function(h){
         return '<li><span>'+esc(nameOf(h.name))+'</span><b>'+
-               esc((mc && mc(h.id)) || '—')+'</b></li>';
+               esc(fmtTime((mc && mc(h.id))) || '—')+'</b></li>';
       }).join('')+'</ul>';
     /* ---- THE GROUP ROW --------------------------------------------------------------- */
     var mine=adhAll(0,29), myToday=adhPct(0,0);
@@ -8166,7 +8181,7 @@ function earned(k){ return committed() - remaining(k); }
       '<div class="h28seed">'+items.map(function(x){
         var on=have[x.name.toUpperCase()], moves=on && place.indexOf(x)>=0;
         var where=x.section ? HT29SEC.NAMES[x.section].toLowerCase() : (x.cadence==='weekly'?'weekly':(x.time?'timed':'anytime'));
-        return '<div class="fl'+(on?' on':'')+'"><i>'+(x.time?esc(x.time):'')+'</i>'+
+        return '<div class="fl'+(on?' on':'')+'"><i>'+(x.time?esc(fmtTime(x.time)):'')+'</i>'+
           '<span><b>'+esc(x.name)+'</b>'+(x.notes?'<em>'+esc(x.notes)+'</em>':'')+'</span>'+
           '<u>'+(moves?'\u2192 '+esc(where):(on?'on your list':esc(where)))+'</u></div>'; }).join('')+
       '</div>'+
@@ -8242,7 +8257,7 @@ function earned(k){ return committed() - remaining(k); }
   function exHtml(){
     return '<div class="k">Examples \u00b7 keep, change or delete any</div>'+
       EXAMPLES.map(function(x){
-        return '<div class="fl"><i>'+(x.time?esc(x.time):'')+'</i><span>'+esc(x.name)+'</span>'+
+        return '<div class="fl"><i>'+(x.time?esc(fmtTime(x.time)):'')+'</i><span>'+esc(x.name)+'</span>'+
           '<b>'+(x.cadence==='weekly'?'WEEKLY':(x.time?'TIMED':'ANYTIME'))+'</b></div>'; }).join('')+
       '<div class="h28t"><button class="btn pri" type="button" data-h28ex="1">Add these 4</button></div>';
   }
@@ -8359,7 +8374,8 @@ function earned(k){ return committed() - remaining(k); }
   function offline(){ return navigator.onLine === false; }
   function isNetErr(e){ return !!e && /fetch|network|load failed|offline|timed? ?out/i.test(String(e.message||e)); }
   function mine(r){ return !r.user_id || (S.me && r.user_id === S.me.id); }
-  function clock2(d){ return ('0'+d.getHours()).slice(-2)+':'+('0'+d.getMinutes()).slice(-2); }
+  /* HT-31 S2.8: the sync stamp is a clock a human reads, so it goes through the one function. */
+  function clock2(d){ return fmtTime(('0'+d.getHours()).slice(-2)+':'+('0'+d.getMinutes()).slice(-2)); }
   function ready(){ return !!S.me && S.loadOk === true; }
   function warn(what, e){ try{ console.warn('HT-28 sync: '+what+(e && e.message ? ' - '+String(e.message).slice(0,120) : '')); }catch(_){} }
 
@@ -9178,8 +9194,8 @@ var HT29SEC = (function(){
       var done = doneAt(S.date, h.id);
       var d = document.createElement('i');
       d.className = 'dot29 ' + cls; d.setAttribute('role', 'button'); d.setAttribute('tabindex', '0');
-      d.setAttribute('aria-label', (cls === 'ontime' ? 'on time' : m + ' minutes late') + ', done ' + done);
-      d.setAttribute('data-say', 'done ' + done + ' · ' + (m === 0 ? 'on time' : (m < 0 ? (-m) + ' min early' : '+' + m + ' min')));
+      d.setAttribute('aria-label', (cls === 'ontime' ? 'on time' : m + ' minutes late') + ', done ' + fmtTime(done));
+      d.setAttribute('data-say', 'done ' + fmtTime(done) + ' · ' + (m === 0 ? 'on time' : (m < 0 ? (-m) + ' min early' : '+' + m + ' min')));
       dat.parentNode.insertBefore(d, dat);
     });
   }
@@ -9362,7 +9378,7 @@ var HT29GRP = (function(){
         out += '<div class="h29r' + (mark ? ' on' : '') + '"><span class="h29ck" aria-label="' + (mark ? 'done' : 'not done') + '">' +
           (mark ? '✓' : '') + '</span><span class="nm"' + (h.done_def ? ' title="Done when: ' + esc(h.done_def) + '"' : '') + '>' +
           esc(nameOf(h.name)) + '</span>' +
-          (cls ? '<i class="dot29 ' + cls + '" data-say="' + esc('done ' + mark + (m === 0 ? ' · on time' : (m < 0 ? ' · ' + (-m) + ' min early' : ' · +' + m + ' min'))) + '" role="button" tabindex="0"></i>' : '') +
+          (cls ? '<i class="dot29 ' + cls + '" data-say="' + esc('done ' + fmtTime(mark) + (m === 0 ? ' · on time' : (m < 0 ? ' · ' + (-m) + ' min early' : ' · +' + m + ' min'))) + '" role="button" tabindex="0"></i>' : '') +
           '</div>';
       });
     });
@@ -9834,8 +9850,9 @@ var HT29MD = (function(){
       out.push('**' + sec[1] + '**');
       rows.forEach(function(h){
         var mark = checked[String(h.id)], bits = [];
-        if (planned(h)) bits.push('planned ' + planned(h));
-        if (typeof mark === 'string' && hhmm(mark)) bits.push('done ' + hhmm(mark));
+        /* HT-31 S2.8: the vault day file reads in Cory's words too. `_ht.py` renders the same. */
+        if (planned(h)) bits.push('planned ' + fmtTime(planned(h)));
+        if (typeof mark === 'string' && hhmm(mark)) bits.push('done ' + fmtTime(hhmm(mark)));
         var v = mark ? variance(h, mark) : null;
         if (v != null) bits.push((v >= 0 ? '+' : '') + v + ' min');
         out.push('- [' + (mark ? 'x' : ' ') + '] ' + strip(h.name) + (bits.length ? ' · ' + bits.join(' · ') : ''));
@@ -10661,7 +10678,7 @@ var HT30TIME = (function(){
       'If one is wrong, Undo puts the name back exactly as it was.</div>' +
       rows.map(function(r){
         return '<div class="h30ren"><span class="n">' + esc(r.was) + '</span>' +
-               '<span class="t num">' + esc(r.time) + '</span>' +
+               '<span class="t num">' + esc(fmtTime(r.time)) + '</span>' +
                '<button class="btn" type="button" data-h30undo="' + esc(String(r.id)) + '">Undo</button></div>';
       }).join('');
     ov.appendChild(n);
@@ -10704,7 +10721,11 @@ window.__HT30TIME = HT30TIME;
 var HT30_SHEET_NOTES = false;
 var HT30_SHEET_MORE = true;
 (function(){
-  var SURFACE = ['Name', 'Section', 'Planned time', 'Planned minutes'];
+  /* HT-31 S2.11 · ONE ADDRESS FOR A TIME. 'Planned time' leaves this list: the chip on the row is
+     where a time is set now, so keeping a second door on the sheet's surface is two answers to one
+     question. The field is not deleted - it folds under More with everything else, which is where a
+     keyboard or a screen reader still reaches it (R70.138). */
+  var SURFACE = ['Name', 'Section', 'Planned minutes'];
   function labOf(f){ var s = f.querySelector('.lab'); return s ? s.textContent.trim() : ''; }
 
   function fold(){
@@ -11455,6 +11476,204 @@ var HT31_SECTIONS_LOCAL = true;
       .then(function(){ return true; }, function(e){ warn31('moved undo', e); return false; });
   }
   window.__HT31MOVED = { list: list, move: move, hide: hide, suspect: suspect };
+})();
+
+
+/* ---- S2.9 / S2.10 · THE CHIP ON THE ROW IS THE EDITOR -------------------------------------------
+   Cory, 9/21: "I don't want to click inside of it to click the time ... editable outside, next to the
+   completed task". So the planned-time chip is not a label any more - tapping it opens a small picker
+   anchored to that row, and the edit page is not involved at all.
+   WHY NOT `<input type="time">`: it follows the DEVICE locale, and on a 24-hour device it shows 24-hour
+   whatever this app renders - which is the complaint. One picker, ours, in his form: hour 1-12, minutes
+   in five-minute steps with a box for an exact minute, AM/PM, Clear. It saves when it closes, closes on
+   an outside tap or Esc, and every control is >= 16px so iOS does not zoom the page (128 A1).
+   THE HIT AREAS DO NOT OVERLAP: the check-off owns the left 44px of the row and the chip owns its own
+   44px at the right. Tapping the chip never toggles the day, and tapping the box never opens a picker -
+   `golden_ht31` S2 proves it with synthetic taps at the centre of each.
+   A ROW WITH NO TIME shows a ghost `+ time` in Morning and Night only (HT31_GHOST_CHIP_SECTIONS): those
+   are the two sections a time means something in. Weekly and Standards show a chip only when a time
+   exists, and the desktop reveals the ghost on hover so a resting list stays quiet. */
+var HT31_TIME_PICKER = true;
+var HT31_GHOST_CHIP_SECTIONS = ['morning', 'night'];
+(function(){
+  var open = null;                    /* {id, chip, node} while a picker is on screen */
+
+  function habit(id){ return (S.habits || []).filter(function(h){ return String(h.id) === String(id); })[0]; }
+  function parts(t){
+    var m = /^\s*(\d{1,2}):([0-5]\d)/.exec(String(t || ''));
+    if(!m) return { h: 7, m: 0, ap: 'AM', had: false };
+    var H = (+m[1]) % 24, ap = H < 12 ? 'AM' : 'PM', hh = H % 12;
+    return { h: hh === 0 ? 12 : hh, m: +m[2], ap: ap, had: true };
+  }
+  function to24(h, mi, ap){
+    var H = (+h) % 12;
+    if(ap === 'PM') H += 12;
+    return ('0' + H).slice(-2) + ':' + ('0' + (+mi)).slice(-2);
+  }
+
+  function html(p){
+    var hrs = '', mins = '', i;
+    for(i = 1; i <= 12; i++) hrs += '<option value="' + i + '"' + (i === p.h ? ' selected' : '') + '>' + i + '</option>';
+    for(i = 0; i < 60; i += 5) mins += '<option value="' + i + '"' + (i === p.m ? ' selected' : '') + '>' + ('0' + i).slice(-2) + '</option>';
+    return '<div class="ht31pr">' +
+        '<select id="ht31h" aria-label="hour">' + hrs + '</select>' +
+        '<span class="ht31c">:</span>' +
+        '<select id="ht31m" aria-label="minute">' + mins + '</select>' +
+        '<input id="ht31x" type="text" inputmode="numeric" maxlength="2" aria-label="exact minute" ' +
+          'placeholder="min" value="' + (p.m % 5 ? ('0' + p.m).slice(-2) : '') + '">' +
+        '<span class="ht31ap">' +
+          '<button type="button" data-ap="AM" class="' + (p.ap === 'AM' ? 'on' : '') + '">AM</button>' +
+          '<button type="button" data-ap="PM" class="' + (p.ap === 'PM' ? 'on' : '') + '">PM</button>' +
+        '</span>' +
+      '</div>' +
+      '<div class="ht31pa">' +
+        '<button type="button" class="btn" data-ht31="clear">Clear</button>' +
+        '<button type="button" class="btn" data-ht31="done">Done</button>' +
+      '</div>';
+  }
+
+  function value(){
+    if(!open) return null;
+    var n = open.node;
+    var h = +n.querySelector('#ht31h').value;
+    var x = String(n.querySelector('#ht31x').value || '').trim();
+    var mi = /^\d{1,2}$/.test(x) ? Math.min(59, +x) : +n.querySelector('#ht31m').value;
+    var ap = n.querySelector('.ht31ap .on');
+    return to24(h, mi, ap ? ap.getAttribute('data-ap') : 'AM');
+  }
+
+  async function write(id, t){
+    var h = habit(id); if(!h) return;
+    var rec = {};
+    if(S.hasTime){ rec.time_anchor = t; }
+    if(S.hasWindow){
+      rec.planned_start = t;
+      rec.planned_end = t ? fmtClock(minsOf(t) + (planMins(h) || 0)) : null;
+    }
+    if(!Object.keys(rec).length){ toast('planned time needs one more column — paste the SQL'); return; }
+    /* S1.6 again, in the one place a reader would look for a breach: THIS NEVER TOUCHES `section`. */
+    var before = HT29SEC.sectionOf(h);
+    if(S.hasTime) h.time_anchor = t;
+    if(S.hasWindow){ h.planned_start = rec.planned_start; h.planned_end = rec.planned_end; }
+    try{ paintAll(); }catch(e){ warn31('repaint after time', e); }
+    if(HT29SEC.sectionOf(h) !== before) warn31('section moved by a time - that is a defect', before);
+    try{
+      var res = await sb.from('habits').update(rec).eq('id', h.id).eq('user_id', S.me.id);
+      if(res && res.error){ toast('not saved — ' + String(res.error.message || '').slice(0, 60)); return; }
+      toast(t ? 'time set ' + fmtTime(t) : 'time cleared');
+    }catch(e){ warn31('time save', e); }
+  }
+
+  function close(save){
+    if(!open) return;
+    /* THE VALUE IS READ BEFORE THE STATE IS CLEARED. `value()` reads `open`, so clearing it first
+       made every Done silently save nothing - caught by the S2 probe, which is why the probe reads
+       the row back instead of trusting that the picker closed. */
+    var t = save === false ? null : value();
+    var o = open; open = null;
+    if(o.node && o.node.parentNode) o.node.parentNode.removeChild(o.node);
+    if(o.chip) o.chip.classList.remove('ht31on');
+    if(save === 'clear'){ write(o.id, null); return; }
+    if(save !== false && t && t !== o.was) write(o.id, t);
+  }
+
+  function place(node, chip){
+    var r = chip.getBoundingClientRect();
+    node.style.position = 'fixed';
+    node.style.top = Math.max(4, Math.min(window.innerHeight - 90, r.bottom + 6)) + 'px';
+    var w = Math.min(300, window.innerWidth - 16);
+    node.style.width = w + 'px';
+    node.style.left = Math.max(8, Math.min(window.innerWidth - w - 8, r.right - w)) + 'px';
+  }
+
+  function show(chip){
+    var id = chip.getAttribute('data-ht31t'); if(!id) return;
+    if(open && open.id === id){ close(true); return; }
+    close(true);
+    var h = habit(id); if(!h) return;
+    var was = winStart(h);
+    var n = document.createElement('div');
+    n.id = 'ht31pick'; n.className = 'ht31pick'; n.setAttribute('role', 'dialog');
+    n.setAttribute('aria-label', 'planned time for ' + nameOf(h.name));
+    n.innerHTML = html(parts(was));
+    document.body.appendChild(n);
+    open = { id: id, chip: chip, node: n, was: was };
+    chip.classList.add('ht31on');
+    place(n, chip);
+    var f = n.querySelector('#ht31h'); if(f) try{ f.focus(); }catch(e){}
+  }
+
+  document.addEventListener('click', function(e){
+    var chip = e.target && e.target.closest ? e.target.closest('[data-ht31t]') : null;
+    if(chip){ e.preventDefault(); e.stopPropagation(); show(chip); return; }
+    var inside = e.target && e.target.closest ? e.target.closest('#ht31pick') : null;
+    if(!inside){ if(open) close(true); return; }
+    var ap = e.target.closest('[data-ap]');
+    if(ap){
+      Array.prototype.slice.call(inside.querySelectorAll('.ht31ap button')).forEach(function(b){ b.classList.remove('on'); });
+      ap.classList.add('on');
+      return;
+    }
+    var act = e.target.closest('[data-ht31]');
+    if(act){
+      e.preventDefault();
+      close(act.getAttribute('data-ht31') === 'clear' ? 'clear' : true);
+    }
+  }, true);
+
+  document.addEventListener('keydown', function(e){
+    if(!open) return;
+    if(e.key === 'Escape'){ e.preventDefault(); close(false); }
+    else if(e.key === 'Enter' && e.target && e.target.closest && e.target.closest('#ht31pick')){
+      e.preventDefault(); close(true);
+    }
+  }, true);
+  window.addEventListener('resize', function(){ if(open) place(open.node, open.chip); });
+
+  /* ---- the chips themselves: the real one is made tappable, the ghost is added where it belongs ---- */
+  function sectionOfRow(r){
+    var h = habit(r.getAttribute('data-h'));
+    return h ? HT29SEC.sectionOf(h) : '';
+  }
+  function chips(){
+    if(!HT31_TIME_PICKER) return;
+    var log = h31El('log'); if(!log) return;
+    Array.prototype.slice.call(log.querySelectorAll('.li')).forEach(function(r){
+      var id = r.getAttribute('data-h'); if(!id) return;
+      var pat = r.querySelector('.pat30') || r.querySelector('.pat');
+      if(pat){
+        pat.setAttribute('data-ht31t', id);
+        pat.setAttribute('role', 'button');
+        pat.setAttribute('tabindex', '0');
+        pat.setAttribute('title', 'set the planned time');
+        var g = r.querySelector('.pat30.ht31ghost');
+        if(g && g !== pat) g.parentNode.removeChild(g);
+        return;
+      }
+      if(HT31_GHOST_CHIP_SECTIONS.indexOf(sectionOfRow(r)) < 0){
+        var old = r.querySelector('.ht31ghost'); if(old) old.parentNode.removeChild(old);
+        return;
+      }
+      if(r.querySelector('.ht31ghost')) return;
+      var b = document.createElement('b');
+      b.className = 'pat pat30 ht31ghost';
+      b.setAttribute('data-ht31t', id);
+      b.setAttribute('role', 'button');
+      b.setAttribute('tabindex', '0');
+      b.setAttribute('title', 'set a planned time');
+      b.textContent = '+ time';
+      var sp = r.querySelector('.sp16');
+      if(sp) r.insertBefore(b, sp); else r.appendChild(b);
+    });
+  }
+  var _pa = paintAll;
+  paintAll = function(){ var out = _pa.apply(null, arguments); try{ chips(); }catch(e){ warn31('time chips', e); } return out; };
+  document.addEventListener('click', function(){ setTimeout(function(){ try{ chips(); }catch(e){} }, 40); }, true);
+  if(document.readyState === 'complete') setTimeout(chips, 400);
+  else window.addEventListener('load', function(){ setTimeout(chips, 400); });
+
+  window.__HT31TIME = { chips: chips, show: show, close: close, value: value, to24: to24, parts: parts,
+                        isOpen: function(){ return !!open; } };
 })();
 
 })();

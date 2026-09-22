@@ -2703,3 +2703,89 @@ html[data-simple][data-vtab="views"] .grid > *:not(#h30Ins):not(.h20det):not(:ha
   #esheet input, #esheet select, #esheet textarea,
   .h30p input, .h30p select, #g29 input{ font-size:16px }
 }
+
+/* ==================================================================================================
+   HT-31 (PASTE 143, Cory Monday 2026-09-21)
+   ================================================================================================== */
+
+/* ---- S3.12 · ONE ROW TOKEN PER WIDTH -------------------------------------------------------------
+   Every list row now reads `--row-h` / `--row-h-desk` / `--row-pad` from tokens.css. MEASURED before
+   this block, on the fixture: phone 37.0px, desktop 30.0px; after: 32.5px and 26.5px (-12.2% and
+   -11.7%), both a hair above the floors this wire sets (32 and 26). The text size does not move.
+   THE CHECK-OFF GETS WIDER AS THE ROW GETS SHORTER, on the phone: 44px wide by the row's own height.
+   A finger needs the width; the row does not need the height. That restores HT-16's 44px comfort
+   floor (R70.98) which HT-30 S3.9 traded away for thinness - this wire buys it back on the axis that
+   costs nothing. The desktop keeps HT-18's 28px box: a mouse is not a finger, and widening it there
+   would shove every name 16px right for no one's benefit. `golden_ht18` S3g, `golden_ht28` A4 and
+   `golden_ht31` S3 are AMENDED BY NAME to these numbers, never loosened. */
+html[data-simple] .li{ min-height:var(--row-h); padding:var(--row-pad) }
+/* THE CONTROLS STRETCH, THEY DO NOT SET THE HEIGHT. Given a fixed `height:var(--row-h)` they add
+   their own height to the row's 1px rule and the row comes out a pixel taller than the token says -
+   measured 33.5px against a 32.5px token, which is a token that does not mean what it reads. */
+html[data-simple] .li .bxw,
+html[data-simple] .li .edp,
+html[data-simple] .li .drg{ height:auto; min-height:0; align-self:stretch }
+html[data-simple] .li .bxw{ flex:0 0 44px; width:44px }
+html[data-simple] .li .bx{ width:22px; height:22px }
+html[data-simple] .li .edp{ flex:0 0 32px; width:32px; font-size:12px }
+html[data-simple] .li .drg{ flex:0 0 32px; width:32px; font-size:12px }
+@media (max-width:640px){
+  html[data-simple] #log .li{ min-height:var(--row-h); padding:0; gap:4px }
+  html[data-simple] #log .li .bxw{ flex:0 0 44px; width:44px; height:auto; min-height:0 }
+  html[data-simple] #log .li .edp, html[data-simple] #log .li .drg{ height:auto; min-height:0 }
+}
+@media(min-width:1024px){
+  html[data-simple] .li{ min-height:var(--row-h-desk); padding:var(--row-pad) }
+  /* the desktop row's floor was never the token - it was the name's own 5px of vertical padding
+     (measured: a 17px line box in a 27px element, so the row could not go below 29px whatever the
+     token said). The padding is what gives way; the 12.5px type does not move. */
+  html[data-simple] .li .nm{ padding:2px 0 }
+  /* the `height:auto` is repeated INSIDE this query on purpose: HT-30's own desktop block sets
+     `height:28px` here, and a rule that lives in a media query is the one a reader looks at when
+     they ask why a desktop row will not get shorter. Answered where the question is asked. */
+  html[data-simple] .li .bxw{ flex:0 0 28px; width:28px; height:auto; min-height:0 }
+  html[data-simple] .li .bx{ width:20px; height:20px }
+  html[data-simple] .li .edp{ flex:0 0 28px; width:28px; font-size:11px; height:auto; min-height:0 }
+  html[data-simple] .li .drg{ flex:0 0 28px; width:28px; font-size:11px; height:auto; min-height:0 }
+  html[data-simple] #h18Comp .li{ min-height:var(--row-h-desk); padding:0 }
+  html[data-simple] #h18Comp .li .bxw{ flex:0 0 28px; width:28px; height:auto; min-height:0 }
+  html[data-simple] #h18Comp .li .edp{ flex:0 0 28px; width:28px; height:auto; min-height:0 }
+  html[data-simple] #h18Comp .li .drg{ flex:0 0 28px; width:28px; height:auto; min-height:0 }
+  html[data-simple] #h18Comp .li .nm{ padding:2px 0 }
+}
+
+/* ---- S2.10 · THE CHIP IS A CONTROL, AND THE GHOST IS A QUIET OFFER --------------------------------
+   The chip already sat at the right of the row (HT-30 S2.6). It now takes taps, so it needs a target
+   a finger can hit without reaching the check-off at the other end of the row - and a ghost `+ time`
+   where a time would mean something and there is none. ~45% at rest, full under a pointer or a press,
+   and on a desktop the ghost appears only on the row it belongs to, so a resting list stays quiet. */
+html[data-simple] .li .pat30[data-ht31t]{ cursor:pointer; min-width:44px; text-align:right;
+  padding:6px 2px; margin-left:6px; border-radius:3px }
+html[data-simple] .li .pat30[data-ht31t]:hover,
+html[data-simple] .li .pat30[data-ht31t]:focus-visible,
+html[data-simple] .li .pat30.ht31on{ opacity:1; color:var(--text); background:var(--rule) }
+html[data-simple] .li .ht31ghost{ opacity:.45; transition:opacity .12s ease }
+html[data-simple] .li:hover .ht31ghost, html[data-simple] .li .ht31ghost:hover,
+html[data-simple] .li .ht31ghost:focus-visible, html[data-simple] .li .ht31ghost:active{ opacity:1 }
+@media(min-width:1024px){
+  html[data-simple] .li .ht31ghost{ opacity:0 }
+  html[data-simple] .li:hover .ht31ghost, html[data-simple] .li .ht31ghost:focus-visible{ opacity:.8 }
+}
+
+/* ---- S2.9 · THE PICKER ----------------------------------------------------------------------------
+   Ours, not the device's: `<input type="time">` follows the device locale and shows 24-hour on a
+   24-hour phone whatever this app renders, which is the complaint. Everything here is >= 16px on a
+   phone so iOS does not zoom the page on focus (128 A1). */
+.ht31pick{ z-index:60; background:var(--bg); border:1px solid var(--border); border-radius:6px;
+  box-shadow:0 8px 28px rgba(0,0,0,.28); padding:10px }
+.ht31pr{ display:flex; align-items:center; gap:6px }
+.ht31pick select, .ht31pick input{ font:400 16px/1.2 var(--mono); padding:6px 4px; min-height:32px;
+  background:var(--bg); color:var(--text); border:1px solid var(--border); border-radius:4px }
+.ht31pick #ht31x{ width:54px; text-align:center }
+.ht31c{ font:400 16px/1 var(--mono); color:var(--ink3) }
+.ht31ap{ display:flex; gap:4px; margin-left:auto }
+.ht31ap button{ font:500 13px/1 var(--mono); letter-spacing:.06em; min-width:44px; min-height:32px;
+  background:none; color:var(--ink3); border:1px solid var(--border); border-radius:4px; cursor:pointer }
+.ht31ap button.on{ color:var(--text); background:var(--rule); border-color:var(--text) }
+.ht31pa{ display:flex; gap:8px; justify-content:flex-end; margin-top:10px }
+.ht31pa .btn{ min-height:36px; padding:0 14px }
