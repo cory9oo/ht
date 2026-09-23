@@ -153,7 +153,7 @@ def seed(conn, variant):
             cur.execute("insert into public.day_private (user_id, date, rating, why, tasks, prayer, brain_dump) "
                         "values (%s, %s, 7, %s, %s, %s, %s)",
                         (uid, TODAY, *(JOURNAL[c] + "-" + uid[-1] for c in ("why", "tasks", "prayer", "brain_dump"))))
-        cur.execute("insert into public.circles (name, join_code, owner) values ('Circle', 'ABC123', %s) returning id",
+        cur.execute("insert into public.circles (name, join_code, owner_id) values ('Circle', 'ABC123', %s) returning id",
                     (OWNER,))
         circle = str(cur.fetchone()[0])
         cur.execute("insert into public.circle_members (circle_id, user_id) values (%s, %s), (%s, %s)",
@@ -332,7 +332,7 @@ def main() -> int:
             ("days upsert", OWNER, "insert into public.days (user_id, date, pct) values (%s, %s, 60) on conflict (user_id, date) do update set pct = excluded.pct returning pct", (OWNER, TODAY)),
             ("day_private upsert", OWNER, "insert into public.day_private (user_id, date, why) values (%s, %s, 'x') on conflict (user_id, date) do update set why = excluded.why returning why", (OWNER, TODAY)),
             ("profile_private upsert", OWNER, "insert into public.profile_private (id, target_age) values (%s, 90) on conflict (id) do update set target_age = excluded.target_age returning id", (OWNER,)),
-            ("circle create + select back", OWNER, "insert into public.circles (name, join_code, owner) values ('Second', 'XYZ789', %s) returning id", (OWNER,)),
+            ("circle create + select back", OWNER, "insert into public.circles (name, join_code, owner_id) values ('Second', 'XYZ789', %s) returning id", (OWNER,)),
             ("member creates own profile", MEMBER, "insert into public.profiles (id, display_name) values (%s, 'Member') on conflict (id) do update set display_name = excluded.display_name returning id", (MEMBER,)),
             ("co-member days read", MEMBER, "select user_id, date, pct from public.days where user_id = %s", (OWNER,)),
         ):

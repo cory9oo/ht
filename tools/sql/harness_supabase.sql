@@ -41,7 +41,7 @@ create table public.day_private (user_id uuid not null references auth.users on 
                                  tomorrow_one_thing text, bed_time time, wake_time time,
                                  primary key (user_id, date));
 create table public.circles (id uuid primary key default gen_random_uuid(), name text,
-                             join_code text unique, owner uuid references auth.users on delete cascade);
+                             join_code text unique, owner_id uuid references auth.users on delete cascade);
 create table public.circle_members (circle_id uuid references public.circles on delete cascade,
                                     user_id uuid references auth.users on delete cascade,
                                     primary key (circle_id, user_id));
@@ -82,7 +82,7 @@ create policy "days write"            on public.days            for insert with 
 create policy "days update"           on public.days            for update using (user_id = auth.uid()) with check (user_id = auth.uid());
 create policy "profiles read"         on public.profiles        for select using (id = auth.uid() or public.shares_circle_with(id));
 create policy "profiles update"       on public.profiles        for update using (id = auth.uid());
-create policy "circles read"          on public.circles         for select using (owner = auth.uid() or public.is_in_circle(id));
-create policy "circles insert"        on public.circles         for insert with check (owner = auth.uid());
+create policy "circles read"          on public.circles         for select using (owner_id = auth.uid() or public.is_in_circle(id));
+create policy "circles insert"        on public.circles         for insert with check (owner_id = auth.uid());
 create policy "members self"          on public.circle_members  for select using (user_id = auth.uid());
 create policy "members insert"        on public.circle_members  for insert with check (user_id = auth.uid());

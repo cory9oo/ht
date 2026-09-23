@@ -1881,7 +1881,7 @@ async function paintCircle(){
     var mine=await sb.from('circle_members').select('circle_id').eq('user_id',S.me.id);
     var ids=(mine.data||[]).map(function(r){return r.circle_id;});
     if(!ids.length){ box.innerHTML='<div class="empty">No circle yet. <b>Manage</b> to create or join one.</div>'; return; }
-    var cs=await sb.from('circles').select('id,name,join_code').in('id',ids);
+    var cs=await sb.from('circles').select('id,name,join_code,owner_id').in('id',ids);
     var mem=await sb.from('circle_members').select('circle_id,user_id').in('circle_id',ids);
     var uids=(mem.data||[]).map(function(r){return r.user_id;});
     var pr=await sb.from('profiles').select('id,display_name,handle').in('id',uids);
@@ -2210,7 +2210,7 @@ function openCircle(){
       el('cMake').onclick=async function(){
         var n=(el('cName').value||'').trim(); if(!n) return;
         var code=Math.random().toString(36).slice(2,8).toUpperCase();
-        var c=await sb.from('circles').insert({name:n,join_code:code,owner:S.me.id}).select('id').single();
+        var c=await sb.from('circles').insert({name:n,join_code:code,owner_id:S.me.id}).select('id').single();
         if(c.error){ el('cMsg').textContent='Could not create it.'; return; }
         await sb.from('circle_members').insert({circle_id:c.data.id,user_id:S.me.id});
         closeOv(); await paintCircle(); toast('code '+code);
@@ -7050,7 +7050,7 @@ var HT32_CARDFIT = true;
         if(mine.error) throw mine.error;
         var ids=(mine.data||[]).map(function(r){ return r.circle_id; });
         if(!ids.length){ HT29GRP.setCircle(null); HT29GRP.setState('none'); return []; }
-        var cs=await sb.from('circles').select('id,name,join_code').in('id',ids);
+        var cs=await sb.from('circles').select('id,name,join_code,owner_id').in('id',ids);
         if(cs.error) throw cs.error;      /* else a failed read reads as "no group yet" and offers to make a second one */
         HT29GRP.setCircle((cs.data||[])[0]||null);
         var mem=await sb.from('circle_members').select('circle_id,user_id').in('circle_id',ids);
@@ -10442,7 +10442,7 @@ var HT29GRP = (function(){
       for(var j = 0; j < n.length; j++) out += A[n[j] % A.length];
       return out;
     })();
-    var c = await sb.from('circles').insert({ name:name, join_code:code, owner:S.me.id }).select('id').single();
+    var c = await sb.from('circles').insert({ name:name, join_code:code, owner_id:S.me.id }).select('id').single();
     if(c.error) return { ok:false, why:'Could not create it.' };
     var m = await sb.from('circle_members').insert({ circle_id:c.data.id, user_id:S.me.id });
     if(m && m.error) return { ok:false, why:'Created, but not joined — enter its code: ' + code };
@@ -13016,7 +13016,7 @@ var HT31_MEMBERS_CAN_INVITE = true;             /* SPEC default; the column over
 function h31CanInvite(circle){
   if(!circle) return HT31_MEMBERS_CAN_INVITE;
   if(circle.members_can_invite === false){
-    return !!(S && S.me && String(circle.owner || '') === String(S.me.id));
+    return !!(S && S.me && String(circle.owner_id || '') === String(S.me.id));
   }
   return true;
 }

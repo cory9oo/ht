@@ -5,6 +5,11 @@
     python tools/sql/build_pending.py            writes ht_pending.sql + ht_pending_rollback.sql
     python tools/sql/build_pending.py --check    exit 1 if either file is out of date
 
+EVERY BUILD IS SCHEMA-CHECKED FIRST (paste 148 N10). Every table.column the stack references is diffed
+against `schema_snapshot.json` (the live column list) by `schema_check.py`; a miss REFUSES the build -
+nothing is written, exit 2, the column is named. 2026-09-23 10:52 is why: `circles.owner` reached the
+live database, which has `owner_id`, after eight days of review that could not see it.
+
 WHY THIS EXISTS. Cory's list of things only he can do has carried "paste the SQL" since HT-29, and
 every wire that needs a column adds another file to it. Two files is a list; four is a chore nobody
 does, and until it is done the app shows quiet lines where features should be. So the wires stack
@@ -134,10 +139,23 @@ def build():
     return ''.join(body), ''.join(rb)
 
 
+def schema_gate():
+    sys.path.insert(0, HERE)
+    import schema_check
+    refs, misses = schema_check.check(''.join(read(n) for n in ORDER), schema_check.load_snapshot())
+    for t, c, why in misses:
+        print('  MISSING  %s.%s - %s' % (t, c, why))
+    print('  schema check %s %d/%d' % ('PASS' if not misses else 'FAIL', len(refs) - len(misses), len(refs)))
+    return not misses
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('--check', action='store_true')
     a = ap.parse_args()
+    if not schema_gate():
+        print('REFUSED: the stack names a column the live schema does not have. Nothing was written.')
+        return 2
     want = {'ht_pending.sql': build()[0], 'ht_pending_rollback.sql': build()[1]}
     drift = []
     for name, text in want.items():

@@ -450,7 +450,7 @@ async def sec_s3(pw):
     # the join card, and the Group panel
     b, pg, errs = await open_page(pw, 390, 844, flags=dict(SQL, __BIGSET=True), wait=2000,
                                   init="try{ localStorage.setItem('ht_join_code','ABC123'); }catch(e){}")
-    await pg.evaluate("""() => { window.__MOCK_DB.circles.push({id:'c-x',name:'The Group',join_code:'ABC123',owner:'u-z'});
+    await pg.evaluate("""() => { window.__MOCK_DB.circles.push({id:'c-x',name:'The Group',join_code:'ABC123',owner_id:'u-z'});
       return window.__HT11.reload(); }""")
     await pg.wait_for_timeout(1400)
     j = await pg.evaluate("() => { const n=document.getElementById('h29Join'); return n && n.classList.contains('on') ? n.innerText : null; }")

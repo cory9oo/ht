@@ -1,0 +1,47 @@
+{
+ "_about": "Live column list of schema public, as far as it is known. SEEDED 2026-09-23 by paste 148 N10 from receipt 170's sweep (os_stage/167/SQL_APPLIED.md, 10:52 CDT): circles is the full live list 170 printed; every other column is one the stack references that 170 verified present. REFRESHED whole from information_schema.columns by apply_pending.py whenever BEV/HT_SUPABASE_DB_URL exists. Data, not belief: never hand-edit to make a build pass.",
+ "source": "seed:receipt-170-sweep",
+ "refreshed": null,
+ "tables": {
+  "circle_members": [
+   "circle_id",
+   "user_id"
+  ],
+  "circles": [
+   "created_at",
+   "id",
+   "join_code",
+   "name",
+   "owner_id"
+  ],
+  "day_private": [
+   "date",
+   "rating",
+   "user_id"
+  ],
+  "days": [
+   "date",
+   "user_id"
+  ],
+  "habits": [
+   "active",
+   "cadence",
+   "group_name",
+   "id",
+   "minutes_planned",
+   "name",
+   "notes",
+   "planned_end",
+   "planned_start",
+   "sort_order",
+   "time_anchor",
+   "user_id"
+  ],
+  "profile_private": [
+   "id"
+  ],
+  "profiles": [
+   "id"
+  ]
+ }
+}

@@ -160,6 +160,32 @@ def assert_grids(grids, say=print):
     return problems
 
 
+def refresh_and_check(conn, say=print):
+    """Write schema_snapshot.json from information_schema (schema public), then schema-check the file."""
+    import json, sys as _sys
+    here = os.path.dirname(os.path.abspath(__file__))
+    with conn.cursor() as cur:
+        cur.execute("select table_name, column_name from information_schema.columns "
+                    "where table_schema = 'public' order by 1, 2")
+        rows = cur.fetchall()
+    tables = {}
+    for t, c in rows:
+        tables.setdefault(t, []).append(c)
+    snap = os.path.join(here, "schema_snapshot.json")
+    doc = json.load(io.open(snap, encoding="utf-8")) if os.path.exists(snap) else {}
+    doc.update({"source": "live:information_schema.columns", "refreshed": stamp(), "tables": tables})
+    with io.open(snap, "w", encoding="utf-8", newline=chr(10)) as f:
+        f.write(json.dumps(doc, indent=1) + chr(10))
+    say("  schema        refreshed from live: %d tables, %d columns" % (len(tables), len(rows)))
+    _sys.path.insert(0, here)
+    import schema_check                                       # noqa: PLC0415
+    refs, misses = schema_check.check(io.open(sql_path(), encoding="utf-8").read(), schema_check.load_snapshot(snap))
+    for t, c, why in misses:
+        say("  MISSING       %s.%s - %s" % (t, c, why))
+    say("  schema check  %s %d/%d" % ("PASS" if not misses else "REFUSED", len(refs) - len(misses), len(refs)))
+    return misses
+
+
 def apply(dsn, dry=False, out=None, say=print):
     import psycopg                                            # noqa: PLC0415
     text = io.open(sql_path(), encoding="utf-8").read()
@@ -174,6 +200,11 @@ def apply(dsn, dry=False, out=None, say=print):
     with psycopg.connect(dsn, autocommit=True, connect_timeout=30) as conn:
         with conn.cursor() as cur:
             cur.execute("set statement_timeout = %s" % STATEMENT_TIMEOUT_MS)
+        # N10: THE SNAPSHOT IS REFRESHED FROM THE DATABASE ITSELF, then the file is checked against it
+        # BEFORE a statement runs - so the next `circles.owner` is refused here, by name, not by 42703.
+        misses = refresh_and_check(conn, say)
+        if misses:
+            return 6, grids
         try:
             with conn.cursor() as cur:
                 cur.execute(text)
