@@ -266,3 +266,25 @@
   --st-skip:var(--ht-st-skip);
   --st-notdue:var(--ht-st-notdue);
 }
+
+/* ---------------------------------------------------------------------------
+   6 · HT-32 S1 · THE SCROLLBAR. Cory, 9/22: "scroll bar … only if needed …
+   grayed out".
+
+   "Only if needed" is `overflow-y:auto`, never `scroll` — `scroll` reserves the
+   gutter and draws a track on a list that fits, which is the bar he is looking
+   at. "Grayed out" is a muted thumb that comes up to full when he reaches for
+   it, and a track that is not drawn at all.
+
+   The thumb is `--ht-muted` at 35%, written as rgba rather than mixed: the same
+   reason the ramp is written out above — a colour function the browser does not
+   implement fails at computed-value time and takes the declaration with it, and
+   a scrollbar that loses its colour falls back to the OS default, which is the
+   loud grey this token exists to replace.
+   --------------------------------------------------------------------------- */
+:root{
+  --sb-thumb:rgba(124,135,152,.35);        /* --ht-muted #7C8798 at 35% */
+  --sb-thumb-hover:rgba(124,135,152,1);    /* the same hue, full, on hover */
+  --sb-track:transparent;                  /* the track is never drawn */
+  --sb-size:8px;
+}

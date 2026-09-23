@@ -2850,3 +2850,48 @@ html[data-simple] #vTabs [data-v][hidden]{ display:none !important }
    So it goes where the stylesheet already expected it: `#ov #h26Jrn` two hundred lines up shows it
    inside an overlay, and Settings -> Journal is where "download my journal" already lives. One door,
    the right one, and the four quarters are untouched. `golden_ht30` S6d asserts it. */
+
+/* ======================= HT-32 S1 · THE SCROLLBAR (paste 148) =======================
+   Cory, 9/22: "scroll bar … only if needed … grayed out".
+
+   THE RULE IS `auto`, AND IT IS NEVER `scroll`. HT-17 already set `overflow-y:auto` on the desktop
+   list, so a list that fits shows nothing — measured before this block: 21 rows at 1080px tall gives
+   scrollHeight == clientHeight and no bar. What was missing is what the bar looks like when it IS
+   needed: `scrollbar-width` and `scrollbar-color` both read `auto`, i.e. the OS default, which on
+   Windows is a wide light-grey track with a bright thumb sitting in the middle of a near-black panel.
+
+   Two properties, two engines, same two tokens:
+     * Firefox reads `scrollbar-width` / `scrollbar-color`;
+     * WebKit and Blink read the `::-webkit-scrollbar-*` pseudo-elements.
+   Both are written, because a page that thins its bar in one engine and not the other is worse than
+   one that does neither.
+
+   THE TRACK IS NOT DRAWN. `--sb-track` is `transparent`, so the groove disappears and only the thumb
+   marks the position — which is the whole of "only if needed" once the list does overflow.
+
+   The phone list is deliberately NOT a scroll container (`overflow-y:visible`): the PAGE scrolls
+   there, and nesting a second scroller inside it is the thing that makes a phone list feel stuck.
+   These rules are written for `#log` at both widths anyway, so the phone picks them up for free if a
+   later wire ever does make it scroll. */
+html[data-simple] #log,
+html[data-simple] #log.h17-scroll{
+  scrollbar-width:thin;
+  scrollbar-color:var(--sb-thumb) var(--sb-track);
+}
+html[data-simple] #log::-webkit-scrollbar,
+html[data-simple] #log.h17-scroll::-webkit-scrollbar{
+  width:var(--sb-size); height:var(--sb-size) }
+html[data-simple] #log::-webkit-scrollbar-track,
+html[data-simple] #log.h17-scroll::-webkit-scrollbar-track{
+  background:var(--sb-track) }
+html[data-simple] #log::-webkit-scrollbar-thumb,
+html[data-simple] #log.h17-scroll::-webkit-scrollbar-thumb{
+  background:var(--sb-thumb); border-radius:2px }
+
+/* full on hover — he is reaching for it, so it stops being furniture */
+html[data-simple] #log:hover,
+html[data-simple] #log.h17-scroll:hover{
+  scrollbar-color:var(--sb-thumb-hover) var(--sb-track) }
+html[data-simple] #log::-webkit-scrollbar-thumb:hover,
+html[data-simple] #log.h17-scroll::-webkit-scrollbar-thumb:hover{
+  background:var(--sb-thumb-hover) }
