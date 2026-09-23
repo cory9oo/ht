@@ -233,7 +233,7 @@ create policy ht29_owner_update on public.profiles for update to authenticated
 
 drop policy if exists ht29_member_select on public.circles;
 create policy ht29_member_select on public.circles for select to authenticated
-  using (owner = auth.uid() or public.ht29_in_circle(id));
+  using (owner_id = auth.uid() or public.ht29_in_circle(id));
 
 -- ------------------------------------------------------------- 4 · what a co-member may see, column by column
 create or replace function public.ht29_join_circle(code text) returns uuid
