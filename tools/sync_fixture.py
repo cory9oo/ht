@@ -51,7 +51,7 @@ def fixture_dir(estate):
     return os.path.join(estate, '_machine', 'ht3')
 
 
-DST = fixture_dir(find_estate(SRC))
+DST = os.environ.get('HT_FIXTURE_DIR') or fixture_dir(find_estate(SRC))   # 179: a private fixture when asked, so two wires never sync one directory
 # HT-31 S0.3: `version.json` joins the copy list. It is how a running build learns it is behind,
 # so a fixture without it cannot exercise the self-update at all.
 # HT-32 S6: the five theme files join the copy list. `tokens.css` alone no longer carries a single
@@ -61,6 +61,8 @@ DST = fixture_dir(find_estate(SRC))
 COPY = ['app.js', 'app.css', 'tokens.css', 'manifest.webmanifest', 'version.json',
         'themes/classic.css', 'themes/paper.css', 'themes/graphite.css',
         'themes/midnight.css', 'themes/terminal.css',
+        # paste 179 S6: the four new schemes
+        'themes/slate.css', 'themes/ember.css', 'themes/linen.css', 'themes/mono.css',
         # HT-32 N4: the mirror registry is a declaration the PAGE reads at run time, so a fixture
         # without it has a Settings picker with nothing in it - and the test that proves a renderer
         # can be added by config alone would have had no config to add it to.

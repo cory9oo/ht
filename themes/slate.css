@@ -1,0 +1,20 @@
+/* SLATE - near-black, cool grey ramp, ONE cold accent. The Graphite lineage, sharpened: a darker ground, a
+   crisper ink and a colder, more saturated accent. Paste 179 S6 scheme 1 - the DEFAULT for a fresh profile.
+   The contract: ONE accent hue - ONE neutral ramp - exactly TWO state colours (--good / --bad) - one
+   colour per group member (--m1..--m4). No gradients, no glows, no second accent. late and t risk
+   are the ACCENT, not a third state colour. Every colour here has this one address (R70.282), and
+   	ools/contrast_ht32.py --check holds every text pair to 4.5:1. */
+:root[data-theme="slate"]{
+  --ground:#090B0F; --sheet:#0E1116; --sunk:#141920; --sel:#192029;
+  --rule:#222A35;   --rule2:#384352;
+  --ink:#E8ECF2;    --ink2:#A6B0BE;  --ink3:#6C7786;
+  --accent:#4FB6EE; --accent-ink:#090B0F; --accent-wash:#0F2130;
+  --bad:#F0786B;    --good:#63CC9E;
+  --g0:#3A1F1C; --g1:#6E3530; --g2:#35414F; --g3:#4B5A6B; --g4:#3F8F6F; --g5:#63CC9E;
+  --st-todo:#E8ECF2; --st-done:#63CC9E; --st-late:#4FB6EE; --st-skip:#A6B0BE; --st-notdue:#A6B0BE;
+  --st-secured:#63CC9E; --st-ontrack:#4FB6EE; --st-atrisk:#4FB6EE; --st-outofreach:#F0786B;
+  --m1:#4FB6EE; --m2:#C9A6F5; --m3:#E9C46E; --m4:#6FD6C6;
+  --sb-thumb:rgba(166,176,190,.35); --sb-thumb-hover:rgba(166,176,190,1);
+  --panel:#0E1116; --panel-2:#141920; --line:#222A35; --dim:#6C7786; --accent-red:#F0786B;
+  color-scheme:dark;
+}

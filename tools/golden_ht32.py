@@ -55,9 +55,11 @@ def fixture_dir(estate):
 FIX = fixture_dir(ESTATE)
 BASE = 'file://' + os.path.join(FIX, 'index.html').replace(os.sep, '/')
 
-THEMES = ['classic', 'graphite', 'midnight', 'paper']
+# paste 179 S6 moved the ruling: eight offered, the four new schemes first, Slate the default, and the
+# system pair Linen by day / Slate by night. The checks below are unchanged; the ruling they hold is.
+THEMES = ['slate', 'ember', 'linen', 'mono', 'classic', 'graphite', 'midnight', 'paper']
 ALL_THEMES = THEMES + ['terminal']
-DEFAULT_THEME = 'graphite'
+DEFAULT_THEME = 'slate'
 
 RES = []
 SEC_COUNT = {}
@@ -199,9 +201,9 @@ async def sec_s6(pw):
     b, pg, errs = await open_page(pw)
     got = await pg.get_attribute('html', 'data-theme')
     vals = await pg.evaluate(TOKENS_READ, ['--ground', '--ink', '--accent'])
-    chk('S6i . a first load with nothing stored is Graphite (S6.14 default; switch user.theme)',
+    chk('S6i . a first load with nothing stored is Slate (179 S6 default; switch user.theme)',
         got == DEFAULT_THEME, got)
-    chk('S6j . and the theme file actually LOADED - --ground resolves to graphite.css\'s own value',
+    chk('S6j . and the theme file actually LOADED - --ground resolves to the default theme file\'s own value',
         rgb(vals['--ground']) == rgb(theme_file_ground(DEFAULT_THEME)), vals)
     chk('S6k . zero page errors on a themed cold start', not errs, errs[:2])
     await b.close()
@@ -227,7 +229,7 @@ async def sec_s6(pw):
     await b.close()
 
     # ---- EXTRA-1: follow the system light/dark pair ----------------------------------------
-    for scheme, want in (('light', 'paper'), ('dark', 'graphite')):
+    for scheme, want in (('light', 'linen'), ('dark', 'slate')):
         b, pg, _ = await open_page(pw, storage={'ht_theme': 'system'}, scheme=scheme)
         got = await pg.get_attribute('html', 'data-theme')
         follow = await pg.get_attribute('html', 'data-theme-follow')

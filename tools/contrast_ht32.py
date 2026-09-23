@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+﻿#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """HT-32 S6 - EVERY TEXT/BACKGROUND PAIR IN EVERY THEME IS MEASURED, NOT EYEBALLED.
 
@@ -36,7 +36,9 @@ FLOOR = 4.5
 # Text tokens (the words a person reads) x background tokens (what they sit on).
 TEXT = ('--ink', '--ink2', '--good', '--bad',
         '--st-todo', '--st-done', '--st-late', '--st-skip', '--st-notdue',
-        '--st-secured', '--st-ontrack', '--st-atrisk', '--st-outofreach')
+        '--st-secured', '--st-ontrack', '--st-atrisk', '--st-outofreach',
+        # paste 179 S6: one colour per group member, and a member's NAME is text
+        '--m1', '--m2', '--m3', '--m4')
 BG = ('--ground', '--sheet', '--sunk', '--sel')
 
 # Measured, but NOT held to the text floor - these are rules, hairlines and dividers.
@@ -69,6 +71,8 @@ def read_theme(path):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('--quiet', action='store_true')
+    ap.add_argument('--check', action='store_true',
+                    help='accepted for the paste-179 spelling; this tool already fails without being asked')
     a = ap.parse_args()
 
     tdir = os.path.join(REPO, 'themes')
@@ -127,7 +131,7 @@ def main():
             if shown:
                 print('   (not held to the text floor: %s)' % ', '.join(shown))
 
-    print('\n%d themes · %d pairs checked · floor %.1f:1 · %d FAIL · %d missing token(s)'
+    print('\n%d themes Â· %d pairs checked Â· floor %.1f:1 Â· %d FAIL Â· %d missing token(s)'
           % (len(files), pairs, FLOOR, bad, unresolved))
     if pairs == 0:
         print('ZERO PAIRS CHECKED - that is a failed run, not a pass (134 R1).')
@@ -137,3 +141,4 @@ def main():
 
 if __name__ == '__main__':
     sys.exit(main())
+

@@ -1,0 +1,20 @@
+/* EMBER - warm charcoal ground, warm grey ramp, ONE copper accent. Paste 179 S6 scheme 2.
+   
+   The contract: ONE accent hue - ONE neutral ramp - exactly TWO state colours (--good / --bad) - one
+   colour per group member (--m1..--m4). No gradients, no glows, no second accent. late and t risk
+   are the ACCENT, not a third state colour. Every colour here has this one address (R70.282), and
+   	ools/contrast_ht32.py --check holds every text pair to 4.5:1. */
+:root[data-theme="ember"]{
+  --ground:#0F0D0B; --sheet:#15120F; --sunk:#1C1814; --sel:#231E19;
+  --rule:#2E2721;   --rule2:#4A3F35;
+  --ink:#F0E9E0;    --ink2:#B9AC9D;  --ink3:#7E7265;
+  --accent:#E8944C; --accent-ink:#0F0D0B; --accent-wash:#2B1D11;
+  --bad:#EF7B6C;    --good:#93C99F;
+  --g0:#3B211C; --g1:#6B3A31; --g2:#3F352C; --g3:#5A4C3F; --g4:#5F8F69; --g5:#93C99F;
+  --st-todo:#F0E9E0; --st-done:#93C99F; --st-late:#E8944C; --st-skip:#B9AC9D; --st-notdue:#B9AC9D;
+  --st-secured:#93C99F; --st-ontrack:#E8944C; --st-atrisk:#E8944C; --st-outofreach:#EF7B6C;
+  --m1:#E8944C; --m2:#8FC3E8; --m3:#D9C27A; --m4:#C9A0D6;
+  --sb-thumb:rgba(166,176,190,.35); --sb-thumb-hover:rgba(166,176,190,1);
+  --panel:#15120F; --panel-2:#1C1814; --line:#2E2721; --dim:#7E7265; --accent-red:#EF7B6C;
+  color-scheme:dark;
+}

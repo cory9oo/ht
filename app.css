@@ -29,14 +29,14 @@ svg{display:block}
   border-bottom:1px solid var(--rule2);
   padding:10px 0 0;
 }
-.mast .r1{display:flex;align-items:baseline;gap:10px;padding-bottom:9px;min-width:0}
+.mast .r1{display:flex;flex-wrap:wrap;align-items:baseline;gap:10px;padding-bottom:9px;min-width:0}
 .mast .r1 .sub{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .wm{font:600 13px/1 var(--mono);letter-spacing:.34em;text-transform:uppercase}
 .wm b{color:var(--accent);font-weight:600}
 .sub{font:400 9.5px/1 var(--mono);letter-spacing:.13em;text-transform:uppercase;color:var(--ink3)}
 .sp{flex:1}
 
-.swatches{display:flex;gap:4px}
+.swatches{display:flex;flex-wrap:wrap;gap:4px;min-width:0}   /* 179 S6: eight swatches wrap, never push Settings off the phone */
 .sw{width:15px;height:15px;border:1px solid var(--rule2);position:relative}
 .sw[aria-pressed="true"]{border-color:var(--ink);box-shadow:inset 0 0 0 2px var(--ground)}
 .tbtn{
@@ -47,7 +47,7 @@ svg{display:block}
 .tbtn.hot{color:var(--accent);border-color:var(--accent)}
 
 /* ---- the tape: one row of statement figures ---- */
-.tape{display:flex;gap:0;border-top:1px solid var(--rule);overflow-x:auto;scrollbar-width:none}
+.tape{display:flex;flex-wrap:wrap;gap:0;border-top:1px solid var(--rule);overflow-x:hidden}   /* 179 S4: wraps, never scrolls */
 .tape::-webkit-scrollbar{display:none}
 .tp{padding:7px 14px 8px 0;margin-right:14px;border-right:1px solid var(--rule);white-space:nowrap;flex:0 0 auto}
 .tp:last-child{border-right:0}
@@ -80,10 +80,10 @@ svg{display:block}
 .blk .sh{padding-top:16px}
 
 /* ---------------- date rail ---------------- */
-.rail{display:flex;gap:0;border:1px solid var(--rule);border-right:0;overflow-x:auto;scrollbar-width:none}
+.rail{display:flex;gap:0;border:1px solid var(--rule);border-right:0;overflow-x:hidden}   /* 179 S4: seven days that fit, paged */
 .rail::-webkit-scrollbar{display:none}
 .rail button{
-  flex:1 0 auto;min-width:42px;padding:6px 4px 5px;text-align:center;
+  flex:1 1 0;min-width:0;padding:6px 2px 5px;text-align:center;
   border-right:1px solid var(--rule);background:var(--sheet)
 }
 .rail button.sel{background:var(--ink);color:var(--ground)}
@@ -153,9 +153,9 @@ svg{display:block}
 .br .p{flex:0 0 34px;text-align:right;font:400 10.5px/1 var(--mono)}
 
 /* ---------------- heat calendar ---------------- */
-.heat{display:grid;grid-auto-flow:column;grid-template-rows:repeat(7,9px);gap:2px;overflow-x:auto;scrollbar-width:none;padding-bottom:2px}
+.heat{display:grid;grid-auto-flow:column;grid-template-rows:repeat(7,auto);gap:2px;overflow-x:hidden;padding-bottom:2px}   /* 179 S4: paintHeat sizes the columns to fit */
 .heat::-webkit-scrollbar{display:none}
-.heat i{width:9px;height:9px;background:var(--sunk);display:block}
+.heat i{width:100%;min-width:0;aspect-ratio:1;max-height:14px;background:var(--sunk);display:block}
 .heat i.tdy{box-shadow:0 0 0 1.5px var(--ink)}
 .mrow{display:flex;gap:0;overflow:hidden;font:500 9.5px/1 var(--sans);letter-spacing:.04em;color:var(--ink3);padding-bottom:5px}
 .mrow span{flex:0 0 auto}
@@ -279,7 +279,7 @@ svg{display:block}
   .li{min-height:36px}
   .tp{padding-right:12px;margin-right:12px}
   .tools{gap:5px;flex-wrap:wrap}
-  .seg{max-width:100%;overflow-x:auto;scrollbar-width:none}
+  .seg{max-width:100%;flex-wrap:wrap;overflow-x:hidden}   /* 179 S4: wraps, never scrolls */
   .seg::-webkit-scrollbar{display:none}
   .seg button{padding:6px 6px;letter-spacing:.06em;flex:0 0 auto}
   .find{min-width:60px;flex:1 1 90px}
@@ -413,7 +413,7 @@ body.small .tape .tp:nth-child(n+5){display:none}
 /* .mrun deleted with its renderer (HT-16 S7 - R70.104). See app.js paintLog. */
 .cuecov{font-size:12px;color:var(--ink2);padding:0 0 8px}
 .ygrid{display:grid;grid-template-columns:repeat(53,1fr);grid-auto-flow:column;
-  grid-template-rows:repeat(7,1fr);gap:2px;overflow-x:auto}
+  grid-template-rows:repeat(7,1fr);gap:2px;overflow-x:hidden}
 .yc{display:block;width:100%;aspect-ratio:1;border-radius:2px;background:var(--sunk)}
 .yc.pad{background:transparent}
 /* the week only interrupts the small view on the days it is meant to be read */
@@ -705,7 +705,8 @@ html[data-simple][data-vtab="views"] .vWeeksSec{ display:block }
 }
 /* phone: a FIXED cell size in a horizontal scroller. Squeezing 52 weeks into 340px makes a cell
    under 6px, which is a texture, not a chart you can read a week off. */
-.wkscroll{ overflow-x:auto; -webkit-overflow-scrolling:touch; padding-bottom:6px }
+.wkscroll{ overflow-x:hidden; padding-bottom:6px }   /* 179 S4: the chart scales to fit */
+.wkscroll > svg{ max-width:100%; height:auto }
 .wkscroll.fit svg{ width:100%; height:auto }
 .wkg{ display:block; shape-rendering:crispEdges }
 .wkg .wl{ font:400 8.5px/1 var(--mono); fill:var(--ink3); shape-rendering:auto }
@@ -845,7 +846,7 @@ html[data-simple] .chart .ax2{ font:400 8.5px/1 var(--mono); fill:var(--muted) }
 html[data-simple] .chart .xl{ font:400 8.5px/1 var(--mono); fill:var(--muted) }
 html[data-simple] .chart .xl2{ font:400 8px/1 var(--mono); fill:var(--grey) }
 /* the chart scrolls, the page never does: 28px a day on a phone so every label survives (R70.94) */
-html[data-simple] .h16scroll{ overflow-x:auto; overflow-y:hidden; -webkit-overflow-scrolling:touch;
+html[data-simple] .h16scroll{ overflow-x:hidden; overflow-y:hidden;   /* 179 S4: not set while MONTH_SCROLLS is false */
   max-width:100% }
 html[data-simple] .h16scroll > svg.chart{ max-width:none }
 html[data-simple] .gnav{ padding:2px 0 6px }
@@ -854,7 +855,7 @@ html[data-simple] .gnav .mv:hover{ color:var(--text); border-color:var(--grey) }
 
 
 /* ======================= HT-16 · S4 · LIFE IN WEEKS (R70.95 · R70.96) ======================= */
-html[data-simple] .wkscroll.natural{ overflow-x:auto }
+html[data-simple] .wkscroll.natural{ overflow-x:hidden }
 /* LEFT-ALIGNED, not centred: centring a 702px chart inside a 1148px panel reads as a hole in the
    square, which is the one thing R70.100 forbids. It starts where every other panel starts. */
 html[data-simple] .wkscroll.natural > svg.wkg{ width:auto; height:auto; margin:0 }
@@ -1392,7 +1393,7 @@ html[data-simple] .li .bx, html[data-simple] .li .edp{ align-self:center }
      sneaked: this un-hides ONE id, on the desktop simple surface only. */
   html[data-simple] .mast #tape{ display:flex !important; flex-wrap:nowrap; gap:0 18px;
     padding:6px 0 0; margin-top:6px; border-top:1px solid var(--border);
-    overflow-x:auto; scrollbar-width:none }
+    flex-wrap:wrap; overflow-x:hidden }   /* 179 S4: the desktop tape wraps rather than scroll */
   /* ONE line, not two. Wrapped it measured 81px and took that straight off all three columns —
      which is the fluff he asked me to remove, arriving in the fix for the space he asked me to
      fill. One row is 40px and the base sheet already scrolls it without a visible bar. */
@@ -2468,11 +2469,11 @@ html[data-simple] .h29bar{ display:none }
 .h29ins .ch29 polyline{ stroke-width:1.6; vector-effect:non-scaling-stroke }
 .h29ins .ch29 .l29r{ stroke:var(--accent) }
 .h29ins .ch29 .l29t{ stroke:var(--st-late); stroke-dasharray:3 3 }
-.h29ins .ch29 .l29m0{ stroke:var(--ink) } .h29ins .ch29 .l29m1{ stroke:var(--ink3) } .h29ins .ch29 .l29m2{ stroke:var(--st-done) }
+.h29ins .ch29 .l29m0{ stroke:var(--m1) } .h29ins .ch29 .l29m1{ stroke:var(--m2) } .h29ins .ch29 .l29m2{ stroke:var(--m3) } .h29ins .ch29 .l29m3{ stroke:var(--m4) }   /* 179 S6 */
 .h29ins .h29leg{ display:flex; flex-wrap:wrap; gap:6px 12px; align-items:center; font:400 11px/1.3 var(--mono); color:var(--muted) }
 .h29ins .h29leg i{ display:inline-block; width:12px; height:2px; vertical-align:middle; margin-right:5px }
 .h29ins .h29leg i.r{ background:var(--accent) } .h29ins .h29leg i.t{ background:var(--st-late) }
-.h29ins .h29leg i.m0{ background:var(--ink) } .h29ins .h29leg i.m1{ background:var(--ink3) } .h29ins .h29leg i.m2{ background:var(--st-done) }
+.h29ins .h29leg i.m0{ background:var(--m1) } .h29ins .h29leg i.m1{ background:var(--m2) } .h29ins .h29leg i.m2{ background:var(--m3) } .h29ins .h29leg i.m3{ background:var(--m4) }   /* 179 S6 */
 .h29ins .h29mb{ background:none; border:1px solid var(--border); border-radius:2px; color:var(--muted); font:400 11px/1 var(--mono);
   padding:6px 8px; min-height:32px; cursor:pointer }
 .h29ins .h29mb.on{ color:var(--text); border-color:var(--rule2) }
@@ -3058,3 +3059,48 @@ html[data-simple] .mast #tape .tp .v.h32out{     color:var(--st-outofreach) }
 .h32logrow{ display:flex; gap:10px; justify-content:space-between; padding:5px 0;
   font:400 11px/1.3 var(--sans); color:var(--ink2); border-bottom:1px solid var(--rule) }
 .h32logrow .k{ color:var(--ink3); white-space:nowrap }
+
+/* ======================= HT-179 (paste 179) · TIME, FIT, LINKS, COLOUR ======================= */
+/* S2/S3 · the done-time chip beside the box: a clock when open, the time and its variance once done */
+.li .ck179{ flex:0 0 auto; align-self:center; min-width:30px; min-height:30px; margin:0 6px 0 0; padding:2px 6px;
+  border:1px solid var(--rule2); background:transparent; color:var(--ink3);
+  font:500 11px/1 var(--mono); white-space:nowrap; cursor:pointer }
+.li .ck179.has{ color:var(--ink2); border-color:var(--rule); display:inline-flex; flex-direction:column;
+  align-items:flex-start; justify-content:center; gap:2px; padding:3px 5px; line-height:1.1; font-size:10.5px }
+.li .ck179.has .t{ color:var(--ink2) }
+.li .ck179.good{ color:var(--good) }
+.li .ck179.bad{ color:var(--bad) }
+.li .ck179:disabled{ cursor:default; opacity:1; border-color:transparent }
+.li.v179 .dot29{ display:none }
+.ck179pick{ z-index:60; background:var(--sheet); border:1px solid var(--rule2); padding:10px }
+.ck179pick .ck179o{ display:flex; gap:6px; flex-wrap:wrap; margin-bottom:8px }
+.ck179pick .ck179o .btn{ flex:1 1 auto; font-size:16px }
+.ck179pick .ck179p{ flex-wrap:wrap; align-items:center }
+.ck179pick .ck179l{ font:500 11px/1 var(--mono); color:var(--ink3); margin-right:6px; text-transform:uppercase; letter-spacing:.1em }
+.ck179pick select, .ck179pick .btn{ font-size:16px }
+/* S5 · the link chip, at the right beside the time */
+.li .lk179{ flex:0 0 auto; align-self:center; min-width:28px; min-height:28px; display:inline-flex;
+  align-items:center; justify-content:center; color:var(--accent); text-decoration:none; font:500 14px/1 var(--mono) }
+/* S3 · the timing tiles above the reports */
+.h179tim{ padding:0 0 12px; border-bottom:1px solid var(--rule); margin-bottom:12px }
+.h179tim .lab{ font:500 10px/1 var(--mono); letter-spacing:.13em; text-transform:uppercase; color:var(--ink3); padding-bottom:8px }
+.h179tim .r179{ display:flex; flex-wrap:wrap; gap:4px 12px; padding:6px 0; border-top:1px solid var(--rule) }
+.h179tim .w{ flex:0 0 100%; font-weight:600 }
+.h179tim .c{ flex:1 1 140px; min-width:0 }
+.h179tim .k{ display:block; font:500 9px/1 var(--mono); letter-spacing:.1em; text-transform:uppercase; color:var(--ink3); padding-bottom:3px }
+.h179tim .t179{ font-size:13px; color:var(--ink2) }
+.h179tim .t179 b{ color:var(--ink) }
+.h179tim .t179 b.good{ color:var(--good) } .h179tim .t179 b.bad{ color:var(--bad) }
+.h179tim .t179 i{ font-style:normal; color:var(--ink3) }
+.h179tim .m1790{ color:var(--m1) } .h179tim .m1791{ color:var(--m2) } .h179tim .m1792{ color:var(--m3) } .h179tim .m1793{ color:var(--m4) }
+/* S4 · the rail's paging controls */
+.rail .rnav{ flex:0 0 30px; min-width:30px; color:var(--ink2); font:500 16px/1 var(--mono) }
+.rail .rnav:disabled{ color:var(--rule2) }
+.rail .rpick{ flex:0 0 30px; position:relative; display:flex; align-items:center; justify-content:center;
+  color:var(--ink2); border-right:1px solid var(--rule); background:var(--sheet); overflow:hidden }
+.rail .rpick input{ position:absolute; inset:0; opacity:0; width:100%; height:100%; font-size:16px }
+/* a member's day: the planned time and the variance, read only */
+.h29r .h179mp{ margin-left:8px; font:500 11px/1 var(--mono); color:var(--ink2); white-space:nowrap }
+.h29r .h179mv{ margin-left:8px; font:500 11px/1 var(--mono); color:var(--ink2); white-space:nowrap }
+.h29r .h179mv.good{ color:var(--good) } .h29r .h179mv.bad{ color:var(--bad) }
+.h29r .h179mv ~ .dot29{ display:none }

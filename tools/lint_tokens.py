@@ -57,7 +57,7 @@ THEME_CONTRACT = ['--ground', '--sheet', '--sunk', '--sel', '--rule', '--rule2',
                   '--bad', '--good', '--g0', '--g5']
 THEME_STATES = ['--st-todo', '--st-done', '--st-late', '--st-skip', '--st-notdue',
                 '--st-secured', '--st-ontrack', '--st-atrisk', '--st-outofreach']
-DEFAULT_THEME = 'graphite'          # S6.14; the switch is `user.theme`
+DEFAULT_THEME = 'slate'             # 179 S6 (was graphite, S6.14); the switch is `user.theme`
 GROUND_DECL = re.compile(r'--ground:\s*(#[0-9a-fA-F]{3,8})')
 LINK = re.compile(r'<link[^>]+rel="stylesheet"[^>]+href="\./([^"]+)"')
 THEME_COLOR = re.compile(r'<meta name="theme-color" content="(#[0-9a-fA-F]{3,8})"')
@@ -158,7 +158,7 @@ def theme_offences(sheets):
          are linked - a theme file on disk that nothing loads is dead, and a link to a file that is
          not there is a 404 on every load.
     """
-    known = ['classic', 'graphite', 'midnight', 'paper', 'terminal']
+    known = ['classic', 'graphite', 'midnight', 'paper', 'terminal', 'slate', 'ember', 'linen', 'mono']
     out = []
     linked = [n for n in sheets if n.startswith(SOURCE_DIR)]
     for want in known:

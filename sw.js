@@ -1,4 +1,4 @@
-const C='ht-v40';
+const C='ht-v41';
 self.addEventListener('install',e=>{self.skipWaiting()});
 self.addEventListener('activate',e=>{e.waitUntil(caches.keys().then(k=>Promise.all(k.filter(x=>x!==C).map(x=>caches.delete(x)))).then(()=>self.clients.claim()))});
 self.addEventListener('fetch',e=>{
@@ -15,7 +15,7 @@ self.addEventListener('fetch',e=>{
     }).catch(()=>caches.match(r))
   );
 });
-/* HT-29 S9 (PASTE 133) · the evening nudge. Numbers only ("12 of 21 · Andrew 9 of 18 · rate the day") - a nudge never
+/* HT-29 S9 (PASTE 133) Â· the evening nudge. Numbers only ("12 of 21 Â· Andrew 9 of 18 Â· rate the day") - a nudge never
    carries a journal word. Nothing arrives until a person turns Nudges on AND the sender is armed (R70.344). */
 self.addEventListener('push',e=>{
   let d={};

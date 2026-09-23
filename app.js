@@ -173,22 +173,27 @@ function nameOf(n){ return String(n==null?'':n); }
    `skin()` is KEPT as the name HT-22's advanced tray calls (R70.138 - hide, never delete): it maps
    the four old `data-skin` values onto their descendants and delegates. The old values also still
    resolve in CSS, because each theme file names its legacy selector beside the new one. */
-var THEMES = ['classic','graphite','midnight','paper'];          /* offered, in picker order */
+/* HT-179 S6: four new schemes, FIRST in the picker, then the four of HT-32. Nothing removed (R70.138). */
+var THEMES = ['slate','ember','linen','mono','classic','graphite','midnight','paper'];   /* offered, in picker order */
 var THEME_ALL = THEMES.concat(['terminal']);                     /* terminal is kept, not offered */
 /* READ, NOT DECLARED. index.html's pre-paint script owns the default and publishes it here; this
    file only needs to agree with it. The literal is the fallback for a page served without the
    attribute, and `golden_ht32` S6 asserts the two spellings are the same word - because when they
    were not, the page painted one theme and app.js changed it a tick later, and no test saw it. */
 var THEME_DEFAULT = (function(){
-  try{ return document.documentElement.getAttribute('data-theme-default') || 'graphite'; }
-  catch(e){ return 'graphite'; }
+  try{ return document.documentElement.getAttribute('data-theme-default') || 'slate'; }
+  catch(e){ return 'slate'; }
 })();
-var THEME_LABEL = { classic:'Classic', graphite:'Graphite', midnight:'Midnight', paper:'Paper',
+var THEME_LABEL = { slate:'Slate', ember:'Ember', linen:'Linen', mono:'Mono',
+                    classic:'Classic', graphite:'Graphite', midnight:'Midnight', paper:'Paper',
                     terminal:'Terminal', system:'Follow system' };
-var THEME_NOTE = { classic:"today's look", graphite:'near-black, cool greys',
+var THEME_NOTE = { slate:'dark, cool, one cold accent', ember:'dark, warm, copper',
+                   linen:'light, clean, one blue', mono:'no colour, high contrast',
+                   classic:"today's look", graphite:'near-black, cool greys',
                    midnight:'deep navy, cyan', paper:'light, warm greys' };
-/* EXTRA-1 (S6.14): "follow system light/dark" is a PAIR, not a fifth palette. */
-var THEME_LIGHT = 'paper', THEME_DARK = 'graphite';
+/* EXTRA-1 (S6.14): "follow system light/dark" is a PAIR, not a fifth palette. 179 S6: Slate by night,
+   Linen by day. */
+var THEME_LIGHT = 'linen', THEME_DARK = 'slate';
 var SKIN2THEME = { statement:'paper', carbon:'graphite', blueprint:'midnight', terminal:'terminal' };
 
 function themePref(){ try{ return localStorage.getItem('ht_theme') || THEME_DEFAULT; }catch(e){ return THEME_DEFAULT; } }
@@ -1001,18 +1006,47 @@ function paintMast(){
 function tp(k,v){ return '<div class="tp"><div class="k">'+k+'</div><div class="v num">'+v+'</div></div>'; }
 
 /* ============================ paint: rail ============================ */
+/* HT-179 S4 · THE RAIL PAGES BY THE WEEK, IT NEVER SCROLLS SIDEWAYS (paste 179 "fit, never scroll").
+   Fourteen 42px buttons in a 365px box was a scroller. Now exactly SEVEN days fit - the week that holds
+   the day on screen - with ‹ › to page a week at a time, a swipe that does the same, and a native date
+   field for a day far back (a date 60 days back is three taps: the field, the day, done). `[` `]` `t`
+   still move the day; the page follows the day, never the other way round. */
+var RAIL_PAGE = null;                 /* weeks back from this week; null = follow S.date */
+function railPageOf(k){ var n=Math.round((dnum(today())-dnum(k))/864e5); return n<0?0:Math.floor(n/7); }
 function paintRail(){
-  var h='';
-  for(var i=13;i>=0;i--){
-    var k=shift(today(),-i), d=dnum(k), r=S.byDate[k];
+  var pg = (RAIL_PAGE==null) ? railPageOf(S.date) : RAIL_PAGE;
+  var h='<button class="rnav" type="button" data-rail="1" aria-label="previous week">‹</button>';
+  for(var i=6;i>=0;i--){
+    var k=shift(today(),-(pg*7+i)), d=dnum(k), r=S.byDate[k];
     var p=(r&&r.pct!=null)?r.pct:null;
     h+='<button data-d="'+k+'" class="'+(k===S.date?'sel':'')+'">'+
        '<div class="wd">'+WD[d.getDay()]+'</div><div class="dd num">'+d.getDate()+'</div>'+
        '<div class="pip" style="background:'+(p==null?'var(--rule2)':dens(p))+'"></div></button>';
   }
+  h+='<button class="rnav" type="button" data-rail="-1" aria-label="next week"'+(pg<=0?' disabled':'')+'>›</button>'+
+     '<label class="rpick" aria-label="pick a day"><span>▤</span><input type="date" data-railpick max="'+today()+'" value="'+S.date+'"></label>';
   el('rail').innerHTML=h;
-  var n=el('rail'), s=n.querySelector('.sel');
-  if(s && n.scrollWidth>n.clientWidth+4) s.scrollIntoView({block:'nearest',inline:'center'});
+  if(!el('rail').__r179){
+    el('rail').__r179=true;
+    var n=el('rail'), x0=null;
+    n.addEventListener('click',function(e){
+      var b=e.target.closest('[data-rail]'); if(!b) return;
+      e.preventDefault(); e.stopPropagation();
+      var cur=(RAIL_PAGE==null)?railPageOf(S.date):RAIL_PAGE;
+      RAIL_PAGE=Math.max(0,cur+(+b.getAttribute('data-rail'))); paintRail();
+    },true);
+    n.addEventListener('change',function(e){
+      var f=e.target.closest('[data-railpick]'); if(!f||!f.value) return;
+      if(f.value<=today()){ RAIL_PAGE=null; goDay(f.value); }
+    });
+    n.addEventListener('touchstart',function(e){ x0=e.touches&&e.touches[0]?e.touches[0].clientX:null; },{passive:true});
+    n.addEventListener('touchend',function(e){
+      if(x0==null) return; var t=e.changedTouches&&e.changedTouches[0]; if(!t) return;
+      var dx=t.clientX-x0; x0=null; if(Math.abs(dx)<40) return;
+      var cur=(RAIL_PAGE==null)?railPageOf(S.date):RAIL_PAGE;
+      RAIL_PAGE=Math.max(0,cur+(dx>0?1:-1)); paintRail();
+    },{passive:true});
+  }
 }
 
 /* ============================ paint: the log ============================ */
@@ -1646,6 +1680,9 @@ function rib(x1,w1,x2,w2,y1,y2,fill,op){
 function paintHeat(){
   var end=dnum(today()), all=dates();
   var start=new Date(end); start.setDate(end.getDate()-363);
+  /* HT-179 S4: on a phone the heat is the last 13 weeks (90 days = 13 x 7), sized to FIT the width;
+     the desktop keeps the year, also fitted to its card. Nothing scrolls sideways at either width. */
+  if(window.innerWidth<=480) start.setDate(end.getDate()-90);
   if(all.length){ var f=dnum(all[0]); f.setDate(f.getDate()-7); if(f>start) start=f; }
   start.setDate(start.getDate()-((start.getDay()+6)%7));       /* back to a Monday */
 
@@ -1661,9 +1698,12 @@ function paintHeat(){
     }
   }
   el('heat').innerHTML=cells;
+  el('heat').style.gridTemplateColumns='repeat('+Math.max(1,cols.length)+',minmax(0,1fr))';
 
-  /* month strip: one span per month, exact column pitch, so it stays aligned */
-  var PITCH=11, mh='', run=0, cur=cols.length?cols[0].getMonth():0;
+  /* month strip: one span per month, exact column pitch, so it stays aligned. 179 S4: the pitch is
+     MEASURED from the fitted grid now, because a column is no longer a fixed 11px. */
+  var hw=el('heat').clientWidth||0;
+  var PITCH=(hw && cols.length) ? hw/cols.length : 11, mh='', run=0, cur=cols.length?cols[0].getMonth():0;
   for(var i=0;i<=cols.length;i++){
     var m=(i<cols.length)?cols[i].getMonth():-1;
     if(m!==cur){
@@ -3725,6 +3765,11 @@ var HT32_CARDFIT = true;
   async function saveSheet(h,isNew){
     var name=str('eName');
     if(!name){ toast('a standard needs a name'); return; }
+    /* HT-179 S5: a link is `https://` or nothing. Validated on save and REFUSED whole, never
+       rewritten - an `http://` or a bare word is his to fix, not ours to guess at. */
+    var lk=str('eLink');
+    /* only a CHANGED link is held to it: a link saved before this rule never blocks a rename */
+    if(lk && lk!==String((h&&h.link)||'') && !/^https:\/\/[^\s\/$.?#][^\s]*$/i.test(lk)){ toast('a link starts with https://'); return; }
     var rec={ user_id:S.me.id, name:name, group_name:str('eGroup'),
               cadence:(function(){
                 var v=str('eCad');
@@ -5222,6 +5267,11 @@ var HT32_CARDFIT = true;
      never scrolls sideways; the chart does. */
   var DOW3=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
   var PHONE_DAY_PX = 28;
+  /* HT-179 S4 (paste 179 ruling "fit, never scroll"): the month chart FITS the phone's width. The
+     28px-a-day scroller is kept behind this switch, never deleted (R70.138); off, the chart takes the
+     same measured fit-to-width branch the desktop always used, whose stride / stagger logic already
+     keeps the axis labels from colliding. Cory 13:53: "the graph view for the month is still scrollable". */
+  var MONTH_SCROLLS = false;
 
   function monthKeys(y,m){
     var out=[]; for(var i=1;i<=31;i++){ var d=new Date(y,m,i); if(d.getMonth()!==m) break; out.push(dk(d)); }
@@ -5260,9 +5310,9 @@ var HT32_CARDFIT = true;
     /* HT-17 S2 (R70.140): NO RIGHT AXIS. Rating x10 reads off the LEFT axis and the legend says so,
        so the 34px right gutter that held it is reclaimed for the plot. R=10 is the half-dot bleed. */
     var H=opts.height||190, L=30, R=10, T=12, B=opts.twoLine?34:24;
-    if(!(opts.perX && window.innerWidth<=480)) H=availHeight(svg,H);
+    var narrow = MONTH_SCROLLS && opts.perX && window.innerWidth<=480;
+    if(!narrow) H=availHeight(svg,H);
     var n=pts.length, W;
-    var narrow = opts.perX && window.innerWidth<=480;
     if(narrow){
       W = L + R + n*opts.perX;                               /* a full cell either end, so nothing clips */
       svg.setAttribute('viewBox','0 0 '+W+' '+H);
@@ -10398,6 +10448,10 @@ var HT29GRP = (function(){
         out += '<div class="h29r' + (mark ? ' on' : '') + '"><span class="h29ck" aria-label="' + (mark ? 'done' : 'not done') + '">' +
           (mark ? '✓' : '') + '</span><span class="nm"' + (h.done_def ? ' title="Done when: ' + esc(h.done_def) + '"' : '') + '>' +
           esc(nameOf(h.name)) + '</span>' +
+          /* HT-179 S1/S3: a member sees the planned time as they see the name, and the signed variance once done */
+          (pl != null ? '<b class="pat h179mp">' + esc(fmtTime(winStart(h))) + '</b>' : '') +
+          (typeof mark === 'string' && at != null ? '<span class="h179mv' + (m == null ? '' : (Math.abs(m) <= HT179_TOL ? ' good' : ' bad')) + '">' +
+            esc(fmtTime(mark)) + (m == null ? '' : ' \u00b7 ' + (Math.abs(m) <= HT179_TOL ? '\u2713 ' : '\u2715 ') + (m > 0 ? '+' : (m < 0 ? '\u2212' : '\u00b1')) + Math.abs(m) + 'm') + '</span>' : '') +
           (cls ? '<i class="dot29 ' + cls + '" data-say="' + esc('done ' + fmtTime(mark) + (m === 0 ? ' · on time' : (m < 0 ? ' · ' + (-m) + ' min early' : ' · +' + m + ' min'))) + '" role="button" tabindex="0"></i>' : '') +
           '</div>';
       });
@@ -10697,7 +10751,7 @@ var HT29INS = (function(){
       var pts = []; vals.forEach(function(v, i){ if(v != null) pts.push((P + i * bw + bw / 2).toFixed(1) + ',' + y(v * scale)); });
       return pts.length > 1 ? '<polyline class="' + cls + '" points="' + pts.join(' ') + '" fill="none"/>' : '';
     }
-    var mem = (members || []).map(function(m, j){ return line(m.pct, 1, 'l29m l29m' + (j % 3)); }).join('');
+    var mem = (members || []).map(function(m, j){ return line(m.pct, 1, 'l29m l29m' + (j % 4)); }).join('');   /* 179 S6: one colour per member, --m1..--m4 */
     return '<svg class="ch29" viewBox="0 0 ' + W + ' ' + H + '" preserveAspectRatio="none" role="img" aria-label="completion, last ' + n + ' days">' +
            bars + line(t.onTime, 1, 'l29t') + line(t.rating, 10, 'l29r') + mem + '</svg>';
   }
@@ -10718,7 +10772,7 @@ var HT29INS = (function(){
       '<div class="h29leg"><span><i class="r"></i>rating</span><span><i class="t"></i>on time</span>' +
         (others.length ? others.map(function(r, j){
           return '<button type="button" class="h29mb' + (shown[r.id] ? ' on' : '') + '" data-i29m="' + esc(r.id) + '" aria-pressed="' + (shown[r.id] ? 'true' : 'false') + '">' +
-                 '<i class="m' + (j % 3) + '"></i>' + esc(r.n) + '</button>'; }).join('') : '') + '</div>');
+                 '<i class="m' + (j % 4) + '"></i>' + esc(r.n) + '</button>'; }).join('') : '') + '</div>');
   }
   function rateCard(){
     var e = explained(pick), nums = '';
@@ -10749,6 +10803,9 @@ var HT29INS = (function(){
     var body = HT29GRP.table(circleRows29());
     if(HT31_INVITE && h31CanInvite(circle)) body += '<div class="tools h31inv"><button class="btn pri" ' +
                             'data-h29invite="1" type="button">Invite</button></div>';
+    /* HT-179 S3: the phone's door to Reports. 148 put it on the desktop GROUP panel only, so on a phone
+       the reports - and the ON TIME tiles above them - had no door at all (R70.211). */
+    body += '<div class="tools h179rep"><button class="btn" data-h32reports="1" type="button">Reports</button></div>';
     return card('group', 'The group side by side', body);
   }
   function render(){
@@ -11529,7 +11586,7 @@ var HT29_UPDATE_BANNER = true;
 /* The one place this build says what it is. `sw.js`'s cache name must equal it, and `golden_ht30` S0 reads
    both files and fails when they drift - a version on the screen that is not the version in the cache is
    worse than no version at all, because it is the thing you check when you are already unsure. */
-var HT30_VERSION = 'ht-v40';
+var HT30_VERSION = 'ht-v41';
 
 function warn30(what, e){ try{ console.warn('HT-30: ' + what, e); }catch(_){} }
 function h30El(id){ return document.getElementById(id); }
@@ -12674,7 +12731,10 @@ var HT31_SECTIONS_LOCAL = true;
    are the two sections a time means something in. Weekly and Standards show a chip only when a time
    exists, and the desktop reveals the ghost on hover so a resting list stays quiet. */
 var HT31_TIME_PICKER = true;
-var HT31_GHOST_CHIP_SECTIONS = ['morning', 'night'];
+/* HT-179 S1 (paste 179, Cory 2026-09-23 13:53 "we're still missing the time for the tasks"): the ghost
+   `+ time` is on EVERY section now. Standards and Weekly had a chip only once a time existed, so a
+   standard with no time offered no way to give it one from the row - which is what he was missing. */
+var HT31_GHOST_CHIP_SECTIONS = ['morning', 'night', 'standards', 'weekly'];
 (function(){
   var open = null;                    /* {id, chip, node} while a picker is on screen */
 
@@ -13313,5 +13373,286 @@ var HT32_WEEK = 'sun_fri';                /* Sunday..Friday; Saturday is the Sab
   }
   window.__HT32NEED = { compute: compute, paint: paint, rowOf: rowOf };
 })();
+
+
+/* ================== HT-179 (PASTE 179) · TIME, FIT, LINKS, COLOUR ==================
+   Cory, Wednesday 2026-09-23 13:53 CDT: "we're still missing the time for the tasks ... time options
+   for the completion of the tasks ... links connected to the tasks".
+
+   WHAT WAS ALREADY THERE, MEASURED (so nothing here is a second copy of it):
+     planned time  = `habits.time_anchor`, edited from the row by HT-31's chip (S1 widens it to every
+                     section, at HT31_GHOST_CHIP_SECTIONS)
+     done time     = `days.checked[id] = "HH:MM"`, the device's own clock, written by a tap (HT-21 S2)
+     link          = `habits.link`, edited in the sheet, carried by the name's <a>
+   So this layer adds NO column. It adds three controls and two numbers, and every one of them reads
+   and writes the fields above.
+
+   S2 · THE DONE TIME HAS THREE ANSWERS. Tapping the box is still done-now, one tap, unchanged. The
+   clock chip beside it opens Now · Planned (only when there is a planned time) · Pick. The chip
+   exists only while the day on screen is TODAY and not closed: after the close the day is history
+   (P4), and a done time you did not do is worse than none (HT-21 S2). Unchecking clears the time
+   because unchecking deletes the entry, as it always has.
+   WHY A CHIP AND NOT A LONG-PRESS: iOS gives a long-press to text selection and the callout, and a
+   gesture that fights the platform is one that works on the desktop and fails in his hand (179
+   stress 3).
+   WHY NOT `<input type="time">`: HT-31 S2.9 measured that it follows the DEVICE locale and shows 24-hour
+   on a 24-hour phone, which is the complaint that built HT-31's picker. Pick uses the same form.
+
+   S3 · THE VARIANCE IS A SECOND NUMBER. `5:12 AM · ✓ +12m` - good colour and a check inside the ON
+   TIME window (|v| <= 15, the existing rule), bad colour and a cross past it. The glyph is there so a
+   theme with no hue (Mono) still says which. It never enters the 80 %: completion is still "is this id
+   truthy", and a clock string is truthy whatever it says. */
+var HT179_TOL = 15;                         /* minutes either side: the ON TIME rule of HT-25 S3 / HT-32 S2 */
+function warn179(what, e){ try{ console.warn('HT-179: ' + what, e); }catch(_){} }
+var HT179 = (function(){
+  var open = null;                          /* {id, chip, node} while the chooser is on screen */
+
+  function habit(id){ return (S.habits || []).filter(function(h){ return String(h.id) === String(id); })[0]; }
+  function editable(){
+    if(!S.me || S.date !== today()) return false;
+    var r = S.byDate[S.date];
+    return !(S.hasClosedAt !== false && r && r.closed_at);      /* a missing column is never a closed day */
+  }
+  function vTxt(m){ return (m > 0 ? '+' : (m < 0 ? '−' : '±')) + Math.abs(m) + 'm'; }
+  function good(m){ return Math.abs(m) <= HT179_TOL; }
+  /* the one function that turns a check into what the row says - golden_ht33 reads it */
+  function label(h, k){
+    var at = doneAt(k, h.id); if(!at) return null;
+    var m = lateMin(h, k);
+    return { at: at, m: m, text: fmtTime(at) + (m == null ? '' : ' · ' + (good(m) ? '✓ ' : '✕ ') + vTxt(m)),
+             cls: m == null ? '' : (good(m) ? 'good' : 'bad') };
+  }
+
+  function chips(){
+    var log = el('log'); if(!log) return;
+    if(log.classList.contains('reordering') || log.querySelector('.li.dragging')) return;
+    var ed = editable();
+    Array.prototype.slice.call(log.querySelectorAll('.li')).forEach(function(r){
+      var id = r.getAttribute('data-h'), h = habit(id);
+      var c = r.querySelector('.ck179');
+      if(!h){ if(c) c.parentNode.removeChild(c); return; }
+      var lb = label(h, S.date);
+      if(!lb && !ed){ if(c) c.parentNode.removeChild(c); return; }
+      if(!c){
+        c = document.createElement('button');
+        c.type = 'button'; c.setAttribute('data-ck179', id);
+        var bx = r.querySelector('.bxw');
+        if(bx && bx.nextSibling) r.insertBefore(c, bx.nextSibling); else r.appendChild(c);
+      }
+      c.className = 'ck179' + (lb ? ' has ' + lb.cls : '');
+      /* two short lines - the time over the variance - so the chip is ~60px and never crushes the name
+         into a one-word column on a 360px phone (measured in the 179 shots before this line existed) */
+      if(lb) c.innerHTML = '<span class="t">' + esc(fmtTime(lb.at)) + '</span>' + (lb.m == null ? '' :
+        '<span class="v">' + (good(lb.m) ? '✓ ' : '✕ ') + vTxt(lb.m) + '</span>');
+      else c.textContent = '◷';
+      c.disabled = !ed;
+      c.setAttribute('aria-label', lb ? ('done ' + lb.text + (ed ? ', change the done time' : '')) : 'done at a time');
+      /* 179 S3: the row carries the variance now, so HT-29's dot beside the name is not a second copy */
+      r.classList.toggle('v179', !!(lb && lb.m != null));
+      link(r, h);
+    });
+  }
+
+  /* S5 · the link is a chip at the right, beside the time - NOT a glyph at the end of the name, which
+     is what Cory removed on 9/15 (R70.287). The name's <a> is untouched. */
+  function link(r, h){
+    var k = r.querySelector('.lk179');
+    if(!h.link || !/^https?:\/\//i.test(String(h.link))){ if(k) k.parentNode.removeChild(k); return; }
+    if(!k){
+      k = document.createElement('a');
+      k.className = 'lk179'; k.target = '_blank'; k.rel = 'noopener';
+      k.textContent = '↗';
+      var sp = r.querySelector('.sp16');
+      if(sp) r.insertBefore(k, sp); else r.appendChild(k);
+    }
+    k.href = h.link;
+    k.setAttribute('aria-label', 'open the link for ' + nameOf(h.name));
+  }
+
+  function nowHHMM(){ return nowClock(); }
+  function apply(id, t){
+    var h = habit(id); if(!h || !t) return;
+    if(!editable()){ toast('that day is closed — its times are history'); return; }
+    var r = S.byDate[S.date] || (S.byDate[S.date] = { date:S.date, checked:{}, pct:0 });
+    r.checked = r.checked || {};
+    if(isWeekly(h) && !r.checked[h.id] && weekCheckDay(h.id, S.date)){
+      toast('done earlier this week — that day keeps its own time'); return;
+    }
+    r.checked[h.id] = t;
+    queueSave(); paintMast(); paintLog(); paintRail(); paintRight();
+    try{ chips(); }catch(e){ warn179('chips after apply', e); }
+    toast('done ' + fmtTime(t));
+  }
+
+  function pickHtml(h){
+    var p = window.__HT31TIME ? window.__HT31TIME.parts(doneAt(S.date, h.id) || nowHHMM()) : { h:7, m:0, ap:'AM' };
+    var hrs = '', mins = '', i;
+    for(i = 1; i <= 12; i++) hrs += '<option value="' + i + '"' + (i === p.h ? ' selected' : '') + '>' + i + '</option>';
+    for(i = 0; i < 60; i++) mins += '<option value="' + i + '"' + (i === p.m ? ' selected' : '') + '>' + ('0' + i).slice(-2) + '</option>';
+    var pl = winStart(h);
+    return '<div class="ck179o">' +
+        '<button type="button" class="btn" data-ck179a="now">Now · ' + esc(fmtTime(nowHHMM())) + '</button>' +
+        (pl ? '<button type="button" class="btn" data-ck179a="planned">Planned · ' + esc(fmtTime(pl)) + '</button>' : '') +
+      '</div>' +
+      '<div class="ht31pr ck179p"><span class="ck179l">Pick</span>' +
+        '<select id="ck179h" aria-label="hour">' + hrs + '</select><span class="ht31c">:</span>' +
+        '<select id="ck179m" aria-label="minute">' + mins + '</select>' +
+        '<span class="ht31ap">' +
+          '<button type="button" data-ap="AM" class="' + (p.ap === 'AM' ? 'on' : '') + '">AM</button>' +
+          '<button type="button" data-ap="PM" class="' + (p.ap === 'PM' ? 'on' : '') + '">PM</button>' +
+        '</span>' +
+        '<button type="button" class="btn pri" data-ck179a="pick">Set</button>' +
+      '</div>';
+  }
+  function close(){ if(!open) return; var o = open; open = null; if(o.node && o.node.parentNode) o.node.parentNode.removeChild(o.node); }
+  function place(node, chip){
+    var r = chip.getBoundingClientRect(), w = Math.min(320, window.innerWidth - 16);
+    node.style.position = 'fixed'; node.style.width = w + 'px';
+    node.style.top = Math.max(4, Math.min(window.innerHeight - 140, r.bottom + 6)) + 'px';
+    node.style.left = Math.max(8, Math.min(window.innerWidth - w - 8, r.left)) + 'px';
+  }
+  function show(chip){
+    var id = chip.getAttribute('data-ck179'); if(!id || chip.disabled) return;
+    if(open && open.id === id){ close(); return; }
+    close();
+    var h = habit(id); if(!h) return;
+    var n = document.createElement('div');
+    n.id = 'ck179pick'; n.className = 'ht31pick ck179pick'; n.setAttribute('role', 'dialog');
+    n.setAttribute('aria-label', 'done time for ' + nameOf(h.name));
+    n.innerHTML = pickHtml(h);
+    document.body.appendChild(n);
+    open = { id: id, chip: chip, node: n };
+    place(n, chip);
+  }
+  function picked(n){
+    var H = +n.querySelector('#ck179h').value, M = +n.querySelector('#ck179m').value;
+    var ap = n.querySelector('.ht31ap .on');
+    return window.__HT31TIME ? window.__HT31TIME.to24(H, M, ap ? ap.getAttribute('data-ap') : 'AM')
+                             : (('0' + H).slice(-2) + ':' + ('0' + M).slice(-2));
+  }
+  document.addEventListener('click', function(e){
+    var t = e.target; if(!t || !t.closest) return;
+    var chip = t.closest('[data-ck179]');
+    if(chip){ e.preventDefault(); e.stopPropagation(); show(chip); return; }
+    var inside = t.closest('#ck179pick');
+    if(!inside){ if(open) close(); return; }
+    e.stopPropagation();
+    var ap = t.closest('[data-ap]');
+    if(ap){ e.preventDefault();
+      Array.prototype.slice.call(inside.querySelectorAll('.ht31ap button')).forEach(function(b){ b.classList.remove('on'); });
+      ap.classList.add('on'); return; }
+    var a = t.closest('[data-ck179a]'); if(!a) return;
+    e.preventDefault();
+    var what = a.getAttribute('data-ck179a'), id = open && open.id, h = habit(id), v = null;
+    if(what === 'now') v = nowHHMM();
+    else if(what === 'planned') v = h ? hhmm(winStart(h)) : null;
+    else if(what === 'pick') v = picked(inside);
+    close();
+    if(id && v) apply(id, v);
+  }, true);
+  document.addEventListener('keydown', function(e){ if(open && e.key === 'Escape'){ e.preventDefault(); close(); } }, true);
+  /* the phone's Reports door (groupCard, .h179rep): the desktop GROUP panel routes its own through
+     HT32GRP.click, and the Insights card has no router - so one listener, scoped to the one button */
+  document.addEventListener('click', function(e){
+    var r = e.target && e.target.closest ? e.target.closest('.h179rep [data-h32reports]') : null;
+    if(r && typeof HT32REP !== 'undefined'){ e.preventDefault(); HT32REP.open(); }
+  });
+
+  /* ---- S3 · THE TWO TIMING TILES: ON TIME % and the median variance, per member, today and 7 days ----
+     Beside the reports, never inside the 80 %. Timed standards only; a check without a clock (every day
+     logged before HT-21 S2) is not counted either way, so no past day is repriced (P4). A member's days
+     come from `ht29_member_day`, which already returns their check-off times and planned times and
+     never a journal word or a link. */
+  function statsOf(days){
+    var vs = [];
+    days.forEach(function(d){
+      var ck = d.checked || {};
+      (d.habits || []).forEach(function(h){
+        var v = ck[h.id]; if(typeof v !== 'string' || !/^\d{2}:\d{2}$/.test(v)) return;
+        var p = winStartMin(h); if(p == null) return;
+        vs.push(minsOf(v) - p);
+      });
+    });
+    if(!vs.length) return null;
+    var ok = vs.filter(good).length;
+    vs.sort(function(a, b){ return a - b; });
+    var mid = Math.floor(vs.length / 2);
+    var med = vs.length % 2 ? vs[mid] : Math.round((vs[mid - 1] + vs[mid]) / 2);
+    return { n: vs.length, pct: Math.round(ok / vs.length * 100), med: med };
+  }
+  function myDays(n){
+    var out = [];
+    for(var i = 0; i < n; i++){
+      var k = shift(today(), -i), r = S.byDate[k];
+      if(r) out.push({ checked: r.checked || {}, habits: S.habits || [] });
+    }
+    return out;
+  }
+  var memo = {};
+  async function memberDays(uid, n){
+    var out = [];
+    for(var i = 0; i < n; i++){
+      var k = shift(today(), -i), key = uid + '|' + k;
+      if(!memo[key] || (Date.now() - memo[key].at) > 300000){
+        var res;
+        try{ res = await sb.rpc('ht29_member_day', { member: uid, d: k }); }catch(e){ res = { error: e }; }
+        memo[key] = { at: Date.now(), day: (res && !res.error && res.data) ? res.data : null };
+      }
+      if(memo[key].day) out.push(memo[key].day);
+    }
+    return out;
+  }
+  function tile(s){
+    if(!s) return '<span class="t179 none">—</span>';
+    return '<span class="t179"><b class="num">' + s.pct + '%</b> on time · median <b class="num ' +
+           (good(s.med) ? 'good' : 'bad') + '">' + (good(s.med) ? '✓ ' : '✕ ') + vTxt(s.med) + '</b>' +
+           '<i> (' + s.n + ')</i></span>';
+  }
+  async function timingHtml(){
+    var rows = [{ id: S.me && S.me.id, n: 'You', mine: true }];
+    circleRows29().forEach(function(r){ if(!S.me || r.id !== S.me.id) rows.push({ id: r.id, n: r.n }); });
+    var body = '';
+    for(var j = 0; j < rows.length; j++){
+      var r = rows[j], d1, d7;
+      if(r.mine){ d1 = myDays(1); d7 = myDays(7); }
+      else { d7 = await memberDays(r.id, 7); d1 = d7.filter(function(d){ return String(d.date) === today(); }); }
+      body += '<div class="r179"><span class="w m179' + (j % 4) + '">' + esc(r.n) + '</span>' +
+              '<span class="c"><span class="k">today</span>' + tile(statsOf(d1)) + '</span>' +
+              '<span class="c"><span class="k">7 days</span>' + tile(statsOf(d7)) + '</span></div>';
+    }
+    return '<div class="h179tim" id="h179tim"><div class="lab">On time</div>' + body +
+           '<div class="note">Timed standards only, within ' + HT179_TOL + ' minutes of the planned time. ' +
+           'A second number: it is never part of the 80 %.</div></div>';
+  }
+  async function timing(){
+    var host = el('h32rep'); if(!host || el('h179tim')) return;
+    var box = document.createElement('div'); box.id = 'h179timw';
+    host.parentNode.insertBefore(box, host);
+    try{ box.innerHTML = await timingHtml(); }catch(e){ warn179('timing', e); box.innerHTML = ''; }
+  }
+  if(typeof HT32REP !== 'undefined' && HT32REP && typeof HT32REP.open === 'function'){
+    var _ro = HT32REP.open;
+    HT32REP.open = function(){ var out = _ro.apply(this, arguments); setTimeout(timing, 60); return out; };
+  }
+
+  /* the chips re-assert after every paint, the way HT-30 and HT-31's do; this layer is the LAST, so it
+     runs after HT-29's regroup has moved the rows (the rows are moved, not rebuilt, so a chip rides along) */
+  var _pa = paintAll;
+  paintAll = function(){ var out = _pa.apply(null, arguments); try{ chips(); }catch(e){ warn179('chips', e); } return out; };
+  var _pl = paintLog;
+  paintLog = function(){ var out = _pl.apply(null, arguments); try{ chips(); }catch(e){ warn179('chips', e); } return out; };
+  /* a day chosen by any route re-centres the rail on it (S4) */
+  var _gd = goDay;
+  goDay = function(){ RAIL_PAGE = null; return _gd.apply(null, arguments); };
+  document.addEventListener('click', function(){ setTimeout(function(){ try{ chips(); }catch(e){} }, 50); }, true);
+  if(document.readyState === 'complete') setTimeout(chips, 450);
+  else window.addEventListener('load', function(){ setTimeout(chips, 450); });
+
+  /* read-only, for the golden: why the chooser is or is not offered on the day on screen */
+  function state(){ var r = S.byDate[S.date]; return { me: !!S.me, date: S.date, today: today(), closed: !!(S.hasClosedAt !== false && r && r.closed_at) }; }
+  return { chips: chips, apply: apply, label: label, statsOf: statsOf, editable: editable, state: state,
+           show: show, close: close, timing: timing, tol: HT179_TOL };
+})();
+window.__HT179 = HT179;
 
 })();

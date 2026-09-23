@@ -20,5 +20,6 @@
   /* tells the browser which way to draw what it owns - form controls, the default
      scrollbar before our own tokens reach it, and the text caret. A light theme that
      does not say so gets dark-drawn native widgets on a paper ground. */
+  --m1:#6FB2C9; --m2:#C9A6F5; --m3:#E9C46E; --m4:#7FD6C6;   /* 179 S6: one colour per group member */
   color-scheme:dark;
 }
