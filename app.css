@@ -2915,3 +2915,146 @@ html[data-simple] .mast #tape .tp .v.h32secured{ color:var(--st-secured) }
 html[data-simple] .mast #tape .tp .v.h32ontrack{ color:var(--st-ontrack) }
 html[data-simple] .mast #tape .tp .v.h32atrisk{  color:var(--st-atrisk) }
 html[data-simple] .mast #tape .tp .v.h32out{     color:var(--st-outofreach) }
+
+/* ==========================================================================
+   HT-32 S6.14 · SETTINGS → APPEARANCE — the theme picker.
+
+   Every colour here is a token, and the three that are NOT are inline on the
+   element: a swatch's ground, ink and accent are written by `paintAppearance()`
+   from the values the browser resolved for THAT theme, because a swatch showing
+   the CURRENT theme's colours would show four identical squares. That is also
+   why they are not in this file — a literal here would be a second address for
+   a colour (R70.282) and would drift the first time a theme file changed.
+
+   One column on the phone, two from 560px. Cory's rule for anything he looks at
+   (R70.306): one centred column, one palette, one colour per state.
+   ========================================================================== */
+.thpick{display:grid;grid-template-columns:1fr;gap:6px;padding:8px 0}
+@media (min-width:560px){ .thpick{grid-template-columns:1fr 1fr} }
+.tbtn.th{
+  display:grid;grid-template-columns:22px 1fr;grid-template-rows:auto auto;
+  gap:2px 10px;align-items:center;text-align:left;text-transform:none;letter-spacing:0;
+  font:400 12px/1.25 var(--sans);padding:8px 10px;width:100%;
+  background:transparent;color:var(--ink2);border:1px solid var(--rule)
+}
+.tbtn.th:hover{border-color:var(--rule2)}
+/* the selected theme is marked by the ACCENT and by aria-pressed — never by colour alone,
+   because "one colour per state" is only honest if the state is also readable without it. */
+.tbtn.th.on{border-color:var(--accent);color:var(--ink)}
+.tbtn.th .thsw{
+  grid-row:1 / span 2;width:22px;height:22px;border:1px solid;position:relative;display:block
+}
+/* the accent pip: the one thing that tells Graphite from Midnight at swatch size */
+.tbtn.th .thsw i{position:absolute;right:2px;bottom:2px;width:7px;height:7px;display:block}
+.tbtn.th .thnm{font:500 12.5px/1.2 var(--sans);color:var(--ink);align-self:end}
+.tbtn.th .thno{font:400 10.5px/1.2 var(--sans);color:var(--ink3);align-self:start}
+
+
+/* ==========================================================================
+   HT-32 N6 · EVERY CHART CARD FITS ONE PHONE SCREEN, WHOLE.
+
+   Cory, 9/22 20:24, screenshot of THE YEAR at 390×844: "This needs to show the
+   full chart and its numberings for x and y". The card was taller than the
+   viewport, so its title and its top gridlines (100, 90) sat under the status
+   bar and the Dynamic Island. The labels were all present in the DOM — which is
+   why nothing failed — and none of the top ones were on screen.
+
+   `--h32-cardmax` is measured and published by `HT32_CARDFIT` in app.js:
+   viewport − tab bar − safe-area inset − the card's own margins. It is a NUMBER
+   from JavaScript and the layout is done here, so there is one layout engine.
+   The fallback is `100svh` so a browser that never runs the module still gets a
+   sane cap; `svh` not `vh`, because `vh` on iOS is the height with the browser
+   chrome retracted and overflows by roughly the chrome.
+   ========================================================================== */
+@media (max-width:1023px){
+  /* THE FIRST CARD STARTS BELOW THE INSET. A chart is never drawn under the island. */
+  html[data-simple] .h30ins{ padding-top:env(safe-area-inset-top) }
+  html[data-simple] .h30ins .h30c{
+    max-height:var(--h32-cardmax, calc(100svh - 60px - env(safe-area-inset-top)));
+    display:flex; flex-direction:column; overflow:hidden
+  }
+  /* THE PLOT SCALES; THE LABELS NEVER DROP. The title and the axis bands are
+     `flex:0 0 auto` so they keep their measured height whatever happens, and the
+     chart itself is the only thing that gives way. Shrinking a label band to fit
+     is the other way to satisfy the inequality, and it is the half of the
+     complaint that was about the numbers being missing. */
+  html[data-simple] .h30ins .h30c > .lab{ flex:0 0 auto }
+  html[data-simple] .h30ins .h30c > .h30cb{ flex:1 1 auto; min-height:0; overflow:hidden }
+  html[data-simple] .h30ins .h30c svg.chart{
+    width:100%; height:auto; max-height:100%; display:block
+  }
+}
+
+
+/* HT-32 N3 · THE WHISPER. Cory: "I don't wanna have to click save." So the only thing the app says
+   about saving is this, in the corner of the heading the field already has - never a toast over the
+   page, and never a button. It is the ACCENT for a moment and then it is the usual muted line again,
+   so a glance catches it and a paragraph of typing does not turn into forty notifications. */
+#jrnC.h32whisper, .h32whisper{ color:var(--accent); transition:color .4s ease }
+
+/* ==========================================================================
+   HT-32 S2.4 / S3.7 / S4 · THE GROUP PANEL'S NEW ROWS AND COLUMNS.
+
+   Cory: "rewards or punishments based off of completion", "a metric ... what
+   percentage you have to hit each day to get to 80%", "daily report and
+   end-of-week report on a Friday ... clickable inside the group section",
+   "Andrew should have been added".
+
+   R70.306 throughout: one centred column, one palette, ONE COLOUR PER STATE.
+   The four week-state colours are `--st-secured` / `--st-ontrack` /
+   `--st-atrisk` / `--st-outofreach`, measured in HT-32 S3 against both grounds
+   and the sunk panel, and they are the SAME four the header's tile uses - the
+   number and the column say the same thing in the same colour or they are two
+   facts about one week.
+   ========================================================================== */
+.h32ndc{ white-space:nowrap; font-variant-numeric:tabular-nums }
+.h32ndc.h32secured{  color:var(--st-secured) }
+.h32ndc.h32ontrack{  color:var(--st-ontrack) }
+.h32ndc.h32atrisk{   color:var(--st-atrisk) }
+.h32ndc.h32out{      color:var(--st-outofreach) }
+
+/* the stakes chip sits ON the member's row, because that is the row it is about */
+.h32stk{ font:400 10px/1 var(--sans); color:var(--ink2); background:none; border:0;
+  border-bottom:1px dashed var(--rule2); padding:0 0 1px; cursor:pointer; max-width:11em;
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap; vertical-align:baseline }
+.h32stk:hover{ color:var(--ink); border-bottom-color:var(--ink3) }
+.h32stkset{ color:var(--ink3); font-style:italic }
+
+/* A PENDING ROW CARRIES NO NUMBERS. Someone who has not signed in has no week, and
+   dashes across four columns read as a bad one. */
+.h32pend td{ color:var(--ink3) }
+.h32pendtag{ font:500 8.5px/1 var(--mono); letter-spacing:.14em; text-transform:uppercase;
+  color:var(--ink3); border:1px solid var(--rule); padding:2px 4px; margin-left:6px }
+.h32lnk, .h32addn{ font:400 10.5px/1.3 var(--sans); color:var(--ink3) }
+.h32lnk{ background:none; border:0; text-decoration:underline; cursor:pointer; padding:0 }
+.h32lnk:hover{ color:var(--ink) }
+
+.h32add{ display:flex; gap:6px; align-items:center; padding:8px 0 2px; flex-wrap:wrap }
+.h32add input{ flex:1 1 12em; min-width:0; font:400 12px/1.2 var(--sans); color:var(--ink);
+  background:var(--sunk); border:1px solid var(--rule); padding:6px 8px }
+.h32add input:focus{ outline:none; border-color:var(--accent) }
+
+/* Reports: a list of rows, each one a door. One column on the phone. */
+.h32rlist{ display:flex; flex-direction:column }
+.h32rrow{ display:grid; grid-template-columns:minmax(0,1fr) auto 3.4em 5.2em; gap:8px; align-items:baseline;
+  width:100%; text-align:left; background:none; border:0; border-bottom:1px solid var(--rule);
+  padding:9px 2px; cursor:pointer; color:var(--ink2); font:400 12px/1.25 var(--sans) }
+.h32rrow:hover{ background:var(--sel) }
+.h32rrow .k{ color:var(--ink); overflow:hidden; text-overflow:ellipsis; white-space:nowrap }
+.h32rrow .w{ color:var(--ink3); font-size:11px }
+.h32rrow .v{ text-align:right; font-variant-numeric:tabular-nums; color:var(--ink) }
+.h32rrow .o{ text-align:right; font:500 9.5px/1 var(--mono); letter-spacing:.1em; text-transform:uppercase }
+.h32rrow .o.h32secured{ color:var(--st-secured) }
+.h32rrow .o.h32out{ color:var(--st-outofreach) }
+
+.h32rcard{ padding:12px 0 }
+.h32rh{ font:500 9.5px/1 var(--mono); letter-spacing:.14em; text-transform:uppercase;
+  color:var(--ink3); padding-bottom:10px }
+.h32kv{ display:flex; gap:10px; justify-content:space-between; border-bottom:1px solid var(--rule);
+  padding:7px 0; font:400 12px/1.3 var(--sans) }
+.h32kv .k{ color:var(--ink3) }
+.h32kv .v{ color:var(--ink); text-align:right }
+.h32log{ padding-top:12px }
+.h32logrow{ display:flex; gap:10px; justify-content:space-between; padding:5px 0;
+  font:400 11px/1.3 var(--sans); color:var(--ink2); border-bottom:1px solid var(--rule) }
+.h32logrow .k{ color:var(--ink3); white-space:nowrap }

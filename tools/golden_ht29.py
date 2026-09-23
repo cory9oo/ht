@@ -466,10 +466,16 @@ async def sec_s3(pw):
     panel = await pg.evaluate("() => { const g=document.getElementById('g29Set'); return g ? g.innerText : null; }")
     chk('S3p · Settings -> Group shows the code and an invite',
         bool(panel) and 'ABC123' in panel and 'invite' in panel.lower(), (panel or '')[:140])
-    await pg.evaluate("() => { const n=document.getElementById('pName'); if(n){ n.value='Cory O'; } const b=document.getElementById('pSave'); b && b.click(); }")
-    await pg.wait_for_timeout(700)
+    # HT-32 N3 (2026-09-23): there is no "Save profile" button any more - Cory, 9/22: "I don't wanna
+    # have to click save". The ASSERTION here is unchanged and is the one that matters: typing a name
+    # must CREATE the row a new member never had (HT-29 S3's own defect). What changed is how a
+    # person gets there - type, then leave the field - so the test types and blurs.
+    await pg.evaluate("""() => { const n=document.getElementById('pName');
+      if(n){ n.value='Cory O'; n.dispatchEvent(new Event('input',{bubbles:true})); n.blur(); } }""")
+    await pg.wait_for_timeout(1400)
     ups = await pg.evaluate("() => (window.__UPSERTS||[]).filter(u=>u[0]==='profiles').map(u=>u[1])")
-    chk('S3q · saving the profile now CREATES the row a new member never had',
+    chk('S3q · typing a profile name still CREATES the row a new member never had - and now with '
+        'no button to press (HT-32 N3)',
         bool(ups) and ups[0].get('id') == 'u-mock' and ups[0].get('display_name') == 'Cory O', ups[:1])
     await no_errors(pg, errs, 'S3 (group panel)')
     await b.close()

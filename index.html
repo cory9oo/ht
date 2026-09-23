@@ -6,8 +6,11 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <!-- This page owns its colours. Dark Reader honours this lock and steps aside. -->
 <meta name="darkreader-lock">
+<!-- HT-32 S6: both of these track the DEFAULT theme (graphite), because they are what a COLD
+     start paints before any script runs. `color-scheme` per theme is set in the theme files
+     themselves, where a light theme can say so; this static pair is only the first frame. -->
 <meta name="color-scheme" content="dark">
-<meta name="theme-color" content="#0A0C10">
+<meta name="theme-color" content="#0B0C0E">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="HT">
 <meta name="mobile-web-app-capable" content="yes">
@@ -19,6 +22,32 @@ try{
              || /[?&]advanced=1/.test(location.search);
   if(!_adv) document.documentElement.setAttribute('data-simple','1');
 }catch(e){ if(!/[?&]advanced=1/.test(location.search)) document.documentElement.setAttribute('data-simple','1'); }
+/* HT-32 S6.14 - THE THEME IS APPLIED BEFORE THE FIRST PAINT, for the same reason data-simple is:
+   a picker that flashes the old theme on every load is the defect this block exists to prevent
+   (148 STRESS 6). It runs BEFORE the <link>s below, reads localStorage only, and never touches the
+   network - the database copy is reconciled later, once, by app.js.
+   `system` is EXTRA-1: follow the OS light/dark pair (paper by day, graphite by night). */
+/* THE DEFAULT IS DECLARED HERE AND NOWHERE ELSE. This script is the only code that runs before
+   the first paint, so it is the only code that can choose a theme without a flash - which makes it
+   the one honest home for the default. It publishes the choice as `data-theme-default`, and app.js
+   READS that rather than carrying a second copy. Two defaults in two files is not a style question:
+   the later one wins AFTER the paint, so the page shows one theme and then changes its mind. */
+var _TDEF = 'graphite';                       /* S6.14 · the switch is `user.theme` */
+var _TPAIR = { light:'paper', dark:'graphite' };   /* EXTRA-1 · the system pair */
+try{
+  var _TH = ['classic','graphite','midnight','paper','terminal'];
+  document.documentElement.setAttribute('data-theme-default', _TDEF);
+  var _t = localStorage.getItem('ht_theme') || _TDEF;
+  if(_t === 'system'){
+    _t = (window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches) ? _TPAIR.light : _TPAIR.dark;
+    document.documentElement.setAttribute('data-theme-follow','1');
+  }
+  if(_TH.indexOf(_t) < 0) _t = _TDEF;
+  document.documentElement.setAttribute('data-theme', _t);
+}catch(e){
+  document.documentElement.setAttribute('data-theme-default', _TDEF);
+  document.documentElement.setAttribute('data-theme', _TDEF);
+}
 </script>
 <link rel="manifest" href="./manifest.webmanifest">
 <link rel="apple-touch-icon" href="./apple-touch-icon.png">
@@ -43,6 +72,15 @@ try{
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Inter:wght@400;500;600&display=swap">
 <link rel="stylesheet" href="./tokens.css">
+<!-- HT-32 S6 - THE FOUR THEMES. `themes/README.md` says why classic.css is FIRST and why
+     re-ordering these five lines silently breaks the picker: `[data-theme=x]`, `[data-simple]`
+     and `[data-skin=y]` all have specificity (0,2,0), so the LATER file wins, and classic.css
+     is the one carrying `[data-simple]` - the attribute the app sets on every simple-view load. -->
+<link rel="stylesheet" href="./themes/classic.css">
+<link rel="stylesheet" href="./themes/paper.css">
+<link rel="stylesheet" href="./themes/graphite.css">
+<link rel="stylesheet" href="./themes/midnight.css">
+<link rel="stylesheet" href="./themes/terminal.css">
 <link rel="stylesheet" href="./app.css">
 </head>
 <body>
@@ -339,6 +377,12 @@ try{
 <div class="ov" id="ov"><div class="inner" id="ovBody"></div></div>
 <div class="toast" id="toast">saved</div>
 
+<!-- HT-32 N4: the mirror registry, BEFORE app.js because Settings draws its picker from it.
+     It is a declaration, not code - one object literal, strict JSON, read by the browser here
+     and by `ht_renderers` in the container. Adding a renderer is an edit to that file and a
+     module, and nothing else: that is N4's claim, and `golden_ht32` S8 proves it by adding a
+     row to the fixture's copy and watching this picker grow. -->
+<script src="./shared/mirrors.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 <script src="./app.js"></script>
 </body>

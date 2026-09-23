@@ -540,8 +540,15 @@ async def run_s5(pw):
             # words are "today · 7-day · 30-day completion and logged-days per member", and the
             # logged count is what makes a skipped day visible once an empty day counts as 0%
             # (Ruling 1). The floor stays "one row per member, always visible, no scorecard".
+            # ---- AMENDED BY HT-32 S3.7 (CC HT 2026-09-23) - SIX COLUMNS NOW ----
+            # member . today . 7 days . 30 days . NEED . logged. Cory, 9/22: "a metric ... what
+            # percentage you have to hit each day to get to 80%", and S3.7 puts it "as a column in
+            # GROUP" beside the header tile that carries the same number from the same scorer.
+            # The FLOOR this check exists to hold is untouched: GROUP on the surface, always
+            # visible, one row per member, zero scorecards. Only the count moved, and it moved
+            # because the paste asked for a column.
             m['exists'] and m['visible'] and m['visibleScorecards'] == 0
-            and m['memberRows'] >= 2 and m['metricCols'] == 5
+            and m['memberRows'] >= 2 and m['metricCols'] == 6
             and 'GROUP' in m['heading'],
             [m['exists'], m['visible'], m['visibleScorecards'], m['memberRows'],
              m['metricCols'], m['heading'][:30]])

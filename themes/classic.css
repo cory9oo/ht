@@ -1,0 +1,31 @@
+/* CLASSIC — today's look, untouched. HT-32 S6.13: "Classic (today's look, untouched)".
+
+   These are `tokens.css` §4's `[data-simple]` mapping RESOLVED through the --ht-* palette, so the
+   shipped instrument is colour-identical to what HT-31 left. The mapping MOVED here; it is not
+   copied (R70.282, one address). `[data-simple]` is named beside `[data-theme="classic"]` so that a
+   load with no theme yet — or with JavaScript off — still renders today's look rather than a flash
+   of something else. THIS FILE IS LINKED FIRST: every other theme must be able to beat that
+   attribute, and at equal specificity the later file wins.
+
+   ONE DISCLOSED CHANGE to "untouched": --bad was #D9483B, which measures 4.18:1 on --sunk — under
+   the 4.5:1 floor tokens.css §5 sets for itself. Nudged the least that clears it on all three
+   backgrounds (4.52 sunk / 4.73 sheet / 4.98 ground). Arithmetic, not taste; tokens.css quieted
+   `done` for exactly the same reason. Revert by putting #D9483B back on this one line. */
+:root[data-theme="classic"],
+:root[data-simple]{
+  --ground:#0A0C10; --sheet:#10131A; --sunk:#141821; --sel:#141821;
+  --rule:#1C212B;   --rule2:#4F5866;
+  --ink:#D6DCE6;    --ink2:#7C8798;  --ink3:#4F5866;
+  --accent:#3FBF7F; --accent-ink:#0A0C10; --accent-wash:#141821;
+  --bad:#E34B3E;    --good:#3FBF7F;
+  --g0:#9B362E; --g1:#9B362E; --g2:#D9483B; --g3:#D9A441; --g4:#2C8058; --g5:#3FBF7F;
+  --st-todo:#D6DCE6; --st-done:#7FB79A; --st-late:#D4A85C; --st-skip:#7C8798; --st-notdue:#78818F;
+  --st-secured:#7FB79A; --st-ontrack:#8FB8D9; --st-atrisk:#D4A85C; --st-outofreach:#D98A80;
+  --sb-thumb:rgba(124,135,152,.35); --sb-thumb-hover:rgba(124,135,152,1);
+  /* the four names the simple view's own rules still read by their old spelling */
+  --panel:#10131A; --panel-2:#141821; --line:#1C212B; --dim:#4F5866; --accent-red:#D9483B;
+  /* tells the browser which way to draw what it owns - form controls, the default
+     scrollbar before our own tokens reach it, and the text caret. A light theme that
+     does not say so gets dark-drawn native widgets on a paper ground. */
+  color-scheme:dark;
+}

@@ -1,0 +1,28 @@
+/* PAPER — light, warm greys, INK accent. Descended from `tokens.css` §3's `statement`, whose
+   selector is named beside the new one so an old preference still resolves.
+
+   `statement`'s accent was #B0161C, a red; S6.13 says "ink accent" and the repo says red is state
+   only, so the accent IS the ink and the red stays on --bad.
+
+   The bare `:root` is a FLOOR, not a default: at specificity (0,1,0) it loses to every
+   `[data-theme]`, `[data-simple]` and `[data-skin]` block regardless of file order, so it only ever
+   renders when nothing at all has been chosen — which is what `tokens.css` §3's bare `:root` used
+   to do for `statement`, preserved rather than dropped. */
+:root,
+:root[data-theme="paper"],
+:root[data-skin="statement"]{
+  --ground:#F4F3EF; --sheet:#FCFCFA; --sunk:#EDECE6; --sel:#E9E7DF;
+  --rule:#DBD9D1;   --rule2:#B4B0A4;
+  --ink:#14161A;    --ink2:#55595F;  --ink3:#83878E;
+  --accent:#2F3338; --accent-ink:#FCFCFA; --accent-wash:#E4E2DA;
+  --bad:#9C1319;    --good:#175C40;
+  --g0:#E7DCDA; --g1:#C9A9A6; --g2:#A97C78; --g3:#8A4F4C; --g4:#9C1319; --g5:#6B0D11;
+  --st-todo:#14161A; --st-done:#175C40; --st-late:#6E4A12; --st-skip:#55595F; --st-notdue:#65686F;
+  --st-secured:#175C40; --st-ontrack:#1C4F75; --st-atrisk:#6E4A12; --st-outofreach:#9C1319;
+  --sb-thumb:rgba(85,89,95,.35); --sb-thumb-hover:rgba(85,89,95,1);
+  --panel:#FCFCFA; --panel-2:#EDECE6; --line:#DBD9D1; --dim:#83878E; --accent-red:#9C1319;
+  /* tells the browser which way to draw what it owns - form controls, the default
+     scrollbar before our own tokens reach it, and the text caret. A light theme that
+     does not say so gets dark-drawn native widgets on a paper ground. */
+  color-scheme:light;
+}

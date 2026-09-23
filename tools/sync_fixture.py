@@ -54,7 +54,17 @@ def fixture_dir(estate):
 DST = fixture_dir(find_estate(SRC))
 # HT-31 S0.3: `version.json` joins the copy list. It is how a running build learns it is behind,
 # so a fixture without it cannot exercise the self-update at all.
-COPY = ['app.js', 'app.css', 'tokens.css', 'manifest.webmanifest', 'version.json']
+# HT-32 S6: the five theme files join the copy list. `tokens.css` alone no longer carries a single
+# skin - they MOVED to `themes/` - so a fixture without them renders every screen with NO resolved
+# --ground, --ink or --accent at all. That is not a subtle drift: it is a blank instrument, and the
+# goldens that measure colour would have been measuring the absence of one.
+COPY = ['app.js', 'app.css', 'tokens.css', 'manifest.webmanifest', 'version.json',
+        'themes/classic.css', 'themes/paper.css', 'themes/graphite.css',
+        'themes/midnight.css', 'themes/terminal.css',
+        # HT-32 N4: the mirror registry is a declaration the PAGE reads at run time, so a fixture
+        # without it has a Settings picker with nothing in it - and the test that proves a renderer
+        # can be added by config alone would have had no config to add it to.
+        'shared/mirrors.js']
 
 FONT_LINE = re.compile(
     r'^<link rel="(?:preconnect|stylesheet)" href="https://fonts\.(?:googleapis|gstatic)\.com.*$',
@@ -94,6 +104,9 @@ def main():
     drift = []
     for name in COPY:
         a, b = os.path.join(SRC, name), os.path.join(DST, name)
+        d = os.path.dirname(b)
+        if d and not os.path.isdir(d):
+            os.makedirs(d)          # `themes/` does not exist in a fixture that predates HT-32
         want = read(a)
         have = read(b) if os.path.exists(b) else None
         if want != have:

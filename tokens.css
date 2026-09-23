@@ -120,117 +120,28 @@
 }
 
 /* ==========================================================================
-   3 · THE FOUR INSTRUMENT SKINS — moved from theme.css, values unchanged.
-   No glass. No blur. No glow. No gradients. No rounded cards. Hairlines and
-   whitespace do all the structuring. One accent. Only the grade ramp carries hue.
+   3 · THE SKINS MOVED OUT — HT-32 S6. This section used to declare four instrument
+   skins (`statement` · `carbon` · `terminal` · `blueprint`) and, below them, the
+   `[data-simple]` mapping that is the shipped instrument.
+
+   ALL FIVE NOW LIVE IN `themes/`, one file each, and they are MOVED, not copied:
+
+       themes/classic.css    <- the `[data-simple]` mapping, resolved   (Classic)
+       themes/graphite.css   <- `carbon`, de-redded                     (Graphite, default)
+       themes/midnight.css   <- `blueprint`                             (Midnight)
+       themes/paper.css      <- `statement`, accent is now the ink      (Paper)
+       themes/terminal.css   <- `terminal`, kept and NOT offered        (R70.138)
+
+   This file keeps only what every theme shares: §1 the `--ht-*` source palette, §2 the
+   legacy name mapping, §5/§6/§7 the state, scrollbar and week-state defaults a theme
+   may override but need not restate.
+
+   WHY THE SECTION IS NOT SIMPLY DELETED: R70.282, quoted at the top of this file —
+   "two colour files is two addresses". Leaving the skins here AND adding `themes/`
+   would have created the second address the whole token exercise exists to remove,
+   and left eight skins where S6.13 asks for four. `themes/README.md` carries the
+   rest, including why `classic.css` must stay the FIRST stylesheet linked.
    ========================================================================== */
-
-/* ---------- STATEMENT (default) — an institutional document ---------- */
-:root,
-:root[data-skin="statement"]{
-  --ground:#F4F3EF;
-  --sheet:#FCFCFA;
-  --sunk:#EDECE6;
-  --rule:#DBD9D1;
-  --rule2:#C2BFB4;
-  --ink:#14161A;
-  --ink2:#5C6068;
-  --ink3:#93979F;
-  --accent:#B0161C;
-  --accent-ink:#FFFFFF;
-  --accent-wash:#F7E3E3;
-  --sel:#E9E7DF;
-  --bad:#B0161C; --good:#1B6B4A;
-  --g0:#E7DCDA; --g1:#DCC0BD; --g2:#CE9B98; --g3:#C0716F; --g4:#B0161C; --g5:#7C0F14;
-}
-
-/* ---------- CARBON — near-black, white ink, one red ---------- */
-:root[data-skin="carbon"]{
-  --ground:#0A0A0B;
-  --sheet:#0F1012;
-  --sunk:#151619;
-  --rule:#25272C;
-  --rule2:#3A3D45;
-  --ink:#F2F3F5;
-  --ink2:#9BA0A8;
-  --ink3:#5F646D;
-  --accent:#FF3B41;
-  --accent-ink:#0A0A0B;
-  --accent-wash:#2A1113;
-  --sel:#1A1C20;
-  --bad:#FF3B41; --good:#3DDC97;
-  --g0:#2A1416; --g1:#4A181C; --g2:#7A2126; --g3:#B22B31; --g4:#FF3B41; --g5:#FF8A8E;
-}
-
-/* ---------- TERMINAL — black, phosphor amber ---------- */
-:root[data-skin="terminal"]{
-  --ground:#050505;
-  --sheet:#0A0A08;
-  --sunk:#101009;
-  --rule:#232112;
-  --rule2:#3A3517;
-  --ink:#F5C542;
-  --ink2:#A8863A;
-  --ink3:#6B5628;
-  --accent:#FF7A18;
-  --accent-ink:#050505;
-  --accent-wash:#2A1608;
-  --sel:#171509;
-  --bad:#FF4A2B; --good:#8FE04A;
-  --g0:#2A1D06; --g1:#4A320A; --g2:#7A5210; --g3:#B07518; --g4:#FF7A18; --g5:#FFB65E;
-}
-
-/* ---------- BLUEPRINT — deep navy, cyan ---------- */
-:root[data-skin="blueprint"]{
-  --ground:#070C14;
-  --sheet:#0B1220;
-  --sunk:#0F1929;
-  --rule:#1B2942;
-  --rule2:#2A3D5C;
-  --ink:#E6EDF7;
-  --ink2:#8FA3BF;
-  --ink3:#5A6C87;
-  --accent:#28D3F0;
-  --accent-ink:#04121A;
-  --accent-wash:#0B2C36;
-  --sel:#132133;
-  --bad:#FF5470; --good:#3DE0B0;
-  --g0:#0E2C34; --g1:#12414E; --g2:#175A6C; --g3:#1C7E96; --g4:#28D3F0; --g5:#8AEBFA;
-}
-
-/* ==========================================================================
-   4 · THE MAPPING (R-THEME) — the shipped instrument.
-   Every earlier layer's token is re-pointed at the palette, so five layers of
-   components inherit it without one of them being edited. `--g1 … --g5` carry
-   the ramp in the order the ramp is defined, which is why `gfill()` and every
-   `var(--gN)` already in the tree resolve to a ramp token.
-   Unlogged is `--surface` and never a ramp colour — an unlogged day must not
-   read as a bad day.
-   ========================================================================== */
-:root[data-simple]{
-  --ground:var(--ht-ground);
-  --panel:var(--ht-panel);
-  --panel-2:var(--ht-panel-2);
-  --line:var(--ht-line);
-  --dim:var(--ht-dim);
-  --accent-red:var(--ht-red);
-
-  --sheet:var(--ht-panel);
-  --sunk:var(--ht-panel-2);
-  --rule:var(--ht-line);
-  --rule2:var(--ht-dim);
-  --ink:var(--ht-text);
-  --ink2:var(--ht-muted);
-  --ink3:var(--ht-dim);
-  --accent:var(--ht-green);          /* a check-off is a positive signal; red is reserved for state */
-  --accent-ink:var(--ht-ground);
-  --accent-wash:var(--ht-panel-2);
-  --sel:var(--ht-panel-2);
-  --bad:var(--ht-red);
-  --good:var(--ht-green);
-  --g0:var(--ht-ramp-0); --g1:var(--ht-ramp-0); --g2:var(--ht-ramp-1);
-  --g3:var(--ht-ramp-2); --g4:var(--ht-ramp-3); --g5:var(--ht-ramp-4);
-}
 
 /* ---------------------------------------------------------------------------
    5 · HT-25 S4 · THE FIVE COMPLETION STATES. Cory: "revamp the coloring for the

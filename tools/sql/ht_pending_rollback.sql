@@ -5,6 +5,9 @@
 -- was applied would drop a column another one still depends on. Run the whole file, or lift out the
 -- one block you want - each is complete on its own.
 
+-- ---- undo of 2026-09-23_ht32.sql ----------------------------------------------------------
+-- 2026-09-23_ht32.sql carries no UNDO block of its own.
+
 -- ---- undo of 2026-09-22_ht31.sql ----------------------------------------------------------
 -- The column holds one group's answer to one question and the function reveals a name and a count;
 -- dropping either loses nothing else, and the app falls back to "any member may invite" and to the

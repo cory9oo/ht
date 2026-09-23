@@ -31,7 +31,10 @@ var WD    = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
 var WD2   = ['S','M','T','W','T','F','S'];
 var MO    = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 var GRADE = [[97,'A+',5],[90,'A',4],[80,'B',3],[70,'C',2],[60,'D',1],[0,'F',0]];
-var SKINS = ['statement','carbon','terminal','blueprint'];
+/* HT-22's `SKINS` list is RETIRED by HT-32 S6: the four raw skin names it held are now the keys of
+   `SKIN2THEME` below, which is live code rather than a second list to keep in step. Nothing reads a
+   raw skin name any more; the old `data-skin` VALUES still resolve in CSS, which is what actually
+   had to be preserved (`themes/README.md`). */
 /* KPI BAND config — lead measures are DERIVED from GOAL MATH (x32), never hand-picked,
    and HELD by R35.7 until GOAL_MATH.md locks. Ships dark; hard-codes no trio. */
 var HT_KPI = { enabled:false, source:'GOAL_MATH.md — not yet locked', measures:[] };
@@ -153,24 +156,148 @@ function toast(t){ var n=el('toast'); n.textContent=t; n.classList.add('on');
    The retired names and the exact regex are in the HT-20 receipt; they are not kept here,
    because a retired identifier left in the source is the thing a later wire grep-restores. */
 function nameOf(n){ return String(n==null?'':n); }
-function skin(s){
-  if(SKINS.indexOf(s)<0) s='statement';
-  document.documentElement.setAttribute('data-skin',s);
-  try{ localStorage.setItem('st.skin',s); }catch(e){}
-  var m=document.querySelector('meta[name=theme-color]');
-  if(m) m.setAttribute('content', getComputedStyle(document.documentElement).getPropertyValue('--ground').trim()||'#F4F3EF');
-  paintSkins();
+/* ================== HT-32 S6 . THEMES - ONE PICKER, FOUR SKINS ==================
+   Cory, 9/22: "revamp all the fonting and the color ... noisy ... test out a few options" and
+   "the user should have an option to change their color scheme ... in the settings".
+
+   THE COLOURS ARE NOT HERE. They are `themes/*.css`, one file per theme, and this module only ever
+   sets one attribute on <html>. That is why `skinSwatch()`'s four hard-coded hexes are gone: a
+   swatch read from a literal in this file is a SECOND address for a colour (R70.282), and it drifts
+   the first time a theme file changes and nobody remembers this line exists. The swatch is read
+   from the value the browser actually resolved for that theme instead, so the two cannot disagree.
+
+   READING A SWATCH DOES NOT FLASH. `themeSwatches()` sets the attribute, reads, and restores inside
+   ONE synchronous function; a browser paints between tasks, never in the middle of one, so nothing
+   reaches the screen. It is memoised anyway, because it forces four style recalculations.
+
+   `skin()` is KEPT as the name HT-22's advanced tray calls (R70.138 - hide, never delete): it maps
+   the four old `data-skin` values onto their descendants and delegates. The old values also still
+   resolve in CSS, because each theme file names its legacy selector beside the new one. */
+var THEMES = ['classic','graphite','midnight','paper'];          /* offered, in picker order */
+var THEME_ALL = THEMES.concat(['terminal']);                     /* terminal is kept, not offered */
+/* READ, NOT DECLARED. index.html's pre-paint script owns the default and publishes it here; this
+   file only needs to agree with it. The literal is the fallback for a page served without the
+   attribute, and `golden_ht32` S6 asserts the two spellings are the same word - because when they
+   were not, the page painted one theme and app.js changed it a tick later, and no test saw it. */
+var THEME_DEFAULT = (function(){
+  try{ return document.documentElement.getAttribute('data-theme-default') || 'graphite'; }
+  catch(e){ return 'graphite'; }
+})();
+var THEME_LABEL = { classic:'Classic', graphite:'Graphite', midnight:'Midnight', paper:'Paper',
+                    terminal:'Terminal', system:'Follow system' };
+var THEME_NOTE = { classic:"today's look", graphite:'near-black, cool greys',
+                   midnight:'deep navy, cyan', paper:'light, warm greys' };
+/* EXTRA-1 (S6.14): "follow system light/dark" is a PAIR, not a fifth palette. */
+var THEME_LIGHT = 'paper', THEME_DARK = 'graphite';
+var SKIN2THEME = { statement:'paper', carbon:'graphite', blueprint:'midnight', terminal:'terminal' };
+
+function themePref(){ try{ return localStorage.getItem('ht_theme') || THEME_DEFAULT; }catch(e){ return THEME_DEFAULT; } }
+function themeFollowsSystem(){ return themePref()==='system'; }
+function systemIsLight(){
+  try{ return !!(window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches); }catch(e){ return false; }
 }
+/* the theme actually ON the element right now - the one a swatch or a screenshot is about */
+function themeNow(){ return document.documentElement.getAttribute('data-theme') || THEME_DEFAULT; }
+/* the theme a preference RESOLVES to. `system` is the only one where those two differ. */
+function themeResolve(t){
+  if(t==='system') return systemIsLight() ? THEME_LIGHT : THEME_DARK;
+  return THEME_ALL.indexOf(t)<0 ? THEME_DEFAULT : t;
+}
+
+var _themeSwatch = null;
+function themeSwatches(){
+  if(_themeSwatch) return _themeSwatch;
+  var root=document.documentElement, was=root.getAttribute('data-theme'), out={};
+  THEME_ALL.forEach(function(t){
+    root.setAttribute('data-theme',t);
+    var cs=getComputedStyle(root);
+    out[t] = { ground:cs.getPropertyValue('--ground').trim(),
+               ink:cs.getPropertyValue('--ink').trim(),
+               accent:cs.getPropertyValue('--accent').trim() };
+  });
+  if(was===null) root.removeAttribute('data-theme'); else root.setAttribute('data-theme',was);
+  _themeSwatch = out; return out;
+}
+
+/* Apply only - no persistence, no network. `applyTheme` is what the system-preference listener and
+   the database reconcile both call, so neither of them can accidentally write a preference back. */
+function applyTheme(t){
+  var r = themeResolve(t);
+  document.documentElement.setAttribute('data-theme', r);
+  if(t==='system') document.documentElement.setAttribute('data-theme-follow','1');
+  else document.documentElement.removeAttribute('data-theme-follow');
+  /* <meta name=theme-color> cannot hold a var(), so it is the one place a colour is copied - and it
+     is copied from what the browser resolved, never typed. It paints the iOS status bar and the
+     Android task-switcher card; left behind, the phone frames a dark app in a light chrome. */
+  var m=document.querySelector('meta[name=theme-color]');
+  if(m){ var g=getComputedStyle(document.documentElement).getPropertyValue('--ground').trim(); if(g) m.setAttribute('content', g); }
+  paintSkins(); paintAppearance();
+  return r;
+}
+
+/* THE PICKER'S ONE WRITE PATH. Local first and synchronously, because the pre-paint script in
+   index.html reads exactly this key and a theme that is only in the database flashes on every load.
+   The database write is best-effort and never blocks the switch: the column may not exist yet
+   (its migration is in tools/sql/ht_pending.sql), and the app must work before and after it lands -
+   the same contract `cue`, `target_age` and `closed_at` are held to. */
+function setTheme(t){
+  if(t!=='system' && THEME_ALL.indexOf(t)<0) t = THEME_DEFAULT;
+  try{ localStorage.setItem('ht_theme', t); }catch(e){}
+  try{ localStorage.setItem('st.skin', t); }catch(e){}   /* HT-22's key, kept so nothing downstream breaks */
+  var r = applyTheme(t);
+  if(window.sb && typeof S!=='undefined' && S && S.me && S.me.id){
+    try{
+      var q = sb.from('profiles').update({ theme:t }).eq('id',S.me.id);
+      if(q && q.then) q.then(function(res){
+        /* silent is the failure this app has been bitten by twice (HT-29 S3). A refusal here is not
+           worth a toast - the choice already applied and persisted locally - but it IS worth a line. */
+        if(res && res.error && typeof warn29==='function') warn29('theme not saved to profile', res.error);
+      }, function(){});
+    }catch(e){}
+  }
+  return r;
+}
+
+/* HT-22's advanced tray. Kept, and now painted from the theme files rather than from a literal. */
+function skin(s){ return setTheme(SKIN2THEME[s] || s); }
 function paintSkins(){
-  var cur=document.documentElement.getAttribute('data-skin')||'statement';
-  el('skins').innerHTML = SKINS.map(function(s){
-    return '<button class="sw" data-skin="'+s+'" aria-pressed="'+(s===cur)+'" title="'+s+'" '+
-      'style="background:'+skinSwatch(s)+'"></button>';
+  var host = el('skins'); if(!host) return;          /* the tray is hidden in the simple view */
+  var cur = themeNow(), sw = themeSwatches();
+  host.innerHTML = THEMES.map(function(t){
+    return '<button class="sw" data-skin2="'+t+'" aria-pressed="'+(t===cur)+'" title="'+THEME_LABEL[t]+'" '+
+      'style="background:'+sw[t].ground+'"></button>';
   }).join('');
 }
-function skinSwatch(s){
-  return { statement:'#F4F3EF', carbon:'#0F1012', terminal:'#0A0A08', blueprint:'#0B1220' }[s];
+
+/* Settings -> Appearance. Re-rendered in place so the pressed state is never stale. */
+function paintAppearance(){
+  var host = el('thPick'); if(!host) return;
+  var pref = themePref(), cur = themeNow(), sw = themeSwatches();
+  host.innerHTML = THEMES.map(function(t){
+    var on = (pref===t);
+    return '<button class="tbtn th'+(on?' on':'')+'" data-theme-pick="'+t+'" aria-pressed="'+on+'">'+
+      '<span class="thsw" style="background:'+sw[t].ground+';border-color:'+sw[t].ink+'">'+
+        '<i style="background:'+sw[t].accent+'"></i></span>'+
+      '<span class="thnm">'+THEME_LABEL[t]+'</span>'+
+      '<span class="thno">'+THEME_NOTE[t]+'</span></button>';
+  }).join('') +
+  '<button class="tbtn th'+(pref==='system'?' on':'')+'" data-theme-pick="system" aria-pressed="'+(pref==='system')+'">'+
+    '<span class="thsw" style="background:'+sw[THEME_LIGHT].ground+';border-color:'+sw[THEME_DARK].ground+'">'+
+      '<i style="background:'+sw[THEME_DARK].ground+'"></i></span>'+
+    '<span class="thnm">'+THEME_LABEL.system+'</span>'+
+    '<span class="thno">'+THEME_LABEL[THEME_LIGHT].toLowerCase()+' by day, '+THEME_LABEL[THEME_DARK].toLowerCase()+' by night</span></button>';
+  if(cur!==themeResolve(pref)) applyTheme(pref);      /* self-heal if something else moved the attribute */
 }
+
+/* The OS switching light/dark mid-session only matters to someone who asked to follow it. */
+(function(){
+  try{
+    var mq = window.matchMedia && window.matchMedia('(prefers-color-scheme: light)');
+    if(!mq) return;
+    var onch = function(){ if(themeFollowsSystem()) applyTheme('system'); };
+    if(mq.addEventListener) mq.addEventListener('change', onch); else if(mq.addListener) mq.addListener(onch);
+  }catch(e){}
+})();
 
 /* ============================ selectors ============================ */
 /* ---- HT-24 C1 . THE CADENCE GRAMMAR, EXTENDED RATHER THAN A NEW COLUMN --------------------
@@ -473,7 +600,15 @@ async function load(){
      as failed, and the sync layer reloads. A real missing column is `42703 column ... does not exist`. */
   var netDrop=false;
   function netShaped(e){ return !!e && (navigator.onLine===false || /fetch|network|load failed|timed? ?out/i.test(String(e.message||e))); }
-  var p  = await sb.from('profiles').select('id,display_name,handle').eq('id',uid).maybeSingle();
+  /* HT-32 S6.14: `theme` is the cross-device copy of the picker. Probed widest-first and stepped
+     down exactly like `cue` / `target_age` / `closed_at`, so this build works before and after its
+     migration lands. localStorage stays the pre-paint source of truth; the database only ever
+     TEACHES a new device what was chosen on an old one. */
+  var p  = await sb.from('profiles').select('id,display_name,handle,theme,mirror,report_hour,timezone').eq('id',uid).maybeSingle();
+  if(p.error && !netShaped(p.error)){
+    S.hasThemeCol=false;
+    p = await sb.from('profiles').select('id,display_name,handle').eq('id',uid).maybeSingle();
+  } else if(!p.error){ S.hasThemeCol=true; }
   /* HT-13 B1: `target_age` is optional until its migration lands. Probe widest first, then step
      down — the same contract as habits.cue and day_private.predict / brain_dump. */
   if(netShaped(p.error)) netDrop=true;
@@ -483,6 +618,15 @@ async function load(){
   } else { S.hasTargetAge=true; }
   S.me = p.data || { id:uid, display_name:(u.email||'').split('@')[0], handle:null };
   S.me.id = uid; S.me.email = u.email;
+  /* A NEW DEVICE ADOPTS THE CHOICE; AN OLD ONE KEEPS ITS OWN. `ht_theme` absent means this browser
+     has never been told, so the database is the only thing that knows - adopt it. Present means a
+     human chose here, and a remote value must not silently override a local act. */
+  try{
+    if(S.me.theme && !localStorage.getItem('ht_theme')){
+      localStorage.setItem('ht_theme', S.me.theme);
+      applyTheme(S.me.theme);
+    }
+  }catch(e){}
   S.priv0 = pp.data || {};
 
   /* `cue` may not exist yet (its migration is Cory's to run). Probe, then degrade —
@@ -576,8 +720,118 @@ function loadPriv(){ S.priv = S.privAll[S.date] || null; return Promise.resolve(
 var saveT=null;
 function queueSave(){ clearTimeout(saveT); saveT=setTimeout(saveDay,450); }
 
+/* ================ HT-32 N3 . NOTHING TO SAVE. IT SAVES AS YOU TYPE. ================
+   Cory, 9/22 ~16:00: "I don't wanna have to click save - it should just auto save after I type it
+   on my phone or on the laptop, and it should be a sync either direction."
+
+   MOST OF THIS WAS ALREADY TRUE and saying so is the honest start: the three journal fields have
+   autosaved on a debounce since HT-22, and HT-28c already queues an offline edit and replays it.
+   N3 names the three places that were NOT true, and they are all the same shape - a person stops
+   typing in a way the debounce does not count as stopping:
+
+     1. THE TAB CLOSES MID-DEBOUNCE. Up to `HT32_SAVE_MS` of typing was in a timer and nowhere
+        else. `visibilitychange` and `pagehide` now flush it, and the flush uses `keepalive` so the
+        request outlives the document - an ordinary fetch is cancelled when the page goes away,
+        which is precisely when this one matters.
+     2. BLUR WAS NOT A SAVE. Tapping from the journal into the rating row left the last word in a
+        timer. Now leaving a field ends its debounce.
+     3. IT SAID "saved" IN A TOAST. A toast is a thing that appears over the page for something
+        that matters; "your keystroke was persisted" is not that, and after the fortieth one it is
+        noise. It is a WHISPER in the field's own corner now: `saved · 9:41 PM`, and it fades.
+
+   ONE FUNCTION FOR EVERY FIELD. `htSaveNow(why)` is the only flush, so the timer, the blur, the
+   pagehide and the sync layer cannot disagree about what "save" means. A second flush path is how
+   two savers come to race over one row.
+
+   THERE IS NO SAVE BUTTON, and `golden_ht32` S7 asserts that by SOURCE SCAN rather than by promise.
+   A control that navigates (Done, Close) stays - it saves nothing new, which is the point. */
+var HT32_SAVE_MS = 800;                 /* N3's number */
+var HT32_WHISPER_MS = 2600;
+
 var pvT=null;
-function queuePriv(){ clearTimeout(pvT); pvT=setTimeout(savePriv,700); }
+function queuePriv(){ clearTimeout(pvT); pvT=setTimeout(function(){ htSaveNow('typing'); }, HT32_SAVE_MS); }
+
+/* THE ONE FLUSH. Everything that can end a debounce calls this and nothing calls `savePriv`
+   directly any more, so "saved" means exactly one thing. */
+function htSaveNow(why){
+  clearTimeout(pvT); pvT=null;
+  try{
+    var r = savePriv();
+    if(r && r.then) r.then(function(){ htWhisper('saved'); }, function(){ htWhisper('not saved'); });
+    else htWhisper('saved');
+    return r;
+  }catch(e){ htWhisper('not saved'); return null; }
+}
+
+/* THE WHISPER. It lives in the Journal heading's own corner - the element that already carried
+   "saves as you type" - so nothing new appears on the page and nothing covers it. */
+var _whT = null;
+function htWhisper(word){
+  var n = el('jrnC'); if(!n) return;
+  var t = new Date();
+  var h = t.getHours(), m = t.getMinutes();
+  var ampm = h >= 12 ? 'PM' : 'AM';
+  h = h % 12; if(!h) h = 12;
+  n.textContent = word + ' \u00b7 ' + h + ':' + (m < 10 ? '0' : '') + m + ' ' + ampm;
+  n.classList.add('h32whisper');
+  clearTimeout(_whT);
+  _whT = setTimeout(function(){
+    n.classList.remove('h32whisper');
+    /* back to the line that says what this field does, never to an empty corner */
+    var c = 0; var pv = S.priv || {};
+    ['brain_dump','tasks','prayer'].forEach(function(k){ if(pv[k]) c++; });
+    n.textContent = c ? c + ' of 3 written \u00b7 autosaves' : 'saves as you type';
+  }, HT32_WHISPER_MS);
+}
+
+/* A CLOSING TAB IS NOT A PAUSE. `pagehide` and a hidden `visibilitychange` are the last moments the
+   page is guaranteed to get, and on a phone they are how EVERY session ends - nobody closes a PWA,
+   they switch apps. `keepalive` is what makes a request survive the document that started it; the
+   supabase client does not offer it, so the flush is a direct POST to PostgREST with the same
+   payload shape `savePriv` upserts, and it is FIRE AND FORGET by design - there is nobody left to
+   tell. It runs only when a debounce is actually pending, so an ordinary app switch costs nothing. */
+function htFlushOnExit(){
+  if(!pvT) return;                                  /* nothing pending: no request, no cost */
+  clearTimeout(pvT); pvT = null;
+  var p = S.priv;
+  if(!p || !S.me || !S.me.id) return;
+  var row = { user_id:S.me.id, date:S.date, rating:(p.rating==null?null:p.rating),
+              why:p.why||'', tasks:p.tasks||'', prayer:p.prayer||'' };
+  if(S.hasDump) row.brain_dump = p.brain_dump||'';
+  try{
+    /* THE TOKEN IS CACHED, BECAUSE THERE IS NO TIME TO ASK FOR IT. `sb.auth.getSession()` is a
+       promise, and `pagehide` is the last synchronous moment this document gets - awaiting anything
+       there is awaiting after the page is gone. `S.__tok` is refreshed on every ordinary save (see
+       `savePriv`), which is exactly the path that has just run if anything is pending.
+       WITHOUT A USER TOKEN THIS WOULD BE REFUSED, not silently written: every table is behind row
+       level security and the publishable key carries no identity. So a missing token means the
+       flush does not happen, and the ordinary debounce - which has not been cleared in that case -
+       is what saves. Better a save that did not happen than a request that pretends. */
+    var key = (typeof SB_KEY !== 'undefined') ? SB_KEY : null;
+    var tok = S.__tok;
+    if(!key || !tok){ queuePriv(); return; }
+    fetch(SB_URL + '/rest/v1/day_private?on_conflict=user_id,date', {
+      method:'POST', keepalive:true,
+      headers:{ 'apikey':key, 'Authorization':'Bearer ' + tok,
+                'Content-Type':'application/json', 'Prefer':'resolution=merge-duplicates,return=minimal' },
+      body: JSON.stringify(row)
+    }).catch(function(){});
+  }catch(e){}
+}
+/* app.js is ONE SEALED CLOSURE (receipt 148's own lesson), so nothing inside it is reachable from a
+   test unless it is published - the same reason `__HT30UPD`, `__HT31UPD` and `__HT29INS` exist. This
+   publishes the one fact a test needs and nothing it could use to change behaviour: IS A SAVE
+   PENDING. A getter, not the timer. */
+window.__HT32SAVE = { pending: function(){ return !!pvT; }, flush: function(){ return htSaveNow('test'); } };
+(function(){
+  try{
+    window.addEventListener('pagehide', htFlushOnExit);
+    document.addEventListener('visibilitychange', function(){
+      if(document.visibilityState === 'hidden') htFlushOnExit();
+    });
+  }catch(e){}
+})();
+
 async function savePriv(){
   var p = S.priv || (S.priv={});
   p.date=S.date; p.user_id=S.me.id;
@@ -596,7 +850,17 @@ async function savePriv(){
   if(S.hasBed)    row.bed_time    = p.bed_time  || null;
   if(S.hasWake)   row.wake_time   = p.wake_time || null;
   var res = await sb.from('day_private').upsert(row,{ onConflict:'user_id,date' });
-  if(res.error) toast('note not saved'); else toast('saved');
+  /* HT-32 N3: refresh the cached access token on the path that has just proved it works. The exit
+     flush cannot await one, and a token read here is a token that was valid a keystroke ago. */
+  try{ if(sb.auth && sb.auth.getSession) sb.auth.getSession().then(function(g){
+        var t = g && g.data && g.data.session && g.data.session.access_token;
+        if(t) S.__tok = t; }, function(){}); }catch(e){}
+  /* HT-32 N3: NO TOAST FOR A KEYSTROKE. "The only UI is a quiet whisper `saved · 9:41 PM` in the
+     field's corner, never a button, never a toast." A toast is for something that needs the page's
+     attention; the fortieth "saved" of a paragraph is noise, and it covers the text being typed.
+     A FAILURE still speaks up - that one does need attention, and it is the case where saying
+     nothing would be the app pretending. */
+  if(res.error) toast('note not saved');
   var n=0; ['brain_dump','tasks','prayer'].forEach(function(k){ if(p[k]) n++; });
   el('jrnC').textContent = n? n+' of 3 written · autosaves' : 'saves as you type';
   paintRating(); paintRChart(); paintRScat(); paintRSleep(); paintRByMo(); paintJournal(); paintCal();
@@ -618,7 +882,7 @@ async function saveTomorrow(){
   if(res && res.error){ toast('tomorrow not saved'); return res; }
   var t = S.privAll[k] || (S.privAll[k]={ date:k, user_id:S.me.id });
   t.tomorrow_one_thing = v||null;
-  toast('saved');
+  htWhisper('saved');   /* HT-32 N3: a text field, so a whisper - the same rule as every other one */
   return res;
 }
 /* THE ONE THING IS A COMPLETION, so it is stored where every completion on a day is stored.
@@ -1714,14 +1978,43 @@ function openSettings(){
       '<button class="btn pri" id="edSave2">Save standards</button>'+
     '</div>'+
 
-    '<div class="sh"><h2>Look</h2><span class="ln"></span><span class="c">pick one</span></div>'+
-    '<div class="tools">'+SKINS.map(function(s){
-      return '<button class="tbtn" data-skin2="'+s+'">'+s+'</button>'; }).join('')+'</div>'+
+    /* HT-32 S6.14 - APPEARANCE. One picker, and it is the only one: the "Look" tray this replaced
+       listed the four RAW SKIN NAMES (`statement`, `carbon`, `blueprint`, `terminal`), which named
+       an implementation rather than a look and offered a fifth thing S6.13 does not ask for.
+       Painted by `paintAppearance()` after the overlay opens, because the swatches are read from
+       the browser's own resolved values and there is no element to read from until then. */
+    '<div class="sh"><h2>Appearance</h2><span class="ln"></span><span class="c">applies at once</span></div>'+
+    '<div class="thpick" id="thPick"></div>'+
+
+    /* HT-32 S4.10 - MY WEEK. Cory, 9/22: "rewards or punishments based off of completion ... under
+       80% ... held accountable" and "notifications ... once at the end of the day". Four things,
+       and they are together because they are one question: what this week is worth, and when the
+       day closes. No save button (N3) - all four autosave, and the whisper says when. */
+    '<div class="sh"><h2>My week</h2><span class="ln"></span><span class="c">target '+HT32_TARGET_PCT+'%</span></div>'+
+    '<label class="fld"><span class="lab">If I hit it · the group can see this</span>'+
+      '<input id="h32mw_rw" placeholder="the reward"></label>'+
+    '<label class="fld"><span class="lab">If I do not</span>'+
+      '<input id="h32mw_cs" placeholder="the consequence"></label>'+
+    '<label class="fld"><span class="lab">My day closes at</span>'+
+      '<select id="h32mw_hr">'+(function(){ var o=''; for(var h=0;h<24;h++){
+         var lab=(h%12||12)+':00 '+(h>=12?'PM':'AM');
+         o+='<option value="'+h+'">'+lab+'</option>'; } return o; })()+'</select></label>'+
+    '<div class="note" id="h32mw_tz" style="padding:2px 0 8px"></div>'+
+
+    /* N4 - WHERE MY JOURNAL MIRRORS. The list is `shared/mirrors.js` and NOTHING here names a
+       renderer: adding one is an edit to that file and a module, which is the whole claim N4 makes
+       and `golden_ht32` S8 proves by adding a row to the fixture's copy. */
+    '<div class="sh"><h2>My journal mirrors to</h2><span class="ln"></span><span class="c">your choice, per person</span></div>'+
+    '<div class="thpick" id="h32mir"></div>'+
+    '<div class="note" id="h32mirn" style="padding:2px 0 8px"></div>'+
 
     '<div class="sh"><h2>You</h2><span class="ln"></span><span class="c">'+esc(S.me.email||'')+'</span></div>'+
+    /* HT-32 N3: NO SAVE BUTTON. These two fields are text and a date, and they now autosave on the
+       same debounce as everything else - "Save profile" only ever saved text, which is exactly the
+       control N3 retires. The whisper says when. */
     '<label class="fld"><span class="lab">Display name</span><input id="pName" value="'+esc(S.me.display_name||'')+'"></label>'+
     '<label class="fld"><span class="lab">Birthday · powers the life grid</span><input id="pBirth" type="date" value="'+esc((S.priv0&&S.priv0.birth_date)||'')+'"></label>'+
-    '<div class="tools"><button class="btn" id="pSave">Save profile</button></div>'+
+    '<div class="note" id="pSaved" style="padding:2px 0 10px">saves as you type</div>'+
 
     '<div class="sh"><h2>Take it with you</h2><span class="ln"></span><span class="c">outputs</span></div>'+
     '<div class="tools">'+
@@ -1753,7 +2046,25 @@ function openSettings(){
     };
     el('edAdd').onclick=add; el('edAdd2').onclick=add;
     el('edSave').onclick=saveStandards; el('edSave2').onclick=saveStandards;
-    el('pSave').onclick=saveProfile;
+    /* the same debounce, the same whisper, no button (N3). `saveProfile` is unchanged and is still
+       the one writer - what went is the requirement that a person press something. */
+    (function(){
+      var pT=null, note=el('pSaved');
+      function say(w){ if(note) note.textContent = w; }
+      function arm(){ clearTimeout(pT); say('saving\u2026'); pT=setTimeout(go, HT32_SAVE_MS); }
+      function go(){ clearTimeout(pT); pT=null;
+        var r=saveProfile();
+        var t=new Date(), h=t.getHours(), m=t.getMinutes(), ap=h>=12?'PM':'AM';
+        h=h%12; if(!h) h=12;
+        var when='saved \u00b7 '+h+':'+(m<10?'0':'')+m+' '+ap;
+        if(r && r.then) r.then(function(){ say(when); }, function(){ say('not saved'); }); else say(when);
+      }
+      ['pName','pBirth'].forEach(function(id){
+        var n=el(id); if(!n) return;
+        n.addEventListener('input', arm);
+        n.addEventListener('blur', function(){ if(pT) go(); });
+      });
+    })();
     el('xCsv').onclick=function(){ dl('ht-days.csv', csvDays()); };
     el('xCsvH').onclick=function(){ dl('ht-standards.csv', csvHabits()); };
     el('xJson').onclick=function(){
@@ -1766,8 +2077,18 @@ function openSettings(){
     };
     el('xPrint').onclick=function(){ closeOv(); setTimeout(function(){ window.print(); },260); };
     el('bOut').onclick=async function(){ await sb.auth.signOut(); location.reload(); };
+    /* DELEGATED, not bound per button: `paintAppearance()` rewrites this container's innerHTML on
+       every switch, so handlers bound to the buttons themselves would be thrown away by the first
+       click and the second would do nothing. The container survives; the listener goes on it. */
+    paintAppearance();
+    HT32SET.paint();
+    var thHost = el('thPick');
+    if(thHost) thHost.addEventListener('click', function(e){
+      var b = e.target.closest('[data-theme-pick]'); if(!b) return;
+      setTheme(b.getAttribute('data-theme-pick'));
+    });
     Array.prototype.forEach.call(document.querySelectorAll('[data-skin2]'),function(b){
-      b.onclick=function(){ skin(b.getAttribute('data-skin2')); };
+      b.onclick=function(){ setTheme(b.getAttribute('data-skin2')); };
     });
   });
 }
@@ -1844,7 +2165,7 @@ async function saveProfile(){
   await sb.from('profile_private').upsert(rec,{onConflict:'id'});
   S.priv0=S.priv0||{}; S.priv0.birth_date=b;
   if(S.hasTargetAge && tn) S.priv0.target_age=t;
-  toast('profile saved'); paintLife();
+  paintLife();   /* HT-32 N3: the whisper beside the field says it, not a toast over the page */
   if(window.__HT13_REPAINT) window.__HT13_REPAINT();
 }
 
@@ -1973,8 +2294,11 @@ function goDay(k){
 
 /* ============================ events ============================ */
 function wire(){
-  el('skins').addEventListener('click',function(e){
-    var b=e.target.closest('[data-skin]'); if(b) skin(b.getAttribute('data-skin'));
+  /* the tray is painted with `data-skin2` now (theme names, not raw skin names), and it is only
+     rendered in the advanced view - so the container may legitimately be absent. */
+  var skinHost = el('skins');
+  if(skinHost) skinHost.addEventListener('click',function(e){
+    var b=e.target.closest('[data-skin2]'); if(b) setTheme(b.getAttribute('data-skin2'));
   });
   el('bSet').onclick=openSettings;
   var bv=el('bView'); if(bv) bv.onclick=toggleView;
@@ -2014,12 +2338,15 @@ function wire(){
   if(oneH) oneH.addEventListener('click',function(e){
     if(e.target.closest('[data-one]')) toggleOne(); });
 
+  /* HT-32 N3: input arms the debounce, BLUR ENDS IT. Tapping from the journal into the rating row
+     used to leave the last word sitting in a timer, and switching apps a moment later took it. */
   [['iWhy','why'],['iTasks','tasks'],['iPrayer','prayer']].forEach(function(p){
     var n=el(p[0]);
     n.addEventListener('input',function(){
       S.priv=S.priv||{}; S.priv[p[1]]=n.value; queuePriv();
-      el('jrnC').textContent='saving…';
+      el('jrnC').textContent='saving\u2026';
     });
+    n.addEventListener('blur',function(){ if(pvT) htSaveNow('blur'); });
   });
 
   /* month calendar */
@@ -2658,10 +2985,89 @@ function paintPredict(){
    arithmetic; the subtraction is simply never the headline. */
 function earned(k){ return committed() - remaining(k); }
 
+/* ============ HT-32 N6 . A CHART CARD FITS ONE PHONE SCREEN, WHOLE ============
+   Cory, 9/22 20:24, with a screenshot of THE YEAR at 390x844: "This needs to show the full chart and
+   its numberings for x and y".
+
+   THE DEFECT, named so it is not re-diagnosed: the card was TALLER THAN THE VIEWPORT, so its top -
+   the title, the 100 and 90 gridlines and their labels - sat under the status bar and the Dynamic
+   Island while the rest of it was in view. Nothing was missing from the DOM, which is why every
+   assertion about "the labels exist" passed. Existing and being visible are different claims, and
+   only the second one is the one he made.
+
+   THE RULE: title + y labels + plot + x labels <= viewport height - the tab bar - the safe-area
+   inset. THE PLOT SCALES; THE LABELS NEVER DROP. Dropping labels to fit is the other way to satisfy
+   an inequality and it is the one he complained about in the same sentence.
+
+   IT IS PUBLISHED AS A NUMBER, NOT APPLIED AS A STYLE. This measures and writes ONE custom property
+   (`--h32-cardmax`); `app.css` does the layout with it. A module that set heights on elements would
+   be a second layout engine racing the first, and the first one wins on a resize.
+
+   `100svh`, not `100vh`: on a phone `vh` is the height WITHOUT the browser chrome retracted, which
+   on iOS Safari is about 60px more than the page ever gets - so a `vh` budget overflows by exactly
+   the amount of the thing it was trying to avoid. `innerHeight` is measured here as well and the
+   SMALLER of the two is used, because a measurement and a unit disagreeing means one of them is
+   wrong about this device. */
+var HT32_CARDFIT = true;
+(function(){
+  if(!HT32_CARDFIT) return;
+  function px(v){ var n = parseFloat(v); return isFinite(n) ? n : 0; }
+  function inset(name){
+    /* env() cannot be read from JS. A one-off probe element that IS styled with it can.
+       `window.__H32_INSET` is a TEST SEAM, the same kind as `window.__MOCK_SB` at the top of this
+       file: a headless browser has no Dynamic Island, so `env(safe-area-inset-top)` is 0 there and
+       the whole rule would be measured against a device that never had the defect. The golden sets
+       59 - an iPhone 14 Pro's inset, which is the screenshot this came from. A phone sets nothing. */
+    if(name === 'safe-area-inset-top' && typeof window.__H32_INSET === 'number') return window.__H32_INSET;
+    try{
+      var d = document.createElement('div');
+      d.style.cssText = 'position:fixed;visibility:hidden;height:env(' + name + ',0px)';
+      document.documentElement.appendChild(d);
+      var h = d.getBoundingClientRect().height;
+      d.parentNode.removeChild(d);
+      return h || 0;
+    }catch(e){ return 0; }
+  }
+  function budget(){
+    var vh = window.innerHeight || 0;
+    try{
+      var probe = document.createElement('div');
+      probe.style.cssText = 'position:fixed;visibility:hidden;height:100svh';
+      document.documentElement.appendChild(probe);
+      var svh = probe.getBoundingClientRect().height;
+      probe.parentNode.removeChild(probe);
+      if(svh) vh = Math.min(vh || svh, svh);
+    }catch(e){}
+    if(!vh) return null;
+    var bar = 0, nav = document.getElementById('h29Bar');
+    if(nav && getComputedStyle(nav).display !== 'none') bar = nav.getBoundingClientRect().height;
+    var top = inset('safe-area-inset-top');
+    /* 24px is the card's own margin above and below (app.css `.h30c{margin:10px 0}` plus its
+       border), measured rather than guessed - a budget that forgets the gap overflows by the gap. */
+    return Math.max(180, Math.round(vh - bar - top - 24));
+  }
+  function apply(){
+    var n = budget();
+    if(n) document.documentElement.style.setProperty('--h32-cardmax', n + 'px');
+    if(window.__HT16 && window.__HT16.repaint){ try{ window.__HT16.repaint(); }catch(e){} }
+  }
+  var t = null;
+  function later(){ clearTimeout(t); t = setTimeout(apply, 120); }
+  if(document.readyState === 'loading') document.addEventListener('DOMContentLoaded', apply);
+  else apply();
+  window.addEventListener('resize', later);
+  window.addEventListener('orientationchange', later);
+  window.__HT32FIT = { budget: budget, apply: apply };
+})();
+
 /* ============================ boot ============================ */
 (async function boot(){
-  var s='carbon'; try{ s=localStorage.getItem('st.skin')||'carbon'; }catch(e){}   /* HT-9a R70.21b: dark is the default; the layer overrides a stored light preference */
-  skin(s);
+  /* HT-32 S6.14: boot APPLIES the preference, it does not WRITE one. The old line defaulted to
+     `carbon` and then called `skin()`, which persists - so a first load on a new device silently
+     wrote a preference nobody had chosen, and the picker's own default could never win. The theme
+     is already on <html> from index.html's pre-paint script; this call only re-derives it for the
+     `system` pair and repaints the two swatch trays. */
+  applyTheme(themePref());
   if(!(await load())) return;
   wire(); paintAll();
   if('serviceWorker' in navigator){
@@ -2723,11 +3129,21 @@ function earned(k){ return committed() - remaining(k); }
   }
   function q(s,r){ return Array.prototype.slice.call((r||document).querySelectorAll(s)); }
 
-  /* ---- 1 · the dark lock, through the app's own skin() so Advanced still shows it selected ---- */
+  /* ---- 1 · the dark lock, RETIRED AS A LOCK by HT-32 S6.14 (R70.138 - the function is kept) ----
+
+     What it used to do: in the simple view it FORCED `carbon`, twice, overriding whatever was
+     stored. That was right when there was no picker - HT-9a's job was to stop the app opening
+     light by accident. It is now the exact opposite of what S6.14 asks for: Cory picks a theme in
+     Settings, and this ran on every boot and took it back. The simple view is where he lives, so
+     the picker would have appeared to work and then silently reverted on the next load.
+
+     What replaces the guarantee: index.html sets `data-theme` BEFORE the stylesheets, and its
+     default is a dark theme. There is no window in which the app is unthemed, so there is nothing
+     left to lock. This now only re-applies the user's own preference if something stripped the
+     attribute - it never chooses a theme for them. */
   function lockSkin(){
-    if(advanced()) return;
-    try{ if(localStorage.getItem('st.skin')!=='carbon') skin('carbon'); }catch(e){ skin('carbon'); }
-    if(document.documentElement.getAttribute('data-skin')!=='carbon') skin('carbon');
+    if(document.documentElement.getAttribute('data-theme')) return;
+    applyTheme(themePref());
   }
 
   /* ---- 2 · structure: outputs out, inputs in order, CLOSE THE DAY last ---- */
@@ -2961,6 +3377,9 @@ function earned(k){ return committed() - remaining(k); }
     t.dataset.bound = '1';
     t.addEventListener('input', function(){
       S.priv = S.priv || {}; S.priv.brain_dump = t.value; grow(t); queuePriv();
+      /* the brain dump is the longest thing anyone types here, so it is the field with the most to
+         lose to a closed tab - it gets the same blur rule as the other three, bound once. */
+      if(!t.__h32blur){ t.__h32blur = true; t.addEventListener('blur', function(){ if(pvT) htSaveNow('blur'); }); }
     });
     ['iDump','iTasks','iPrayer','iWhy'].forEach(function(id){
       var n = document.getElementById(id); if(!n || n.dataset.blurred) return;
@@ -4822,7 +5241,18 @@ function earned(k){ return committed() - remaining(k); }
     Array.prototype.slice.call(panel.children).forEach(function(c){
       if(c.contains(svg)) return; used+=c.offsetHeight; });
     var h=panel.clientHeight-used-10;
-    return Math.max(dflt, Math.min(620, Math.round(h)));
+    /* HT-32 N6: the ceiling is the CARD BUDGET on a phone, not a fixed 620. A chart allowed to grow
+       to 620 inside an 844px screen is exactly how the card ended up taller than the viewport with
+       its title under the Dynamic Island. `--h32-cardmax` is published by HT32_CARDFIT; when it is
+       absent (a browser with no env() support, or before the first measure) the old 620 stands, so
+       this can only ever make a chart smaller than it was. */
+    var cap = 620;
+    try{
+      var v = getComputedStyle(document.documentElement).getPropertyValue('--h32-cardmax');
+      var n = parseFloat(v);
+      if(isFinite(n) && n > 0) cap = Math.min(cap, Math.round(n - 74));   /* title + x labels + pad */
+    }catch(e){}
+    return Math.max(140, Math.min(cap, Math.max(dflt, Math.round(h))));
   }
   function h16Chart(svgId, pts, opts){
     var svg=document.getElementById(svgId); if(!svg) return 0;
@@ -4865,13 +5295,26 @@ function earned(k){ return committed() - remaining(k); }
        it is a 1-10 rating, and the legend now carries `rating x10` instead.
        LABEL DENSITY IS MEASURED, NOT FIXED: every 10 when the chart has >=180px to give them, every
        20 below that. Eleven labels in an 84px band is a grey smear, not an axis. */
-    var labelStep = H >= 180 ? 10 : 20;
+    /* HT-32 N6: 0 - 25 - 50 - 75 - 100 ON THE PHONE, every 10 on the desktop. Eleven labels in a
+       390px-wide card is the grey smear the measured rule below already avoided at small heights;
+       Cory's complaint was the opposite one - that the top labels were not VISIBLE at all - and the
+       answer to that is a card that fits (see HT32_CARDFIT), not fewer labels. Five is what a phone
+       can read at a glance and it always includes the 100 he named. The gridlines stay every 10. */
+    /* GRIDLINES AND LABELS ARE TWO LISTS, NOT ONE LOOP WITH A MODULO.
+       They used to share the ten-step loop and pick labels with `v % labelStep`, which can only ever
+       select values the LOOP offers - so asking for 25 gave 0, 50 and 100, because 25 and 75 are not
+       multiples of ten and the loop never reached them. `golden_ht32` S9d caught it on its first
+       run. A list also states what the axis reads, which a modulo does not. */
+    var yLabels = (window.innerWidth <= 480) ? [0, 25, 50, 75, 100]
+                : (H >= 180 ? [0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100]
+                            : [0, 20, 40, 60, 80, 100]);
     for(var v=0; v<=100; v+=10){
       s+='<line class="ax'+(v===0?' ax0':'')+'" x1="'+L+'" y1="'+py(v).toFixed(1)+'" x2="'+(W-R)+
          '" y2="'+py(v).toFixed(1)+'"/>';
-      if(v%labelStep===0)
-        s+='<text class="ayl" x="'+(L-5)+'" y="'+(py(v)+3).toFixed(1)+'" text-anchor="end">'+v+'</text>';
     }
+    yLabels.forEach(function(v){
+      s+='<text class="ayl" x="'+(L-5)+'" y="'+(py(v)+3).toFixed(1)+'" text-anchor="end">'+v+'</text>';
+    });
     function runs(get){
       var out=[], cur=[];
       pts.forEach(function(p,i){ var val=get(p);
@@ -6665,8 +7108,29 @@ function earned(k){ return committed() - remaining(k); }
       ins.insertBefore(g, ins.firstChild);
       g.addEventListener('click', function(e){
         if(e.target.closest('[data-h18more]')) toggleDrawer();
+        /* HT-32: the new controls go FIRST and short-circuit. A stakes chip sits INSIDE a member's
+           row, and that row opens their day - so without this the tap would do both, and the day
+           sheet would cover the editor that had just opened behind it. */
+        if(HT32GRP.click(e)) return;
         HT29GRP.click(e);                                   /* HT-29 S3: a member's day, the invite, join */
       });
+      /* the group's pending rows and stakes are read once the circle id is known, and a repaint
+         follows so the table is drawn with them rather than drawn twice. */
+      if(!g.__h32load){
+        g.__h32load = true;
+        setTimeout(function(){
+          try{
+            var st = HT29GRP.state();
+            /* A REJECTION HANDLER, because the `try` around this catches nothing once the
+               promise exists: an async failure is not a synchronous throw. Without one a bad
+               load is an unhandled rejection - which every golden here counts as a page error,
+               while saying nothing at all about what failed. */
+            if(st && st.circle) HT32GRP.load(st.circle.id).then(function(){
+              if(typeof paintAll === 'function') paintAll();
+            }, function(err){ warn29('group extras did not load', err); });
+          }catch(e){}
+        }, 400);
+      }
     }
     /* HT-29 S3 (PASTE 133): ONE renderer for the member lines - this card, and Insights' group side by side.
        today · 7 days · 30 days · logged, Ruling 1's arithmetic, a tap opens a member's day. DETAIL is retired
@@ -8600,9 +9064,13 @@ function earned(k){ return committed() - remaining(k); }
   }
   /* what the original savePriv did after its write, for the row this layer wrote */
   function privTail(){
-    toast('saved');
+    /* HT-32 N3: THIS IS THE PATH A REAL DEVICE TAKES. It is a second copy of `savePriv`'s tail, and
+       it used to raise the toast N3 retires and then rewrite `#jrnC` - the element the whisper lives
+       in - so the whisper would have appeared and been overwritten a moment later by a count. One
+       call to `htWhisper` does both jobs: it says `saved · 9:41 PM` and it puts the count back
+       itself when it fades. */
+    htWhisper('saved');
     var p=S.priv||{}, n=0; ['brain_dump','tasks','prayer'].forEach(function(f){ if(p[f]) n++; });
-    var c=el('jrnC'); if(c) c.textContent = n ? n+' of 3 written \u00b7 autosaves' : 'saves as you type';
     try{ paintRating(); paintRChart(); paintRScat(); paintRSleep(); paintRByMo(); paintJournal(); paintCal(); }
     catch(e){ warn('repaint after save failed', e); }
   }
@@ -9258,6 +9726,481 @@ var HT29SEC = (function(){
    member's line simply does not open (hidden, never a broken door). */
 var HT29_GROUP_OLD = false;                       /* true brings back HT-18d's three-column card, untouched */
 function warn29(what, e){ try{ console.warn('HT-29: ' + what, e && (e.code || e.message || e)); }catch(x){} }
+/* ============ HT-32 S4.10 + N4 . THE SETTINGS A PERSON OWNS ABOUT THEIR OWN WEEK ============
+   Four fields and a picker, and every one of them is a thing N1's input-completeness rule says a
+   MEMBER must be able to change from their own phone with no help from Cory: what the week is worth
+   to them, when their day closes, what zone that is in, and where their journal mirrors.
+
+   THE TIMEZONE IS DETECTED AND SHOWN, NEVER ASKED (S4.10: "timezone auto-detected and shown"). A
+   person who has to pick their own timezone from a list of four hundred picks the wrong one, and
+   the browser already knows.
+
+   NO SAVE BUTTON, ANYWHERE (N3). Everything autosaves on the shared debounce.
+
+   THE MIRROR PICKER IS DRAWN FROM `shared/mirrors.js` AND NOTHING ELSE. There is no list of
+   renderers in this file - that is N4's requirement stated as code rather than as a promise, and
+   `golden_ht32` S8 adds a row to the fixture's copy of that file and watches this picker grow. */
+var HT32SET = (function(){
+  function tz(){
+    try{ return Intl.DateTimeFormat().resolvedOptions().timeZone || ''; }catch(e){ return ''; }
+  }
+  function mirrors(){
+    var m = window.HT_MIRRORS;
+    return (m && m.renderers) ? m.renderers : null;
+  }
+  function paintMirror(){
+    var host = el('h32mir'); if(!host) return;
+    var list = mirrors();
+    if(!list){
+      host.innerHTML = '';
+      var n0 = el('h32mirn');
+      if(n0) n0.textContent = 'The mirror list did not load.';
+      return;
+    }
+    var cur = (S.me && S.me.mirror) || (window.HT_MIRRORS && window.HT_MIRRORS['default']) || 'none';
+    host.innerHTML = list.map(function(r){
+      var on = (r.key === cur);
+      var wall = (r.available === false);
+      return '<button class="tbtn th' + (on ? ' on' : '') + '" data-h32mir="' + esc(r.key) + '" ' +
+        'aria-pressed="' + on + '">' +
+        '<span class="thnm">' + esc(r.label || r.key) + '</span>' +
+        '<span class="thno">' + esc(r.note || '') + (wall ? ' \u00b7 not yet' : '') + '</span></button>';
+    }).join('');
+    var note = el('h32mirn');
+    if(note){
+      var hit = list.filter(function(r){ return r.key === cur; })[0];
+      note.textContent = (hit && hit.available === false)
+        ? 'Chosen. It starts mirroring the day that route opens \u2014 nothing else to do.'
+        : (hit && hit.key === 'none' ? 'Your journal stays in the app.'
+                                     : 'Every line you write reaches it within seconds.');
+    }
+  }
+  async function setMirror(key){
+    if(!S.me) return;
+    S.me.mirror = key;
+    paintMirror();
+    try{
+      var r = await sb.from('profiles').update({ mirror:key }).eq('id', S.me.id).select('id');
+      if(r.error) warn29('mirror not saved', r.error);
+    }catch(e){}
+  }
+
+  /* the member's own row in their own circle, which is where the stakes live */
+  function myStake(){
+    try{ return HT32GRP.stakeOf(S.me && S.me.id); }catch(e){ return { reward:'', consequence:'' }; }
+  }
+
+  function paint(){
+    var z = el('h32mw_tz');
+    if(z) z.textContent = tz() ? ('Times are in ' + tz() + ', detected from this device.')
+                               : 'Times are in this device\u2019s own zone.';
+    var hr = el('h32mw_hr');
+    if(hr) hr.value = String((S.me && S.me.report_hour != null) ? S.me.report_hour : HT32_REPORT_HOUR);
+    var st = myStake();
+    var rw = el('h32mw_rw'), cs = el('h32mw_cs');
+    if(rw) rw.value = st.reward || '';
+    if(cs) cs.value = st.consequence || '';
+    paintMirror();
+    wire();
+  }
+
+  var wired = false;
+  function wire(){
+    if(wired) return; wired = true;
+    var host = el('h32mir');
+    if(host) host.addEventListener('click', function(e){
+      var b = e.target.closest('[data-h32mir]'); if(!b) return;
+      setMirror(b.getAttribute('data-h32mir'));
+    });
+    /* the same debounce as every other field (N3), and the same one writer for the stakes
+       (`HT32GRP` logs the change) - a second writer here would produce edits with no record. */
+    [['h32mw_rw', 'reward'], ['h32mw_cs', 'consequence']].forEach(function(pair){
+      var n = el(pair[0]); if(!n) return;
+      var t = null, was = myStake()[pair[1]] || '';
+      function go(){
+        clearTimeout(t); t = null;
+        if(n.value === was) return;
+        var prev = was; was = n.value;
+        /* THIS IS THE WRITE THAT CARRIES N1's EDIT LOG, so a failure here is a stakes change with
+           no record of it - the one thing the log exists to make impossible. It says so in the
+           panel's own note rather than failing quietly, and `was` is put BACK so the next keystroke
+           retries instead of the field believing the value landed. */
+        HT32GRP.saveStake(S.me.id, pair[1], prev, n.value).then(function(ok){
+          if(ok) return;
+          was = prev;
+          var note = el('h32mw_tz');
+          if(note) note.textContent = 'that did not save - it will try again as you type';
+        }, function(err){ was = prev; warn29('stakes not saved', err); });
+      }
+      n.addEventListener('input', function(){ clearTimeout(t); t = setTimeout(go, HT32_SAVE_MS); });
+      n.addEventListener('blur', function(){ if(t) go(); });
+    });
+    var hr = el('h32mw_hr');
+    if(hr) hr.addEventListener('change', function(){
+      var v = +hr.value;
+      if(!S.me) return;
+      S.me.report_hour = v;
+      try{
+        sb.from('profiles').update({ report_hour:v, timezone:tz() || null }).eq('id', S.me.id)
+          .then(function(r){ if(r && r.error) warn29('report hour not saved', r.error); }, function(){});
+      }catch(e){}
+    });
+  }
+
+  return { paint:paint, paintMirror:paintMirror, setMirror:setMirror, tz:tz,
+           state:function(){ return { tz:tz(), mirror:(S.me && S.me.mirror) || 'none' }; } };
+})();
+
+/* ============================ HT-32 S4 . THE REPORTS ============================
+   Cory, 9/22: "notifications ... once at the end of the day ... a summary report on how each person
+   did" and "daily report and end-of-week report on a Friday ... clickable inside the group section".
+
+   THE ROWS ARE WRITTEN BY ONE SERVER-SIDE JOB, NEVER BY THE CLIENT (S4.8). This module READS them
+   and draws them, and it holds the SHAPE of a report so that the job and the screen cannot disagree
+   about what one is. A client that wrote its own report rows would produce a different report on
+   every device that happened to be awake at nine o'clock.
+
+   PRIVACY IS THE FIRST THING HERE, NOT THE LAST. A report carries a day's NUMBERS - percentage,
+   rating number, streak, what tomorrow needs - and that member's own stakes text. It never carries
+   the journal, the WHY, completed or the prayer: those four are the journal and are private to
+   their author (the standing 9/15 ruling, and CLAUDE.md's PRIVACY section). The `reports` table has
+   no column that could hold one and there is no path from it to `day_private` - not a foreign key,
+   not a view, not a function. `golden_ht32` S4 asserts the field list rather than trusting it, and
+   `privacy_check.py` runs over this file like every other.
+
+   IT DEGRADES. The table arrives with `2026-09-23_ht32.sql`. Until that runs, Reports opens and
+   says what it is waiting for, in one quiet line. It never shows an error and never shows nothing. */
+var HT32_REPORT_HOUR = 21;                /* user.report_hour - 9:00 PM in the member's own zone */
+var HT32REP = (function(){
+  var FIELDS = 'id,kind,user_id,period,pct,rating,streak,need_next,state,days_met,best_day,' +
+               'worst_day,outcome,stakes,compare';
+  /* THE FOUR PRIVATE FIELDS, NAMED, so the assertion that they are absent has something to read.
+     Written here rather than in the test, because the rule belongs to the app. */
+  var NEVER = ['brain_dump', 'why', 'tasks', 'prayer'];
+  var rows = null, err = null;
+
+  function nameOf32(uid){
+    if(S.me && uid === S.me.id) return 'You';
+    var list = (typeof window.__HT29GRP_ROWS === 'function') ? window.__HT29GRP_ROWS() : [];
+    var hit = list.filter(function(r){ return r.id === uid; })[0];
+    return hit ? hit.n : 'member';
+  }
+  function dayLabel32(k){
+    try{ var d = dnum(k); return WD[d.getDay()] + ' ' + d.getDate() + ' ' + MO[d.getMonth()]; }
+    catch(e){ return String(k || ''); }
+  }
+
+  async function load(){
+    try{
+      var r = await sb.from('reports').select(FIELDS)
+                      .gte('period', shift(today(), -34))
+                      .order('period', { ascending:false }).limit(200);
+      if(r.error){ err = r.error; rows = null; return null; }
+      err = null; rows = r.data || []; return rows;
+    }catch(e){ err = e; rows = null; return null; }
+  }
+
+  function line(r){
+    var who = nameOf32(r.user_id);
+    if(r.kind === 'weekly'){
+      return '<button class="h32rrow" type="button" data-h32rep="' + esc(String(r.id)) + '">' +
+        '<span class="k">WEEK to ' + esc(dayLabel32(r.period)) + '</span>' +
+        '<span class="w">' + esc(who) + '</span>' +
+        '<span class="v num">' + (r.pct == null ? '\u2014' : Math.round(r.pct) + '%') + '</span>' +
+        '<span class="o ' + (r.outcome === 'MET' ? 'h32secured' : 'h32out') + '">' +
+          esc(r.outcome || '\u2014') + '</span></button>';
+    }
+    return '<button class="h32rrow" type="button" data-h32rep="' + esc(String(r.id)) + '">' +
+      '<span class="k">' + esc(dayLabel32(r.period)) + '</span>' +
+      '<span class="w">' + esc(who) + '</span>' +
+      '<span class="v num">' + (r.pct == null ? '\u2014' : Math.round(r.pct) + '%') + '</span>' +
+      '<span class="o">' + (r.rating == null ? '' : 'rated ' + r.rating) + '</span></button>';
+  }
+
+  function card(r){
+    var who = nameOf32(r.user_id);
+    function kv(k, v){ return v == null || v === '' ? '' :
+      '<div class="h32kv"><span class="k">' + esc(k) + '</span><span class="v">' + esc(String(v)) + '</span></div>'; }
+    var head = (r.kind === 'weekly' ? 'WEEK to ' : '') + dayLabel32(r.period);
+    return '<div class="h32rcard">' +
+      '<div class="h32rh">' + esc(who) + ' \u00b7 ' + esc(head) + '</div>' +
+      kv('completion', r.pct == null ? null : Math.round(r.pct) + '%') +
+      (r.kind === 'weekly'
+        ? kv('days at target', r.days_met) + kv('best day', r.best_day) + kv('worst day', r.worst_day) +
+          kv('outcome', r.outcome) + kv('riding on it', r.stakes)
+        : kv('rating', r.rating) + kv('streak', r.streak) +
+          kv('needed tomorrow', r.need_next == null ? null : Math.round(r.need_next) + '%') +
+          kv('state', r.state)) +
+      kv('against the group', r.compare) +
+      /* THE LINE THAT SAYS WHAT IS NOT HERE. A person reading a report about themselves should be
+         able to see, on the page, that their journal is not in it. */
+      '<div class="note" style="padding-top:10px">Numbers only. Your journal, your why, what you ' +
+      'completed and your prayer are never in a report.</div></div>';
+  }
+
+  function listHtml(){
+    if(err){
+      return '<div class="empty">Reports start the day the group\u2019s migration runs \u2014 ' +
+             'nothing is lost in the meantime, the days are all still here.</div>';
+    }
+    if(!rows || !rows.length){
+      return '<div class="empty">No reports yet. The first one is written at ' +
+             (HT32_REPORT_HOUR % 12 || 12) + ':00 ' + (HT32_REPORT_HOUR >= 12 ? 'PM' : 'AM') +
+             ' in each member\u2019s own time zone, and Friday\u2019s carries the week.</div>';
+    }
+    return '<div class="h32rlist">' + rows.map(line).join('') + '</div>';
+  }
+
+  async function open(){
+    openOv('Reports', '<div id="h32rep"><div class="empty">Loading\u2026</div></div>', function(){
+      load().then(function(){
+        var host = el('h32rep'); if(!host) return;
+        host.innerHTML = listHtml();
+        host.addEventListener('click', function(e){
+          var b = e.target.closest('[data-h32rep]'); if(!b) return;
+          var id = b.getAttribute('data-h32rep');
+          var hit = (rows || []).filter(function(r){ return String(r.id) === id; })[0];
+          if(!hit) return;
+          host.innerHTML = '<button class="tbtn" type="button" data-h32back>\u2039 all reports</button>' + card(hit);
+        });
+        host.addEventListener('click', function(e){
+          if(e.target.closest('[data-h32back]')) host.innerHTML = listHtml();
+        });
+      });
+    });
+  }
+
+  return { open:open, load:load, listHtml:listHtml, card:card, FIELDS:FIELDS, NEVER:NEVER,
+           state:function(){ return { rows:rows, err:!!err }; } };
+})();
+
+/* ================= HT-32 S2.4/2.5 + S4.10 + N1 . PEOPLE, AND WHAT THEY HAVE RIDING ON IT =========
+   Cory, 9/22: "Andrew should have been added ... I don't see him in my circle" and "rewards or
+   punishments based off of completion ... held accountable".
+
+   THREE THINGS, and they are one module because they are one row on one table:
+
+   S2.4  ADD A MEMBER BY EMAIL. Any member types an address; a `pending` row appears AT ONCE, named
+         for the email's local part. When that address signs in, `ht32_claim_pending()` turns it
+         into a real membership with no further act by anybody - which is what "they appear now"
+         means. Idempotent with the invite link: joining by link fulfils a pending row for the same
+         email, because the function clears the row whichever route made the membership.
+   S4.10 THE STAKES. Free text per member - the reward and the consequence - set by that member.
+   N1    AND BY THE GROUP. "editable by that member AND by the group (any member; the starter can
+         restrict it to starter-only, default open)". Every edit is logged: who, when, before ->
+         after. The Friday report prints THE TEXT IN FORCE AT WEEK'S END, which is only possible
+         because there is a log - without one, Friday can only print what the text says today.
+
+   IT DEGRADES, IT DOES NOT BREAK. Every column and table here arrives with `2026-09-23_ht32.sql`,
+   and this build has to work before and after that runs - the same contract `cue`, `target_age` and
+   `closed_at` are held to. A missing table is a quiet line, never a broken panel and never an error
+   the person has to read.
+
+   NO EMAIL IS EVER WRITTEN INTO THIS FILE, a fixture, a golden or a commit message. `standard`
+   pushes to the public `ht` repo and 131 Ruling 3 is absolute about it. The fixture's addresses are
+   `member-a@example.com`. */
+var HT32_STAKES_OPEN = true;              /* group.stakes_open - N1's default: any member may edit */
+var HT32GRP = (function(){
+  var pending = [], stakes = {}, log = {}, has = { pending:null, stakes:null };
+  /* THE NOTE IS STATE, NOT A DOM WRITE. `add()` ends with a repaint - that is how the new row
+     appears - and a repaint replaces the very element the confirmation was written into, so the
+     message vanished the instant it was set. The golden caught it; a person would have read it as
+     "nothing happened" and pressed add again. It is rendered by `addRow()` like everything else. */
+  var note = '';
+
+  function local(email){ return String(email || '').split('@')[0] || 'member'; }
+  /* HT29GRP exports its circle through `state()`, not as a getter of its own - read what is there
+     rather than adding a second accessor to a module this one does not own. */
+  function circleId(){ try{ var st = HT29GRP.state(); return (st && st.circle) ? st.circle.id : null; }catch(e){ return null; } }
+
+  /* ---- reading ------------------------------------------------------------------------- */
+  async function load(cid){
+    if(!cid || !S.me) return;
+    try{
+      var r = await sb.from('circle_pending').select('id,circle_id,email,added_by').eq('circle_id', cid);
+      if(r.error){ has.pending = false; }
+      else { has.pending = true; pending = r.data || []; }
+    }catch(e){ has.pending = false; }
+    try{
+      var m = await sb.from('circle_members').select('user_id,reward,consequence').eq('circle_id', cid);
+      if(m.error){ has.stakes = false; }
+      else {
+        has.stakes = true; stakes = {};
+        (m.data || []).forEach(function(x){ stakes[x.user_id] = { reward:x.reward || '', consequence:x.consequence || '' }; });
+      }
+    }catch(e){ has.stakes = false; }
+  }
+
+  /* ---- drawing ------------------------------------------------------------------------- */
+  function stakeOf(uid){ return stakes[uid] || { reward:'', consequence:'' }; }
+  function stakeChip(r){
+    if(has.stakes === false || !r || !r.id) return '';
+    var st = stakeOf(r.id);
+    var txt = st.reward || st.consequence;
+    if(!txt) return ' <button class="h32stk h32stkset" type="button" data-h32stake="' + esc(r.id) +
+                     '" title="set what is riding on this week">stakes</button>';
+    return ' <button class="h32stk" type="button" data-h32stake="' + esc(r.id) + '" title="' +
+           esc((st.reward ? 'reward: ' + st.reward : '') + (st.consequence ? (st.reward ? ' \u00b7 ' : '') + 'else: ' + st.consequence : '')) +
+           '">' + esc(txt.length > 28 ? txt.slice(0, 27) + '\u2026' : txt) + '</button>';
+  }
+
+  function pendingRows(){
+    if(!pending.length) return '';
+    /* A PENDING ROW IS A PERSON WHO IS NOT HERE YET, and it says so rather than showing dashes that
+       read as a bad week. It carries no numbers at all, because there are none. */
+    return pending.map(function(p){
+      var mine = p.added_by === (S.me && S.me.id);
+      return '<tr class="h32pend"><td class="n">' + esc(local(p.email)) +
+        ' <span class="h32pendtag">invited</span></td>' +
+        '<td class="p" colspan="5">waiting for them to sign in' +
+        (mine ? ' <button class="h32lnk" type="button" data-h32unpend="' + esc(String(p.id)) +
+                '">remove</button>' : '') + '</td></tr>';
+    }).join('');
+  }
+
+  function addRow(){
+    if(has.pending === false) return '';
+    /* ANY MEMBER, per S2.4's "same switch as the invite" - `group.members_can_invite`. */
+    return '<div class="h32add">' +
+      '<input id="h32email" type="email" inputmode="email" autocomplete="off" ' +
+      'placeholder="add someone by email" aria-label="add a member by email">' +
+      '<button class="tbtn" type="button" data-h32add>add</button>' +
+      '<span class="h32addn" id="h32addn">' + esc(note) + '</span></div>';
+  }
+
+  /* ---- acting -------------------------------------------------------------------------- */
+  function say(msg){ note = msg; var n = el('h32addn'); if(n) n.textContent = msg; }
+
+  async function add(){
+    var n = el('h32email'); if(!n) return;
+    var email = String(n.value || '').trim().toLowerCase();
+    /* the shallowest possible check, on purpose: an address is validated by a person signing in
+       with it, not by a regular expression. This only catches an empty box and a typo with no @. */
+    if(!email || email.indexOf('@') < 1 || email.indexOf('.', email.indexOf('@')) < 0){
+      say('that does not look like an email'); return;
+    }
+    var cid = circleId();
+    if(!cid){ say('start or join a group first'); return; }
+    say('adding\u2026');
+    var r = await sb.from('circle_pending').insert({ circle_id:cid, email:email, added_by:S.me.id })
+                    .select('id,circle_id,email,added_by');
+    if(r.error){
+      /* A DUPLICATE IS NOT A FAILURE - it is the answer. The unique key is (circle_id, email), so a
+         second add of the same address means they are already invited, and saying "already added"
+         is both true and the thing a person wants to know. */
+      say(/duplicate|unique/i.test(String(r.error.message || '')) ? 'already added' : 'not added');
+      if(!/duplicate|unique/i.test(String(r.error.message || ''))) warn29('add by email failed', r.error);
+      return;
+    }
+    pending = pending.concat(r.data || []);
+    n.value = ''; say('added \u00b7 they appear when they sign in');
+    if(typeof paintAll === 'function') paintAll();
+  }
+
+  async function unpend(id){
+    var r = await sb.from('circle_pending').delete().eq('id', id);
+    if(r.error){ say('not removed'); return; }
+    pending = pending.filter(function(p){ return String(p.id) !== String(id); });
+    if(typeof paintAll === 'function') paintAll();
+  }
+
+  /* N1: EVERY EDIT IS LOGGED, and the log is written by the same call that changes the text, so a
+     change without a record is not a shape this code can produce. */
+  async function saveStake(uid, field, before, after){
+    var cid = circleId(); if(!cid) return false;
+    var patch = {}; patch[field] = after;
+    /* RESOLVES false, NEVER REJECTS. Two callers read the answer to decide whether to put the old
+       value back and retry; a rejection would take that decision away from both of them. And the
+       ROW COUNT is checked, not just the error - an update that matches no row is not an error to
+       PostgREST, which is the exact silence HT-29 S3 was bitten by twice. */
+    var r;
+    try{
+      r = await sb.from('circle_members').update(patch).eq('circle_id', cid).eq('user_id', uid).select('user_id');
+    }catch(e){ warn29('stakes not saved', e); return false; }
+    if(r.error || !(r.data || []).length){ warn29('stakes not saved', r.error); return false; }
+    try{
+      await sb.from('stakes_log').insert({ circle_id:cid, member_id:uid, field:field,
+                                           before_text:before || '', after_text:after || '',
+                                           edited_by:S.me.id });
+    }catch(e){ warn29('stakes log', e); }
+    stakes[uid] = stakes[uid] || { reward:'', consequence:'' };
+    stakes[uid][field] = after;
+    return true;
+  }
+
+  function editStakes(uid){
+    var st = stakeOf(uid);
+    var mine = uid === (S.me && S.me.id);
+    if(!mine && !HT32_STAKES_OPEN){
+      toast('only ' + esc(local('')) + 'that member can change their stakes'); return;
+    }
+    var who = (function(){
+      var rows = (typeof window.__HT29GRP_ROWS === 'function') ? window.__HT29GRP_ROWS() : [];
+      var hit = rows.filter(function(r){ return r.id === uid; })[0];
+      return mine ? 'You' : (hit ? hit.n : 'member');
+    })();
+    openOv(who + ' \u00b7 this week',
+      '<div class="note" style="padding-bottom:10px">What is riding on hitting ' + HT32_TARGET_PCT +
+      '% this week. The group can see it, and ' + (HT32_STAKES_OPEN ? 'any member can edit it \u2014 every change is logged.' : 'only they can edit it.') + '</div>' +
+      '<label class="fld"><span class="lab">If they hit it</span>' +
+      '<input id="h32rw" value="' + esc(st.reward) + '" placeholder="the reward"></label>' +
+      '<label class="fld"><span class="lab">If they do not</span>' +
+      '<input id="h32cs" value="' + esc(st.consequence) + '" placeholder="the consequence"></label>' +
+      '<div class="note" id="h32stn" style="padding-top:6px">saves as you type</div>' +
+      '<div class="h32log" id="h32log"></div>',
+      function(){
+        /* N3 applies here too: no save button, anywhere. */
+        [['h32rw', 'reward'], ['h32cs', 'consequence']].forEach(function(pair){
+          var n = el(pair[0]); if(!n) return;
+          var t = null, was = stakeOf(uid)[pair[1]];
+          function go(){
+            clearTimeout(t); t = null;
+            var now = n.value;
+            if(now === was) return;
+            var prev = was; was = now;
+            saveStake(uid, pair[1], prev, now).then(function(ok){
+              var note = el('h32stn'); if(note) note.textContent = ok ? 'saved' : 'not saved';
+              if(ok && typeof paintAll === 'function') paintAll();
+            });
+          }
+          n.addEventListener('input', function(){ clearTimeout(t); t = setTimeout(go, HT32_SAVE_MS); });
+          n.addEventListener('blur', function(){ if(t) go(); });
+        });
+        loadLog(uid);
+      });
+  }
+
+  async function loadLog(uid){
+    var host = el('h32log'); if(!host) return;
+    try{
+      var r = await sb.from('stakes_log').select('field,before_text,after_text,edited_at,edited_by')
+                      .eq('member_id', uid).order('edited_at', { ascending:false }).limit(8);
+      if(r.error || !(r.data || []).length){ host.innerHTML = ''; return; }
+      host.innerHTML = '<div class="sh"><h2>Changes</h2><span class="ln"></span></div>' +
+        r.data.map(function(x){
+          var when = String(x.edited_at || '').slice(0, 10);
+          var mine = x.edited_by === (S.me && S.me.id);
+          return '<div class="h32logrow"><span class="k">' + esc(when) + ' \u00b7 ' +
+            (mine ? 'you' : 'the group') + '</span> <span class="v">' + esc(x.field) + ': ' +
+            esc(x.before_text || '\u2014') + ' \u2192 ' + esc(x.after_text || '\u2014') + '</span></div>';
+        }).join('');
+    }catch(e){ host.innerHTML = ''; }
+  }
+
+  /* ---- the seam the panel already has --------------------------------------------------- */
+  function click(e){
+    var a = e.target.closest('[data-h32add]');          if(a){ add(); return true; }
+    var u = e.target.closest('[data-h32unpend]');       if(u){ unpend(u.getAttribute('data-h32unpend')); return true; }
+    var k = e.target.closest('[data-h32stake]');        if(k){ e.stopPropagation(); editStakes(k.getAttribute('data-h32stake')); return true; }
+    var r = e.target.closest('[data-h32reports]');      if(r){ HT32REP.open(); return true; }
+    return false;
+  }
+
+  return { load:load, click:click, stakeChip:stakeChip, pendingRows:pendingRows, addRow:addRow,
+           stakeOf:stakeOf, saveStake:saveStake,
+           state:function(){ return { pending:pending.slice(), stakes:stakes, has:has }; } };
+})();
+
 var HT29GRP = (function(){
   var circle = null, state = 'loading', canDay = null, canRate = null, rateErr = false;
   /* "the function is not there yet" is one specific answer - PostgREST says PGRST202, Postgres says 42883.
@@ -9316,13 +10259,53 @@ var HT29GRP = (function(){
     var rf = (window.__HT16 && window.__HT16.rampFill) || function(){ return 'var(--surface)'; };
     return '<td class="p"><i style="background:' + rf(v) + '"></i>' + pc(v) + '</td>';
   }
+  /* ---- HT-32 S3.7 . THE NEED COLUMN ---------------------------------------------------------
+     S3.7: "Shown on Today's header as `NEED >= NN% TODAY` and as a column in GROUP." The header
+     half shipped with S3; this is the column.
+
+     ONE SCORER, and it is the one the header uses - `__HT32WEEK.forDay`, the pure function with the
+     37-assertion oracle behind it. A second definition of the same number, computed from the same
+     rows a few lines further down the file, is how the header and the table come to disagree about
+     what the week needs; S3.6 names that as its whole point ("the week uses it").
+
+     WHAT WE KNOW ABOUT SOMEONE ELSE'S DAY is completion % and nothing else (R47.3 - the one
+     cross-user read is `days.select('user_id,date,pct')`). So `due` is not knowable for a member and
+     is reported as 1 for any day that has a percentage: a day with a percentage had something to do.
+     A day with NO row is not logged, and the standing 9/15 rule makes that a zero, not an unknown.
+     The UNKNOWN case - a day that asked nothing of you - is therefore only ever detectable for
+     YOURSELF, where `active_set` is readable. That is a limit of what a group may see, not a bug,
+     and it is written here so the next wire does not "fix" it by widening the query. */
+  function needOf(r){
+    if(!window.__HT32WEEK || !r || !r.days) return null;
+    var dm = r.days;
+    try{
+      return window.__HT32WEEK.forDay(today(), function(k){
+        var v = dm[k];
+        if(v == null) return { pct:0, logged:false, due:1 };
+        return { pct:+v, logged:true, due:1 };
+      }, null);
+    }catch(e){ return null; }
+  }
+  function needCell(r){
+    var n = needOf(r);
+    if(!n || n.need == null) return '<td class="p h32ndc">\u2014</td>';
+    var txt = (n.state === 'SECURED') ? 'secured'
+            : (n.state === 'OUT OF REACH') ? ('best ' + Math.round(n.best) + '%')
+            : ('\u2265 ' + Math.round(n.need) + '%');
+    return '<td class="p h32ndc ' + window.__HT32WEEK.cls(n) + '" title="' +
+           esc(n.state + ' \u00b7 target ' + HT32_TARGET_PCT + '% over ' + n.scoringDays +
+               ' scoring days') + '">' + esc(txt) + '</td>';
+  }
+
   function rows(list, opts){
     return list.map(function(r){
       var open = !r.you && canDay === true;
       return '<tr' + (r.you ? ' class="h18me"' : '') + (open ? ' data-h29m="' + esc(r.id) + '" tabindex="0"' : '') + '>' +
-        '<td class="n">' + esc(r.n) + (open ? ' <span class="h29go">›</span>' : '') + '</td>' +
-        cell(r.t) + cell(r.w) + cell(r.m) + '<td class="l">' + (r.logged == null ? '—' : r.logged + '/7') + '</td></tr>';
-    }).join('');
+        '<td class="n">' + esc(r.n) + (open ? ' <span class="h29go">›</span>' : '') +
+        HT32GRP.stakeChip(r) + '</td>' +
+        cell(r.t) + cell(r.w) + cell(r.m) + needCell(r) +
+        '<td class="l">' + (r.logged == null ? '—' : r.logged + '/7') + '</td></tr>';
+    }).join('') + HT32GRP.pendingRows();
   }
   function empty(){
     if(state === 'error') return 'The group did not load — it will try again on the next open.';
@@ -9330,10 +10313,16 @@ var HT29GRP = (function(){
     return 'No one else yet. <button class="h29lnk" type="button" data-h29invite>Invite someone</button>';
   }
   function table(others){
-    return '<table class="h18gt h29gt"><colgroup><col class="n"><col><col><col><col></colgroup>' +
-      '<thead><tr><th>member</th><th>today</th><th>7 days</th><th>30 days</th><th>logged</th></tr></thead>' +
+    /* the column count is written ONCE and read by the empty row's colspan: the two went out of
+       step the last time a column was added, and an empty state that spans the wrong number of
+       columns is a ragged table nobody notices until it is the only state on screen. */
+    var COLS = 7;
+    return '<table class="h18gt h29gt"><colgroup><col class="n"><col><col><col><col><col><col></colgroup>' +
+      '<thead><tr><th>member</th><th>today</th><th>7 days</th><th>30 days</th>' +
+      '<th title="what today has to be to end the week at ' + HT32_TARGET_PCT + '%">need</th>' +
+      '<th>logged</th></tr></thead>' +
       '<tbody>' + rows([you()].concat(others)) +
-      (others.length ? '' : '<tr class="h18none"><td colspan="5">' + empty() + '</td></tr>') +
+      (others.length ? '' : '<tr class="h18none"><td colspan="' + COLS + '">' + empty() + '</td></tr>') +
       '</tbody></table>';
   }
   function block(others){
@@ -9342,8 +10331,16 @@ var HT29GRP = (function(){
        HT-32 adds a Rename field. It is never drawn in this header again. */
     return '<div class="h18gh">GROUP' +
       '<span class="sp"></span><button class="h18more h29off" data-h18more type="button">detail</button>' +
+      /* S4.9: "GROUP panel gains Reports ... click -> the detail card". One control on the panel,
+         beside the one that adds people - the two things a group does. */
+      '<button class="h29inv" type="button" data-h32reports>reports</button>' +
+      /* HT-32 S7/N1: with a circle, `invite` SHARES - it does not open settings - so the group's
+         name, its code, its share link and its reset had no door at all once a group existed. The
+         name in particular is something S2.3 deliberately made editable, and then nobody could
+         reach it. One word, and only when there is something to manage. */
+      (circle ? '<button class="h29inv" type="button" data-h29group>group</button>' : '') +
       '<button class="h29inv" type="button" data-h29' + (circle ? 'invite' : 'group') + '>' + (circle ? 'invite' : 'join') + '</button></div>' +
-      table(others);
+      table(others) + HT32GRP.addRow();
   }
 
   /* ---- a member's day: sections, names, check marks, the time dots, the rating number - read only ---- */
@@ -10370,11 +11367,42 @@ var HT29_UPDATE_BANNER = true;
             : r.ok ? 'nothing to send to this phone yet' : 'the test did not send');
     }catch(e){ toast('the test did not send'); }
   }
+  /* HT-32 S5 - THE THREE SENTENCES THIS PANEL OWES A PERSON, and no more than three.
+
+     (1) ONE A DAY, NOT TWO. Cory, 9/22: "notifications ... once at the end of the day". The sender
+         sends one report at that person's own hour; the noon and evening slots are kept in the code
+         (R70.138) and are no longer what this panel describes.
+     (2) iOS NEEDS THE APP ON THE HOME SCREEN. Safari will not deliver a web push to a page in a tab,
+         and it says so nowhere - the switch simply never works and there is nothing to read. One
+         quiet line, shown only to the phone it is true of (S5.11).
+     (3) IF IT IS BLOCKED, SOMETHING STILL WORKS. "denied permission -> the in-app Reports list is
+         the fallback and nothing nags". So the fallback is NAMED here, once, and there is no second
+         prompt anywhere in the app - the ask happens when a person reaches for this switch, which
+         is also how "never on load" is satisfied without adding an interruption nobody asked for. */
+  function iosNoHome(){
+    try{
+      var ios = /iPad|iPhone|iPod/.test(navigator.userAgent || '');
+      var standalone = (window.navigator.standalone === true) ||
+                       (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches);
+      return ios && !standalone;
+    }catch(e){ return false; }
+  }
+  function blocked(){
+    try{ return window.Notification && window.Notification.permission === 'denied'; }catch(e){ return false; }
+  }
   function html(){
     var p = prefs();
     return '<div class="lab">Nudges</div>' +
-      '<div class="note" style="padding:4px 0 10px">A notification at noon and at 9 pm with your numbers and your group’s — never your journal.' +
+      '<div class="note" style="padding:4px 0 10px">One notification a day, at the hour your day closes, ' +
+        'with your numbers and your group’s — never your journal. Friday’s carries the week.' +
         (p.enabled && !p.saved ? ' Tap Allow once to finish.' : '') + '</div>' +
+      (iosNoHome()
+        ? '<div class="note" id="n32ios" style="padding:0 0 10px">On an iPhone this only works once the ' +
+          'app is on your Home Screen: Share → Add to Home Screen, then open it from there.</div>' : '') +
+      (blocked()
+        ? '<div class="note" id="n32blocked" style="padding:0 0 10px">Notifications are blocked for this ' +
+          'app in your phone’s settings. Nothing here will nag you about it — the same summary is ' +
+          'in <b>Reports</b> on the GROUP panel whenever you want it.</div>' : '') +
       '<label class="fld h28rest"><span class="lab">Nudges</span><span class="h28sw"><input type="checkbox" id="n29On"' + (p.enabled ? ' checked' : '') + '> on this phone</span></label>' +
       '<div class="h29times"><label class="fld"><span class="lab">Midday</span><input type="time" id="n29Noon" value="' + esc(p.noon) + '"></label>' +
       '<label class="fld"><span class="lab">Evening</span><input type="time" id="n29Eve" value="' + esc(p.evening) + '"></label></div>' +
@@ -10498,7 +11526,7 @@ var HT29_UPDATE_BANNER = true;
 /* The one place this build says what it is. `sw.js`'s cache name must equal it, and `golden_ht30` S0 reads
    both files and fails when they drift - a version on the screen that is not the version in the cache is
    worse than no version at all, because it is the thing you check when you are already unsure. */
-var HT30_VERSION = 'ht-v39';
+var HT30_VERSION = 'ht-v40';
 
 function warn30(what, e){ try{ console.warn('HT-30: ' + what, e); }catch(_){} }
 function h30El(id){ return document.getElementById(id); }

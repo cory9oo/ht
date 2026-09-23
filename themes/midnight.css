@@ -1,0 +1,20 @@
+/* MIDNIGHT — deep navy, cyan accent. Descended from `tokens.css` §3's `blueprint`, which already
+   matched S6.13's brief almost literally; only the values that missed the 4.5:1 text floor moved.
+   `blueprint`'s selector is named beside the new one so an old preference still resolves. */
+:root[data-theme="midnight"],
+:root[data-skin="blueprint"]{
+  --ground:#070C14; --sheet:#0B1220; --sunk:#0F1929; --sel:#132133;
+  --rule:#1B2942;   --rule2:#2A3D5C;
+  --ink:#E6EDF7;    --ink2:#9FB2CC;  --ink3:#5A6C87;
+  --accent:#28D3F0; --accent-ink:#04121A; --accent-wash:#0B2C36;
+  --bad:#FF7A90;    --good:#3DE0B0;
+  --g0:#0E2C34; --g1:#12414E; --g2:#2D7B92; --g3:#4FA8BE; --g4:#28D3F0; --g5:#8AEBFA;
+  --st-todo:#E6EDF7; --st-done:#5FD3AE; --st-late:#E0B257; --st-skip:#9FB2CC; --st-notdue:#8B9CB5;
+  --st-secured:#5FD3AE; --st-ontrack:#6FC8E8; --st-atrisk:#E0B257; --st-outofreach:#FF7A90;
+  --sb-thumb:rgba(159,178,204,.35); --sb-thumb-hover:rgba(159,178,204,1);
+  --panel:#0B1220; --panel-2:#0F1929; --line:#1B2942; --dim:#5A6C87; --accent-red:#FF7A90;
+  /* tells the browser which way to draw what it owns - form controls, the default
+     scrollbar before our own tokens reach it, and the text caret. A light theme that
+     does not say so gets dark-drawn native widgets on a paper ground. */
+  color-scheme:dark;
+}

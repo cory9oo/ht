@@ -103,6 +103,105 @@ export function compose(slot, me, members) {
   return { title: 'Habit Tracker', body: parts.join(' · ') };
 }
 
+// ====================== HT-32 S5 · ONE PUSH A DAY, AND ONLY ONE ======================
+// Cory, 9/22: "notifications ... once at the end of the day ... a summary report on how each person
+// did", and S5.11: "at each member's report hour, ONE push".
+//
+// THIS SUPERSEDES HT-29's TWO SLOTS. `noon` and `evening` were right when a nudge was a prompt to
+// act; a REPORT is a thing you read once, after the day is over, and two of them is the "1-2 a day
+// max" research line being spent on the same information twice. The old slots are KEPT (R70.138) -
+// `sweep()` above is untouched and still tested - and `HT32_ONE_A_DAY` decides which sender runs.
+// Nothing is deleted, so reversing this is one constant.
+//
+// THE CAP IS STRUCTURAL, NOT A RULE ANYONE HAS TO REMEMBER. `reportDue` refuses when `last_sent`
+// already holds today's date for this person, and the sweep can emit at most one entry per user
+// because it iterates users, not slots. There is no arrangement of the data that produces two.
+export const HT32_ONE_A_DAY = true;
+export const HT32_REPORT_HOUR = 21;            // 9:00 PM in the member's OWN zone; user.report_hour
+export const HT32_TARGET_PCT = 80;             // group.target_pct
+
+// The window is the same 15 minutes the scheduler runs on, for the same reason: a member whose hour
+// falls between two runs must still be caught by one of them.
+export function reportDue(prefs, parts) {
+  if (!prefs || !prefs.enabled) return false;
+  const hour = (prefs.report_hour == null) ? HT32_REPORT_HOUR : +prefs.report_hour;
+  const at = hour * 60;
+  const late = parts.minutes - at;
+  if (!(late >= 0 && late < WINDOW_MIN)) return false;
+  // ONE PER MEMBER PER DAY. `last_sent.report` is the whole cap.
+  return (prefs.last_sent || {}).report !== parts.date;
+}
+
+// Friday carries the week. Saturday is the Sabbath and is not a scoring day (HT32_WEEK = sun_fri),
+// so the week ENDS on Friday and its report rides Friday's daily - which is what S4.8 asks for and
+// is also the only day a week-shaped sentence is true on.
+export function isWeekEnd(parts) { return parts.weekday === 5; }
+
+// ONE line per member, numbers only. The privacy rule is not a filter applied afterwards: the only
+// things this function is GIVEN are a name, a percentage and a rating number, so there is nothing
+// here to leak. A journal line cannot reach this file - `sweepReport` never reads one.
+export function composeReport(day, me, members, week) {
+  const line = (x) => `${firstName(x.name)} ${Math.round(x.pct)}%` +
+                      (x.rating == null ? '' : ` · rating ${x.rating}`);
+  const parts = [line({ name: 'You', pct: me.pct, rating: me.rating })];
+  for (const x of members) parts.push(line(x));
+  let body = parts.join('\n');
+  if (week) {
+    body += `\nWEEK: ${week.outcome} · ${Math.round(week.pct)}%`;
+  }
+  return { title: `HT · ${day}`, body };
+}
+
+// One sweep, one entry per member at most. Pure, like everything else in this file.
+export function sweepReport(now, data) {
+  const out = [];
+  const seen = new Set();
+  for (const prefs of data.prefs) {
+    if (seen.has(prefs.user_id)) continue;     // belt and braces: a duplicated prefs row is one push
+    const parts = localParts(now, prefs.tz);
+    if (!reportDue(prefs, parts)) continue;
+    seen.add(prefs.user_id);
+    const mine = data.byUser[prefs.user_id] || { habits: [], days: {} };
+    const dayRow = mine.days[parts.date] || null;
+    const c = counts(mine.habits, dayRow, parts.weekday);
+    const me = { pct: (dayRow && dayRow.pct != null) ? +dayRow.pct : (c.due ? (c.done / c.due) * 100 : 0),
+                 rating: (mine.ratings && mine.ratings[parts.date] != null) ? mine.ratings[parts.date] : null };
+    const members = (data.comembers[prefs.user_id] || []).map((uid) => {
+      const o = data.byUser[uid] || { habits: [], days: {}, name: 'member' };
+      const d = o.days[parts.date] || null;
+      const oc = counts(o.habits, d, parts.weekday);
+      return { name: o.name, pct: (d && d.pct != null) ? +d.pct : (oc.due ? (oc.done / oc.due) * 100 : 0),
+               rating: (o.ratings && o.ratings[parts.date] != null) ? o.ratings[parts.date] : null };
+    });
+    const week = isWeekEnd(parts) ? weekOf(mine, parts) : null;
+    out.push({ user_id: prefs.user_id, slot: 'report', date: parts.date,
+               message: composeReport(parts.date, me, members, week) });
+  }
+  return out;
+}
+
+// The week's own arithmetic: Sunday..Friday, an unchecked box is a zero, a day that asked nothing
+// drops out of the denominator. The APP owns this rule (`__HT32WEEK`) and this is the sender's copy
+// of the same three sentences - they are held together by `golden_ht32`, which computes both.
+export function weekOf(mine, parts) {
+  const end = new Date(parts.date + 'T12:00:00Z');
+  const days = [];
+  for (let back = end.getUTCDay(); back >= 0; back--) {
+    const d = new Date(end); d.setUTCDate(end.getUTCDate() - back);
+    if (d.getUTCDay() === 6) continue;         // Saturday is not scored
+    days.push(d.toISOString().slice(0, 10));
+  }
+  let sum = 0, n = 0;
+  for (const k of days) {
+    const row = mine.days[k];
+    if (row && row.pct == null && row.unknown) continue;
+    sum += (row && row.pct != null) ? +row.pct : 0;
+    n++;
+  }
+  const pct = n ? sum / n : 0;
+  return { pct, outcome: pct >= HT32_TARGET_PCT ? 'MET' : 'MISSED', days: n };
+}
+
 // One whole sweep, pure: people + their data in, messages out. index.ts sends them and stamps last_sent.
 export function sweep(now, data) {
   const out = [];

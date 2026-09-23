@@ -1,0 +1,28 @@
+/* TERMINAL — black, phosphor amber. `tokens.css` §3's fourth skin, MOVED here unchanged.
+
+   KEPT, NOT OFFERED (R70.138 — hide, never delete). S6.13 names four themes and this is not one of
+   them, so the picker does not list it; the selector still resolves, so anyone whose preference is
+   already `terminal` keeps what they had.
+
+   IT IS MEASURED LIKE THE OTHER FOUR AND IT PASSES - 54 pairs, 0 under 4.5:1 (2026-09-23). The
+   exemption this file was going to carry turned out not to be needed, and the measurement came
+   first: an unoffered skin is the easiest place to write an exemption nobody ever checks. Its
+   `--st-*` values are the ones it has always inherited from `tokens.css` §5/§7, written out so
+   the file is self-contained. */
+:root[data-theme="terminal"],
+:root[data-skin="terminal"]{
+  --ground:#050505; --sheet:#0A0A08; --sunk:#101009; --sel:#171509;
+  --rule:#232112;   --rule2:#3A3517;
+  --ink:#F5C542;    --ink2:#A8863A;  --ink3:#6B5628;
+  --accent:#FF7A18; --accent-ink:#050505; --accent-wash:#2A1608;
+  --bad:#FF4A2B;    --good:#8FE04A;
+  --g0:#2A1D06; --g1:#4A320A; --g2:#7A5210; --g3:#B07518; --g4:#FF7A18; --g5:#FFB65E;
+  --st-todo:#D6DCE6; --st-done:#7FB79A; --st-late:#D4A85C; --st-skip:#7C8798; --st-notdue:#78818F;
+  --st-secured:#7FB79A; --st-ontrack:#8FB8D9; --st-atrisk:#D4A85C; --st-outofreach:#D98A80;
+  --sb-thumb:rgba(168,134,58,.35); --sb-thumb-hover:rgba(168,134,58,1);
+  --panel:#0A0A08; --panel-2:#101009; --line:#232112; --dim:#6B5628; --accent-red:#FF4A2B;
+  /* tells the browser which way to draw what it owns - form controls, the default
+     scrollbar before our own tokens reach it, and the text caret. A light theme that
+     does not say so gets dark-drawn native widgets on a paper ground. */
+  color-scheme:dark;
+}

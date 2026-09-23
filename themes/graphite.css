@@ -1,0 +1,24 @@
+/* GRAPHITE — near-black, COOL greys, ONE accent, muted states. The default (S6.14).
+   Descended from `tokens.css` §3's `carbon`, whose selector is named beside the new one so a
+   preference saved before HT-32 keeps resolving without a migration.
+
+   The accent is DELIBERATELY NOT RED. tokens.css §1: "RED IS STATE ONLY — it is `--bad` and the
+   overdue tint, and it is not decoration." `carbon` used #FF3B41 as its accent and so spent the one
+   colour this app reserves for trouble; a check-off would have shouted as loudly as a missed day. */
+:root[data-theme="graphite"],
+:root[data-skin="carbon"]{
+  --ground:#0B0C0E; --sheet:#111317; --sunk:#171A1F; --sel:#1B1F25;
+  --rule:#23272E;   --rule2:#3A404A;
+  --ink:#E2E6EC;    --ink2:#9AA3AF;  --ink3:#626B77;
+  --accent:#6FB2C9; --accent-ink:#0B0C0E; --accent-wash:#16242A;
+  --bad:#E06A5E;    --good:#7FC0A0;
+  --g0:#5E2F2B; --g1:#8A4139; --g2:#B4604F; --g3:#C4954F; --g4:#5A9E7B; --g5:#7FC0A0;
+  --st-todo:#E2E6EC; --st-done:#7FC0A0; --st-late:#C9A063; --st-skip:#9AA3AF; --st-notdue:#7F8792;
+  --st-secured:#7FC0A0; --st-ontrack:#6FB2C9; --st-atrisk:#C9A063; --st-outofreach:#E06A5E;
+  --sb-thumb:rgba(154,163,175,.35); --sb-thumb-hover:rgba(154,163,175,1);
+  --panel:#111317; --panel-2:#171A1F; --line:#23272E; --dim:#626B77; --accent-red:#E06A5E;
+  /* tells the browser which way to draw what it owns - form controls, the default
+     scrollbar before our own tokens reach it, and the text caret. A light theme that
+     does not say so gets dark-drawn native widgets on a paper ground. */
+  color-scheme:dark;
+}
