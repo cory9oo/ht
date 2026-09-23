@@ -10,7 +10,7 @@
      start paints before any script runs. `color-scheme` per theme is set in the theme files
      themselves, where a light theme can say so; this static pair is only the first frame. -->
 <meta name="color-scheme" content="dark">
-<meta name="theme-color" content="#090B0F">
+<meta name="theme-color" content="#07090D">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="HT">
 <meta name="mobile-web-app-capable" content="yes">
@@ -35,7 +35,7 @@ try{
 var _TDEF = 'slate';                          /* 179 S6 (was graphite, S6.14) · the switch is `user.theme` */
 var _TPAIR = { light:'linen', dark:'slate' };     /* EXTRA-1 · the system pair (179 S6) */
 try{
-  var _TH = ['slate','ember','linen','mono','classic','graphite','midnight','paper','terminal'];
+  var _TH = ['slate','ember','linen','mono','neon','classic','graphite','midnight','paper','terminal'];
   document.documentElement.setAttribute('data-theme-default', _TDEF);
   var _t = localStorage.getItem('ht_theme') || _TDEF;
   if(_t === 'system'){
@@ -86,6 +86,7 @@ try{
 <link rel="stylesheet" href="./themes/ember.css">
 <link rel="stylesheet" href="./themes/linen.css">
 <link rel="stylesheet" href="./themes/mono.css">
+<link rel="stylesheet" href="./themes/neon.css">   <!-- 185 S2 extra -->
 <link rel="stylesheet" href="./app.css">
 </head>
 <body>

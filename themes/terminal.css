@@ -25,5 +25,6 @@
      scrollbar before our own tokens reach it, and the text caret. A light theme that
      does not say so gets dark-drawn native widgets on a paper ground. */
   --m1:#E8B04A; --m2:#8FC3E8; --m3:#C9A6F5; --m4:#8FE0B0;   /* 179 S6: one colour per group member */
+  --sec-morning:#ED5A90; --sec-night:#A97DF4; --sec-weekly:#61E5D4; --sec-standards:#FF7A18;   /* 185 S3: one colour per section */
   color-scheme:dark;
 }

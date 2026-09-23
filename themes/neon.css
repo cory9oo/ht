@@ -1,0 +1,19 @@
+/* NEON - near-black + ONE ELECTRIC MAGENTA (hue 311). Paste 185 S2 EXTRA ("Sharp - Futuristic"; strike if
+   unwanted - removing this file and its <link> and picker entry is the whole undo). The bold one: the drama
+   is one saturated accent on true black. No gradients, no glows. Sections: standards = the accent; morning
+   gold, night violet, weekly aqua. */
+:root[data-theme="neon"]{
+  --ground:#050507; --sheet:#0B0B10; --sunk:#121219; --sel:#1A1A24;
+  --rule:#24242F;   --rule2:#3C3C4C;
+  --ink:#F4F4FA;    --ink2:#ADADBF;  --ink3:#6E6E82;
+  --accent:#FF2BD6; --accent-ink:#0A0010; --accent-wash:#2A0A25;
+  --bad:#FF6B6B;    --good:#3DF5A0;
+  --g0:#3A1A1A; --g1:#6E2B2B; --g2:#26263A; --g3:#3A3A55; --g4:#1F9E66; --g5:#3DF5A0;
+  --st-todo:#F4F4FA; --st-done:#3DF5A0; --st-late:#FF2BD6; --st-skip:#ADADBF; --st-notdue:#ADADBF;
+  --st-secured:#3DF5A0; --st-ontrack:#FF2BD6; --st-atrisk:#FF2BD6; --st-outofreach:#FF6B6B;
+  --m1:#FF2BD6; --m2:#61E5D4; --m3:#F6CD51; --m4:#AD83F5;
+  --sec-morning:#F6CD51; --sec-night:#AD83F5; --sec-weekly:#61E5D4; --sec-standards:#FF2BD6;
+  --sb-thumb:rgba(173,173,191,.35); --sb-thumb-hover:rgba(173,173,191,1);
+  --panel:#0B0B10; --panel-2:#121219; --line:#24242F; --dim:#6E6E82; --accent-red:#FF6B6B;
+  color-scheme:dark;
+}

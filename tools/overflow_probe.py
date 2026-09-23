@@ -59,6 +59,8 @@ MEASURE = r"""() => {
 SCREENS = [
     ('today',  "() => { const b=[...document.querySelectorAll('[data-t29]')].find(x=>/today/i.test(x.textContent)); if(b){b.click(); return true;} return false; }"),
     ('month',  "() => { const b=[...document.querySelectorAll('[data-t29]')].find(x=>/insights/i.test(x.textContent)); if(b){b.click(); return true;} return false; }"),
+    # 185 S4: the LIFE chart lives on Views - the screen Cory reported it on ("doesn't show all the weeks")
+    ('life',   "() => { const b=[...document.querySelectorAll('[data-t29]')].find(x=>/views/i.test(x.textContent)); if(b){b.click(); return true;} return false; }"),
     ('report', "() => { const t=[...document.querySelectorAll('[data-t29]')].find(x=>/today/i.test(x.textContent)); if(t) t.click(); const b=document.querySelector('[data-h32reports]'); if(b){b.click(); return true;} return false; }"),
     ('group',  "() => { const o=document.querySelector('.ov.on [data-close], .ovX, [data-ovclose]'); if(o) o.click(); const b=document.querySelector('[data-h29group]'); if(b){b.click(); return true;} return false; }"),
 ]

@@ -57,7 +57,7 @@ BASE = 'file://' + os.path.join(FIX, 'index.html').replace(os.sep, '/')
 
 # paste 179 S6 moved the ruling: eight offered, the four new schemes first, Slate the default, and the
 # system pair Linen by day / Slate by night. The checks below are unchanged; the ruling they hold is.
-THEMES = ['slate', 'ember', 'linen', 'mono', 'classic', 'graphite', 'midnight', 'paper']
+THEMES = ['slate', 'ember', 'linen', 'mono', 'neon', 'classic', 'graphite', 'midnight', 'paper']
 ALL_THEMES = THEMES + ['terminal']
 DEFAULT_THEME = 'slate'
 

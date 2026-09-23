@@ -3104,3 +3104,80 @@ html[data-simple] .mast #tape .tp .v.h32out{     color:var(--st-outofreach) }
 .h29r .h179mv{ margin-left:8px; font:500 11px/1 var(--mono); color:var(--ink2); white-space:nowrap }
 .h29r .h179mv.good{ color:var(--good) } .h29r .h179mv.bad{ color:var(--bad) }
 .h29r .h179mv ~ .dot29{ display:none }
+
+/* ==== PASTE 185 · LANDS AND SHARPENS ===================================================================
+   One block, last in the file, so it wins every tie on order and nothing above it has to be edited. */
+
+/* ---- S1 · THE GROUP TABLE: SIX FIXED COLUMNS, EACH WITH ITS OWN ROOM ------------------------------------
+   Cory 9/23: the header labels ran together - `TODAY7 DAYS`, `NEEDLOGGED`, `best 61%4/7`, `You stakes`.
+   THE CLASS, not the instance: a fixed-layout table with zero horizontal padding and right-aligned text puts
+   two labels edge to edge the moment either is wider than its column, and nothing ever separated them. So:
+   every column has a declared width (they add to 100), every cell but the first has left padding, a label
+   may WRAP at its own space ("7 / DAYS") but never overlap, a value is clipped inside its own cell, and only
+   the MEMBER column ellipsizes (stress 7). */
+html[data-simple] .h185gt, .h29ins .h185gt{ width:100%; table-layout:fixed; border-collapse:collapse }
+html[data-simple] .h185gt col.n,  .h29ins .h185gt col.n { width:31% }
+html[data-simple] .h185gt col.t,  .h29ins .h185gt col.t { width:13% }
+html[data-simple] .h185gt col.w,  .h29ins .h185gt col.w { width:13% }
+html[data-simple] .h185gt col.m,  .h29ins .h185gt col.m { width:14% }
+html[data-simple] .h185gt col.nd, .h29ins .h185gt col.nd{ width:16% }
+html[data-simple] .h185gt col.lg, .h29ins .h185gt col.lg{ width:13% }
+html[data-simple] #h18Group .h185gt th, .h29ins .h185gt th, html[data-simple] .h185gt th{
+  font:500 9.5px/1.15 var(--mono); letter-spacing:.06em; text-transform:uppercase; color:var(--muted);
+  white-space:normal; overflow-wrap:normal; word-break:normal; vertical-align:bottom; padding:0 0 6px 6px }
+html[data-simple] .h185gt th:first-child, .h29ins .h185gt th:first-child{ padding-left:0; text-align:left }
+html[data-simple] .h185gt th:not(:first-child), .h29ins .h185gt th:not(:first-child){ text-align:right }
+html[data-simple] #h18Group .h185gt td, .h29ins .h185gt td, html[data-simple] .h185gt td{
+  padding-left:6px; overflow:hidden; text-overflow:clip; vertical-align:middle }
+html[data-simple] #h18Group .h185gt td.n, .h29ins .h185gt td.n, html[data-simple] .h185gt td.n{
+  padding-left:0; white-space:normal; overflow:hidden }
+.h185gt .h185nm{ display:inline-block; max-width:100%; overflow:hidden; text-overflow:ellipsis;
+  white-space:nowrap; vertical-align:bottom }
+/* the NEED value is the longest word in the row ("best 61%"): it may break onto two lines, never spill */
+.h185gt td.h32ndc{ white-space:normal !important; line-height:1.15; font-size:11.5px }
+/* `stakes` is a chip of its own: bordered, spaced, and on its own line when the name needs the room */
+.h185gt .h32stk{ display:inline-block; margin:3px 0 0 0; padding:3px 7px; border:1px solid var(--border);
+  border-radius:10px; line-height:1; white-space:nowrap; max-width:100%; overflow:hidden; text-overflow:ellipsis }
+
+/* ---- S3 · THE FOUR SECTIONS STAND APART ----------------------------------------------------------------
+   SPEC 12's ruling: "a section is recognisable without reading its name". One colour per section from the
+   theme's own tokens (`--sec-morning/-night/-weekly/-standards`, every theme file carries all four and
+   contrast_ht32 holds them to 4.5:1 as TEXT), on the header, a 3px rail down its rows and its `+ Add to` line.
+   The header is heavier, letter-spaced and has 12px more air above it. The planned-time chip and the on-time
+   circle keep THEIR colours - those are state, not section. Rows are tagged by app.js HT185SEC. */
+html[data-simple] #log > [data-sec="morning"]  { --sec:var(--sec-morning,   var(--accent)) }
+html[data-simple] #log > [data-sec="night"]    { --sec:var(--sec-night,     var(--accent)) }
+html[data-simple] #log > [data-sec="weekly"]   { --sec:var(--sec-weekly,    var(--accent)) }
+html[data-simple] #log > [data-sec="standards"]{ --sec:var(--sec-standards, var(--accent)) }
+html[data-simple] #h18Comp #log > .grp[data-sec], html[data-simple] #log > .grp[data-sec]{
+  color:var(--sec); font:700 11.5px/1.2 var(--sans); letter-spacing:.16em; text-transform:uppercase;
+  margin-top:12px; padding:9px 0 7px 9px; border-left:3px solid var(--sec); border-bottom:1px solid var(--rule) }
+html[data-simple] #h18Comp #log > .grp[data-sec]:first-child, html[data-simple] #log > .grp[data-sec]:first-child{ margin-top:0 }
+html[data-simple] #h18Comp #log > .li[data-sec], html[data-simple] #log > .li[data-sec]{
+  border-left:3px solid var(--sec); padding-left:6px }
+html[data-simple] #h18Comp #log > .eadd[data-sec], html[data-simple] #log > .eadd[data-sec]{
+  color:var(--sec); font-weight:600; border-left:3px solid var(--sec); padding-left:9px }
+/* MONO has no hue to spend, so the four sections differ by the rail's STYLE as well as by lightness */
+html[data-theme="mono"][data-simple] #log > [data-sec="night"]{ border-left-style:double }
+html[data-theme="mono"][data-simple] #log > [data-sec="weekly"]{ border-left-style:dashed }
+html[data-theme="mono"][data-simple] #log > [data-sec="standards"]{ border-left-style:dotted }
+
+/* ---- S6 · the circle legend under the list (the row's own .dot29 classes, so it matches in every theme) ---- */
+.h185leg{ display:flex; flex-wrap:wrap; gap:6px 14px; padding:10px 2px 4px; font:400 11px/1.3 var(--sans); color:var(--ink2); min-width:0 }
+.h185leg span{ display:inline-flex; align-items:center; gap:6px; white-space:nowrap }
+.h185leg .dot29{ display:inline-block; width:8px; height:8px; border-radius:50%; margin:0; background:var(--st-done); position:static }
+.h185leg .dot29::after{ content:none }
+.h185leg .dot29.late{ background:var(--st-late) }
+.h185leg .dot29.beyond{ background:var(--ht-red) }
+.h185leg .h185no{ display:inline-block; width:8px; height:8px; border-radius:50%; border:1px solid var(--ink3); box-sizing:border-box }
+html:not([data-simple]) .h185leg{ display:none }
+
+/* ---- S5.3 · the sync stamp in the header: `v42 · synced 4:12p` ---- */
+.h185sync{ font:500 10px/1 var(--mono); letter-spacing:.04em; color:var(--ink3); white-space:nowrap; margin-left:8px;
+  overflow:hidden; text-overflow:ellipsis; min-width:0 }
+.h185sync.bad{ color:var(--bad) }
+
+/* ---- S4 · the phone life chart: its own axes, fitted to the width, never a scroller ---- */
+svg.h185life{ display:block; max-width:100%; height:auto; overflow:visible }
+svg.h185life text{ font:500 8.5px/1 var(--mono); fill:var(--ink3) }
+@media (max-width:1023px){ #vLife[data-h185], #vWeeks[data-h185]{ overflow:hidden; min-width:0 } }

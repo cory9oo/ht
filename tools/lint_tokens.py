@@ -158,7 +158,7 @@ def theme_offences(sheets):
          are linked - a theme file on disk that nothing loads is dead, and a link to a file that is
          not there is a 404 on every load.
     """
-    known = ['classic', 'graphite', 'midnight', 'paper', 'terminal', 'slate', 'ember', 'linen', 'mono']
+    known = ['classic', 'graphite', 'midnight', 'paper', 'terminal', 'slate', 'ember', 'linen', 'mono', 'neon']
     out = []
     linked = [n for n in sheets if n.startswith(SOURCE_DIR)]
     for want in known:

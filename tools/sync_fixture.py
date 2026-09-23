@@ -62,7 +62,7 @@ COPY = ['app.js', 'app.css', 'tokens.css', 'manifest.webmanifest', 'version.json
         'themes/classic.css', 'themes/paper.css', 'themes/graphite.css',
         'themes/midnight.css', 'themes/terminal.css',
         # paste 179 S6: the four new schemes
-        'themes/slate.css', 'themes/ember.css', 'themes/linen.css', 'themes/mono.css',
+        'themes/slate.css', 'themes/ember.css', 'themes/linen.css', 'themes/mono.css', 'themes/neon.css',
         # HT-32 N4: the mirror registry is a declaration the PAGE reads at run time, so a fixture
         # without it has a Settings picker with nothing in it - and the test that proves a renderer
         # can be added by config alone would have had no config to add it to.

@@ -38,7 +38,9 @@ TEXT = ('--ink', '--ink2', '--good', '--bad',
         '--st-todo', '--st-done', '--st-late', '--st-skip', '--st-notdue',
         '--st-secured', '--st-ontrack', '--st-atrisk', '--st-outofreach',
         # paste 179 S6: one colour per group member, and a member's NAME is text
-        '--m1', '--m2', '--m3', '--m4')
+        '--m1', '--m2', '--m3', '--m4',
+        # paste 185 S3: a section header, its rail and its `+ Add` line are text in the section colour
+        '--sec-morning', '--sec-night', '--sec-weekly', '--sec-standards')
 BG = ('--ground', '--sheet', '--sunk', '--sel')
 
 # Measured, but NOT held to the text floor - these are rules, hairlines and dividers.

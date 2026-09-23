@@ -37,7 +37,7 @@ SIZES = [(1280, 900), (1920, 1080), (375, 812)]
 # 390x844 is the phone Cory actually holds (375x812 is the older one this file has always shot), and
 # 1280x720 / 1920x1080 are his two desktop widths.
 THEME_SIZES = [(390, 844), (1280, 720), (1920, 1080)]
-THEMES = ['slate', 'ember', 'linen', 'mono', 'classic', 'graphite', 'midnight', 'paper']
+THEMES = ['slate', 'ember', 'linen', 'mono', 'neon', 'classic', 'graphite', 'midnight', 'paper']
 
 
 async def shoot(pw, base, tag, out, flags):

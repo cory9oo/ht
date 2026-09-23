@@ -1,20 +1,22 @@
-/* SLATE - near-black, cool grey ramp, ONE cold accent. The Graphite lineage, sharpened: a darker ground, a
-   crisper ink and a colder, more saturated accent. Paste 179 S6 scheme 1 - the DEFAULT for a fresh profile.
-   The contract: ONE accent hue - ONE neutral ramp - exactly TWO state colours (--good / --bad) - one
-   colour per group member (--m1..--m4). No gradients, no glows, no second accent. late and t risk
-   are the ACCENT, not a third state colour. Every colour here has this one address (R70.282), and
-   	ools/contrast_ht32.py --check holds every text pair to 4.5:1. */
+/* SLATE - cool near-black + ELECTRIC CYAN (hue 188). Paste 185 S2, Cory 9/23: "get a little drastic, some of them
+   are very similar". 179's Slate was a steel blue on blue-black and sat beside Graphite and Linen; this one is
+   darker and colder, and its accent is pure cyan. The DEFAULT for a fresh profile.
+   The contract (179): ONE accent hue - ONE neutral ramp - exactly TWO state colours (--good / --bad) - one colour
+   per group member (--m1..--m4). 185 adds FOUR SECTION colours (--sec-*): standards = the accent; morning gold,
+   night violet, weekly rose (teal is skipped - it sits within 40 deg of the accent). No gradients, no glows.
+   `tools/contrast_ht32.py` holds every text pair to 4.5:1 and `tools/scheme_distance.py` holds the schemes apart. */
 :root[data-theme="slate"]{
-  --ground:#090B0F; --sheet:#0E1116; --sunk:#141920; --sel:#192029;
-  --rule:#222A35;   --rule2:#384352;
-  --ink:#E8ECF2;    --ink2:#A6B0BE;  --ink3:#6C7786;
-  --accent:#4FB6EE; --accent-ink:#090B0F; --accent-wash:#0F2130;
-  --bad:#F0786B;    --good:#63CC9E;
-  --g0:#3A1F1C; --g1:#6E3530; --g2:#35414F; --g3:#4B5A6B; --g4:#3F8F6F; --g5:#63CC9E;
-  --st-todo:#E8ECF2; --st-done:#63CC9E; --st-late:#4FB6EE; --st-skip:#A6B0BE; --st-notdue:#A6B0BE;
-  --st-secured:#63CC9E; --st-ontrack:#4FB6EE; --st-atrisk:#4FB6EE; --st-outofreach:#F0786B;
-  --m1:#4FB6EE; --m2:#C9A6F5; --m3:#E9C46E; --m4:#6FD6C6;
-  --sb-thumb:rgba(166,176,190,.35); --sb-thumb-hover:rgba(166,176,190,1);
-  --panel:#0E1116; --panel-2:#141920; --line:#222A35; --dim:#6C7786; --accent-red:#F0786B;
+  --ground:#07090D; --sheet:#0D1117; --sunk:#131922; --sel:#1A2230;
+  --rule:#232C39;   --rule2:#3A4658;
+  --ink:#EEF3F8;    --ink2:#A9B4C2;  --ink3:#6B7788;
+  --accent:#22D3EE; --accent-ink:#041014; --accent-wash:#0A2730;
+  --bad:#F4796B;    --good:#4ADE9B;
+  --g0:#3A1E1B; --g1:#6E332D; --g2:#2A3442; --g3:#3E4B5C; --g4:#2E8A64; --g5:#4ADE9B;
+  --st-todo:#EEF3F8; --st-done:#4ADE9B; --st-late:#22D3EE; --st-skip:#A9B4C2; --st-notdue:#A9B4C2;
+  --st-secured:#4ADE9B; --st-ontrack:#22D3EE; --st-atrisk:#22D3EE; --st-outofreach:#F4796B;
+  --m1:#22D3EE; --m2:#C4A6FF; --m3:#F6CD51; --m4:#F59BC0;
+  --sec-morning:#F6CD51; --sec-night:#B28BF6; --sec-weekly:#ED5A90; --sec-standards:#22D3EE;
+  --sb-thumb:rgba(169,180,194,.35); --sb-thumb-hover:rgba(169,180,194,1);
+  --panel:#0D1117; --panel-2:#131922; --line:#232C39; --dim:#6B7788; --accent-red:#F4796B;
   color-scheme:dark;
 }

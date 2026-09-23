@@ -1,20 +1,19 @@
-/* EMBER - warm charcoal ground, warm grey ramp, ONE copper accent. Paste 179 S6 scheme 2.
-   
-   The contract: ONE accent hue - ONE neutral ramp - exactly TWO state colours (--good / --bad) - one
-   colour per group member (--m1..--m4). No gradients, no glows, no second accent. late and t risk
-   are the ACCENT, not a third state colour. Every colour here has this one address (R70.282), and
-   	ools/contrast_ht32.py --check holds every text pair to 4.5:1. */
+/* EMBER - warm charcoal + HOT AMBER (hue 38). Paste 185 S2: the accent moved from 179's soft copper to a hot amber
+   and the ground warmed, so Ember is 150 deg from Slate and can never be mistaken for it.
+   The 179 contract holds (one accent, one ramp, two states, four members). Sections: standards = the accent;
+   morning rose (gold sits within 40 deg of amber), night violet, weekly aqua. No gradients, no glows. */
 :root[data-theme="ember"]{
-  --ground:#0F0D0B; --sheet:#15120F; --sunk:#1C1814; --sel:#231E19;
-  --rule:#2E2721;   --rule2:#4A3F35;
-  --ink:#F0E9E0;    --ink2:#B9AC9D;  --ink3:#7E7265;
-  --accent:#E8944C; --accent-ink:#0F0D0B; --accent-wash:#2B1D11;
-  --bad:#EF7B6C;    --good:#93C99F;
-  --g0:#3B211C; --g1:#6B3A31; --g2:#3F352C; --g3:#5A4C3F; --g4:#5F8F69; --g5:#93C99F;
-  --st-todo:#F0E9E0; --st-done:#93C99F; --st-late:#E8944C; --st-skip:#B9AC9D; --st-notdue:#B9AC9D;
-  --st-secured:#93C99F; --st-ontrack:#E8944C; --st-atrisk:#E8944C; --st-outofreach:#EF7B6C;
-  --m1:#E8944C; --m2:#8FC3E8; --m3:#D9C27A; --m4:#C9A0D6;
-  --sb-thumb:rgba(166,176,190,.35); --sb-thumb-hover:rgba(166,176,190,1);
-  --panel:#15120F; --panel-2:#1C1814; --line:#2E2721; --dim:#7E7265; --accent-red:#EF7B6C;
+  --ground:#14100C; --sheet:#1C1712; --sunk:#241D16; --sel:#2D241B;
+  --rule:#3A2F24;   --rule2:#57483A;
+  --ink:#FBF1E4;    --ink2:#C8B7A3;  --ink3:#8A7A68;
+  --accent:#F5A524; --accent-ink:#1A1108; --accent-wash:#3A2710;
+  --bad:#F4806E;    --good:#9BD39A;
+  --g0:#3E221B; --g1:#6E3B2F; --g2:#3A3027; --g3:#574A3C; --g4:#5C8F5B; --g5:#9BD39A;
+  --st-todo:#FBF1E4; --st-done:#9BD39A; --st-late:#F5A524; --st-skip:#C8B7A3; --st-notdue:#C8B7A3;
+  --st-secured:#9BD39A; --st-ontrack:#F5A524; --st-atrisk:#F5A524; --st-outofreach:#F4806E;
+  --m1:#F5A524; --m2:#8FC8F2; --m3:#F17EA8; --m4:#C9A6F2;
+  --sec-morning:#F17EA8; --sec-night:#B590F6; --sec-weekly:#61E5D4; --sec-standards:#F5A524;
+  --sb-thumb:rgba(200,183,163,.35); --sb-thumb-hover:rgba(200,183,163,1);
+  --panel:#1C1712; --panel-2:#241D16; --line:#3A2F24; --dim:#8A7A68; --accent-red:#F4806E;
   color-scheme:dark;
 }

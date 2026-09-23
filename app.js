@@ -214,7 +214,8 @@ function nameOf(n){ return String(n==null?'':n); }
    the four old `data-skin` values onto their descendants and delegates. The old values also still
    resolve in CSS, because each theme file names its legacy selector beside the new one. */
 /* HT-179 S6: four new schemes, FIRST in the picker, then the four of HT-32. Nothing removed (R70.138). */
-var THEMES = ['slate','ember','linen','mono','classic','graphite','midnight','paper'];   /* offered, in picker order */
+/* 185 S2: Neon joins after Mono (the EXTRA - strike it by removing it here, in index.html and its file). */
+var THEMES = ['slate','ember','linen','mono','neon','classic','graphite','midnight','paper'];   /* offered, in picker order */
 var THEME_ALL = THEMES.concat(['terminal']);                     /* terminal is kept, not offered */
 /* READ, NOT DECLARED. index.html's pre-paint script owns the default and publishes it here; this
    file only needs to agree with it. The literal is the fallback for a page served without the
@@ -224,11 +225,12 @@ var THEME_DEFAULT = (function(){
   try{ return document.documentElement.getAttribute('data-theme-default') || 'slate'; }
   catch(e){ return 'slate'; }
 })();
-var THEME_LABEL = { slate:'Slate', ember:'Ember', linen:'Linen', mono:'Mono',
+var THEME_LABEL = { slate:'Slate', ember:'Ember', linen:'Linen', mono:'Mono', neon:'Neon',
                     classic:'Classic', graphite:'Graphite', midnight:'Midnight', paper:'Paper',
                     terminal:'Terminal', system:'Follow system' };
-var THEME_NOTE = { slate:'dark, cool, one cold accent', ember:'dark, warm, copper',
-                   linen:'light, clean, one blue', mono:'no colour, high contrast',
+var THEME_NOTE = { slate:'near-black, electric cyan', ember:'warm charcoal, hot amber',
+                   linen:'light paper, one violet', mono:'graphite grey, no colour at all',
+                   neon:'true black, electric magenta',
                    classic:"today's look", graphite:'near-black, cool greys',
                    midnight:'deep navy, cyan', paper:'light, warm greys' };
 /* EXTRA-1 (S6.14): "follow system light/dark" is a PAIR, not a fifth palette. 179 S6: Slate by night,
@@ -290,7 +292,8 @@ function setTheme(t){
   try{ localStorage.setItem('ht_theme', t); }catch(e){}
   try{ localStorage.setItem('st.skin', t); }catch(e){}   /* HT-22's key, kept so nothing downstream breaks */
   var r = applyTheme(t);
-  if(window.sb && typeof S!=='undefined' && S && S.me && S.me.id){
+  /* 186 N1: `window.sb` was never assigned (the client is this closure's `sb`), so this write never ran */
+  if(sb && typeof S!=='undefined' && S && S.me && S.me.id){
     try{
       var q = sb.from('profiles').update({ theme:t }).eq('id',S.me.id);
       if(q && q.then) q.then(function(res){
@@ -10410,7 +10413,9 @@ var HT29GRP = (function(){
     return list.map(function(r){
       var open = !r.you && canDay === true;
       return '<tr' + (r.you ? ' class="h18me"' : '') + (open ? ' data-h29m="' + esc(r.id) + '" tabindex="0"' : '') + '>' +
-        '<td class="n">' + esc(r.n) + (open ? ' <span class="h29go">›</span>' : '') +
+        /* 185 S1: the name is its own ellipsis box and the stake is its own chip, so neither can run
+           into the other ("You stakes") and a long name never pushes a number out of its column. */
+        '<td class="n"><span class="h185nm">' + esc(r.n) + '</span>' + (open ? ' <span class="h29go">›</span>' : '') +
         HT32GRP.stakeChip(r) + '</td>' +
         cell(r.t) + cell(r.w) + cell(r.m) + needCell(r) +
         '<td class="l">' + (r.logged == null ? '—' : r.logged + '/7') + '</td></tr>';
@@ -10425,8 +10430,13 @@ var HT29GRP = (function(){
     /* the column count is written ONCE and read by the empty row's colspan: the two went out of
        step the last time a column was added, and an empty state that spans the wrong number of
        columns is a ragged table nobody notices until it is the only state on screen. */
-    var COLS = 7;
-    return '<table class="h18gt h29gt"><colgroup><col class="n"><col><col><col><col><col><col></colgroup>' +
+    /* 185 S1: SIX columns, and the colgroup says six. It said seven after HT-32 added NEED, so a
+       phantom seventh column took its share of a fixed-layout table and the six real ones were
+       squeezed until their right-aligned labels touched: `TODAY7 DAYS`, `NEEDLOGGED`, `best 61%4/7`.
+       Every column now has a class, a width and its own padding (app.css `.h185gt`). */
+    var COLS = 6;
+    return '<table class="h18gt h29gt h185gt"><colgroup><col class="n"><col class="t"><col class="w">' +
+      '<col class="m"><col class="nd"><col class="lg"></colgroup>' +
       '<thead><tr><th>member</th><th>today</th><th>7 days</th><th>30 days</th>' +
       '<th title="what today has to be to end the week at ' + HT32_TARGET_PCT + '%">need</th>' +
       '<th>logged</th></tr></thead>' +
@@ -11642,7 +11652,7 @@ var HT29_UPDATE_BANNER = true;
 /* The one place this build says what it is. `sw.js`'s cache name must equal it, and `golden_ht30` S0 reads
    both files and fails when they drift - a version on the screen that is not the version in the cache is
    worse than no version at all, because it is the thing you check when you are already unsure. */
-var HT30_VERSION = 'ht-v41';
+var HT30_VERSION = 'ht-v42';
 
 function warn30(what, e){ try{ console.warn('HT-30: ' + what, e); }catch(_){} }
 function h30El(id){ return document.getElementById(id); }
@@ -12572,7 +12582,21 @@ var HT31_VERSION_EVERY_MS = 60000;
   }
   function go(v){
     mark(v); stash(); flush();
-    setTimeout(function(){ try{ location.reload(); }catch(e){ warn31('reload', e); } }, 60);
+    /* 185 S5.3: ask the worker for the new build FIRST (its cache name is per version, and it calls
+       skipWaiting + clients.claim), then the one reload - so the reload is answered by the new worker.
+       An update that never answers still reloads, once, at 2.5 s. */
+    var done = false;
+    function reload(){ if(done) return; done = true; try{ location.reload(); }catch(e){ warn31('reload', e); } }
+    try{
+      if(navigator.serviceWorker && typeof navigator.serviceWorker.getRegistration === 'function'){
+        navigator.serviceWorker.getRegistration().then(function(r){
+          return r && r.update ? r.update() : null;
+        }).then(function(){ setTimeout(reload, 60); }, function(){ setTimeout(reload, 60); });
+        setTimeout(reload, 2500);
+        return;
+      }
+    }catch(e){ warn31('sw update', e); }
+    setTimeout(reload, 60);
   }
   /* A pending update takes the first safe moment: a blur, a visibility change, or the next poll. */
   function ready(){
@@ -12611,6 +12635,7 @@ var HT31_VERSION_EVERY_MS = 60000;
     setTimeout(check, 1500);
     setInterval(check, HT31_VERSION_EVERY_MS);
     document.addEventListener('visibilitychange', function(){ if(document.visibilityState === 'visible'){ ready(); check(); } });
+    window.addEventListener('focus', function(){ check(); });          /* 185 S5.3: on focus, too */
     document.addEventListener('focusout', function(){ setTimeout(ready, 120); }, true);
   }
   if(document.readyState === 'complete') setTimeout(start, 300);
@@ -12679,7 +12704,7 @@ var HT31_SECTIONS_LOCAL = true;
      only for rows the column has nothing for, so a placement made on another device is never
      overwritten by an older one kept here. */
   function push(){
-    if(!S || !S.hasSection || !S.me || !window.sb) return;
+    if(!S || !S.hasSection || !S.me || !sb) return;
     var m = load(), ids = Object.keys(m);
     if(!ids.length) return;
     ids.forEach(function(id){
@@ -12696,7 +12721,7 @@ var HT31_SECTIONS_LOCAL = true;
          makes the count readable, and an RLS refusal, a check constraint or a zero-row match all land
          here as "not written" instead of as success. The device keeps its copy and tries again. */
       try{
-        window.sb.from('habits').update({section: m[id]}).eq('id', id).eq('user_id', S.me.id).select('id')
+        sb.from('habits').update({section: m[id]}).eq('id', id).eq('user_id', S.me.id).select('id')
           .then(function(res){
             if(res && res.error){ warn31('section push refused', res.error); return; }
             if(!res || !res.data || !res.data.length){ warn31('section push matched no row', id); return; }
@@ -12712,7 +12737,9 @@ var HT31_SECTIONS_LOCAL = true;
 
   var _pa = paintAll;
   paintAll = function(){ var out = _pa.apply(null, arguments);
-                         try{ claim(); push(); }catch(e){ warn31('section push', e); } return out; };
+                         /* 186 N1 RULE: no section write on render. `push()` stays whole and is run on request
+                            (`__HT31SEC.push()`, named in the bus's RECOVER.md) - never by a paint. */
+                         try{ claim(); }catch(e){ warn31('section claim', e); } return out; };
 })();
 
 
@@ -12761,12 +12788,15 @@ var HT31_SECTIONS_LOCAL = true;
        task where the bug put it AND took away the one tap that would have fixed it - permanently,
        because `hide()` is remembered. Same reason as the two above: no error is not the same as a row. */
     h.section = sec;
-    if(!S.hasSection || !window.sb || !S.me){
+    /* 186 N1: this said `!window.sb`, which is ALWAYS true (nothing assigns window.sb), so every one-tap move
+       went to this device's localStorage and never to the database - a section fixed on the desktop that the
+       phone, and the next fresh load, never saw. The closure's own client is the one to ask. */
+    if(!S.hasSection || !sb || !S.me){
       if(window.__HT31SEC) window.__HT31SEC.place(id, sec);
       hide(String(id));
       return Promise.resolve(true);
     }
-    return window.sb.from('habits').update({section: sec}).eq('id', id).eq('user_id', S.me.id).select('id')
+    return sb.from('habits').update({section: sec}).eq('id', id).eq('user_id', S.me.id).select('id')
       .then(function(res){
         if(res && res.error){ warn31('moved undo refused', res.error); return false; }
         if(!res || !res.data || !res.data.length){ warn31('moved undo matched no row', id); return false; }
@@ -13736,5 +13766,318 @@ function ht186Superseded(id, local, server){
   try{ localStorage.setItem(K, JSON.stringify(rows.slice(-200))); }catch(e){}
 }
 window.__HT186N1 = { changed:ht186Changed, norm:ht186Norm };
+/* ======================= PASTE 185 · LANDS AND SHARPENS (WIRE HT-185) =======================
+   Cory, Wednesday 2026-09-23 16:17: "make the categories and times more distinguished between standards,
+   weekly, night routine, morning routine" · "my phone should be a one-to-one sync with the desktop".
+
+   ---- S3 · A SECTION IS RECOGNISABLE WITHOUT READING ITS NAME ----------------------------------------------
+   Every row under a section header carries that section as `data-sec`, and app.css paints the header, a 3px
+   rail down its rows and its `+ Add to ...` line in the section's own colour (`--sec-*`, one per theme).
+   WHY AN OBSERVER AND NOT A LINE IN regroup29: four renderers put rows into #log (HT29SEC's grouper, HT-16's
+   reorder, the drag handler and the desktop's canonical grouper), and a drag moves a row across a header
+   without any of them repainting. The ONE fact that decides a row's section on screen is the nearest header
+   above it - so this reads exactly that, after every child-list change, and writes an attribute (which is not
+   a child-list change, so it cannot re-trigger itself). It never MOVES a row and never renames a section. */
+var HT185SEC = (function(){
+  var SECS = { morning:1, night:1, weekly:1, standards:1 };
+  function tag(log){
+    log = log || document.getElementById('log'); if(!log) return 0;
+    var cur = null, n = 0;
+    Array.prototype.forEach.call(log.children, function(c){
+      if(c.classList.contains('grp')){
+        var s = c.getAttribute('data-sec');
+        cur = SECS[s] ? s : null;
+        return;
+      }
+      if(c.classList.contains('li') || c.classList.contains('eadd')){
+        var own = c.classList.contains('eadd') ? c.getAttribute('data-sec') : cur;
+        if(own && SECS[own]){ if(c.getAttribute('data-sec') !== own) c.setAttribute('data-sec', own); n++; }
+        else if(c.classList.contains('li') && c.hasAttribute('data-sec')) c.removeAttribute('data-sec');
+      }
+    });
+    return n;
+  }
+  var mo = null;
+  function watch(){
+    var log = document.getElementById('log');
+    if(!log || mo || typeof MutationObserver === 'undefined') return;
+    mo = new MutationObserver(function(){ tag(log); });
+    mo.observe(log, { childList:true });
+    tag(log);
+  }
+  if(document.readyState === 'loading') document.addEventListener('DOMContentLoaded', watch);
+  else watch();
+  window.addEventListener('load', watch);
+  return { tag:tag, watch:watch };
+})();
+window.__HT185SEC = HT185SEC;
+
+/* ---- S6 · THE CIRCLES, EXPLAINED ON SCREEN (EXTRA - strike if unwanted) ----------------------------------
+   The existing rule made visible, nothing repriced: HT29SEC.dotOf() - on time within HT179_TOL (15) minutes of
+   the plan, late within 60, past that the third colour; a task with no planned time gets no circle. The legend
+   draws the SAME `.dot29` classes the rows draw, so it can never show a colour the row does not, in any theme
+   (no colour WORDS: Slate's "late" is cyan and Mono's is a grey, and a legend that said "yellow" would lie). */
+var HT185LEG = (function(){
+  function html(){
+    return '<span><i class="dot29 ontime"></i>on time (\u2264 ' + HT179_TOL + ' min of plan)</span>' +
+           '<span><i class="dot29 late"></i>late (\u2264 60 min)</span>' +
+           '<span><i class="dot29 beyond"></i>missed \u00b7 over an hour</span>' +
+           '<span><i class="h185no"></i>no plan \u00b7 no circle</span>';
+  }
+  function place(){
+    var log = document.getElementById('log'); if(!log || !log.parentNode) return false;
+    var el = document.getElementById('h185leg');
+    if(!el){
+      el = document.createElement('div'); el.id = 'h185leg'; el.className = 'h185leg';
+      el.setAttribute('aria-label', 'what the circles mean');
+      el.innerHTML = html();
+    }
+    if(el.previousElementSibling !== log) log.parentNode.insertBefore(el, log.nextSibling);
+    return true;
+  }
+  if(document.readyState === 'loading') document.addEventListener('DOMContentLoaded', place);
+  else place();
+  window.addEventListener('load', place);
+  return { place:place, html:html };
+})();
+window.__HT185LEG = HT185LEG;
+
+/* ---- S5 · ONE-TO-ONE SYNC ------------------------------------------------------------------------------------
+   Cory: "my phone should be a one-to-one sync with the desktop". THE AUDIT (185 S5.1, measured 2026-09-23 against
+   the live database with the public key - a missing column answers 42703 before RLS is ever asked):
+     section, order, name, planned time, link  -> habits.section / sort_order / name / planned_start / link  LIVE
+     checks and the done time                  -> days.checked ("HH:MM" per id) + days.updated_at           LIVE
+     rating                                    -> day_private.rating + updated_at                            LIVE
+     group settings                            -> circles.* (members_can_invite LIVE)                        LIVE
+     THEME CHOICE                              -> profiles.theme is MISSING live: the choice has only ever
+                                                  lived in ONE browser's localStorage. <- the defect.
+   The migration that adds profiles.theme needs BEV/HT_SUPABASE_DB_URL, which is not set (apply_pending --check).
+   So the theme rides the ONE per-user record Supabase already keeps and the user can already write: the auth
+   user's metadata (`auth.updateUser({data})`) - server state, no migration, readable by every device the person
+   signs in on. profiles.theme is still written too (HT-32's line, above), so the column takes over the day it
+   lands. CONFLICT RULE: last write wins by `ht_theme_at` (ms); a device holding a choice newer than the server's
+   writes it up once and then the server wins (stress 4) - never a silent drop, never a silent override. */
+function warn185(what, e){ try{ console.warn('HT-185: ' + what, e); }catch(_){} }
+var HT185SYNC = (function(){
+  var AT = 'ht_theme_at', busy = false;
+  function localAt(){ try{ return +(localStorage.getItem(AT) || 0) || 0; }catch(e){ return 0; } }
+  function localTheme(){ try{ return localStorage.getItem('ht_theme') || ''; }catch(e){ return ''; } }
+  function authOk(){ return !!(sb && sb.auth && S.me); }   /* 186: the closure's client; window.sb never existed */
+  function up(t, at){
+    if(!authOk() || typeof sb.auth.updateUser !== 'function') return;
+    try{
+      var q = sb.auth.updateUser({ data:{ ht_theme:t, ht_theme_at:at } });
+      if(q && q.then) q.then(function(r){ if(r && r.error) warn185('theme not saved to the account', r.error); },
+                             function(e){ warn185('theme save', e); });
+    }catch(e){ warn185('theme save', e); }
+  }
+  /* the picker's write path gains a clock and a server copy; nothing else about it changes */
+  if(typeof setTheme === 'function'){
+    var _st = setTheme;
+    setTheme = function(t){
+      var out = _st.apply(this, arguments);
+      var at = Date.now();
+      try{ localStorage.setItem(AT, String(at)); }catch(e){}
+      up(localTheme() || t, at);
+      return out;
+    };
+  }
+  async function pullTheme(){
+    if(busy || !authOk() || typeof sb.auth.getUser !== 'function') return null;
+    busy = true;
+    try{
+      var r = await sb.auth.getUser();
+      var md = (r && r.data && r.data.user && r.data.user.user_metadata) || {};
+      var st = md.ht_theme || '', sat = +(md.ht_theme_at || 0) || 0;
+      var lt = localTheme(), lat = localAt();
+      if(st && (sat > lat || !lt)){
+        if(st !== lt){
+          try{ localStorage.setItem('ht_theme', st); localStorage.setItem('st.skin', st); }catch(e){}
+          if(typeof applyTheme === 'function') applyTheme(st);
+        }
+        try{ localStorage.setItem(AT, String(sat)); }catch(e){}
+        return st === lt ? 'same' : 'adopted';
+      }
+      if(lt && (!st || lat > sat)){
+        var at = lat || Date.now();
+        try{ localStorage.setItem(AT, String(at)); }catch(e){}
+        up(lt, at); return 'pushed';
+      }
+      /* 186: another tab of this browser may have stored the account's choice already - the storage agrees, the
+         page does not. Paint what the account says. */
+      if(st && st !== 'system' && document.documentElement.getAttribute('data-theme') !== st && typeof applyTheme === 'function'){
+        applyTheme(st); return 'adopted';
+      }
+      return 'same';
+    }catch(e){ warn185('theme pull', e); return null; }
+    finally{ busy = false; }
+  }
+
+  /* ---- S5.3 · THE STAMP: `v42 · synced 4:12p`, in the header, updated on every successful fetch ---------------- */
+  function clock(d){
+    var h = d.getHours(), m = d.getMinutes();
+    return ((h % 12) || 12) + ':' + (m < 10 ? '0' : '') + m + (h < 12 ? 'a' : 'p');
+  }
+  function ver(){ return String((typeof HT30_VERSION === 'string' && HT30_VERSION) || '').replace(/^ht-/, ''); }
+  function stamp(){
+    var host = document.querySelector('.mast .r1'); if(!host) return null;
+    var el = document.getElementById('h185sync');
+    if(!el){
+      el = document.createElement('span'); el.id = 'h185sync'; el.className = 'h185sync';
+      var d = document.getElementById('mDate');
+      if(d && d.parentNode === host) host.insertBefore(el, d.nextSibling); else host.appendChild(el);
+    }
+    var st = (window.__HT28c && window.__HT28c.state) ? window.__HT28c.state() : null;
+    var when = st && st.last ? new Date(st.last) : null;
+    var bad = !!(st && (st.state === 'offline' || st.state === 'error'));
+    var txt = ver() + (bad ? (' · ' + (st.state === 'offline' ? 'offline' : 'not synced')) :
+                       (when ? ' · synced ' + clock(when) : ''));
+    if(el.textContent !== txt) el.textContent = txt;
+    el.classList.toggle('bad', bad);
+    return txt;
+  }
+
+  /* ---- S5.2 · REALTIME COVERS WHAT A PHONE CAN BE LOOKING AT --------------------------------------------------
+     HT-29's channel covers the person's own days / day_private / habits. This adds their profile row and their
+     group membership, so a rename or a join on one device repaints the other. A table not in the realtime
+     publication simply sends nothing - the refetch on `visibilitychange` / `online` / `focus` (HT-28c) and the
+     theme pull below are the floor under it, which is exactly iOS dropping the socket in the background
+     (stress 8). */
+  var ch = null, chFor = null;
+  function poke(){ try{ if(window.__HT28c && window.__HT28c.pull) window.__HT28c.pull(); }catch(e){} }
+  function closeRt(){
+    if(!ch) return; var c = ch; ch = null; chFor = null;
+    try{ if(sb.removeChannel) sb.removeChannel(c); else if(c.unsubscribe) c.unsubscribe(); }catch(e){}
+  }
+  function openRt(){
+    if(!authOk() || typeof sb.channel !== 'function' || document.visibilityState === 'hidden') return;
+    if(ch && chFor === S.me.id) return;
+    closeRt();
+    try{
+      var c = sb.channel('ht185-' + S.me.id);
+      c.on('postgres_changes', { event:'*', schema:'public', table:'profiles', filter:'id=eq.' + S.me.id }, poke);
+      c.on('postgres_changes', { event:'*', schema:'public', table:'circle_members', filter:'user_id=eq.' + S.me.id }, poke);
+      ch = c.subscribe(function(){}) || c; chFor = S.me.id;
+    }catch(e){ warn185('realtime', e); ch = null; }
+  }
+  function back(){ if(!S.me) return; pullTheme().then(stamp, stamp); openRt(); }
+  document.addEventListener('visibilitychange', function(){
+    if(document.visibilityState === 'visible') back(); else closeRt();
+  });
+  window.addEventListener('focus', back);
+  window.addEventListener('online', back);
+  /* the stamp follows the sync layer's own clock; the theme is asked again every 30 s while visible */
+  setInterval(function(){ if(document.visibilityState === 'visible') stamp(); }, 5000);
+  setInterval(function(){ if(document.visibilityState === 'visible' && S.me) pullTheme(); }, 30000);
+  if(typeof paintAll === 'function'){
+    var _pa = paintAll;
+    paintAll = function(){
+      var out = _pa.apply(null, arguments);
+      try{ stamp(); if(S.me && chFor !== S.me.id) back(); }catch(e){ warn185('paint hook', e); }
+      return out;
+    };
+  }
+  return { pullTheme:pullTheme, stamp:stamp, openRt:openRt, live:function(){ return !!ch; } };
+})();
+window.__HT185SYNC = HT185SYNC;
+
+/* ---- S4 · THE LIFE CHART FITS THE PHONE, WITH BOTH AXES ------------------------------------------------------
+   Cory 9/23: "the life chart on the phone doesn't show any x or y, doesn't show all the weeks of my life". MEASURED
+   CAUSE: on a phone the grid is HT-16's 9 px-cell renderer (546 x 1016) inside a scroller - wider than the screen,
+   so most weeks were off to the right, and its axis labels were drawn outside the part that showed. The desktop
+   grid (HT-18/HT-20) is untouched: `desktop()` still owns #vWeeks there.
+   ON THE PHONE the cell comes from the viewport: cell = (clientWidth - axis) / 52, square, never under 5 px (stress
+   6: if it would be, the week ticks drop to every 13 and the cell stays >= 5 - never a scrollbar). x axis = weeks,
+   a tick every 10 (every 13 when narrow) and 52 at the end; y axis = age, a tick every 10 years. Lived weeks are one
+   run per year, logged weeks carry the completion ramp, today is outlined. ONE renderer for both phone hosts (#vLife
+   on Views, #vWeeks on Insights), re-asserted by an observer after any other renderer writes the host - the
+   attribute stamp `data-h185` is what makes the observer a no-op on its own write. */
+var HT185LIFE = (function(){
+  var HOSTS = ['vLife', 'vWeeks'], AX = 20, AXT = 13, GAP = 1, WEEKS = 52, MIN = 5;
+  function phone(){ return window.innerWidth < 1024; }
+  function birthD(){ var b = S.priv0 && S.priv0.birth_date; return b ? new Date(b + 'T12:00:00') : null; }
+  function years(){ var t = S.priv0 && S.priv0.target_age; return (t == null || t === '') ? 90 : Math.max(20, Math.min(120, +t)); }
+  function weekIdx(k, b){
+    if(window.__HT16 && window.__HT16.weekIndex) return window.__HT16.weekIndex(k, b);
+    var d = (k instanceof Date) ? k : new Date(k + 'T12:00:00');
+    return Math.floor((d - b) / 6048e5);
+  }
+  function fill(p){ return (window.__HT16 && window.__HT16.rampFill) ? window.__HT16.rampFill(p) : 'var(--accent)'; }
+  function render(host){
+    var b = birthD(); if(!b || !phone()) return false;
+    var W = Math.floor(host.clientWidth || host.getBoundingClientRect().width || 0);
+    if(W < 120) return false;
+    var Y = years();
+    var cellP = (W - AX) / WEEKS;                        /* the pitch: a cell plus its gap */
+    var tickW = 10;
+    if(cellP - GAP < MIN){ tickW = 13; }
+    var cell = Math.max(MIN, Math.floor((cellP - GAP) * 100) / 100), P = cell + GAP;
+    var gridW = WEEKS * P - GAP, H = AXT + Y * P - GAP;
+    var nowW = weekIdx(new Date(), b);
+    var s = '<rect x="' + AX + '" y="' + AXT + '" width="' + gridW + '" height="' + (Y * P - GAP) + '" fill="var(--sunk)"/>';
+    for(var y = 0; y < Y; y++){
+      var st = y * WEEKS, livedTo = Math.min(st + WEEKS - 1, nowW);
+      if(livedTo >= st)
+        s += '<rect class="h185lived" x="' + AX + '" y="' + (AXT + y * P) + '" width="' + ((livedTo - st + 1) * P - GAP) +
+             '" height="' + cell + '" fill="var(--rule2)"/>';
+      if(y % 10 === 0)
+        s += '<text class="h185y" x="' + (AX - 4) + '" y="' + (AXT + y * P + cell) + '" text-anchor="end">' + y + '</text>';
+    }
+    /* logged weeks on the ramp */
+    var by = {};
+    dates().forEach(function(k){
+      var r = S.byDate[k]; if(!r || r.pct == null || !loggedOn(k)) return;
+      var wi = weekIdx(k, b); if(wi == null || wi < 0) return;
+      (by[wi] = by[wi] || []).push(+r.pct);
+    });
+    Object.keys(by).forEach(function(k){
+      var wi = +k, yr = Math.floor(wi / WEEKS), wk = wi % WEEKS; if(yr >= Y) return;
+      var a = by[k], m = a.reduce(function(x, v){ return x + v; }, 0) / a.length;
+      s += '<rect class="h185wk" data-wk="' + wi + '" x="' + (AX + wk * P) + '" y="' + (AXT + yr * P) + '" width="' + cell +
+           '" height="' + cell + '" fill="' + fill(m) + '"><title>week ' + wi + ' · ' + Math.round(m) + '%</title></rect>';
+    });
+    /* the x axis: weeks */
+    for(var x = 0; x <= WEEKS - tickW; x += tickW)
+      s += '<text class="h185x" x="' + (AX + x * P) + '" y="' + (AXT - 3) + '" text-anchor="start">' + x + '</text>';
+    s += '<text class="h185x" x="' + (AX + gridW) + '" y="' + (AXT - 3) + '" text-anchor="end">' + WEEKS + '</text>';
+    /* today */
+    var cy = Math.floor(nowW / WEEKS), cw = nowW % WEEKS;
+    if(cy < Y) s += '<rect class="h185today" x="' + (AX + cw * P - 1) + '" y="' + (AXT + cy * P - 1) + '" width="' + (cell + 2) +
+                    '" height="' + (cell + 2) + '" fill="none" stroke="var(--accent)" stroke-width="1.5"/>';
+    var tw = AX + gridW;
+    host.innerHTML = '<svg class="h185life" viewBox="0 0 ' + tw + ' ' + H + '" width="' + tw + '" height="' + H +
+      '" data-cols="' + WEEKS + '" data-rows="' + Y + '" data-cell="' + cell + '" data-tick="' + tickW +
+      '" role="img" aria-label="your life in weeks: ' + WEEKS + ' across, one row per year, age down the left">' + s + '</svg>';
+    host.setAttribute('data-h185', String(W));
+    return true;
+  }
+  var obs = {};
+  function assert(id){
+    var host = document.getElementById(id); if(!host || !phone()) return;
+    var ok = host.querySelector('svg.h185life') && host.getAttribute('data-h185') === String(Math.floor(host.clientWidth));
+    if(!ok) render(host);
+  }
+  function watch(){
+    HOSTS.forEach(function(id){
+      var host = document.getElementById(id);
+      if(!host || obs[id] || typeof MutationObserver === 'undefined') return;
+      obs[id] = new MutationObserver(function(){ if(phone() && !host.querySelector('svg.h185life')) render(host); });
+      obs[id].observe(host, { childList:true });
+      assert(id);
+    });
+  }
+  function all(){ watch(); HOSTS.forEach(assert); }
+  if(typeof paintAll === 'function'){
+    var _pa = paintAll;
+    paintAll = function(){ var out = _pa.apply(null, arguments); try{ all(); }catch(e){ warn185('life', e); } return out; };
+  }
+  window.addEventListener('resize', function(){ try{ HOSTS.forEach(assert); }catch(e){} });
+  document.addEventListener('click', function(e){
+    if(e.target && e.target.closest && e.target.closest('[data-t29]')) setTimeout(all, 120);
+  });
+  window.addEventListener('load', function(){ setTimeout(all, 400); });
+  return { render:render, all:all };
+})();
+window.__HT185LIFE = HT185LIFE;
 
 })();

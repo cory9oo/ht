@@ -1,20 +1,19 @@
-/* LINEN - off-white paper ground, ink text, ONE saturated blue accent, states muted. The Paper lineage,
-   sharpened. Paste 179 S6 scheme 3 - the light half of "Follow system".
-   The contract: ONE accent hue - ONE neutral ramp - exactly TWO state colours (--good / --bad) - one
-   colour per group member (--m1..--m4). No gradients, no glows, no second accent. late and t risk
-   are the ACCENT, not a third state colour. Every colour here has this one address (R70.282), and
-   	ools/contrast_ht32.py --check holds every text pair to 4.5:1. */
+/* LINEN - light paper + ink + ONE saturated VIOLET (hue 262). Paste 185 S2: the accent left 179's blue (the same
+   family as Slate's and Midnight's) for violet; the ground alone puts Linen 60+ L* from every other offered scheme.
+   The light half of Follow system. Sections: standards = the accent; morning dark gold, night crimson-rose (violet
+   is taken by the accent), weekly deep teal. States stay muted - on paper a loud red reads as an error page. */
 :root[data-theme="linen"]{
-  --ground:#F7F6F2; --sheet:#FFFFFF; --sunk:#EFEDE7; --sel:#E7E4DC;
-  --rule:#DCD8CE;   --rule2:#B9B3A6;
-  --ink:#15171B;    --ink2:#4A4F57;  --ink3:#868B93;
-  --accent:#1D5BD6; --accent-ink:#FFFFFF; --accent-wash:#E2EBFB;
-  --bad:#A8392D;    --good:#2A6E4B;
-  --g0:#EEDFDC; --g1:#D4ABA5; --g2:#E4E0D6; --g3:#CBC5B8; --g4:#8DB9A0; --g5:#2A6E4B;
-  --st-todo:#15171B; --st-done:#2A6E4B; --st-late:#1D5BD6; --st-skip:#4A4F57; --st-notdue:#4A4F57;
-  --st-secured:#2A6E4B; --st-ontrack:#1D5BD6; --st-atrisk:#1D5BD6; --st-outofreach:#A8392D;
-  --m1:#1D5BD6; --m2:#7A3FB0; --m3:#8A5A00; --m4:#0F6E6A;
-  --sb-thumb:rgba(74,79,87,.35); --sb-thumb-hover:rgba(74,79,87,1);
-  --panel:#FFFFFF; --panel-2:#EFEDE7; --line:#DCD8CE; --dim:#868B93; --accent-red:#A8392D;
+  --ground:#F6F3EA; --sheet:#FFFFFF; --sunk:#EDE8DB; --sel:#E3DCCB;
+  --rule:#D8D1C0;   --rule2:#B5AC98;
+  --ink:#111317;    --ink2:#454A52;  --ink3:#857F72;
+  --accent:#6D28D9; --accent-ink:#FFFFFF; --accent-wash:#EDE4FB;
+  --bad:#A3302A;    --good:#1F6B45;
+  --g0:#EEDCD8; --g1:#D6A9A2; --g2:#E6E0D2; --g3:#CCC3B0; --g4:#8DBBA0; --g5:#1F6B45;
+  --st-todo:#111317; --st-done:#1F6B45; --st-late:#6D28D9; --st-skip:#454A52; --st-notdue:#454A52;
+  --st-secured:#1F6B45; --st-ontrack:#6D28D9; --st-atrisk:#6D28D9; --st-outofreach:#A3302A;
+  --m1:#6D28D9; --m2:#0F5E8C; --m3:#7A5200; --m4:#0C615D;
+  --sec-morning:#6E5406; --sec-night:#AC134B; --sec-weekly:#106358; --sec-standards:#6D28D9;
+  --sb-thumb:rgba(69,74,82,.35); --sb-thumb-hover:rgba(69,74,82,1);
+  --panel:#FFFFFF; --panel-2:#EDE8DB; --line:#D8D1C0; --dim:#857F72; --accent-red:#A3302A;
   color-scheme:light;
 }

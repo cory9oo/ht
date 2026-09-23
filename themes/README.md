@@ -41,3 +41,19 @@ write. The script reads `themes/*.css` rather than a copy of their values, for t
 ## Paste 179 — the four schemes
 
 Each is ONE accent hue, ONE neutral ramp, exactly TWO state colours (`--good` / `--bad`; `late` and `at risk` are the accent) and one colour per group member (`--m1`..`--m4`, which every theme now carries). No gradients, no glows. `tools/contrast_ht32.py` holds the member colours to the text floor too: **9 themes, 630 pairs, 0 under 4.5:1**, measured 2026-09-23. The picker lists the four new first, then Classic · Graphite · Midnight · Paper; Terminal stays hidden; nothing was removed (R70.138).
+
+## Paste 185 — five schemes, far apart, and a colour per section
+
+Cory 9/23: *"get a little drastic, some of them are very similar"*. SPEC 12's rule, now measured by
+`tools/scheme_distance.py --check`: between any two of the five new schemes the accent hues are **≥ 60° apart**
+or the grounds are **≥ 25 L\* apart**. **Slate** near-black + electric cyan · **Ember** warm charcoal + hot amber ·
+**Linen** light paper + ink + violet · **Mono** greyscale on a graphite-grey ground (L\* 31) · **Neon** true black +
+electric magenta (the EXTRA — delete `neon.css`, its `<link>` and its `THEMES` entry to strike it). Measured
+2026-09-23: 10 enforced pairs, 0 alike. The four legacy themes are measured and printed, never failed.
+
+**Every theme now carries four section colours** — `--sec-morning` · `--sec-night` · `--sec-weekly` ·
+`--sec-standards` — used as TEXT on the section header and `+ Add to` line and as the 3 px rail down the rows
+(`app.css` 185 S3). Standards takes the scheme's accent; the three routines take gold · violet · teal, and a
+routine whose hue sits within 40° of the accent takes rose instead. Mono has no hue, so its sections differ by
+rail style (solid · double · dashed · dotted). `contrast_ht32.py` holds all four to 4.5:1: **10 themes, 860 pairs,
+0 under the floor**, measured 2026-09-23.
