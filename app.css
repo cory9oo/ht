@@ -2895,3 +2895,23 @@ html[data-simple] #log.h17-scroll:hover{
 html[data-simple] #log::-webkit-scrollbar-thumb:hover,
 html[data-simple] #log.h17-scroll::-webkit-scrollbar-thumb:hover{
   background:var(--sb-thumb-hover) }
+
+/* ======================= HT-32 S3 · THE WEEK STATE (paste 148) =======================
+   One line on the Today header and one column in GROUP, in one colour per state. The
+   number is `NEED ≥ NN% TODAY`; the colour says how much trouble it is. */
+html[data-simple] .h32need{
+  font:500 10px/1 var(--mono); letter-spacing:.06em; text-transform:uppercase;
+  white-space:nowrap; color:var(--ink2) }
+html[data-simple] .h32secured{ color:var(--st-secured) }
+html[data-simple] .h32ontrack{ color:var(--st-ontrack) }
+html[data-simple] .h32atrisk{  color:var(--st-atrisk) }
+html[data-simple] .h32out{     color:var(--st-outofreach) }
+/* THE DESKTOP MAST PAINTS ITS OWN TILE COLOUR. `html[data-simple] .mast #tape .tp .v` (line ~1402)
+   carries an id, so it outranks the four rules above and the state colour was measured as
+   rgb(214,220,230) - plain --text - on both desktop widths while the phone was correct. The answer is
+   to MATCH that selector and add one class, not to reach for !important: the specificity war an
+   !important starts is lost by whoever comes next. */
+html[data-simple] .mast #tape .tp .v.h32secured{ color:var(--st-secured) }
+html[data-simple] .mast #tape .tp .v.h32ontrack{ color:var(--st-ontrack) }
+html[data-simple] .mast #tape .tp .v.h32atrisk{  color:var(--st-atrisk) }
+html[data-simple] .mast #tape .tp .v.h32out{     color:var(--st-outofreach) }

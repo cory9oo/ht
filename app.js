@@ -12081,8 +12081,6 @@ function h31CanInvite(circle){
                        peek: peek, field: field, alphabet: ALPHA };
 })();
 
-})();
-
 
 /* ==============================================================================================
    HT-32 (PASTE 148, Cory Tuesday 2026-09-22) - THE GROUP HEADER, THE 80% WEEK, REPORTS, THEMES.
@@ -12125,4 +12123,164 @@ function h31CanInvite(circle){
   }
 
   window.__HT32GRP = { rename: rename, circle: circleNow };
+})();
+
+/* ---- S3 · THE 80% ENGINE - ONE SCORER, ONE NUMBER ------------------------------------------------
+   Cory, 9/22: "a metric ... what percentage you have to hit each day to get to 80%".
+
+       need = (target x D - sum of completed days' %) / days remaining including today
+
+   THE FORMULA WAS RUN BEFORE IT WAS WRITTEN HERE. `ht_stage/148/draft/need_today.py` is the oracle:
+   37 assertions, 0 FAIL, and it caught four arithmetic errors in the paste's own acceptance table
+   before a line of this reached the app. `tools/test_need32.mjs` re-runs that same table against THIS
+   code, so the two can never drift.
+
+   TWO THINGS THAT ARE SUBTLER THAN THE ONE-LINE FORMULA, and both are load-bearing:
+
+   1. CLAMP AFTER CLASSIFY, NEVER BEFORE. The paste asks to clamp to [0,100] AND for a SECURED state at
+      need <= 0 and OUT OF REACH above 100. Clamp first and both become unreachable, because 0 and 100
+      are exactly the values that would have been <=0 and >100. So the RAW number picks the state and
+      the clamped one is what the screen shows.
+   2. AN UNKNOWN DAY LEAVES THE DENOMINATOR, NOT JUST THE NUMERATOR. An unchecked box is a zero
+      (standing, 9/15) - but a day that asked nothing of you is not a zero, it is UNKNOWN, and it drops
+      out of D. Scoring it 0 instead would cost 40 points a day on a six-day week; the oracle pins that
+      exact difference.
+
+   Worth saying plainly, because the screen will show it: AT TARGET 80 ON A SUN-FRI WEEK, `SECURED` IS
+   ONLY REACHABLE ON THE LAST DAY. Four perfect days is 400 against a 480 week, so two days out you
+   still owe 40 a day. The state is correct; it is simply rare. */
+var HT32_TARGET_PCT = 80;                 /* group.target_pct */
+var HT32_WEEK = 'sun_fri';                /* Sunday..Friday; Saturday is the Sabbath and is not scored */
+(function(){
+  var SECURED = 'SECURED', ON_TRACK = 'ON TRACK', AT_RISK = 'AT RISK', OUT = 'OUT OF REACH';
+
+  /* THE PURE FUNCTION. No DOM, no state, no clock - which is why it can be tested at all. */
+  function need(donePcts, daysAhead, pace, target){
+    target = (target == null) ? HT32_TARGET_PCT : +target;
+    donePcts = donePcts || [];
+    var remaining = (+daysAhead || 0) + 1;
+    var D = donePcts.length + remaining;
+    if(D <= 0 || remaining <= 0) return { raw:null, need:null, state:SECURED, D:D, best:null };
+    var sum = 0, i;
+    for(i = 0; i < donePcts.length; i++) sum += (+donePcts[i] || 0);
+    var raw = (target * D - sum) / remaining;
+    var state;
+    if(raw <= 0) state = SECURED;
+    else if(raw > 100) state = OUT;
+    else if(raw <= (+pace || 0)) state = ON_TRACK;
+    else state = AT_RISK;
+    return { raw: raw, need: Math.max(0, Math.min(100, raw)), state: state, D: D,
+             best: (state === OUT) ? (sum + 100 * remaining) / D : null };
+  }
+
+  /* the scoring days of the week k falls in. Sunday..Friday; the person’s own Sabbath drops out too
+     (Ruling 5 - the Sabbath is the person’s, and DEC-172’s arithmetic is untouched by this). */
+  function weekDays(k, sabbathDow){
+    var d = dnum(k), sun = new Date(d);
+    sun.setDate(d.getDate() - d.getDay());           /* back to Sunday */
+    var out = [];
+    for(var i = 0; i < 7; i++){
+      var c = new Date(sun); c.setDate(sun.getDate() + i);
+      if(c.getDay() === 6) continue;                  /* Saturday: not a scoring day (HT32_WEEK) */
+      if(sabbathDow != null && c.getDay() === +sabbathDow) continue;
+      out.push(dk(c));
+    }
+    return out;
+  }
+
+  /* Turn a date->row map into the three numbers `need` wants. `rowOf(k)` returns
+     { pct, logged, due } for a day, or null when there is nothing at all. */
+  function gather(k, rowOf, sabbathDow){
+    var days = weekDays(k, sabbathDow), done = [], ahead = 0, pace = 0;
+    for(var i = 0; i < days.length; i++){
+      var d = days[i], r = rowOf(d);
+      if(d < k){
+        if(r && r.logged && r.due === 0) continue;    /* UNKNOWN: nothing was due - out of D */
+        done.push(r && r.logged ? (+r.pct || 0) : 0); /* an unchecked box is a zero */
+      } else if(d === k){
+        pace = (r && r.pct != null) ? (+r.pct || 0) : 0;
+      } else ahead++;
+    }
+    return { done: done, ahead: ahead, pace: pace, days: days };
+  }
+
+  function forDay(k, rowOf, sabbathDow, target){
+    var g = gather(k, rowOf, sabbathDow);
+    var n = need(g.done, g.ahead, g.pace, target);
+    n.pace = g.pace; n.scoringDays = g.days.length;
+    return n;
+  }
+
+  /* the label the header carries. R70.306: one line, one number, one colour per state. */
+  function label(n){
+    if(!n || n.need == null) return null;
+    if(n.state === SECURED) return 'SECURED FOR THE WEEK';
+    if(n.state === OUT) return 'BEST POSSIBLE ' + Math.round(n.best) + '%';
+    return 'NEED ≥ ' + Math.round(n.need) + '% TODAY';
+  }
+  function cls(n){
+    if(!n) return '';
+    return n.state === SECURED ? 'h32secured'
+         : n.state === ON_TRACK ? 'h32ontrack'
+         : n.state === AT_RISK ? 'h32atrisk' : 'h32out';
+  }
+
+  window.__HT32WEEK = { need: need, weekDays: weekDays, gather: gather, forDay: forDay,
+                        label: label, cls: cls,
+                        STATES: { SECURED: SECURED, ON_TRACK: ON_TRACK, AT_RISK: AT_RISK, OUT: OUT } };
+})();
+
+/* ---- S3.7 · THE NUMBER ON THE HEADER ------------------------------------------------------------
+   `paintMast` is WRAPPED, not edited - the same pattern HT-31 used for `paintAll`. The mast is one of
+   the oldest functions in the file and a dozen goldens read its tiles; adding a thirteenth tile from
+   outside leaves all of them alone.
+
+   THE DUE COUNT COMES FROM `active_set`, which `saveDay()` snapshots on every save - the same column
+   the grade is computed over. That is what makes "a day with zero items due" answerable at all, and
+   it is why a Sabbath scores UNKNOWN instead of nought. A day with NO row has no snapshot, so it
+   falls back to today’s due count: unopened is a zero, and a zero needs a denominator. */
+(function(){
+  function sabbathDow(){
+    try{ var st = window.__HT30SAB && window.__HT30SAB.state(); return st ? st.dow : null; }
+    catch(e){ return null; }
+  }
+  function rowOf(k){
+    var r = (typeof S !== 'undefined' && S.byDate) ? S.byDate[k] : null;
+    if(!r) return null;
+    var due = null;
+    if(r.active_set && r.active_set.length != null) due = r.active_set.length;
+    if(due == null){ try{ due = daily().length; }catch(e){ due = 1; } }
+    return { pct: (r.pct == null ? null : +r.pct), logged: loggedOn(k), due: due };
+  }
+  function compute(){
+    if(!window.__HT32WEEK) return null;
+    return window.__HT32WEEK.forDay(today(), rowOf, sabbathDow());
+  }
+  function paint(){
+    var tape = el('tape'); if(!tape) return;
+    var old = tape.querySelector('.h32tp'); if(old) old.parentNode.removeChild(old);
+    var n = compute(); if(!n) return;
+    var txt = window.__HT32WEEK.label(n); if(!txt) return;
+    var d = document.createElement('div');
+    d.className = 'tp h32tp';
+    d.setAttribute('title', txt + '  ·  target ' + HT32_TARGET_PCT + '% over ' + n.scoringDays +
+                   ' scoring days (Sun–Fri)');
+    var v = (n.state === 'SECURED' || n.state === 'OUT OF REACH')
+          ? txt
+          : '≥ ' + Math.round(n.need) + '%';
+    d.innerHTML = '<div class="k">Need today</div><div class="v num h32need ' +
+                  window.__HT32WEEK.cls(n) + '">' + v + '</div>';
+    tape.appendChild(d);
+  }
+  if(typeof paintMast === 'function'){
+    var _m = paintMast;
+    paintMast = function(){
+      var out = _m.apply(null, arguments);
+      try{ paint(); }catch(e){ if(window.console) console.warn('HT-32 need', e); }
+      return out;
+    };
+  }
+  window.__HT32NEED = { compute: compute, paint: paint, rowOf: rowOf };
+})();
+
 })();

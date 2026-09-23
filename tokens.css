@@ -288,3 +288,32 @@
   --sb-track:transparent;                  /* the track is never drawn */
   --sb-size:8px;
 }
+
+/* ---------------------------------------------------------------------------
+   7 · HT-32 S3 · THE FOUR WEEK STATES. Cory, 9/22: "a metric ... what percentage
+   you have to hit each day to get to 80%".
+
+   ONE COLOUR PER STATE (R70.306), and each measured against BOTH grounds the
+   text sits on and the sunk panel, exactly as HT-25 did for the five completion
+   states above. Measured 2026-09-22 by `tools/contrast_ht25.py`’s own arithmetic:
+
+       secured     #7FB79A   8.52 / 8.09 / 7.73   the calm green, not the klaxon
+       on-track    #8FB8D9   9.34 / 8.87 / 8.48   a cool blue: progress, not praise
+       at-risk     #D4A85C   8.91 / 8.46 / 8.08   the same amber as `done-late`
+       out-of-reach #D98A80  7.36 / 6.99 / 6.68   a QUIETED red - the week is lost,
+                                                  which is information, not an alarm
+
+   `--ht-red` itself is NOT used here. Red is state, and `--bad` already owns it;
+   a second bright red would make "out of reach" shout louder than a real failure.
+   --------------------------------------------------------------------------- */
+:root{
+  --ht-st-secured:#7FB79A;
+  --ht-st-ontrack:#8FB8D9;
+  --ht-st-atrisk:#D4A85C;
+  --ht-st-outofreach:#D98A80;
+
+  --st-secured:var(--ht-st-secured);
+  --st-ontrack:var(--ht-st-ontrack);
+  --st-atrisk:var(--ht-st-atrisk);
+  --st-outofreach:var(--ht-st-outofreach);
+}
