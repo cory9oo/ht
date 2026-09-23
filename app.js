@@ -13,6 +13,46 @@ var sb = (window.__MOCK_SB) || window.supabase.createClient(SB_URL, SB_KEY, {
 });
 window.ST = { sb: sb };
 
+/* ---- PASTE 186 NUDGE N1 · EVERY WRITE TO `habits` KEEPS WHAT IT REPLACED ----------------------------------
+   Cory 9/23 17:02: "HT reversed the edits I made". The database keeps no history of a row (no `updated_at`, no
+   backup had ever run), so a value overwritten was a value gone. From this build every `habits` update first
+   copies the PRIOR value of each field it is about to write, from this device's copy of the row, into
+   localStorage `ht186_habits_prior` (newest 400). Read it with `__HT186PRIOR.rows()`; `RECOVER.md` in the bus
+   names the key. It changes nothing about the write itself - it is a shadow, never a gate. */
+(function(){
+  var KEY = 'ht186_habits_prior', CAP = 400;
+  if(!sb || typeof sb.from !== 'function') return;
+  var _from = sb.from;
+  function log(id, patch){
+    var h = null;
+    try{ h = (S.habits || []).filter(function(r){ return String(r.id) === String(id); })[0] || null; }catch(e){}
+    var prior = {};
+    if(h) Object.keys(patch || {}).forEach(function(k){ prior[k] = (h[k] === undefined ? null : h[k]); });
+    var rows = [];
+    try{ rows = JSON.parse(localStorage.getItem(KEY) || '[]') || []; }catch(e){ rows = []; }
+    rows.push({ at:new Date().toISOString(), id:String(id), name:h ? String(h.name || '') : null, prior:prior, patch:patch });
+    if(rows.length > CAP) rows = rows.slice(rows.length - CAP);
+    try{ localStorage.setItem(KEY, JSON.stringify(rows)); }catch(e){}
+  }
+  sb.from = function(t){
+    var q = _from.apply(sb, arguments);
+    if(t !== 'habits' || !q || typeof q.update !== 'function') return q;
+    var _up = q.update;
+    q.update = function(v){
+      var b = _up.apply(q, arguments);
+      if(!b || typeof b.eq !== 'function') return b;
+      var _eq = b.eq;
+      b.eq = function(k, x){
+        if(k === 'id'){ b.eq = _eq; try{ log(x, v); }catch(e){} }
+        return _eq.apply(b, arguments);
+      };
+      return b;
+    };
+    return q;
+  };
+  window.__HT186PRIOR = { rows:function(){ try{ return JSON.parse(localStorage.getItem(KEY) || '[]') || []; }catch(e){ return []; } } };
+})();
+
 /* ---- HT-26 S1 · THE FIVE INPUTS ONLY — Cory, 2026-09-10 15:15 ----------------------------
    "No new inputs of any kind; delete the sleep display." The day takes exactly five inputs:
    check-offs · the 1–10 rating with its why · the brain dump · completed · prayer. Sleep, bed,
@@ -3850,6 +3890,13 @@ var HT32_CARDFIT = true;
         : S.habits.length;
       res = await sb.from('habits').insert(rec);
     } else {
+      /* PASTE 186 N1 · A SAVE SENDS ONLY WHAT THIS SHEET CHANGED. The sheet used to write EVERY field back from
+         this device's copy of the row, so a device holding an older copy (a phone on a cached build, a tab left
+         open since morning) put the old section and the old planned time back over newer edits the moment
+         anything at all was saved on it - one of the two ways Cory's desktop edits could come undone. Unchanged
+         fields are compared against the row the sheet was opened from and left out of the write. */
+      rec = ht186Changed(rec, h);
+      if(!Object.keys(rec).length){ closeSheet(); toast('nothing changed'); return; }
       res = await sb.from('habits').update(rec).eq('id',h.id).eq('user_id',S.me.id);
     }
     if(res && res.error){ toast('not saved — '+String(res.error.message||'').slice(0,60)); return; }
@@ -11724,7 +11771,10 @@ function h30Advanced(){
      4 · every change is listed for him to read (Settings -> "Names I cleaned of times", and `RENAMED.md`).
    TWO TIMES IN ONE NAME: the FIRST is taken as the planned time and the row is flagged in the list; the
    second is left in the name, because a name is the only place it still means anything. */
-var HT30_NAME_TIMES = true;
+/* PASTE 186 N1 RULE: a name, section, planned time or order is written ONLY on an explicit action on that row -
+   never on load, render, sync, migration or suggestion. This pass renamed rows on load, so it is OFF; its
+   functions (find · plan · markdown · undo) stay whole and tested (R70.138). */
+var HT30_NAME_TIMES = false;
 var HT30TIME = (function(){
   /* `5 AM` · `5:00` · `at 5am` · `9pm` · `05:00` · `7.30am`. A bare `5` is NOT a time: "Read 5 chapters". */
   var RE = /(?:^|[\s\(\[–—-])(?:at\s+)?(\d{1,2})(?:[:.](\d{2}))?\s*([ap])\.?m\.?(?=$|[\s\)\]–—-])|(?:^|[\s\(\[–—-])(?:at\s+)?([01]?\d|2[0-3]):([0-5]\d)(?=$|[\s\)\]–—-])/i;
@@ -12636,7 +12686,10 @@ var HT31_SECTIONS_LOCAL = true;
       var h = (S.habits || []).filter(function(x){ return String(x.id) === id; })[0];
       if(!h){ forget(id); return; }
       if(String(h.section || '') === String(m[id])){ forget(id); return; }
-      if(h.section){ forget(id); return; }
+      /* PASTE 186 N1: a device placement the server disagrees with used to be forgotten in silence - the ONLY copy
+         of a move Cory made. The server still wins, but the placement is archived first
+         (localStorage `ht186_sections_superseded`), so it can be read back and restored. */
+      if(h.section){ ht186Superseded(id, m[id], h.section); forget(id); return; }
       /* AN UPDATE THAT MATCHES NO ROW IS NOT AN ERROR TO PostgREST - this file learned that at
          app.js:1833 and HT-31 nearly paid for it again. This `forget()` deletes the ONLY copy of a
          placement Cory made, so it may not run on anything weaker than a row coming back: `.select('id')`
@@ -13663,5 +13716,25 @@ var HT179 = (function(){
            show: show, close: close, timing: timing, tol: HT179_TOL };
 })();
 window.__HT179 = HT179;
+
+/* ---- PASTE 186 NUDGE N1 · helpers (declarations, hoisted, so the sheet and HT-31 above can call them) ---------- */
+function ht186Norm(v){
+  if(v === undefined || v === null || v === '') return null;
+  if(typeof v === 'string' && /^\d{2}:\d{2}(:\d{2})?$/.test(v)) return v.slice(0, 5);
+  return String(v);
+}
+function ht186Changed(rec, h){
+  if(!h) return rec;
+  var out = {};
+  Object.keys(rec || {}).forEach(function(k){ if(ht186Norm(rec[k]) !== ht186Norm(h[k])) out[k] = rec[k]; });
+  return out;
+}
+function ht186Superseded(id, local, server){
+  var K = 'ht186_sections_superseded', rows = [];
+  try{ rows = JSON.parse(localStorage.getItem(K) || '[]') || []; }catch(e){ rows = []; }
+  rows.push({ at:new Date().toISOString(), id:String(id), device:String(local), server:String(server) });
+  try{ localStorage.setItem(K, JSON.stringify(rows.slice(-200))); }catch(e){}
+}
+window.__HT186N1 = { changed:ht186Changed, norm:ht186Norm };
 
 })();
