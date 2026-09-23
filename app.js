@@ -5323,8 +5323,17 @@ var HT32_CARDFIT = true;
     } else {
       if(host) host.classList.remove('h16scroll');
       svg.removeAttribute('width'); svg.style.width='';
-      if(!svg.getClientRects().length) return 0;             /* a hidden surface measures 0 wide */
-      W = fitSvg(svgId,H);
+      if(!svg.getClientRects().length){                      /* a hidden surface measures 0 wide */
+        /* HT-179 S4: the phone's month chart lives on the Insights tab, hidden while Today is up. The
+           28px branch drew it anyway; the fit branch must too, or its axis is empty until the tab is
+           opened. It is drawn at the width the card WILL have - the viewport less the card's padding -
+           and measureAndDraw re-fits it to the pixel once the tab shows it. */
+        if(!(opts.perX && window.innerWidth<=480)) return 0;
+        W = Math.max(240, Math.round(window.innerWidth - 76));
+        svg.setAttribute('viewBox','0 0 '+W+' '+H);
+        svg.setAttribute('preserveAspectRatio','xMinYMin meet');
+        svg.setAttribute('height',H); svg.style.height=H+'px';
+      } else W = fitSvg(svgId,H);
       if(W==null) return 0;               /* B0.2: unmeasurable — measureAndDraw will call back */
     }
     var pad=opts.pad||0;
@@ -13416,7 +13425,7 @@ var HT179 = (function(){
   function vTxt(m){ return (m > 0 ? '+' : (m < 0 ? '−' : '±')) + Math.abs(m) + 'm'; }
   function good(m){ return Math.abs(m) <= HT179_TOL; }
   /* the one function that turns a check into what the row says - golden_ht33 reads it */
-  function label(h, k){
+  function doneLabel(h, k){
     var at = doneAt(k, h.id); if(!at) return null;
     var m = lateMin(h, k);
     return { at: at, m: m, text: fmtTime(at) + (m == null ? '' : ' · ' + (good(m) ? '✓ ' : '✕ ') + vTxt(m)),
@@ -13431,7 +13440,7 @@ var HT179 = (function(){
       var id = r.getAttribute('data-h'), h = habit(id);
       var c = r.querySelector('.ck179');
       if(!h){ if(c) c.parentNode.removeChild(c); return; }
-      var lb = label(h, S.date);
+      var lb = doneLabel(h, S.date);
       if(!lb && !ed){ if(c) c.parentNode.removeChild(c); return; }
       if(!c){
         c = document.createElement('button');
@@ -13650,7 +13659,7 @@ var HT179 = (function(){
 
   /* read-only, for the golden: why the chooser is or is not offered on the day on screen */
   function state(){ var r = S.byDate[S.date]; return { me: !!S.me, date: S.date, today: today(), closed: !!(S.hasClosedAt !== false && r && r.closed_at) }; }
-  return { chips: chips, apply: apply, label: label, statsOf: statsOf, editable: editable, state: state,
+  return { chips: chips, apply: apply, doneLabel: doneLabel, statsOf: statsOf, editable: editable, state: state,
            show: show, close: close, timing: timing, tol: HT179_TOL };
 })();
 window.__HT179 = HT179;
