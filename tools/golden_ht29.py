@@ -388,15 +388,23 @@ async def sec_s3(pw):
       return { txt:g?g.innerText:null, cols:[...g.querySelectorAll('thead th')].map(t=>t.textContent),
                open:g.querySelectorAll('[data-h29m]').length,
                detail:(()=>{const d=g.querySelector('.h18more'); return d?getComputedStyle(d).display:null;})() }; }""")
-    chk('S3a · five columns: member · today · 7 days · 30 days · logged',
-        card['cols'] == ['member', 'today', '7 days', '30 days', 'logged'], card['cols'])
+    # ---- AMENDED BY HT-32 S3.7 (CC HT 2026-09-23) - SIX COLUMNS ----
+    # member . today . 7 days . 30 days . NEED . logged. Cory, 9/22: "a metric ... what
+    # percentage you have to hit each day to get to 80%", and S3.7 puts it "as a column in
+    # GROUP". The check's floor is unchanged - the same five facts are still asserted, in the
+    # same renderer - and only the expected list grew, because the paste asked for a column.
+    chk('S3a · six columns: member · today · 7 days · 30 days · need · logged',
+        card['cols'] == ['member', 'today', '7 days', '30 days', 'need', 'logged'], card['cols'])
     chk('S3b · DETAIL is retired from the card', card['detail'] == 'none', card['detail'])
     chk('S3c · before the SQL a member\'s line does not open', card['open'] == 0, card['open'])
     rows = await pg.evaluate("""() => [...document.querySelectorAll('#h18Group tbody tr')].map(r=>[...r.children].map(c=>c.textContent.trim()))""")
     andrew = [r for r in rows if r and r[0].startswith('Andrew')]
     chk('S3d · Ruling 1: three unlogged days drag Andrew\'s 7 days to 41% and his 30 days to 64%',
         andrew and andrew[0][1] == '71%' and andrew[0][2] == '41%' and andrew[0][3] == '64%', andrew)
-    chk('S3e · logged N/7 counts the days he actually logged', andrew and andrew[0][4] == '4/7', andrew)
+    # the `logged` cell moved from index 4 to 5 when `need` landed between them. Indexing by
+    # POSITION is what made this check move at all; it reads the last cell now, which is what
+    # `logged` is and what it will stay.
+    chk('S3e · logged N/7 counts the days he actually logged', andrew and andrew[0][-1] == '4/7', andrew)
     await no_errors(pg, errs, 'S3 (before the SQL)')
     await b.close()
 
@@ -530,8 +538,11 @@ async def sec_s5(pw):
         rate['rows'] >= 1 and rate['why'] >= 1 and not rate['leak'], {k: rate[k] for k in ('rows', 'why', 'leak')})
     grp = await pg.evaluate("""() => { const c=document.querySelector('[data-i29="group"]');
       return { cols:[...c.querySelectorAll('thead th')].map(t=>t.textContent), rows:c.querySelectorAll('tbody tr').length }; }""")
+    # SAME RENDERER, SAME COLUMNS - which is the point of the check, and is why it had to move
+    # with S3a rather than being pinned separately. If these two lists ever disagree again, two
+    # renderers have come back.
     chk('S5h · the group side by side is the same renderer',
-        grp['cols'] == ['member', 'today', '7 days', '30 days', 'logged'] and grp['rows'] == 4, grp)
+        grp['cols'] == ['member', 'today', '7 days', '30 days', 'need', 'logged'] and grp['rows'] == 4, grp)
     await no_errors(pg, errs, 'S5 (phone)')
     await b.close()
 

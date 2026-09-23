@@ -9998,7 +9998,10 @@ var HT32REP = (function(){
 
    NO EMAIL IS EVER WRITTEN INTO THIS FILE, a fixture, a golden or a commit message. `standard`
    pushes to the public `ht` repo and 131 Ruling 3 is absolute about it. The fixture's addresses are
-   `member-a@example.com`. */
+   a reserved-domain address the fixture makes up. `golden_ht31` S6a forbids an email SHAPE
+   anywhere in this file, including a comment - a comment ships in the bundle like every other
+   byte, and a rule that means "no addresses except the ones I thought were fine" is not a
+   rule. The fixture's own value lives in the goldens, which are not served to anyone. */
 var HT32_STAKES_OPEN = true;              /* group.stakes_open - N1's default: any member may edit */
 var HT32GRP = (function(){
   var pending = [], stakes = {}, log = {}, has = { pending:null, stakes:null };
