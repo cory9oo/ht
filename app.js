@@ -9337,7 +9337,10 @@ var HT29GRP = (function(){
       '</tbody></table>';
   }
   function block(others){
-    return '<div class="h18gh">GROUP' + (circle ? ' <span class="h29gn">' + esc(circle.name || '') + '</span>' : '') +
+    /* HT-32 S2.3 (Cory 9/22): "remove the 'Cory Fugiel circle' verbiage ... just GROUP and the
+       members". The group's NAME is kept and still editable - it moved to Group settings, where
+       HT-32 adds a Rename field. It is never drawn in this header again. */
+    return '<div class="h18gh">GROUP' +
       '<span class="sp"></span><button class="h18more h29off" data-h18more type="button">detail</button>' +
       '<button class="h29inv" type="button" data-h29' + (circle ? 'invite' : 'group') + '>' + (circle ? 'invite' : 'join') + '</button></div>' +
       table(others);
@@ -9520,6 +9523,20 @@ var HT29GRP = (function(){
       rs.disabled = false;
       if(!r.ok){ if(msg) msg.textContent = r.why; return; }
       toast('new link'); openGroup();
+    };
+    /* HT-32 S2.3 - rename. ANY member may rename: the group is four people who chose each other,
+       and the starter-only switch that guards the stakes (S4.10) is deliberately not copied here.
+       Cory asked for the name out of the header, not for a permission system around it. */
+    var rn = el('h32GRename');
+    if(rn) rn.onclick = async function(){
+      var v = String((el('h32GName') || {}).value || '').trim();
+      if(!v){ if(msg) msg.textContent = 'A group needs a name.'; return; }
+      rn.disabled = true;
+      var r = (window.__HT32GRP && window.__HT32GRP.rename) ? await window.__HT32GRP.rename(v)
+                                                            : { ok:false, why:'not available' };
+      rn.disabled = false;
+      if(!r.ok){ if(msg) msg.textContent = r.why; return; }
+      toast('renamed'); openGroup();
     };
     var lv = el('h30Leave');
     if(lv) lv.onclick = async function(){
@@ -11274,6 +11291,12 @@ var HT30GRP = (function(){
       var url = link(c.join_code || '');
       return '<div class="note" style="padding:4px 0 12px">You are in <b>' + esc(c.name || 'a group') + '</b>. ' +
         'The group sees your standards, check-offs and the day’s number — never your journal.</div>' +
+        /* HT-32 S2.3: the name left the panel header, so THIS is now the only place it can be
+           read or changed. A value a person is shown and cannot edit is exactly the defect N1's
+           input-completeness rule exists to catch, so it ships with a control, not as prose. */
+        '<label class="fld"><span class="lab">Group name</span>' +
+          '<input id="h32GName" autocomplete="off" maxlength="60" value="' + esc(c.name || '') + '"></label>' +
+        '<div class="tools"><button class="btn" id="h32GRename" type="button">Rename</button></div>' +
         '<div class="h29code">code <b>' + esc(c.join_code || '') + '</b></div>' +
         (url ? '<label class="fld"><span class="lab">Share link</span>' +
                '<input id="h30Link" readonly value="' + esc(url) + '"></label>' : '') +
@@ -12061,3 +12084,45 @@ function h31CanInvite(circle){
 })();
 
 
+/* ==============================================================================================
+   HT-32 (PASTE 148, Cory Tuesday 2026-09-22) - THE GROUP HEADER, THE 80% WEEK, REPORTS, THEMES.
+   Same convention as the HT-31 block above: flags first, then one IIFE per subject, each exporting
+   the seam its golden reads.
+   ============================================================================================== */
+
+/* ---- S2.3 · THE GROUP’S NAME LIVES IN GROUP SETTINGS -------------------------------------------
+   Cory, 9/22: "remove the 'Cory Fugiel circle' verbiage ... just GROUP and the members". The name
+   is KEPT and stays editable (R70.138 - hide, never delete); it simply stopped being chrome. */
+(function(){
+  function circleNow(){
+    try{
+      var st = window.__HT29GRP && window.__HT29GRP.state && window.__HT29GRP.state();
+      return (st && st.circle) || (window.__HT31GRP && window.__HT31GRP.circle) || null;
+    }catch(e){ return null; }
+  }
+
+  async function rename(name){
+    var v = String(name == null ? '' : name).trim();
+    if(!v) return { ok:false, why:'A group needs a name.' };
+    if(v.length > 60) v = v.slice(0, 60);
+    if(!S || !S.me) return { ok:false, why:'not signed in' };
+    var c = circleNow();
+    if(!c || !c.id) return { ok:false, why:'no group' };
+    if(v === (c.name || '')) return { ok:true, name:v };
+    /* READ THE WRITE BACK, for the reason `__HT31GRP.reset` gives two hundred lines up: a PostgREST
+       update that matches NO row - which is exactly what an RLS refusal looks like - comes back with
+       no error and an empty array. A bare `if(r.error)` would report a rename that never happened,
+       and the sheet would reopen showing the old name with a "renamed" toast over it. */
+    try{
+      var r = await sb.from('circles').update({ name: v }).eq('id', c.id).select('name');
+      if(r && r.error) return { ok:false, why:'Could not rename the group.' };
+      if(!r || !r.data || !r.data.length || r.data[0].name !== v){
+        return { ok:false, why:'The group was NOT renamed - it still reads as before.' };
+      }
+      c.name = v;
+      return { ok:true, name:v };
+    }catch(e){ return { ok:false, why:'Could not rename the group.' }; }
+  }
+
+  window.__HT32GRP = { rename: rename, circle: circleNow };
+})();
