@@ -315,16 +315,17 @@ async def sec_s2(pw):
       for (const r of document.querySelectorAll('#log .li')){
         let p=r.previousElementSibling, h='';
         while(p){ if(p.classList && p.classList.contains('grp')){ h=p.textContent.trim(); break; } p=p.previousElementSibling; }
-        const wants = (h === 'Morning routine' || h === 'Night routine');
+        const wants = true;   /* paste 179 S1: the ghost is on EVERY section now, not Morning and Night only */
         const has = !!r.querySelector('.ht31ghost');
         if (has) out.in.push(h);
         if (wants && !has && !r.querySelector('.pat30')) out.out.push(r.getAttribute('data-h'));
       }
       return out; }""")
-    chk('S2l . every ghost + time is in Morning or Night, and there IS at least one (%d)' % len(ghosts['in']),
+    # paste 179 S1 moved the rule this check holds: a row with no time shows `+ time` in all four sections.
+    chk('S2l . every ghost + time sits in one of the four sections, and there IS at least one (%d)' % len(ghosts['in']),
         len(ghosts['in']) >= 1
-        and all(h in ('Morning routine', 'Night routine') for h in ghosts['in']), ghosts)
-    chk('S2m . and no timeless row in those two sections was left without one',
+        and all(h in ('Morning routine', 'Night routine', 'Weekly routine', 'Standards') for h in ghosts['in']), ghosts)
+    chk('S2m . and no timeless row in any section was left without one',
         not ghosts['out'], ghosts['out'][:4])
     chk('S2n . zero page errors', not errs, errs[:2])
     await b.close()
