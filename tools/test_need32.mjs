@@ -137,10 +137,10 @@ test('gather: a past day that was never opened is a zero, not an UNKNOWN', () =>
 });
 
 test('label and colour: one line, one class per state', () => {
-  assert.match(W.label(W.need([], 5, 0)), /^NEED ≥ 80% TODAY$/);
-  assert.equal(W.label(W.need([100, 100, 100, 100, 100], 0, 0)), 'SECURED FOR THE WEEK');
-  assert.match(W.label(W.need([0, 0, 0, 0, 0], 0, 0)), /^BEST POSSIBLE 17%$/);
-  assert.equal(W.label(W.need([], -1, 0)), null);
+  assert.match(W.needLabel(W.need([], 5, 0)), /^NEED ≥ 80% TODAY$/);
+  assert.equal(W.needLabel(W.need([100, 100, 100, 100, 100], 0, 0)), 'SECURED FOR THE WEEK');
+  assert.match(W.needLabel(W.need([0, 0, 0, 0, 0], 0, 0)), /^BEST POSSIBLE 17%$/);
+  assert.equal(W.needLabel(W.need([], -1, 0)), null);
   const seen = new Set([
     W.cls(W.need([100, 100, 100, 100, 100], 0, 0)),
     W.cls(W.need([], 5, 85)),

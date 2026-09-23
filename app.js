@@ -12212,7 +12212,7 @@ var HT32_WEEK = 'sun_fri';                /* Sunday..Friday; Saturday is the Sab
   }
 
   /* the label the header carries. R70.306: one line, one number, one colour per state. */
-  function label(n){
+  function needLabel(n){
     if(!n || n.need == null) return null;
     if(n.state === SECURED) return 'SECURED FOR THE WEEK';
     if(n.state === OUT) return 'BEST POSSIBLE ' + Math.round(n.best) + '%';
@@ -12226,7 +12226,7 @@ var HT32_WEEK = 'sun_fri';                /* Sunday..Friday; Saturday is the Sab
   }
 
   window.__HT32WEEK = { need: need, weekDays: weekDays, gather: gather, forDay: forDay,
-                        label: label, cls: cls,
+                        needLabel: needLabel, cls: cls,
                         STATES: { SECURED: SECURED, ON_TRACK: ON_TRACK, AT_RISK: AT_RISK, OUT: OUT } };
 })();
 
@@ -12260,7 +12260,7 @@ var HT32_WEEK = 'sun_fri';                /* Sunday..Friday; Saturday is the Sab
     var tape = el('tape'); if(!tape) return;
     var old = tape.querySelector('.h32tp'); if(old) old.parentNode.removeChild(old);
     var n = compute(); if(!n) return;
-    var txt = window.__HT32WEEK.label(n); if(!txt) return;
+    var txt = window.__HT32WEEK.needLabel(n); if(!txt) return;
     var d = document.createElement('div');
     d.className = 'tp h32tp';
     d.setAttribute('title', txt + '  ·  target ' + HT32_TARGET_PCT + '% over ' + n.scoringDays +
