@@ -57,6 +57,15 @@ def src(p):
     return io.open(p, encoding='utf-8', errors='replace').read()
 
 
+# AMENDED BY HT-194 S3 (paste 194, R67.2): an EMPTY section now renders its header and `+ Add` (stress 3 - it is the
+# only way to give it a first row), so on the `__SECTION` fixture Morning and Night sit ABOVE the first row and push it
+# ~160px down, into the 64px auto-scroll band at the foot of an 844px phone. The drags below were written for a list
+# that starts near the top; TOP_JS puts the first row where they assumed it was. They measure the drag, not the
+# fixture's header count, and every assertion is unchanged.
+TOP_JS = """() => { window.scrollTo(0, 0); const r = document.querySelector('#log .li'); if (!r) return 0;
+  const y = r.getBoundingClientRect().top; if (y > innerHeight * 0.4) window.scrollTo(0, y - 120); return window.scrollY; }"""
+
+
 async def open_page(pw, w=390, h=844, flags=None, touch=True):
     b = await pw.chromium.launch()
     ctx = await b.new_context(viewport={'width': w, 'height': h},
@@ -332,7 +341,7 @@ async def S2(pw):
     # a finger held in the bottom band scrolls the list (that is how a long list is reordered end
     # to end) and the row travels with it, so "during" is a moving target by design - but the order
     # the drop commits is exactly the order on screen at the instant of release.
-    await pg.evaluate("() => window.scrollTo(0, 0)")
+    await pg.evaluate(TOP_JS)                        # HT-194: was scrollTo(0, 0) - see TOP_JS
     await settled(pg, "() => window.scrollY")
     a = await pg.evaluate(BOX_JS, {'i': 0, 'handle': True})
     sy0 = await pg.evaluate("() => window.scrollY")
@@ -358,7 +367,7 @@ async def S2(pw):
     # same thing as the app's own auto-scroll near an edge, which is a feature and gets its own
     # check below - so this drag stays well inside the viewport, where any movement of the scroll
     # position can only be the browser panning.
-    await pg.evaluate("window.scrollTo(0, 0)")
+    await pg.evaluate(TOP_JS)                        # HT-194: was scrollTo(0, 0) - see TOP_JS
     a = await pg.evaluate(BOX_JS, {'i': 0, 'handle': True})
     t = await pg.evaluate(BOX_JS, {'i': 3, 'handle': False})
     vh = await pg.evaluate("() => window.innerHeight")
@@ -369,7 +378,7 @@ async def S2(pw):
         abs(y1 - y0) <= 2, {'before': y0, 'after': y1, 'vh': vh})
 
     # ---- and auto-scroll DOES fire at the edge: a long list must be reorderable end to end ----
-    await pg.evaluate("window.scrollTo(0, 0)")
+    await pg.evaluate(TOP_JS)                        # HT-194: was scrollTo(0, 0) - see TOP_JS
     a = await pg.evaluate(BOX_JS, {'i': 0, 'handle': True})
     s0 = await pg.evaluate("() => window.scrollY")
     await touch_drag(pg, cdp, a['x'], a['y'], a['x'], vh - 10, steps=34)
@@ -441,6 +450,7 @@ async def S2(pw):
     ragged = await pg.evaluate("""() => [...document.querySelectorAll('#log .li')]
         .map(r => Math.round(r.getBoundingClientRect().height))""")
     wrongway = []
+    await pg.evaluate(TOP_JS)                        # HT-194: see TOP_JS
     r0 = await pg.evaluate(ROWS_JS)
     for n in range(6):
         before = await pg.evaluate(ROWS_JS)
@@ -487,7 +497,10 @@ async def S2(pw):
       return [...r.querySelectorAll('[tabindex],a[href],button')]
         .map(n=>n.tagName + (n.className? '.'+String(n.className).split(' ')[0] : '')); }""")
     chk("S2l " + u"·" + " R70.98's tab order gains the handle AT THE END, the first three unmoved",
-        o[:3] == ['BUTTON.bxw', 'A.nm', 'SPAN.edp'] and o[-1] == 'SPAN.drg', o)
+        # AMENDED BY HT-194 S1 (R67.2): with the clock chip gone the link chip (179 S5) renders on EVERY day, a closed
+        # one included - it is a link, not a time - so it may sit between the name and the pencil. The three R70.98
+        # fixed are still first, in order, and the handle is still last.
+        [x for x in o if x != 'A.lk179'][:3] == ['BUTTON.bxw', 'A.nm', 'SPAN.edp'] and o[-1] == 'SPAN.drg', o)
     await b.close()
 
 
@@ -619,8 +632,12 @@ async def C1(pw):
 
     # ---- no days picked is not a cadence ----------------------------------------------
     b, pg, errs = await open_page(pw, 1280, 900, flags={'__DOW': True}, touch=False)
+    # AMENDED BY HT-194 S2 (R67.2): Standards now renders ABOVE Weekly, so "the first row" became a daily standard and
+    # a daily saved as daily is correctly "nothing changed". The check wants a row that is NOT daily already - the first
+    # Weekly row, which is what the first row used to be.
     d = await pg.evaluate("""async () => {
-      const row = document.querySelector('#log .li');
+      const wk = [...document.querySelectorAll('#log > *')]; const i = wk.findIndex(n => n.matches('.grp[data-sec="weekly"]'));
+      const row = (i >= 0 && wk.slice(i).find(n => n.classList.contains('li'))) || document.querySelector('#log .li');
       row.querySelector('.edp').dispatchEvent(new MouseEvent('click',{bubbles:true}));
       await new Promise(r=>setTimeout(r,600));
       const sel = document.getElementById('eCad');

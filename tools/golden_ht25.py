@@ -293,7 +293,8 @@ async def s3(pw):
         # above), which is what this section is really about; the header names are the part that moved.
         # AMENDED BY NAME, HT-30 (paste 137 S1.4), 2026-09-20: the last two swap and the fourth
         # is renamed. S3h and S3i assert the same two properties about the same four names.
-        SECS29 = ['Morning routine', 'Night routine', 'Weekly routine', 'Standards']
+        # AMENDED BY HT-194 S2 (R67.2, Cory 2026-09-24): Standards now comes BEFORE Weekly routine; names unchanged.
+        SECS29 = ['Morning routine', 'Night routine', 'Standards', 'Weekly routine']
         chk('S3h · the headers read the four sections and nothing else',
             heads and all(h in SECS29 for h in heads), heads)
         chk('S3i · and they appear in that order',

@@ -57,9 +57,13 @@ BASE = 'file://' + os.path.join(FIX, 'index.html').replace(os.sep, '/')
 
 # paste 179 S6 moved the ruling: eight offered, the four new schemes first, Slate the default, and the
 # system pair Linen by day / Slate by night. The checks below are unchanged; the ruling they hold is.
-THEMES = ['slate', 'ember', 'linen', 'mono', 'neon', 'classic', 'graphite', 'midnight', 'paper']
-ALL_THEMES = THEMES + ['terminal']
-DEFAULT_THEME = 'slate'
+# AMENDED BY HT-194 N2.1 (R67.2, Cory 2026-09-24 11:12): EXACTLY FIVE - Classic (the default again) + Crimson . Moss .
+# Gilt . Orchid. The nine older files and Follow system are RETIRED to themes/_retired/ (kept, never deleted, never
+# linked). The checks below hold the same rulings - one default, one address, applied before paint - over the five.
+THEMES = ['classic', 'crimson', 'moss', 'gilt', 'orchid']
+ALL_THEMES = list(THEMES)
+RETIRED = ['slate', 'ember', 'linen', 'mono', 'neon', 'graphite', 'midnight', 'paper', 'terminal']
+DEFAULT_THEME = 'classic'
 
 RES = []
 SEC_COUNT = {}
@@ -162,8 +166,9 @@ async def sec_s6(pw):
         [s for s in ('data-skin=', 'data-simple]{') if s in tokens.replace(' ', '')])
     chk('S6b . and it kept the shared layers it should have kept (palette, mapping, states)',
         '--ht-ground:' in tokens and '--st-secured:' in tokens and '--sb-thumb:' in tokens)
-    missing = [t for t in ALL_THEMES if not os.path.exists(os.path.join(REPO, 'themes', t + '.css'))]
-    chk('S6c . five theme files on disk: the four offered plus terminal, kept not deleted (R70.138)',
+    missing = [t for t in ALL_THEMES if not os.path.exists(os.path.join(REPO, 'themes', t + '.css'))] + \
+              [t for t in RETIRED if not os.path.exists(os.path.join(REPO, 'themes', '_retired', t + '.css'))]
+    chk('S6c . the five offered are on disk, and the nine retired are kept in themes/_retired (R70.138)',
         not missing, missing)
 
     linked = re.findall(r'<link rel="stylesheet" href="\./themes/([a-z]+)\.css">', index)
@@ -201,7 +206,7 @@ async def sec_s6(pw):
     b, pg, errs = await open_page(pw)
     got = await pg.get_attribute('html', 'data-theme')
     vals = await pg.evaluate(TOKENS_READ, ['--ground', '--ink', '--accent'])
-    chk('S6i . a first load with nothing stored is Slate (179 S6 default; switch user.theme)',
+    chk('S6i . a first load with nothing stored is Classic (194 N2.1 default)',
         got == DEFAULT_THEME, got)
     chk('S6j . and the theme file actually LOADED - --ground resolves to the default theme file\'s own value',
         rgb(vals['--ground']) == rgb(theme_file_ground(DEFAULT_THEME)), vals)
@@ -229,12 +234,15 @@ async def sec_s6(pw):
     await b.close()
 
     # ---- EXTRA-1: follow the system light/dark pair ----------------------------------------
-    for scheme, want in (('light', 'linen'), ('dark', 'slate')):
+    # AMENDED BY HT-194 N2.1: Follow system is retired with the nine. A saved `system` still RESOLVES - to Classic in
+    # either light - and nothing claims to follow; the saved value is left as it was (resolution never writes).
+    for scheme, want in (('light', 'classic'), ('dark', 'classic')):
         b, pg, _ = await open_page(pw, storage={'ht_theme': 'system'}, scheme=scheme)
         got = await pg.get_attribute('html', 'data-theme')
         follow = await pg.get_attribute('html', 'data-theme-follow')
-        chk('S6o.%s . "follow system" resolves to %s and says it is following' % (scheme, want),
-            got == want and follow == '1', [got, follow])
+        kept = await pg.evaluate("() => localStorage.getItem('ht_theme')")
+        chk('S6o.%s . a saved "system" resolves to %s, follows nothing and is not rewritten' % (scheme, want),
+            got == want and follow is None and kept == 'system', [got, follow, kept])
         await b.close()
 
     # ---- the picker: instant, persisted, and the only one ----------------------------------
@@ -243,8 +251,8 @@ async def sec_s6(pw):
     await pg.wait_for_timeout(900)
     picks = await pg.evaluate("() => [...document.querySelectorAll('[data-theme-pick]')]"
                               ".map(b => b.getAttribute('data-theme-pick'))")
-    chk('S6p . Settings -> Appearance offers the four themes and the system pair, and nothing else',
-        picks == THEMES + ['system'], picks)
+    chk('S6p . Settings -> Appearance offers exactly the five, and nothing else (194 N2.1)',
+        picks == THEMES, picks)
     pressed = await pg.evaluate("() => [...document.querySelectorAll('[data-theme-pick]')]"
                                 ".filter(b => b.getAttribute('aria-pressed')==='true')"
                                 ".map(b => b.getAttribute('data-theme-pick'))")
@@ -254,7 +262,7 @@ async def sec_s6(pw):
     chk('S6r . the old raw skin names are gone from Settings - a person picks a look, not a token set',
         not any(w in body for w in ('statement', 'carbon', 'blueprint')), body[:160])
 
-    await pg.evaluate("() => document.querySelector('[data-theme-pick=\"midnight\"]').click()")
+    await pg.evaluate("() => document.querySelector('[data-theme-pick=\"gilt\"]').click()")
     await pg.wait_for_timeout(400)
     after = await pg.evaluate("""() => ({
       attr: document.documentElement.getAttribute('data-theme'),
@@ -262,26 +270,26 @@ async def sec_s6(pw):
       ground: getComputedStyle(document.documentElement).getPropertyValue('--ground').trim(),
       meta: (document.querySelector('meta[name=theme-color]')||{}).content })""")
     chk('S6s . one tap switches it at once - attribute, resolved colour and the stored value agree',
-        after['attr'] == 'midnight' and after['stored'] == 'midnight'
-        and rgb(after['ground']) == rgb(theme_file_ground('midnight')), after)
+        after['attr'] == 'gilt' and after['stored'] == 'gilt'
+        and rgb(after['ground']) == rgb(theme_file_ground('gilt')), after)   # HT-194: was midnight (retired)
     # the status bar is the one place a colour is COPIED, so it is the one place it can be stale
     chk('S6t . and <meta theme-color> follows, so the phone status bar is not the old theme',
-        rgb(after['meta']) == rgb(theme_file_ground('midnight')), after['meta'])
+        rgb(after['meta']) == rgb(theme_file_ground('gilt')), after['meta'])
     pressed2 = await pg.evaluate("() => [...document.querySelectorAll('[data-theme-pick]')]"
                                  ".filter(b => b.getAttribute('aria-pressed')==='true')"
                                  ".map(b => b.getAttribute('data-theme-pick'))")
     chk('S6u . the picker repaints its own pressed state - and a second tap still works, which a '
-        'per-button handler would have broken when innerHTML was rewritten', pressed2 == ['midnight'], pressed2)
-    await pg.evaluate("() => document.querySelector('[data-theme-pick=\"paper\"]').click()")
+        'per-button handler would have broken when innerHTML was rewritten', pressed2 == ['gilt'], pressed2)
+    await pg.evaluate("() => document.querySelector('[data-theme-pick=\"orchid\"]').click()")
     await pg.wait_for_timeout(400)
     twice = await pg.get_attribute('html', 'data-theme')
-    chk('S6v . the second tap lands too (the delegated listener survives the repaint)', twice == 'paper', twice)
+    chk('S6v . the second tap lands too (the delegated listener survives the repaint)', twice == 'orchid', twice)   # HT-194: was paper (retired)
 
     await pg.reload()
     await pg.wait_for_timeout(1200)
     kept = await pg.get_attribute('html', 'data-theme')
     chk('S6w . and it survives a reload - HT-9a\'s dark lock no longer takes the choice back',
-        kept == 'paper', kept)
+        kept == 'orchid', kept)
     chk('S6x . zero page errors through the whole picker walk', not errs, errs[:2])
     await b.close()
 
@@ -479,24 +487,27 @@ async def sec_s2(pw):
     b, pg, errs = await open_page(pw, 1280, 900, wait=1600, flags=GRP_FLAGS)
     await pg.wait_for_timeout(1400)
 
-    head = await pg.evaluate("""() => { const t=document.querySelector('#h18Group table.h29gt');
-      return t ? [...t.querySelectorAll('thead th')].map(n=>n.textContent.trim()) : null; }""")
-    chk('S2a . GROUP carries the NEED column S3.7 asks for, beside the ones it had',
-        head == ['member', 'today', '7 days', '30 days', 'need', 'logged'], head)
-    cols = await pg.evaluate("""() => { const t=document.querySelector('#h18Group table.h29gt');
+    # AMENDED BY HT-194 N2.4 (R67.2, Cory 2026-09-24 11:12): "the group card drops the best-of-week number" - the NEED
+    # column and every `best NN%` leave GROUP; the day's need-to-hit number stays where it lives, on TODAY. The card
+    # is a grid now (S5), so "every row spans the same columns" is read off the grid itself.
+    head = await pg.evaluate("""() => { const t=document.querySelector('#h18Group .g194');
+      return t ? [...t.querySelectorAll('.g194h .g194c')].map(n=>(n.querySelector('.lg')||n).textContent.trim()) : null; }""")
+    gtxt = await pg.evaluate("() => (document.getElementById('h18Group')||{}).textContent || ''")
+    chk('S2a . GROUP is member . today . 7 days . 30 days . logged - no NEED column, no `best`',
+        head == ['member', 'today', '7 days', '30 days', 'logged'] and not re.search(r'best\s*\d', gtxt), head)
+    cols = await pg.evaluate("""() => { const t=document.querySelector('#h18Group .g194');
       if(!t) return null;
-      const th=t.querySelectorAll('thead th').length;
-      const bad=[...t.querySelectorAll('tbody tr')].map(r => {
-        let n=0; for(const c of r.children) n += (+c.getAttribute('colspan') || 1);
-        return n; }).filter(n => n !== th);
+      const th=t.querySelectorAll('.g194h .g194c').length;
+      const bad=[...t.querySelectorAll('.g194r:not(.g194h):not(.g194p):not(.g194none)')]
+        .map(r => r.querySelectorAll(':scope > .g194c').length).filter(n => n !== th);
       return { th, bad }; }""")
     chk('S2b . and every row spans the same number of columns - the count is written once, so the '
         'empty state cannot go out of step with the header again', cols and not cols['bad'], cols)
 
-    needs = await pg.evaluate("""() => [...document.querySelectorAll('#h18Group td.h32ndc')]
+    needs = await pg.evaluate("""() => [...document.querySelectorAll('.h32need')]
       .map(n => ({ t:n.textContent.trim(), c:[...n.classList].filter(x=>x.startsWith('h32')&&x!=='h32ndc')[0]||null,
                    col:getComputedStyle(n).color }))""")
-    chk('S2c . a need cell per member, each with ONE state class (R70.306: one colour per state)',
+    chk('S2c . the need-to-hit number is on TODAY with ONE state class (R70.306; 194 N2.4 moved it off GROUP)',
         len(needs) >= 1 and all(n['c'] for n in needs), needs[:4])
     chk('S2d . and the colours actually resolve - a state class pointing at a token no theme '
         'declares would render as plain text and say nothing',
@@ -507,10 +518,10 @@ async def sec_s2(pw):
     same = await pg.evaluate("""() => {
       if(!window.__HT32WEEK || !window.__HT32NEED) return null;
       const mine = window.__HT32NEED.compute();
-      const cell = document.querySelector('#h18Group tr.h18me td.h32ndc');
+      const cell = document.querySelector('.h32need');                       /* HT-194 N2.4: the TODAY tile */
       return { state: mine && mine.state, cellClass: cell ? [...cell.classList].join(' ') : null,
                cls: mine ? window.__HT32WEEK.cls(mine) : null }; }""")
-    chk('S2e . YOUR row uses the same scorer as the header tile - one definition of the week',
+    chk('S2e . the TODAY tile uses the one scorer - one definition of the week',
         same and same['cls'] and same['cellClass'] and same['cls'] in same['cellClass'], same)
 
     stake = await pg.evaluate("""() => { const b=document.querySelector('#h18Group [data-h32stake]');
@@ -525,7 +536,7 @@ async def sec_s2(pw):
       i.value='member-a@example.com';
       b.click();
       await new Promise(r=>setTimeout(r,900));
-      const rows=[...document.querySelectorAll('#h18Group tr.h32pend')].map(r=>r.textContent.trim());
+      const rows=[...document.querySelectorAll('#h18Group .h32pend')].map(r=>r.textContent.trim());
       return { note:(document.getElementById('h32addn')||{}).textContent||'', rows,
                left:(document.getElementById('h32email')||{}).value }; }""")
     chk('S2g . any member can add someone BY EMAIL, and the row appears at once',
@@ -545,7 +556,7 @@ async def sec_s2(pw):
       const r=document.querySelector('[data-h32unpend]');
       if(!r) return {no:'remove'};
       r.click(); await new Promise(res=>setTimeout(res,700));
-      return { rows:document.querySelectorAll('#h18Group tr.h32pend').length }; }""")
+      return { rows:document.querySelectorAll('#h18Group .h32pend').length }; }""")
     chk('S2k . and whoever added them can take the row back out (S2.4)', gone.get('rows') == 0, gone)
     chk('S2l . zero page errors through the whole group walk', not errs, errs[:2])
     await b.close()

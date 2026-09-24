@@ -786,8 +786,9 @@ async def sec_e(pw):
     # AMENDED BY HT-29 S2 · R67.2 · paste 133 Ruling 3: four placed sections, in this order.
     # AMENDED BY NAME, HT-30 (paste 137 S1.4), 2026-09-20: Cory's review swaps the last two and
     # renames the fourth. E14 asserts the same property about the same four names.
-    SECS29 = ['Morning routine', 'Night routine', 'Weekly routine', 'Standards']
-    chk("E14 · the sections are Morning routine, Night routine, Weekly routine, Standards",
+    # AMENDED BY HT-194 S2 (R67.2, Cory 2026-09-24): Standards before Weekly routine; names unchanged.
+    SECS29 = ['Morning routine', 'Night routine', 'Standards', 'Weekly routine']
+    chk("E14 · the sections are Morning routine, Night routine, Standards, Weekly routine",
         sat['heads'] == [s for s in SECS29 if s in sat['heads']] and sat['heads'], sat['heads'])
     chk("F16 · Saturday: the Sabbath is one ordinary due item (in the denominator, weight 1)", 'h1' in sat['daily'], sat['daily'])
     await pg.evaluate("() => { window.__WRITES=[]; }")
@@ -898,9 +899,14 @@ async def sec_f(pw):
     # THE LINE GOT STRONGER, not weaker: it used to read `index()` on a header that might not exist and
     # would have CRASHED the section rather than failing it (134 R1), and now it asserts the header is
     # present before it asserts what is under it.
+    # AMENDED BY HT-194 S3 (R67.2): an EMPTY section now renders its header (stress 3 - a drop target), so
+    # '#Morning routine' is present with nothing under it. The claim is unchanged and asserted directly: the
+    # header each new row sits under is Standards.
+    def under(n):
+        i = order.index(n)
+        return next((x for x in reversed(order[:i]) if x.startswith('#')), None)
     chk("F19 · they render on a weekday: all three in Standards, because a clock places nothing",
-        '#Standards' in order and '#Morning routine' not in order
-        and all(order.index('#Standards') < order.index(n) for n in names), order)
+        '#Standards' in order and all(n in order and under(n) == '#Standards' for n in names), order)
     after = await pg.evaluate("(n) => JSON.stringify(window.__MOCK_DB.habits.filter(h=>n.indexOf(h.name)<0).map(h=>[h.id,h.name,h.cadence,h.sort_order,h.time_anchor||null]))", names)
     ups = await pg.evaluate("() => (window.__UPDATES||[]).filter(u=>u[0]==='habits').length")
     chk("F19 · every existing standard is untouched", before == after and ups == 0, [ups])
@@ -962,7 +968,8 @@ async def sec_g(pw):
     # no section of its own lands: a clock does not place anything any more (Cory 9/21), so the weekly one
     # is in Weekly routine and the other three are in Standards, which is where he moves them from.
     chk("G21 · one tap starts from four EXAMPLES across Weekly routine and Standards",
-        e['rows'] == 4 and e['heads'] == ['Weekly routine', 'Standards'] and not e['card']
+        # AMENDED BY HT-194 S2/S3 (R67.2): all four headers render, empty ones included, in Cory's 9/24 order
+        e['rows'] == 4 and e['heads'] == ['Morning routine', 'Night routine', 'Standards', 'Weekly routine'] and not e['card']
         and e['ins'] == [['Move for 20 minutes|daily|07:00', 'Read 10 pages|daily|', 'Lights out|daily|22:30', 'Plan the week|weekly|']], e)
     # edit: rename + Days + delete, all in the app
     rid = await pg.evaluate("() => [...document.querySelectorAll('#log .li')].find(r=>/Read 10 pages/.test(r.textContent)).getAttribute('data-h')")

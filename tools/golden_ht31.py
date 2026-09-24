@@ -418,7 +418,8 @@ async def sec_s3(pw):
 # =============================================================================================
 # S4 . INSIGHTS
 # =============================================================================================
-FOUR = ['The month', 'The year', 'The life', 'The group, side by side']
+# AMENDED BY HT-194 S6.1 (R67.2, Cory 2026-09-24): the group card moves ABOVE the life grid
+FOUR = ['The month', 'The year', 'The group, side by side', 'The life']
 
 
 async def sec_s4(pw):

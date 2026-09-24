@@ -476,7 +476,8 @@ S5 = """() => {
   /* AMENDED for HT-18d note 3: the one-line ADHERENCE button is retired; GROUP is the surface
      block now — one row per member, two percentages, always visible. */
   const a=g('h18Group'), d=g('h18Draw');
-  const meRow=a?a.querySelector('tr.h18me'):null;
+  /* AMENDED BY HT-194 S5 (paste 194, R67.2): the table is a grid of rows now - `.g194r` - same classes */
+  const meRow=a?a.querySelector('tr.h18me, .g194r.h18me'):null;
   const rows=window.__HT16.scorecardRows();
   let hit=0, opp=0; rows.forEach(r=>{ hit+=r.hit; opp+=r.opp; });
   const st=window.__HT16.state? window.__HT16.state() : null;
@@ -485,10 +486,10 @@ S5 = """() => {
     text: a? a.textContent : null,
     /* HT-29 S3.12: the row is member · today · 7 days · 30 days · logged, so the 30-day cell is the third
        percentage, and it is COMPLETION (Ruling 1), not adherence - `mine30` is what it must equal. */
-    v: meRow? (meRow.querySelectorAll('td.p')[2]||{}).textContent : null,
+    v: meRow? (meRow.querySelectorAll('td.p, .g194c.p')[2]||{}).textContent : null,
     mine30: (window.__HT29GRP ? window.__HT29GRP.you().m : null),
-    memberRows: a? a.querySelectorAll('tbody tr').length : 0,
-    metricCols: a? a.querySelectorAll('thead th').length : 0,
+    memberRows: a? a.querySelectorAll('tbody tr, .g194r:not(.g194h)').length : 0,
+    metricCols: a? a.querySelectorAll('thead th, .g194h .g194c').length : 0,
     heading: a? (a.querySelector('.h18gh')||{}).textContent || '' : '',
     aria: d? String(!d.hidden) : null,
     title: 'n/a',
@@ -547,8 +548,11 @@ async def run_s5(pw):
             # The FLOOR this check exists to hold is untouched: GROUP on the surface, always
             # visible, one row per member, zero scorecards. Only the count moved, and it moved
             # because the paste asked for a column.
+            # ---- AMENDED BY HT-194 N2.4 (CC HT 2026-09-24) - FIVE COLUMNS AGAIN ----
+            # member . today . 7 days . 30 days . logged. Cory 9/24 11:12: the best-of-week number leaves the
+            # group card; the day's need-to-hit stays on TODAY. The floor is untouched.
             m['exists'] and m['visible'] and m['visibleScorecards'] == 0
-            and m['memberRows'] >= 2 and m['metricCols'] == 6
+            and m['memberRows'] >= 2 and m['metricCols'] == 5
             and 'GROUP' in m['heading'],
             [m['exists'], m['visible'], m['visibleScorecards'], m['memberRows'],
              m['metricCols'], m['heading'][:30]])
@@ -692,7 +696,9 @@ async def run_s6(pw):
         chk("S6a · %s · data-rows 100 and data-cols 52 (was 52 and 100 — inverted)" % t,
             m['rows'] == 100 and m['cols'] == 52, [m['rows'], m['cols']])
         chk("S6b · %s · ONE graph (Cory 2026-09-07), ages 0..90 in order DOWN THE LEFT" % t,
-            m['labels'] == ['0', '10', '20', '30', '40', '50', '60', '70', '80', '90']
+            # AMENDED BY HT-194 S6.4 (R67.2, Cory 2026-09-24: "it doesn't show ... the full years up to 100"): the axis
+            # now ends with 100 at its foot. Still one graph, in order, down the left.
+            m['labels'] == ['0', '10', '20', '30', '40', '50', '60', '70', '80', '90', '100']
             and m['folds'] == 1 and m['distinctX'] == 1 and m['labelsDescend']
             and m['labelsLeftOfCells'],
             {'labels': m['labels'], 'distinctX': m['distinctX'], 'distinctY': m['distinctY'],

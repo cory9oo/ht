@@ -196,6 +196,12 @@ function toast(t){ var n=el('toast'); n.textContent=t; n.classList.add('on');
    The retired names and the exact regex are in the HT-20 receipt; they are not kept here,
    because a retired identifier left in the source is the thing a later wire grep-restores. */
 function nameOf(n){ return String(n==null?'':n); }
+/* PASTE 194 S6.2 · ONE DEFAULT TARGET AGE (R70.68 says one; there were two, both 90). The life grid runs to
+   this unless the person saved their own target, which still wins. */
+var DEFAULT_TARGET = 100;
+var HT194_SHEET = true;           /* 194 S4: the five-field sheet */
+var HT194_DRAG_SECTIONS = true;   /* 194 S3: headers are drop targets; one section write, on the moved row */
+var HT194_GRID = true;            /* 194 S5: the group card is a fixed-column grid, five columns */
 /* ================== HT-32 S6 . THEMES - ONE PICKER, FOUR SKINS ==================
    Cory, 9/22: "revamp all the fonting and the color ... noisy ... test out a few options" and
    "the user should have an option to change their color scheme ... in the settings".
@@ -215,31 +221,31 @@ function nameOf(n){ return String(n==null?'':n); }
    resolve in CSS, because each theme file names its legacy selector beside the new one. */
 /* HT-179 S6: four new schemes, FIRST in the picker, then the four of HT-32. Nothing removed (R70.138). */
 /* 185 S2: Neon joins after Mono (the EXTRA - strike it by removing it here, in index.html and its file). */
-var THEMES = ['slate','ember','linen','mono','neon','classic','graphite','midnight','paper'];   /* offered, in picker order */
-var THEME_ALL = THEMES.concat(['terminal']);                     /* terminal is kept, not offered */
+/* PASTE 194 N2.1 (Cory 2026-09-24 11:12): EXACTLY FIVE - Classic (the default, unchanged) + Crimson . Moss . Gilt .
+   Orchid. The nine older files and Follow system moved to `themes/_retired/` (kept in git, never deleted -
+   DEC-037 / R70.138). A saved retired name RESOLVES and is never written back: Neon -> Orchid (the same
+   family, darker and calmer), anything else -> Classic. See THEME_RETIRED. */
+var THEMES = ['classic','crimson','moss','gilt','orchid'];   /* offered, in picker order */
+var THEME_ALL = THEMES.slice();
+var THEME_RETIRED = { neon:'orchid', slate:'classic', ember:'classic', linen:'classic', mono:'classic',
+                      graphite:'classic', midnight:'classic', paper:'classic', terminal:'classic', system:'classic' };
 /* READ, NOT DECLARED. index.html's pre-paint script owns the default and publishes it here; this
    file only needs to agree with it. The literal is the fallback for a page served without the
    attribute, and `golden_ht32` S6 asserts the two spellings are the same word - because when they
    were not, the page painted one theme and app.js changed it a tick later, and no test saw it. */
 var THEME_DEFAULT = (function(){
-  try{ return document.documentElement.getAttribute('data-theme-default') || 'slate'; }
-  catch(e){ return 'slate'; }
+  try{ return document.documentElement.getAttribute('data-theme-default') || 'classic'; }
+  catch(e){ return 'classic'; }
 })();
-var THEME_LABEL = { slate:'Slate', ember:'Ember', linen:'Linen', mono:'Mono', neon:'Neon',
-                    classic:'Classic', graphite:'Graphite', midnight:'Midnight', paper:'Paper',
-                    terminal:'Terminal', system:'Follow system' };
-var THEME_NOTE = { slate:'near-black, electric cyan', ember:'warm charcoal, hot amber',
-                   linen:'light paper, one violet', mono:'graphite grey, no colour at all',
-                   neon:'true black, electric magenta',
-                   classic:"today's look", graphite:'near-black, cool greys',
-                   midnight:'deep navy, cyan', paper:'light, warm greys' };
-/* EXTRA-1 (S6.14): "follow system light/dark" is a PAIR, not a fifth palette. 179 S6: Slate by night,
-   Linen by day. */
-var THEME_LIGHT = 'linen', THEME_DARK = 'slate';
-var SKIN2THEME = { statement:'paper', carbon:'graphite', blueprint:'midnight', terminal:'terminal' };
+var THEME_LABEL = { classic:'Classic', crimson:'Crimson', moss:'Moss', gilt:'Gilt', orchid:'Orchid' };
+var THEME_NOTE = { classic:"today's look", crimson:'near-black, deep crimson', moss:'green-black, sage',
+                   gilt:'true black, antique gold', orchid:'aubergine-black, deep orchid' };
+/* 194 N2.1: Follow system is retired with the nine; the pair is kept only so an old `system` resolves */
+var THEME_LIGHT = 'classic', THEME_DARK = 'classic';
+var SKIN2THEME = { statement:'classic', carbon:'classic', blueprint:'classic', terminal:'classic' };
 
 function themePref(){ try{ return localStorage.getItem('ht_theme') || THEME_DEFAULT; }catch(e){ return THEME_DEFAULT; } }
-function themeFollowsSystem(){ return themePref()==='system'; }
+function themeFollowsSystem(){ return false; }         /* 194 N2.1: Follow system is retired */
 function systemIsLight(){
   try{ return !!(window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches); }catch(e){ return false; }
 }
@@ -247,8 +253,9 @@ function systemIsLight(){
 function themeNow(){ return document.documentElement.getAttribute('data-theme') || THEME_DEFAULT; }
 /* the theme a preference RESOLVES to. `system` is the only one where those two differ. */
 function themeResolve(t){
-  if(t==='system') return systemIsLight() ? THEME_LIGHT : THEME_DARK;
-  return THEME_ALL.indexOf(t)<0 ? THEME_DEFAULT : t;
+  if(THEME_ALL.indexOf(t)>=0) return t;
+  if(THEME_RETIRED[t]) return THEME_RETIRED[t];          /* 194 N2.1: resolution never writes */
+  return THEME_ALL.indexOf(THEME_DEFAULT)<0 ? 'classic' : THEME_DEFAULT;
 }
 
 var _themeSwatch = null;
@@ -260,7 +267,11 @@ function themeSwatches(){
     var cs=getComputedStyle(root);
     out[t] = { ground:cs.getPropertyValue('--ground').trim(),
                ink:cs.getPropertyValue('--ink').trim(),
-               accent:cs.getPropertyValue('--accent').trim() };
+               accent:cs.getPropertyValue('--accent').trim(),
+               sheet:cs.getPropertyValue('--sheet').trim(),
+               ink2:cs.getPropertyValue('--ink2').trim(),
+               good:cs.getPropertyValue('--good').trim(),
+               rule:cs.getPropertyValue('--rule').trim() };
   });
   if(was===null) root.removeAttribute('data-theme'); else root.setAttribute('data-theme',was);
   _themeSwatch = out; return out;
@@ -271,8 +282,7 @@ function themeSwatches(){
 function applyTheme(t){
   var r = themeResolve(t);
   document.documentElement.setAttribute('data-theme', r);
-  if(t==='system') document.documentElement.setAttribute('data-theme-follow','1');
-  else document.documentElement.removeAttribute('data-theme-follow');
+  document.documentElement.removeAttribute('data-theme-follow');   /* 194: nothing follows the system now */
   /* <meta name=theme-color> cannot hold a var(), so it is the one place a colour is copied - and it
      is copied from what the browser resolved, never typed. It paints the iOS status bar and the
      Android task-switcher card; left behind, the phone frames a dark app in a light chrome. */
@@ -288,7 +298,7 @@ function applyTheme(t){
    (its migration is in tools/sql/ht_pending.sql), and the app must work before and after it lands -
    the same contract `cue`, `target_age` and `closed_at` are held to. */
 function setTheme(t){
-  if(t!=='system' && THEME_ALL.indexOf(t)<0) t = THEME_DEFAULT;
+  if(THEME_ALL.indexOf(t)<0) t = themeResolve(t);        /* 194: only the five are ever WRITTEN */
   try{ localStorage.setItem('ht_theme', t); }catch(e){}
   try{ localStorage.setItem('st.skin', t); }catch(e){}   /* HT-22's key, kept so nothing downstream breaks */
   var r = applyTheme(t);
@@ -320,20 +330,23 @@ function paintSkins(){
 /* Settings -> Appearance. Re-rendered in place so the pressed state is never stale. */
 function paintAppearance(){
   var host = el('thPick'); if(!host) return;
-  var pref = themePref(), cur = themeNow(), sw = themeSwatches();
+  var pref = themeResolve(themePref()), cur = themeNow(), sw = themeSwatches();
+  /* 194 S7.3 EXTRA (strike with "no preview"): each tile carries a live mini-card - one real row of his, its
+     check and the accent - painted from the values the browser resolved for THAT scheme, so he chooses from
+     the product and not from a swatch. `.thsw` stays as the tile's first child (golden_ht32 reads it). */
+  var first = (typeof S!=='undefined' && S && S.habits && S.habits[0]) ? nameOf(S.habits[0].name) : 'Read the Bible';
   host.innerHTML = THEMES.map(function(t){
-    var on = (pref===t);
+    var on = (pref===t), s = sw[t];
     return '<button class="tbtn th'+(on?' on':'')+'" data-theme-pick="'+t+'" aria-pressed="'+on+'">'+
-      '<span class="thsw" style="background:'+sw[t].ground+';border-color:'+sw[t].ink+'">'+
-        '<i style="background:'+sw[t].accent+'"></i></span>'+
+      '<span class="thsw" style="background:'+s.ground+';border-color:'+s.ink+'">'+
+        '<i style="background:'+s.accent+'"></i></span>'+
       '<span class="thnm">'+THEME_LABEL[t]+'</span>'+
-      '<span class="thno">'+THEME_NOTE[t]+'</span></button>';
-  }).join('') +
-  '<button class="tbtn th'+(pref==='system'?' on':'')+'" data-theme-pick="system" aria-pressed="'+(pref==='system')+'">'+
-    '<span class="thsw" style="background:'+sw[THEME_LIGHT].ground+';border-color:'+sw[THEME_DARK].ground+'">'+
-      '<i style="background:'+sw[THEME_DARK].ground+'"></i></span>'+
-    '<span class="thnm">'+THEME_LABEL.system+'</span>'+
-    '<span class="thno">'+THEME_LABEL[THEME_LIGHT].toLowerCase()+' by day, '+THEME_LABEL[THEME_DARK].toLowerCase()+' by night</span></button>';
+      '<span class="thno">'+THEME_NOTE[t]+'</span>'+
+      '<span class="thmini" aria-hidden="true" style="background:'+s.sheet+';border-color:'+s.rule+';color:'+s.ink+'">'+
+        '<i class="thmb" style="background:'+s.good+';border-color:'+s.good+';color:'+s.ground+'">\u2713</i>'+
+        '<span class="thmn">'+esc(first)+'</span>'+
+        '<b class="thma" style="color:'+s.accent+';border-color:'+s.accent+'">6:00 AM</b></span></button>';
+  }).join('');
   if(cur!==themeResolve(pref)) applyTheme(pref);      /* self-heal if something else moved the attribute */
 }
 
@@ -3662,8 +3675,10 @@ var HT32_CARDFIT = true;
         return fld('Section','<select id="eSection">'+HT29SEC.ORDER.map(function(s){
           return '<option value="'+s+'"'+(s===cur?' selected':'')+'>'+HT29SEC.NAMES[s]+'</option>'; }).join('')+'</select>');
       })()+
-      fld('Group','<select id="eGroup">'+groupsFor(grp).map(function(g){
-          return '<option'+(g===grp?' selected':'')+'>'+esc(g)+'</option>'; }).join('')+'</select>')+
+      /* PASTE 194 S4.2: the Group select left the sheet - it was a second Section. `group_name` stays a column the
+         sheet never writes again (saveSheet sends it only when #eGroup exists, and it no longer does). */
+      (HT194_SHEET ? '' : fld('Group','<select id="eGroup">'+groupsFor(grp).map(function(g){
+          return '<option'+(g===grp?' selected':'')+'>'+esc(g)+'</option>'; }).join('')+'</select>'))+
       /* HT-24 C1: three cadences now, and the third carries a day picker that is only shown
          when it is chosen. `dow:` is stored as the grammar, never as a second column. */
       (function(){
@@ -3674,11 +3689,17 @@ var HT32_CARDFIT = true;
         var dw = dowOf(h), sab = isSabbathStd(h);
         var rests = !sab && !!(dw && dw.length===6 && dw.indexOf(6)<0);
         var cad = isWeekly(h) ? 'weekly' : ((dw && !rests) ? 'dow' : 'daily');
-        return fld('Days','<select id="eCad">'+
+        /* PASTE 194 S4.3: Days is ONE field and its dependents are sub-rows INSIDE it - never a sixth field */
+        var dfld = HT194_SHEET
+          ? function(lab, inner){ return '<div class="fld h194days"><span class="lab">'+lab+'</span>'+inner+'</div>'; }
+          : fld;
+        return dfld('Days','<select id="eCad">'+
             '<option value="daily"'+(cad==='daily'?' selected':'')+'>Every day</option>'+
             '<option value="dow"'+(cad==='dow'?' selected':'')+'>Certain days</option>'+
-            '<option value="weekly"'+(cad==='weekly'?' selected':'')+'>Once a week</option></select>')+
-          '<div class="fld dowf" id="eDowFld"'+(cad==='dow'?'':' hidden')+'>'+
+            '<option value="weekly"'+(cad==='weekly'?' selected':'')+'>Once a week</option></select>'+
+            (HT194_SHEET ? daysSub() : ''))+
+          (HT194_SHEET ? '' : daysSub());
+        function daysSub(){ return '<div class="fld dowf" id="eDowFld"'+(cad==='dow'?'':' hidden')+'>'+
             '<span class="lab">Which days</span>'+
             '<div class="dowq" id="eDowQ"><button type="button" class="dowqb" data-q="1,2,3,4,5">Weekdays</button>'+
               '<button type="button" class="dowqb" data-q="0,6">Weekends</button></div>'+
@@ -3690,9 +3711,10 @@ var HT32_CARDFIT = true;
             }).join('')+'</div></div>'+
           (sab ? '' : '<label class="fld h28rest" id="eRestFld"'+(cad==='weekly'?' hidden':'')+'>'+
             '<span class="lab">Rests on Sabbath</span>'+
-            '<span class="h28sw"><input type="checkbox" id="eRest"'+(rests?' checked':'')+'> not due on Saturdays</span></label>');
+            '<span class="h28sw"><input type="checkbox" id="eRest"'+(rests?' checked':'')+'> not due on Saturdays</span></label>'); }
       })()+
-      (S.hasTime ? '<div class="fld" id="eTimeFld"><span class="lab">Planned time</span>'+
+      /* PASTE 194 S4.2: Planned time left the sheet entirely - the chip on the row is its one address (S1). */
+      (S.hasTime && !HT194_SHEET ? '<div class="fld" id="eTimeFld"><span class="lab">Planned time</span>'+
           '<div class="win"><input id="eAnchor" type="time" value="'+esc(hhmm(h.time_anchor)||'')+'">'+
           '</div>'+
           (function(){
@@ -3733,6 +3755,7 @@ var HT32_CARDFIT = true;
           '<div class="fld"><span class="lab">Notes</span>'+
           '<textarea rows="3" disabled placeholder="one migration away — see below"></textarea>'+
           '</div>')+
+      /* 194 S4.4: Archive is the sheet's action row, under the fields - never a field */
       '<div class="etools">'+
         (isNew?'':'<button class="btn" id="eArch">Delete</button>')+
         '<span style="flex:1"></span>'+
@@ -3813,7 +3836,7 @@ var HT32_CARDFIT = true;
     var lk=str('eLink');
     /* only a CHANGED link is held to it: a link saved before this rule never blocks a rename */
     if(lk && lk!==String((h&&h.link)||'') && !/^https:\/\/[^\s\/$.?#][^\s]*$/i.test(lk)){ toast('a link starts with https://'); return; }
-    var rec={ user_id:S.me.id, name:name, group_name:str('eGroup'),
+    var rec={ user_id:S.me.id, name:name,
               cadence:(function(){
                 var v=str('eCad');
                 if(v==='weekly') return 'weekly';
@@ -3834,6 +3857,9 @@ var HT32_CARDFIT = true;
                 return serializeCadence({ kind:'dow', days:days });   /* all seven -> 'daily' */
               })(),
               minutes:num('eMin'), link:str('eLink')||null };
+    /* 194 S4.2: `group_name` is written only by a sheet that SHOWS the Group field. Absent, `str()` would read ''
+       and the write would blank the column on every save - the same shape as the cue and notes lines below. */
+    if(document.getElementById('eGroup')) rec.group_name = str('eGroup');
     /* S5 · THE ONE LINE THAT WOULD HAVE DESTROYED EVERY CUE. `str('eCue')` returns '' when the
        input is not rendered, so writing it unconditionally would blank the field for every
        standard on the next save — the same shape of defect as HT-20's Strip button, which also
@@ -3869,7 +3895,9 @@ var HT32_CARDFIT = true;
     /* S2: one minutes box now. It writes BOTH `minutes` (what committed()/remaining() read)
        and `minutes_planned` (what planOf() prefers), so the two can never drift apart — which is
        exactly what two separate inputs allowed. */
-    if(S.hasTime){ rec.time_anchor = str('eAnchor')||null;
+    /* 194 S4.2: the planned time is written only when its input is on the sheet; the row chip owns it now, and an
+       absent input read as '' would clear every planned time on the next save of that standard. */
+    if(S.hasTime){ if(document.getElementById('eAnchor')) rec.time_anchor = str('eAnchor')||null;
                    rec.minutes_planned = num('eMin') || null; }
     /* ---- HT-22 S1 · THE WINDOW IS WRITTEN FROM THE ANCHOR, IN THE SAME ACTION -------
        Same reasoning as S2's one minutes box writing both `minutes` and `minutes_planned`: two
@@ -3879,7 +3907,7 @@ var HT32_CARDFIT = true;
        window with no start is a row that sorts by a time nobody set, and that is how a list
        reorders itself under him for no reason he can see. */
     if(S.hasWindow){
-      var an = S.hasTime ? (str('eAnchor')||null) : (hhmm(h.time_anchor)||null);
+      var an = (S.hasTime && document.getElementById('eAnchor')) ? (str('eAnchor')||null) : (hhmm(h && h.time_anchor)||null);
       var mp = num('eMin') || 0;
       rec.planned_start = an;
       rec.planned_end   = an ? fmtClock(minsOf(an)+mp) : null;
@@ -4010,6 +4038,32 @@ var HT32_CARDFIT = true;
      band and asserts the band's own contract separately (golden_ht23 S2e1/S2e2). */
   function moveDrag(y){
     var log=document.getElementById('log'); if(!log) return;
+    /* PASTE 194 S3.1: a section HEADER is a drop target too, so an EMPTY section (header, then its `+ Add`)
+       can take a row. Rows are judged by their middle, a header by its TOP: a release anywhere on or under a
+       header belongs to that header (stress 2 - the header immediately above the release point, nothing else). */
+    if(log.querySelector(':scope > .grp[data-sec]')){
+      var kids=Array.prototype.slice.call(log.children).filter(function(n){
+        return n!==st.row && (n.classList.contains('li') || (n.classList.contains('grp') && n.hasAttribute('data-sec'))); });
+      var hit=null;
+      for(var k=0;k<kids.length;k++){
+        var b=kids[k].getBoundingClientRect(), line=kids[k].classList.contains('grp') ? b.top : (b.top+b.height/2);
+        if(y < line){ hit=kids[k]; break; }
+      }
+      var at;
+      if(hit && hit.classList.contains('li')) at=hit;
+      else if(hit){                                   /* above a header: the foot of the section before it */
+        at=hit;
+        while(at.previousElementSibling && at.previousElementSibling!==st.row &&
+              at.previousElementSibling.classList.contains('eadd')) at=at.previousElementSibling;
+        if(!hit.previousElementSibling || hit.previousElementSibling===st.row && !st.row.previousElementSibling) at=null;
+      } else {                                        /* below everything: the foot of the last section */
+        var tail=log.lastElementChild;
+        while(tail && (tail===st.row || !tail.classList.contains('eadd'))) tail=tail.previousElementSibling;
+        at=tail;
+      }
+      if(at && at!==st.row && at!==st.row.nextElementSibling) log.insertBefore(st.row, at);
+      return;
+    }
     var others=q('.li',log).filter(function(n){ return n!==st.row; });
     var before=null;
     for(var i=0;i<others.length;i++){ if(y < midOf(others[i])){ before=others[i]; break; } }
@@ -4043,10 +4097,13 @@ var HT32_CARDFIT = true;
       var grp=(cur==null)?null:cur;
       var chg={};
       if(h.sort_order!==so) chg.sort_order=so;
-      if(grp!==null && (h.group_name||'')!==grp) chg.group_name=grp;
+      /* PASTE 194 S3.2: a drag writes `sort_order` for the rows whose order changed and `section` for the MOVED
+         row only - never `group_name` (the sheet no longer writes it either, S4.2) and never a section on a row
+         the person did not move (186 N1: `habits` is written only by an explicit act on THAT row). */
+      if(!HT194_DRAG_SECTIONS && grp!==null && (h.group_name||'')!==grp) chg.group_name=grp;
       /* HT-29 S2: a drag across a section's header moves the standard into that section (Ruling 3).
          HT-31 S1.6: without the column the move is kept on the device instead of being dropped. */
-      if(sec && HT29SEC.sectionOf(h)!==sec){
+      if(sec && HT29SEC.sectionOf(h)!==sec && (!HT194_DRAG_SECTIONS || k===row)){
         if(S.hasSection) chg.section=sec;
         else if(window.__HT31SEC){ window.__HT31SEC.place(h.id, sec); }
       }
@@ -4155,6 +4212,29 @@ var HT32_CARDFIT = true;
      after the repaint, or the second press would land on whatever took its place. */
   function nudge(row, dir){
     var log=document.getElementById('log'); if(!log||!row) return;
+    /* PASTE 194 S3.3 · KEYBOARD PARITY: Up at the top of a section, or Down at its foot, crosses the header
+       into the next section (its foot going up, its top going down) - the same move a drag makes, through
+       the same endDrag(). An empty section is crossed INTO, never skipped. */
+    if(HT194_DRAG_SECTIONS && log.querySelector(':scope > .grp[data-sec]')){
+      var p=row.previousElementSibling, n=row.nextElementSibling;
+      if(dir<0 && p && p.classList.contains('grp')){
+        var foot=p.previousElementSibling; if(!foot) return;                 /* the first section: nowhere to go */
+        log.insertBefore(row, foot.classList.contains('eadd') ? foot : p);
+      }else if(dir>0 && n && n.classList.contains('eadd')){
+        var hd=n.nextElementSibling; while(hd && !hd.classList.contains('grp')) hd=hd.nextElementSibling;
+        if(!hd) return;                                                      /* the last section */
+        log.insertBefore(row, hd.nextSibling);
+      }else if(dir<0 && p && p.classList.contains('li')) log.insertBefore(row, p);
+      else if(dir>0 && n && n.classList.contains('li')) log.insertBefore(row, n.nextSibling);
+      else return;
+      var hid0=row.getAttribute('data-h');
+      endDrag(row);
+      setTimeout(function(){
+        var again=document.querySelector('#log .li[data-h="'+hid0+'"] .drg');
+        if(again) again.focus();
+      }, 120);
+      return;
+    }
     var rows=q('.li',log), i=rows.indexOf(row);
     if(i<0) return;
     var j=i+dir; if(j<0||j>=rows.length) return;
@@ -4262,7 +4342,7 @@ var HT32_CARDFIT = true;
   var DOW=['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
   var DOWFULL=['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
   var LIFE_ESSAY='https://waitbutwhy.com/2014/05/life-weeks.html';
-  var DEFAULT_TARGET=90;   /* HT-15 R70.68 raised this from 80; one default in the app, not two */
+  /* 194 S6.2: DEFAULT_TARGET is declared once, at the top of this file (100) */
 
   function advanced(){
     try{ if(localStorage.getItem('ht_advanced')==='1') return true; }catch(e){}
@@ -4743,7 +4823,7 @@ var HT32_CARDFIT = true;
    before them flips back on the next repaint. Guarded with data-ht15 and re-asserted from the same
    patched paints the earlier layers use. */
 (function(){
-  var DEFAULT_TARGET = 90;         /* R70.68 — HT-13 used 80; this wire supersedes it */
+  /* 194 S6.2: DEFAULT_TARGET is declared once, at the top of this file (100) */
   var WEEKS_ESSAY = 'https://www.bryanbraun.com/your-life/weeks.html';
   var MSWEEK = 6048e5;
 
@@ -5829,14 +5909,14 @@ var HT32_CARDFIT = true;
     var LEFT=26, TOP=16;
     var cell = phone()? 9 : 12;
     var P=cell+GAP;
-    var W=LEFT+cols*P, H=TOP+rows*P;
+    var W=LEFT+cols*P, H=TOP+rows*P+12;               /* 194 S6.4: 12px for the `100` at the foot */
     var s='<text class="wl" x="'+LEFT+'" y="'+(TOP-5)+'">weeks \u2192</text>';
     var lived=0;
     for(var r=0;r<rows;r++){
       var yy=TOP+r*P;
       /* the future: --surface, never a ramp colour */
-      s+='<rect x="'+LEFT+'" y="'+yy+'" width="'+(cols*P-GAP)+'" height="'+cell+
-         '" fill="var(--surface)"/>';
+      s+='<rect class="h194un" x="'+LEFT+'" y="'+yy+'" width="'+(cols*P-GAP)+'" height="'+cell+
+         '" fill="var(--surface)"/>';                  /* 194 N2.5: app.css softens this to the faint tone */
       var start=r*cols, end=start+cols-1;
       var livedTo=Math.min(end, nowWeek);
       if(livedTo>=start){
@@ -5848,6 +5928,7 @@ var HT32_CARDFIT = true;
       if(r%10===0)
         s+='<text class="wl" x="'+(LEFT-5)+'" y="'+(yy+cell)+'" text-anchor="end">'+r+'</text>';
     }
+    s+='<text class="wl h194foot" x="'+(LEFT-5)+'" y="'+(TOP+rows*P+10)+'" text-anchor="end">'+rows+'</text>';   /* 194 */
     /* the logged weeks, each in its own cell, carrying that week's mean completion on the ramp */
     Object.keys(by).forEach(function(wi){
       var i=+wi, rr=Math.floor(i/cols), cc=i%cols;
@@ -7492,7 +7573,8 @@ var HT32_CARDFIT = true;
       var bx=foldX(i)+LEFT, bw=WEEKS*PW-GAP, bh=rowsIn*PH-GAP;
       /* --surface-2, not --surface: the panel behind it IS --surface, so the unlived weeks were
          invisible and the grid had no body. This is the one line that makes it read as a grid. */
-      bg+='<rect x="'+bx+'" y="'+TOP+'" width="'+bw+'" height="'+bh+'" fill="var(--surface-2)"/>';
+      /* 194 N2.5: `.h194un` - app.css softens the unlived weeks to the faint tone; the gaps stay --bg, fainter still */
+      bg+='<rect class="h194un" x="'+bx+'" y="'+TOP+'" width="'+bw+'" height="'+bh+'" fill="var(--surface-2)"/>';
       pat+='<pattern id="wkcell18_'+i+'" x="'+bx+'" y="'+TOP+'" width="'+PW+'" height="'+PH+
            '" patternUnits="userSpaceOnUse">'+
            '<rect x="'+cellW+'" y="0" width="'+GAP+'" height="'+PH+'" fill="var(--bg)"/>'+
@@ -7518,6 +7600,10 @@ var HT32_CARDFIT = true;
       if(y%10===0)
         s+='<text class="wl" x="'+(x0-4)+'" y="'+(yy+cellH)+'" text-anchor="end">'+y+'</text>';
     }
+    /* 194 S6.4: the age the grid runs to, at the FOOT of its axis - on the last row's bottom edge, inside the box the
+       grid already fills, so the cells lose nothing */
+    (function(){ var lf=Math.floor((YEARS-1)/rows), lr=(YEARS-1)%rows;
+      s+='<text class="wl h194foot h194f3" x="'+foldX(lf)+'" y="'+(TOP+(lr+1)*PH-GAP)+'" text-anchor="start">'+YEARS+'</text>'; })();   /* three digits: from the gutter's left edge, a size smaller (app.css) */
     /* HT-18c (his note 5): "Life graph is missing x and y values - add them." The AGE axis (y) was
        already down the left. The WEEK axis (x) had never been drawn at all, so the grid carried one
        axis and read as a texture. Every ten weeks across the top, and the last one is 52 rather
@@ -9699,7 +9785,8 @@ var HT29SEC = (function(){
      133 shipped `standards` before `weekly` and called the fourth one "Weekly"; his newer word governs
      both. THE ORDER IS DECLARED ONCE HERE and read by every renderer, by the markdown shape (HT29MD's
      SECTIONS) and by the nudge sender - `golden_ht30` S1 reads all three and fails the moment they drift. */
-  var ORDER = ['morning','night','weekly','standards'];
+  /* PASTE 194 S2 (Cory 2026-09-24): Morning routine . Night routine . Standards . Weekly routine. Names unchanged. */
+  var ORDER = ['morning','night','standards','weekly'];
   var NAMES = { morning:'Morning routine', night:'Night routine', weekly:'Weekly routine', standards:'Standards' };
   function sectionOf(h){
     var s = String((h && h.section) || '').toLowerCase();
@@ -9759,7 +9846,8 @@ var HT29SEC = (function(){
     B.morning.sort(byTime); B.night.sort(byTime); B.standards.sort(byOrder); B.weekly.sort(byOrder);
     var frag = document.createDocumentFragment();
     HT29SEC.ORDER.forEach(function(s){
-      if(!B[s].length) return;
+      /* 194 S3.1 / stress 3: an EMPTY section is still a section - header and `+ Add` - because a drop on its
+         header or its add button is the only way to give it a first row */
       var hd = document.createElement('div'); hd.className = 'grp'; hd.setAttribute('data-sec', s);
       hd.textContent = HT29SEC.NAMES[s];
       frag.appendChild(hd);
@@ -9870,7 +9958,7 @@ var HT32SET = (function(){
     host.innerHTML = list.map(function(r){
       var on = (r.key === cur);
       var wall = (r.available === false);
-      return '<button class="tbtn th' + (on ? ' on' : '') + '" data-h32mir="' + esc(r.key) + '" ' +
+      return '<button class="tbtn th th194' + (on ? ' on' : '') + '" data-h32mir="' + esc(r.key) + '" ' +
         'aria-pressed="' + on + '">' +
         '<span class="thnm">' + esc(r.label || r.key) + '</span>' +
         '<span class="thno">' + esc(r.note || '') + (wall ? ' \u00b7 not yet' : '') + '</span></button>';
@@ -10409,6 +10497,35 @@ var HT29GRP = (function(){
                ' scoring days') + '">' + esc(txt) + '</td>';
   }
 
+  /* PASTE 194 S5 + N2.4 · A GRID, NOT A TABLE: MEMBER . TODAY . 7 DAYS . 30 DAYS . LOGGED. Each value is its
+     own grid cell with its own minimum width, so two words can never share a box - which is what 185's
+     fixed-layout table still let happen at 125 % scaling (`You stakes`, `best 50%4/7`). The NEED column and
+     every `best NN%` leave the card; the day's need-to-hit number stays on Today, untouched. ONE renderer:
+     the desktop GROUP panel and the phone's Insights card both call table(). */
+  function gcell(v){
+    var rf = (window.__HT16 && window.__HT16.rampFill) || function(){ return 'var(--surface)'; };
+    return '<span class="g194c p"><i style="background:' + rf(v) + '"></i>' + pc(v) + '</span>';
+  }
+  function grows(list){
+    return list.map(function(r){
+      var open = !r.you && canDay === true;
+      return '<div class="g194r' + (r.you ? ' h18me' : '') + '" role="row"' + (open ? ' data-h29m="' + esc(r.id) + '" tabindex="0"' : '') + '>' +
+        /* the stake is its own chip INSIDE the member cell: a flex item that never shrinks, beside a name that
+           ellipsizes - so `You stakes` can never run together, and the row stays one line on the desktop */
+        '<span class="g194c n" role="cell"><span class="h185nm">' + esc(r.n) + '</span>' + (open ? '<span class="h29go">›</span>' : '') +
+        HT32GRP.stakeChip(r) + '</span>' +
+        gcell(r.t) + gcell(r.w) + gcell(r.m) +
+        '<span class="g194c l" role="cell">' + (r.logged == null ? '—' : r.logged + '/7') + '</span></div>';
+    }).join('');
+  }
+  function gpending(){
+    /* the pending-invite rows are table rows elsewhere; here they are one line each, spanning the grid */
+    var p = HT32GRP.pendingRows(); if(!p) return '';
+    var d = document.createElement('tbody'); d.innerHTML = p;
+    return Array.prototype.map.call(d.querySelectorAll('tr'), function(tr){
+      return '<div class="g194r g194p h32pend">' + tr.innerHTML.replace(/<(\/?)td\b[^>]*>/g, function(m, sl){ return sl ? '</span>' : '<span class="g194w">'; }) + '</div>';
+    }).join('');
+  }
   function rows(list, opts){
     return list.map(function(r){
       var open = !r.you && canDay === true;
@@ -10434,6 +10551,15 @@ var HT29GRP = (function(){
        phantom seventh column took its share of a fixed-layout table and the six real ones were
        squeezed until their right-aligned labels touched: `TODAY7 DAYS`, `NEEDLOGGED`, `best 61%4/7`.
        Every column now has a class, a width and its own padding (app.css `.h185gt`). */
+    if(HT194_GRID){
+      return '<div class="g194" role="table" aria-label="the group, side by side">' +
+        '<div class="g194r g194h" role="row"><span class="g194c n">member</span><span class="g194c"><b class="lg">today</b></span>' +
+        '<span class="g194c"><b class="lg">7 days</b><b class="sm">7D</b></span><span class="g194c"><b class="lg">30 days</b><b class="sm">30D</b></span>' +
+        '<span class="g194c l"><b class="lg">logged</b><b class="sm">LOG</b></span></div>' +
+        grows([you()].concat(others)) + gpending() +
+        (others.length ? '' : '<div class="g194r g194none"><span class="g194w">' + empty() + '</span></div>') +
+        '</div>';
+    }
     var COLS = 6;
     return '<table class="h18gt h29gt h185gt"><colgroup><col class="n"><col class="t"><col class="w">' +
       '<col class="m"><col class="nd"><col class="lg"></colgroup>' +
@@ -10955,8 +11081,10 @@ var HT29INS = (function(){
    download needs no library and no CDN. */
 var HT29MD = (function(){
   var START = '<!-- ht:start -->', END = '<!-- ht:end -->';
-  /* HT-30 S1.4: the SAME order HT29SEC declares, and `golden_ht30` S1 compares the two lists. */
-  var SECTIONS = [['morning','Morning routine'],['night','Night routine'],['weekly','Weekly routine'],['standards','Standards']];
+  /* HT-30 S1.4: the SAME order HT29SEC declares. PASTE 194 S2: READ from it, never copied - it was a second literal,
+     and "declared once" meant one array, every reader. The vault copier (tools/copiers/_ht.py) is the Python half and
+     `golden_ht29` S6 compares the bytes. */
+  var SECTIONS = HT29SEC.ORDER.map(function(k){ return [k, HT29SEC.NAMES[k]]; });
   var DAYS = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
 
   function hhmm(v){
@@ -11968,18 +12096,38 @@ window.__HT30TIME = HT30TIME;
    is not rendered and `notes` is NOT WRITTEN while it is absent, so every definition of done survives exactly
    as it is (R70.138). It comes back by setting HT30_SHEET_NOTES to true. */
 var HT30_SHEET_NOTES = false;
-var HT30_SHEET_MORE = true;
+var HT30_SHEET_MORE = false;           /* 194 S4.1: retired - the sheet is five fields and nothing folds */
 (function(){
   /* HT-31 S2.11 · ONE ADDRESS FOR A TIME. 'Planned time' leaves this list: the chip on the row is
      where a time is set now, so keeping a second door on the sheet's surface is two answers to one
      question. The field is not deleted - it folds under More with everything else, which is where a
      keyboard or a screen reader still reaches it (R70.138). */
-  var SURFACE = ['Name', 'Section', 'Planned minutes'];
+  /* PASTE 194 S4.1: EXACTLY FIVE on the surface, in this order, and no More: Name . Section . Planned minutes .
+     Days (with its sub-rows) . Link. The More drawer is retired - HT30_SHEET_MORE is false - and the one thing
+     it still hid, "Done when", stays hidden in place and off the surface (never rendered, never written). */
+  var SURFACE = HT194_SHEET ? ['Name', 'Section', 'Planned minutes', 'Days', 'Link'] : ['Name', 'Section', 'Planned minutes'];
   function labOf(f){ var s = f.querySelector('.lab'); return s ? s.textContent.trim() : ''; }
 
   function fold(){
-    if(!HT30_SHEET_MORE) return;
     var body = h30El('ebody'); if(!body || body.querySelector('#h30More')) return;
+    if(!HT30_SHEET_MORE){
+      /* 194: no drawer, but "Done when" still never shows and is never written (its id is moved off) */
+      Array.prototype.slice.call(body.children).forEach(function(f){
+        var lab = labOf(f);
+        /* written ONCE: the sheet's observer watches attributes, so re-setting them would re-fire it forever */
+        if((lab === 'Done when' || lab === 'Notes') && !HT30_SHEET_NOTES && !f.classList.contains('h30gone')){
+          f.setAttribute('hidden', ''); f.classList.add('h30gone');
+          var ta = f.querySelector('textarea'); if(ta && ta.id === 'eNotes') ta.id = 'eNotesHidden';
+        }
+      });
+      /* 194 S4.1: his order is Name . Section . Planned minutes . Days . Link - the builder writes Days before the
+         minutes, so Days moves once, to sit right after them (only when it is not already there: the observer
+         watches this subtree, and a move that repeated would re-fire it forever) */
+      var days = body.querySelector(':scope > .h194days'), mins = null;
+      Array.prototype.forEach.call(body.children, function(f){ if(labOf(f) === 'Planned minutes') mins = f; });
+      if(days && mins && mins.nextElementSibling !== days) body.insertBefore(days, mins.nextSibling);
+      return;
+    }
     var tools = body.querySelector('.etools'); if(!tools) return;
 
     var kids = Array.prototype.slice.call(body.children);
@@ -12885,7 +13033,7 @@ var HT31_GHOST_CHIP_SECTIONS = ['morning', 'night', 'standards', 'weekly'];
     var h = +n.querySelector('#ht31h').value;
     var x = String(n.querySelector('#ht31x').value || '').trim();
     var mi = /^\d{1,2}$/.test(x) ? Math.min(59, +x) : +n.querySelector('#ht31m').value;
-    var ap = n.querySelector('.ht31ap .on');
+    var ap = n.querySelector('.ht31pr:not(.ck179p) .ht31ap .on');     /* 194: never the Done-at block's AM/PM */
     return to24(h, mi, ap ? ap.getAttribute('data-ap') : 'AM');
   }
 
@@ -12933,8 +13081,10 @@ var HT31_GHOST_CHIP_SECTIONS = ['morning', 'night', 'standards', 'weekly'];
   function place(node, chip){
     var r = chip.getBoundingClientRect();
     node.style.position = 'fixed';
-    node.style.top = Math.max(4, Math.min(window.innerHeight - 90, r.bottom + 6)) + 'px';
-    var w = Math.min(300, window.innerWidth - 16);
+    /* 194: the menu can hold the Done-at block too - keep ALL of it on screen, above the chip if need be */
+    var tall = node.offsetHeight || 90;
+    node.style.top = Math.max(4, Math.min(window.innerHeight - tall - 4, r.bottom + 6)) + 'px';
+    var w = Math.min(320, window.innerWidth - 16);
     node.style.width = w + 'px';
     node.style.left = Math.max(8, Math.min(window.innerWidth - w - 8, r.right - w)) + 'px';
   }
@@ -12948,7 +13098,9 @@ var HT31_GHOST_CHIP_SECTIONS = ['morning', 'night', 'standards', 'weekly'];
     var n = document.createElement('div');
     n.id = 'ht31pick'; n.className = 'ht31pick'; n.setAttribute('role', 'dialog');
     n.setAttribute('aria-label', 'planned time for ' + nameOf(h.name));
-    n.innerHTML = html(parts(was));
+    n.innerHTML = html(parts(was)) +
+      /* 194 S1.2: a second block, `Done at`, only while the row is checked today and the day is open */
+      ((typeof HT179 !== 'undefined' && HT179 && HT179.doneBlock) ? HT179.doneBlock(id) : '');
     document.body.appendChild(n);
     open = { id: id, chip: chip, node: n, was: was };
     chip.classList.add('ht31on');
@@ -12961,9 +13113,10 @@ var HT31_GHOST_CHIP_SECTIONS = ['morning', 'night', 'standards', 'weekly'];
     if(chip){ e.preventDefault(); e.stopPropagation(); show(chip); return; }
     var inside = e.target && e.target.closest ? e.target.closest('#ht31pick') : null;
     if(!inside){ if(open) close(true); return; }
+    if(e.target.closest('.ck194done')) return;                        /* 194: HT-179's handler owns that block */
     var ap = e.target.closest('[data-ap]');
     if(ap){
-      Array.prototype.slice.call(inside.querySelectorAll('.ht31ap button')).forEach(function(b){ b.classList.remove('on'); });
+      Array.prototype.slice.call((ap.closest('.ht31ap') || inside).querySelectorAll('button')).forEach(function(b){ b.classList.remove('on'); });
       ap.classList.add('on');
       return;
     }
@@ -13046,7 +13199,8 @@ var HT31_GHOST_CHIP_SECTIONS = ['morning', 'night', 'standards', 'weekly'];
    data is untouched; `HT31_INSIGHTS_EXTRAS = true` brings the page straight back. */
 var HT31_INSIGHTS_EXTRAS = false;
 var HT31_DESK_INSIGHTS = false;
-var HT31_INS_ORDER = ['h31Month', 'h31Year', 'h30Life', 'h30Group'];
+/* PASTE 194 S6.1: Month . Year . GROUP . LIFE - the life grid last, so it can be as tall as 100 rows need */
+var HT31_INS_ORDER = ['h31Month', 'h31Year', 'h30Group', 'h30Life'];
 var HT31_INS_HIDE = ['h30MonthC', 'h30MonthR', 'h30Trend', 'h30Rate'];
 function h31Phone(){ return window.innerWidth < 1024; }
 /* THE FLAG, AND A SEAM TO FLIP IT AT RUNTIME. `HT31_INSIGHTS_EXTRAS = true` brings HT-29's and
@@ -13510,6 +13664,9 @@ var HT32_WEEK = 'sun_fri';                /* Sunday..Friday; Saturday is the Sab
    theme with no hue (Mono) still says which. It never enters the 80 %: completion is still "is this id
    truthy", and a clock string is truthy whatever it says. */
 var HT179_TOL = 15;                         /* minutes either side: the ON TIME rule of HT-25 S3 / HT-32 S2 */
+/* PASTE 194 switches - each one brings the earlier behaviour back untouched when set false (R70.138) */
+var HT194_ONE_ADDRESS = true;               /* S1: no clock chip; done-time answers in the time chip's menu */
+var HT185_LEGEND = false;                   /* N2.3: the circles legend is removed */
 function warn179(what, e){ try{ console.warn('HT-179: ' + what, e); }catch(_){} }
 var HT179 = (function(){
   var open = null;                          /* {id, chip, node} while the chooser is on screen */
@@ -13537,6 +13694,15 @@ var HT179 = (function(){
     Array.prototype.slice.call(log.querySelectorAll('.li')).forEach(function(r){
       var id = r.getAttribute('data-h'), h = habit(id);
       var c = r.querySelector('.ck179');
+      /* PASTE 194 S1 · ONE ADDRESS FOR A TIME: the clock chip between the box and the name is GONE. The done-time
+         answers live in the right-hand time chip's menu (doneBlock, below); the variance is the small number
+         by the logged time (HT194.rows). The link chip is still this layer's. */
+      if(HT194_ONE_ADDRESS){
+        if(c) c.parentNode.removeChild(c);
+        r.classList.remove('v179');
+        if(h) link(r, h);
+        return;
+      }
       if(!h){ if(c) c.parentNode.removeChild(c); return; }
       var lb = doneLabel(h, S.date);
       if(!lb && !ed){ if(c) c.parentNode.removeChild(c); return; }
@@ -13641,6 +13807,24 @@ var HT179 = (function(){
     var t = e.target; if(!t || !t.closest) return;
     var chip = t.closest('[data-ck179]');
     if(chip){ e.preventDefault(); e.stopPropagation(); show(chip); return; }
+    /* 194 S1.2: the SAME answers, reached inside the time chip's own menu */
+    var blk = t.closest('#ht31pick .ck194done');
+    if(blk){
+      e.stopPropagation();
+      var bap = t.closest('[data-ap]');
+      if(bap){ e.preventDefault();
+        Array.prototype.slice.call(blk.querySelectorAll('.ht31ap button')).forEach(function(b){ b.classList.remove('on'); });
+        bap.classList.add('on'); return; }
+      var ba = t.closest('[data-ck179a]'); if(!ba) return;
+      e.preventDefault();
+      var bid = blk.getAttribute('data-id'), bh = habit(bid), bv = null, bw = ba.getAttribute('data-ck179a');
+      if(bw === 'now') bv = nowHHMM();
+      else if(bw === 'planned') bv = bh ? hhmm(winStart(bh)) : null;
+      else if(bw === 'pick') bv = picked(blk);
+      if(window.__HT31TIME && window.__HT31TIME.close) window.__HT31TIME.close(true);
+      if(bid && bv) apply(bid, bv);
+      return;
+    }
     var inside = t.closest('#ck179pick');
     if(!inside){ if(open) close(); return; }
     e.stopPropagation();
@@ -13757,8 +13941,14 @@ var HT179 = (function(){
 
   /* read-only, for the golden: why the chooser is or is not offered on the day on screen */
   function state(){ var r = S.byDate[S.date]; return { me: !!S.me, date: S.date, today: today(), closed: !!(S.hasClosedAt !== false && r && r.closed_at) }; }
+  /* 194 S1.2: the done-time block for the time chip's menu - only while the day is today and open AND the row is
+     checked (stress 7: yesterday's check offers none; an uncheck takes it away with the time). One chooser. */
+  function doneBlock(id){
+    var h = habit(id); if(!h || !editable() || !doneAt(S.date, h.id)) return '';
+    return '<div class="ck194done" data-id="' + esc(String(id)) + '"><div class="ck194l">Done at</div>' + pickHtml(h) + '</div>';
+  }
   return { chips: chips, apply: apply, doneLabel: doneLabel, statsOf: statsOf, editable: editable, state: state,
-           show: show, close: close, timing: timing, tol: HT179_TOL };
+           show: show, close: close, timing: timing, tol: HT179_TOL, doneBlock: doneBlock };
 })();
 window.__HT179 = HT179;
 
@@ -13840,6 +14030,8 @@ var HT185LEG = (function(){
            '<span><i class="h185no"></i>no plan \u00b7 no circle</span>';
   }
   function place(){
+    /* PASTE 194 N2.3: the legend is removed - the small number by the logged time is the only lateness signal */
+    if(!HT185_LEGEND){ var gone = document.getElementById('h185leg'); if(gone && gone.parentNode) gone.parentNode.removeChild(gone); return false; }
     var log = document.getElementById('log'); if(!log || !log.parentNode) return false;
     var el = document.getElementById('h185leg');
     if(!el){
@@ -13920,7 +14112,7 @@ var HT185SYNC = (function(){
       }
       /* 186: another tab of this browser may have stored the account's choice already - the storage agrees, the
          page does not. Paint what the account says. */
-      if(st && st !== 'system' && document.documentElement.getAttribute('data-theme') !== st && typeof applyTheme === 'function'){
+      if(st && document.documentElement.getAttribute('data-theme') !== themeResolve(st) && typeof applyTheme === 'function'){
         applyTheme(st); return 'adopted';
       }
       return 'same';
@@ -14011,7 +14203,7 @@ var HT185LIFE = (function(){
   var HOSTS = ['vLife', 'vWeeks'], AX = 20, AXT = 13, GAP = 1, WEEKS = 52, MIN = 5;
   function phone(){ return window.innerWidth < 1024; }
   function birthD(){ var b = S.priv0 && S.priv0.birth_date; return b ? new Date(b + 'T12:00:00') : null; }
-  function years(){ var t = S.priv0 && S.priv0.target_age; return (t == null || t === '') ? 90 : Math.max(20, Math.min(120, +t)); }
+  function years(){ var t = S.priv0 && S.priv0.target_age; return (t == null || t === '') ? DEFAULT_TARGET : Math.max(20, Math.min(120, +t)); }
   function weekIdx(k, b){
     if(window.__HT16 && window.__HT16.weekIndex) return window.__HT16.weekIndex(k, b);
     var d = (k instanceof Date) ? k : new Date(k + 'T12:00:00');
@@ -14024,20 +14216,30 @@ var HT185LIFE = (function(){
     if(W < 120) return false;
     var Y = years();
     var cellP = (W - AX) / WEEKS;                        /* the pitch: a cell plus its gap */
-    var tickW = 10;
-    if(cellP - GAP < MIN){ tickW = 13; }
-    var cell = Math.max(MIN, Math.floor((cellP - GAP) * 100) / 100), P = cell + GAP;
-    var gridW = WEEKS * P - GAP, H = AXT + Y * P - GAP;
+    /* 194 S6.3: a tick every 13 weeks, always; at 360 wide the GAP gives way before the 5 px cell does (stress 5) */
+    var tickW = 13, gap = GAP;
+    if(cellP - gap < MIN) gap = Math.max(0.25, Math.round((cellP - MIN) * 100) / 100);
+    var cell = Math.max(MIN, Math.floor((cellP - gap) * 100) / 100), P = cell + gap;
+    var FOOT = 12;                                        /* room for the `100` under the last row */
+    var gridW = WEEKS * P - gap, H = AXT + Y * P - gap + FOOT;
     var nowW = weekIdx(new Date(), b);
-    var s = '<rect x="' + AX + '" y="' + AXT + '" width="' + gridW + '" height="' + (Y * P - GAP) + '" fill="var(--sunk)"/>';
+    /* N2.5: no solid ground under the grid - the gaps are the card itself, fainter than any fill */
+    var s = '';
     for(var y = 0; y < Y; y++){
       var st = y * WEEKS, livedTo = Math.min(st + WEEKS - 1, nowW);
+      /* N2.5: the unlived weeks of this row, in the faint tone (app.css .h194un), never the heavy slate */
+      var unFrom = Math.max(st, nowW + 1);
+      if(unFrom <= st + WEEKS - 1)
+        s += '<rect class="h194un" x="' + (AX + (unFrom - st) * P) + '" y="' + (AXT + y * P) + '" width="' +
+             ((st + WEEKS - unFrom) * P - gap) + '" height="' + cell + '" fill="var(--sunk)"/>';
       if(livedTo >= st)
-        s += '<rect class="h185lived" x="' + AX + '" y="' + (AXT + y * P) + '" width="' + ((livedTo - st + 1) * P - GAP) +
+        s += '<rect class="h185lived" x="' + AX + '" y="' + (AXT + y * P) + '" width="' + ((livedTo - st + 1) * P - gap) +
              '" height="' + cell + '" fill="var(--rule2)"/>';
       if(y % 10 === 0)
         s += '<text class="h185y" x="' + (AX - 4) + '" y="' + (AXT + y * P + cell) + '" text-anchor="end">' + y + '</text>';
     }
+    /* 194 N2.5: the label at the FOOT of the axis - the age the grid runs to, visible at 390 and 360 */
+    s += '<text class="h185y h194foot" x="' + (AX - 4) + '" y="' + (AXT + Y * P - gap + FOOT - 2) + '" text-anchor="end">' + Y + '</text>';
     /* logged weeks on the ramp */
     var by = {};
     dates().forEach(function(k){
@@ -14094,5 +14296,75 @@ var HT185LIFE = (function(){
   return { render:render, all:all };
 })();
 window.__HT185LIFE = HT185LIFE;
+
+/* ======================= PASTE 194 · ROW, SECTIONS, SHEET, GROUP, LIFE, SCHEMES (WIRE HT-194) =======================
+   Cory, Thursday 2026-09-24 09:11 and 11:12 CDT, screen by screen. Most of this wire is edits in place, each marked
+   `194` where it sits (the order, the drag, the sheet, the grid, the schemes, the time chip). This layer holds the
+   one thing that has no older home:
+
+   ---- N2.3 · THE LATENESS IS A SMALL NUMBER, AND NOTHING ELSE ------------------------------------------------------
+   The circles legend is gone (HT185_LEGEND) and the clock chip that carried `✓ +12m` is gone (S1). What is left is
+   the logged time the row already shows (`.dat`, HT-21 S2) and, beside it, ONE number: minutes against the plan,
+   signed, tabular, muted - `+12` late · `0` on time · `−5` early · `+75` over an hour, no words and no category.
+   A row checked without a plan shows only its time. An unchecked row shows nothing on the day that is still open;
+   on a day that is history (P4) a planned row left undone shows `—`. It never colours anything and it never enters
+   the 80 %: completion is still "is this id truthy". */
+var HT194 = (function(){
+  function num(m){ return m == null ? '' : (m > 0 ? '+' + m : (m < 0 ? '−' + (-m) : '0')); }
+  function habitOf(id){ return (S.habits || []).filter(function(h){ return String(h.id) === String(id); })[0]; }
+  function rows(){
+    var log = document.getElementById('log'); if(!log) return 0;
+    if(log.classList.contains('reordering') || log.querySelector('.li.dragging')) return 0;
+    var past = S.date !== today(), n = 0;
+    Array.prototype.slice.call(log.querySelectorAll('.li')).forEach(function(r){
+      var h = habitOf(r.getAttribute('data-h')); if(!h) return;
+      var nm = r.querySelector('.nm'); if(!nm) return;
+      var dat = r.querySelector('.dat'), at = doneAt(S.date, h.id), m = lateMin(h, S.date);
+      if(dat){
+        dat.classList.remove('dat29off', 'late', 'ontime', 'over', 'early');
+        var want = '✓ ' + esc(fmtTime(at || '')) + (m == null ? '' : ' <span class="v194">' + num(m) + '</span>');
+        if(!at) want = '✓';
+        if(dat.innerHTML !== want) dat.innerHTML = want;
+        dat.classList.add('d194');
+        n++;
+      }
+      /* history: a planned row not done reads `—`, and only there */
+      var miss = r.querySelector('.v194miss');
+      var missed = past && !dat && !doneOn(h, S.date) && winStart(h);
+      if(missed && !miss){
+        miss = document.createElement('i'); miss.className = 'dat d194 v194miss';
+        miss.innerHTML = '<span class="v194">—</span>';
+        nm.appendChild(miss);
+      }else if(!missed && miss) miss.parentNode.removeChild(miss);
+      r.classList.toggle('v179', !!dat);              /* the old dot beside the name is not a second signal */
+    });
+    return n;
+  }
+  function all(){ try{ rows(); }catch(e){ try{ console.warn('HT-194 rows', e); }catch(_){} } }
+  if(typeof paintAll === 'function'){
+    var _pa = paintAll;
+    paintAll = function(){ var out = _pa.apply(null, arguments); all(); return out; };
+  }
+  if(typeof paintLog === 'function'){
+    var _pl = paintLog;
+    paintLog = function(){ var out = _pl.apply(null, arguments); all(); return out; };
+  }
+  document.addEventListener('click', function(){ setTimeout(all, 60); }, true);
+  if(document.readyState === 'complete') setTimeout(all, 500);
+  else window.addEventListener('load', function(){ setTimeout(all, 500); });
+
+  /* read-only, for the golden and the live probe */
+  function probe(){
+    var hs = Array.prototype.slice.call(document.querySelectorAll('#log > .grp[data-sec]'));
+    return {
+      order: hs.map(function(x){ return x.getAttribute('data-sec'); }),
+      legend: !!document.getElementById('h185leg'),
+      clockChips: document.querySelectorAll('#log .ck179').length,
+      numbers: Array.prototype.map.call(document.querySelectorAll('#log .v194'), function(x){ return x.textContent; })
+    };
+  }
+  return { rows: rows, num: num, probe: probe };
+})();
+window.__HT194 = HT194;
 
 })();

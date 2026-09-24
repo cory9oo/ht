@@ -253,7 +253,8 @@ async def sec_s2(pw):
         # AMENDED BY NAME, HT-30 (paste 137 S1.4): his newer word orders them Morning . Night . Weekly
         # routine . Standards, and renames the fourth. The assertion - "they render in the declared
         # order, and only the ones that have rows" - is unchanged.
-        names == [n for n in ['Morning routine', 'Night routine', 'Weekly routine', 'Standards'] if n in names]
+        # AMENDED BY HT-194 S2 (R67.2, Cory 2026-09-24): Standards before Weekly routine; names unchanged.
+        names == [n for n in ['Morning routine', 'Night routine', 'Standards', 'Weekly routine'] if n in names]
         and all(h[1] for h in heads) and not [n for n in names if n in ('TIMED', 'ANYTIME', 'WEEKLY')], heads)
     rule = await pg.evaluate("""() => { const S=window.__HT29S2, out={};
       for(const h of (window.__MOCK_DB.habits||[])) out[h.id]=S.sectionOf(h); return out; }""")
@@ -304,7 +305,8 @@ async def sec_s2(pw):
     sheet = await pg.evaluate("""() => { const s=document.getElementById('eSection'), n=document.getElementById('eNotes');
       const body=document.getElementById('ebody'), more=document.getElementById('h30More');
       const lab=x => { const l=x.querySelector('.lab'); return l ? l.textContent.trim() : null; };
-      const surface=[...body.children].filter(x => x!==more && !x.classList.contains('eh')
+      /* AMENDED BY HT-194 S4: no More drawer any more, so a HIDDEN field (Done when) is off the surface by `hidden` */
+      const surface=[...body.children].filter(x => x!==more && !x.hidden && !x.classList.contains('eh')
                      && !x.classList.contains('etools') && !x.classList.contains('note')).map(lab).filter(Boolean);
       return { has:!!s, val:s&&s.value, opts:s?[...s.options].map(o=>o.value):[],
                notesInput: !!n, surface: surface }; }""")
@@ -315,13 +317,15 @@ async def sec_s2(pw):
     # must not write `notes` AT ALL (writing '' or null would have wiped every definition of done -
     # the defect `saveSheet` now guards against by element presence, as it already did for the cue).
     chk('S2f · the sheet has Section (four, the row\'s own selected), and no free text (HT-30 S3.8)',
-        sheet['has'] and sheet['val'] == 'night' and sheet['opts'] == ['morning', 'night', 'weekly', 'standards']
+        sheet['has'] and sheet['val'] == 'night' and sheet['opts'] == ['morning', 'night', 'standards', 'weekly']
         # the FIELD is what "no free text" means: HT-30 hides the textarea and leaves its row inside
         # "More" (hidden, never deleted), so the LABEL is still in the DOM and `#eNotes` is not.
         and not sheet['notesInput']
         # AMENDED BY NAME, HT-31 (paste 143 S2.11): 'Planned time' leaves the SURFACE - the chip on the
         # row is where a time is set now - and folds under More with Group, Days and Link. Not deleted.
-        and sheet['surface'] == ['Name', 'Section', 'Planned minutes'], sheet)
+        # AMENDED BY HT-194 S4.1 (R67.2, Cory 2026-09-24): "name, section, plan minutes, days, link" - five on the
+        # surface and no More. Group and Planned time left the sheet; Done when stays hidden and unwritten.
+        and sheet['surface'] == ['Name', 'Section', 'Planned minutes', 'Days', 'Link'], sheet)
     await pg.select_option('#eSection', 'standards')
     await pg.click('#eSave')
     await pg.wait_for_timeout(700)
@@ -349,8 +353,11 @@ async def sec_s2(pw):
     by = {d['id']: d for d in dots}
     chk('S2i · one dot per timed check-off: on time (<=15) · late (<=60) · beyond',
         by.get('h0', {}).get('cls') == 'ontime' and by.get('h1', {}).get('cls') == 'late' and by.get('h2', {}).get('cls') == 'beyond', dots[:4])
-    chk('S2j · never a number in the row: the old time label is hidden',
-        all(d['datShown'] is False for d in dots if d['cls']), dots[:4])
+    # AMENDED BY HT-194 N2.3 (R67.2, Cory 2026-09-24 11:12): the legend and the circle states go, and "a small number
+    # carries it" - the logged time is SHOWN with one signed number beside it, which is now the only lateness signal.
+    nums = await pg.evaluate("() => [...document.querySelectorAll('#log .li .dat .v194')].map(n => n.textContent)")
+    chk('S2j · the logged time is on the row with ONE small number beside it (%s)' % nums,
+        all(d['datShown'] for d in dots if d['cls']) and sorted(nums) == sorted(['+10', '+50', '+110']), (dots[:4], nums))
     await pg.evaluate("() => document.querySelector('#log .li[data-h=h1] .dot29').click()")
     await pg.wait_for_timeout(200)
     said = await pg.evaluate("() => (document.getElementById('toast')||{}).textContent||''")
@@ -385,7 +392,8 @@ async def sec_s3(pw):
     # before the SQL: the lines still count, but nothing pretends to open
     b, pg, errs = await open_page(pw, 1280, 800, flags={'__BIGSET': True, '__CIRCLE': True, '__GAPS29': True})
     card = await pg.evaluate("""() => { const g=document.getElementById('h18Group');
-      return { txt:g?g.innerText:null, cols:[...g.querySelectorAll('thead th')].map(t=>t.textContent),
+      /* AMENDED BY HT-194 S5: the table is a grid; a header cell's full label is its `.lg` */
+      return { txt:g?g.innerText:null, cols:[...g.querySelectorAll('thead th, .g194h .g194c')].map(x => (x.querySelector('.lg') || x).textContent.trim()),
                open:g.querySelectorAll('[data-h29m]').length,
                detail:(()=>{const d=g.querySelector('.h18more'); return d?getComputedStyle(d).display:null;})() }; }""")
     # ---- AMENDED BY HT-32 S3.7 (CC HT 2026-09-23) - SIX COLUMNS ----
@@ -393,11 +401,13 @@ async def sec_s3(pw):
     # percentage you have to hit each day to get to 80%", and S3.7 puts it "as a column in
     # GROUP". The check's floor is unchanged - the same five facts are still asserted, in the
     # same renderer - and only the expected list grew, because the paste asked for a column.
-    chk('S3a · six columns: member · today · 7 days · 30 days · need · logged',
-        card['cols'] == ['member', 'today', '7 days', '30 days', 'need', 'logged'], card['cols'])
+    # AMENDED BY HT-194 N2.4 (R67.2, Cory 2026-09-24 11:12): the NEED column and every `best NN%` leave the group card;
+    # the day's need-to-hit stays on TODAY. Five columns.
+    chk('S3a · five columns: member · today · 7 days · 30 days · logged',
+        card['cols'] == ['member', 'today', '7 days', '30 days', 'logged'], card['cols'])
     chk('S3b · DETAIL is retired from the card', card['detail'] == 'none', card['detail'])
     chk('S3c · before the SQL a member\'s line does not open', card['open'] == 0, card['open'])
-    rows = await pg.evaluate("""() => [...document.querySelectorAll('#h18Group tbody tr')].map(r=>[...r.children].map(c=>c.textContent.trim()))""")
+    rows = await pg.evaluate("""() => [...document.querySelectorAll('#h18Group tbody tr, #h18Group .g194r:not(.g194h)')].map(r=>[...r.children].map(c=>c.textContent.trim()))""")
     andrew = [r for r in rows if r and r[0].startswith('Andrew')]
     chk('S3d · Ruling 1: three unlogged days drag Andrew\'s 7 days to 41% and his 30 days to 64%',
         andrew and andrew[0][1] == '71%' and andrew[0][2] == '41%' and andrew[0][3] == '64%', andrew)
@@ -537,12 +547,12 @@ async def sec_s5(pw):
     chk('S5g · tapping a rating shows what those days had in common, and your own whys',
         rate['rows'] >= 1 and rate['why'] >= 1 and not rate['leak'], {k: rate[k] for k in ('rows', 'why', 'leak')})
     grp = await pg.evaluate("""() => { const c=document.querySelector('[data-i29="group"]');
-      return { cols:[...c.querySelectorAll('thead th')].map(t=>t.textContent), rows:c.querySelectorAll('tbody tr').length }; }""")
+      return { cols:[...c.querySelectorAll('thead th, .g194h .g194c')].map(x => (x.querySelector('.lg') || x).textContent.trim()), rows:c.querySelectorAll('tbody tr, .g194r:not(.g194h)').length }; }""")
     # SAME RENDERER, SAME COLUMNS - which is the point of the check, and is why it had to move
     # with S3a rather than being pinned separately. If these two lists ever disagree again, two
     # renderers have come back.
     chk('S5h · the group side by side is the same renderer',
-        grp['cols'] == ['member', 'today', '7 days', '30 days', 'need', 'logged'] and grp['rows'] == 4, grp)
+        grp['cols'] == ['member', 'today', '7 days', '30 days', 'logged'] and grp['rows'] == 4, grp)   # HT-194 N2.4
     await no_errors(pg, errs, 'S5 (phone)')
     await b.close()
 

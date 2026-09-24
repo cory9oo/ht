@@ -158,7 +158,9 @@ async def sec_s0(pw):
 # =============================================================================================
 # S1 . FOUR SECTIONS, IN HIS ORDER
 # =============================================================================================
-ORDER = ['Morning routine', 'Night routine', 'Weekly routine', 'Standards']
+# AMENDED BY HT-194 S2 (R67.2, Cory 2026-09-24 09:11): "morning routine, nightly routine, standards and then weekly
+# routine". Names unchanged; Standards moves before Weekly routine. Every check below asks the same question.
+ORDER = ['Morning routine', 'Night routine', 'Standards', 'Weekly routine']
 
 
 async def sec_s1(pw):
@@ -166,13 +168,14 @@ async def sec_s1(pw):
     print("\n--- S1 . four sections, in Cory's 9/20 order ---")
     js = src(os.path.join(REPO, 'app.js'))
     m = re.search(r"var ORDER = \[([^\]]*)\];", js)
-    chk('S1a . HT29SEC declares morning, night, weekly, standards',
-        bool(m) and [x.strip().strip("'") for x in m.group(1).split(',')] == ['morning', 'night', 'weekly', 'standards'],
+    chk('S1a . HT29SEC declares morning, night, standards, weekly',
+        bool(m) and [x.strip().strip("'") for x in m.group(1).split(',')] == ['morning', 'night', 'standards', 'weekly'],
         m.group(1) if m else None)
-    ms = re.search(r"var SECTIONS = \[(\[[^;]*)\];", js)
+    # AMENDED BY HT-194 S2: the markdown shape no longer carries its own literal - it READS HT29SEC.ORDER, which is
+    # the strongest form of "the same order" (a second literal is how two lists drift).
+    ms = re.search(r"var SECTIONS = ([^;]*);", js)
     chk('S1b . the markdown shape reads the SAME order (one grammar, three languages)',
-        bool(ms) and [x for x in re.findall(r"\['(\w+)'", ms.group(1))] == ['morning', 'night', 'weekly', 'standards'],
-        ms.group(1)[:90] if ms else None)
+        bool(ms) and ms.group(1).startswith('HT29SEC.ORDER.map('), ms.group(1)[:90] if ms else None)
     core = src(os.path.join(REPO, 'tools', 'supabase', 'functions', 'nudge', 'core.js'))
     chk('S1c . the nudge sender still places a row by the same rule',
         "if (h.cadence === 'weekly') return 'weekly';" in core and "return 'standards';" in core
@@ -354,7 +357,7 @@ async def sec_s3(pw):
         await pg.evaluate("() => { const e = document.querySelector('#log .li .edp'); if(e) e.click(); }")
         await pg.wait_for_timeout(800)
         surf = await pg.evaluate("""() => { const b=document.getElementById('ebody');
-            const top=[...b.children].filter(n => n.id !== 'h30More' && !n.classList.contains('eh')
+            const top=[...b.children].filter(n => n.id !== 'h30More' && !n.hidden && !n.classList.contains('eh')   /* HT-194: hidden = off */
                         && !n.classList.contains('etools') && !n.classList.contains('note'));
             const lab=n => { const s=n.querySelector('.lab'); return s ? s.textContent.trim() : null; };
             const more=document.getElementById('h30More');
@@ -368,12 +371,14 @@ async def sec_s3(pw):
         # answers to one question. The field is not deleted - S3h below now proves it is one tap down
         # under More, the same treatment Group, Days and Link already get.
         chk('S3e . %s . the surface is name, section and duration; the time is set on the row' % tag,
-            surf['surface'] == ['Name', 'Section', 'Planned minutes'], surf['surface'])
+            # AMENDED BY HT-194 S4.1 (R67.2, Cory 2026-09-24): "name, section, plan minutes, days, link" - five, no More
+            surf['surface'] == ['Name', 'Section', 'Planned minutes', 'Days', 'Link'], surf['surface'])
         chk('S3f . %s . and Delete, which is the fifth thing he named' % tag, surf['del'], surf)
         chk('S3g . %s . the free-text field is GONE from the sheet' % tag, not surf['notes'], surf)
         chk('S3h . %s . the rest is one tap down, closed until it is asked for' % tag,
-            surf['more'] is not None and surf['moreOpen'] is False and
-            set(['Group', 'Days', 'Link', 'Planned time']) <= set(surf['more']), surf['more'])
+            # AMENDED BY HT-194 S4.1: the More drawer is retired; Group and Planned time left the sheet (the row chip is
+            # the time's one address). What this check protected - nothing extra on the surface - is S3e now.
+            surf['more'] is None and 'Group' not in surf['surface'] and 'Planned time' not in surf['surface'], surf)
         if tag == 'phone':
             sizes = await pg.evaluate("""() => [...document.querySelectorAll('#esheet input, #esheet select, #esheet textarea')]
                 .map(n => parseFloat(getComputedStyle(n).fontSize))""")
@@ -497,7 +502,8 @@ CARDS_HT30 = ['Month . completion', 'Month . rating', 'Completion and rating ove
               'The life', 'The group, side by side', 'What makes a good day']
 # HT-31 (paste 143 S4.13): Cory's four, in his order. The six above are what HT-30 put there and are
 # kept as a record of what the drawer now holds - S6e reads them back out of it.
-CARDS_HT31 = ['The month', 'The year', 'The life', 'The group, side by side']
+# AMENDED BY HT-194 S6.1 (R67.2, Cory 2026-09-24): the group card moves ABOVE the life grid on the phone
+CARDS_HT31 = ['The month', 'The year', 'The group, side by side', 'The life']
 CARDS = CARDS_HT31
 
 

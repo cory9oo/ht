@@ -3187,3 +3187,113 @@ html:not([data-simple]) .h185leg{ display:none }
 svg.h185life{ display:block; max-width:100%; height:auto; overflow:visible }
 svg.h185life text{ font:500 8.5px/1 var(--mono); fill:var(--ink3) }
 @media (max-width:1023px){ #vLife[data-h185], #vWeeks[data-h185]{ overflow:hidden; min-width:0 } }
+
+/* ==== PASTE 194 · ROW, SECTIONS, SHEET, GROUP, LIFE, SCHEMES ===========================================================
+   One block, last in the file, so it wins every tie on order and nothing above it has to be edited. Colours are
+   tokens only (lint_tokens): the hexes live in themes/*.css. */
+
+/* ---- N2.2 · THE FOUR SECTIONS: NO COLOUR, STRONG SEPARATION -------------------------------------------------------
+   185 S3 gave each section a hue (header, a rail down its rows, its `+ Add`). Cory 11:12: "the sections lose their
+   colours but stay strongly separated". Separation is STRUCTURE: the caps/letter-spaced header in the body-text
+   colour, a full-width hairline above it, 24px of air above it on the desktop and 20px on the phone, and the
+   `+ Add to ...` line closing the section. The rows keep `data-sec` (HT185SEC) - it is what the drag reads. */
+html[data-simple] #log > [data-sec]{ --sec:var(--ink) }
+html[data-simple] #h18Comp #log > .grp[data-sec], html[data-simple] #log > .grp[data-sec]{
+  color:var(--ink); font:700 11.5px/1.2 var(--sans); letter-spacing:.16em; text-transform:uppercase;
+  margin-top:24px; padding:6px 0; border-left:0; border-top:1px solid var(--rule2);
+  border-bottom:1px solid var(--rule) }            /* HT-20 P5 still holds: 6px each side, the rows' own separator under it */
+html[data-simple] #h18Comp #log > .grp[data-sec]:first-child, html[data-simple] #log > .grp[data-sec]:first-child{
+  margin-top:0 }
+html[data-simple] #h18Comp #log > .li[data-sec], html[data-simple] #log > .li[data-sec]{ box-shadow:none }
+html[data-simple] #h18Comp #log > .eadd[data-sec], html[data-simple] #log > .eadd[data-sec]{
+  color:var(--ink2); font-weight:500; border-left:0; padding-left:0 }
+@media (max-width:1023px){
+  html[data-simple] #h18Comp #log > .grp[data-sec], html[data-simple] #log > .grp[data-sec]{ margin-top:20px }
+  html[data-simple] #h18Comp #log > .grp[data-sec]:first-child, html[data-simple] #log > .grp[data-sec]:first-child{ margin-top:0 }
+}
+
+/* ---- N2.3 · ONE COLOUR FOR A CHECKED CIRCLE; THE LATENESS IS A SMALL NUMBER --------------------------------------- */
+.li .dot29, .li .dot29.late, .li .dot29.beyond{ background:var(--good) }
+.li .dat.d194, .li .dat.d194.late, .li .dat.d194.ontime{ color:var(--st-done) }
+.li .dat .v194{ margin-left:5px; font:500 10px/1 var(--mono); font-variant-numeric:tabular-nums; color:var(--ink2);
+  letter-spacing:0; white-space:nowrap }
+.li .dat.v194miss{ margin-left:8px; font-style:normal }
+
+/* ---- S1 · the Done-at block inside the time chip's menu ---- */
+.ht31pick .ck194done{ margin-top:10px; padding-top:10px; border-top:1px solid var(--rule) }
+.ht31pick .ck194done .ck194l{ font:500 11px/1 var(--mono); color:var(--ink3); text-transform:uppercase; letter-spacing:.1em;
+  margin-bottom:8px }
+.ht31pick .ck194done .ck179o{ display:flex; gap:6px; flex-wrap:wrap; margin-bottom:8px }
+.ht31pick .ck194done .ck179o .btn{ flex:1 1 auto; font-size:16px }
+.ht31pick .ck194done .ck179p{ flex-wrap:wrap; align-items:center }
+.ht31pick .ck194done .ck179l{ font:500 11px/1 var(--mono); color:var(--ink3); margin-right:6px; text-transform:uppercase; letter-spacing:.1em }
+.ht31pick .ck194done select, .ht31pick .ck194done .btn{ font-size:16px }
+
+/* ---- S4 · Days holds its sub-rows; they are never a sixth field ---- */
+.fld.h194days{ display:block }
+.fld.h194days > select{ display:block }
+.fld.h194days > .fld{ margin:10px 0 0; padding:0 0 0 12px; border-left:1px solid var(--rule) }
+.fld.h194days > .fld[hidden]{ display:none }
+
+/* ---- S5 + N2.4 · THE GROUP CARD: A GRID OF FIXED COLUMNS, NOTHING SHARES A BOX ----------------------------------
+   MEMBER . TODAY . 7 DAYS . 30 DAYS . LOGGED. Every row is the same grid, every value its own cell with a fixed
+   width; only the MEMBER column flexes, and only it ellipsizes. No table layout, no float, no absolute position,
+   no inline run of spans - so two words cannot meet at 100 % or at 125 % scaling. The phone keeps the grid and
+   abbreviates the header by CSS (7D, 30D, LOG); nothing scrolls sideways. */
+.g194{ display:block; width:100%; min-width:0 }
+.g194r{ display:grid; grid-template-columns:minmax(0,1fr) 58px 58px 58px 42px; column-gap:8px; align-items:center;
+  padding:6px 0; border-top:1px solid var(--rule); min-width:0 }
+.g194r.g194h{ border-top:0; padding:0 0 6px; align-items:end }
+.g194c{ min-width:0; overflow:hidden; white-space:nowrap; text-align:right; font-variant-numeric:tabular-nums }
+.g194c.n{ text-align:left; display:flex; align-items:center; gap:4px }
+.g194c.n .h185nm{ min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap }
+.g194c.p i{ display:inline-block; width:7px; height:7px; margin-right:5px; vertical-align:middle }
+.g194h .g194c{ font:500 9.5px/1.15 var(--mono); letter-spacing:.06em; text-transform:uppercase; color:var(--muted) }
+.g194h .g194c b{ font-weight:500 }
+.g194h .g194c .sm{ display:none }
+.g194c.n .h32stk{ flex:0 0 auto; margin:0 0 0 2px; max-width:none }
+.g194p{ grid-template-columns:minmax(0,1fr) minmax(0,auto) }
+.g194w{ min-width:0; overflow:hidden; text-overflow:ellipsis }
+.g194none .g194w{ grid-column:1 / -1; white-space:normal }
+.g194r.h18me .g194c.n{ font-weight:600 }
+.g194r[data-h29m]{ cursor:pointer }
+@media (max-width:1023px){
+  .g194r{ grid-template-columns:minmax(0,1fr) 50px 46px 46px 34px; column-gap:6px }
+  .g194h .g194c .lg{ display:none }
+  .g194h .g194c .sm{ display:inline }
+  .g194h .g194c:nth-child(2) .lg{ display:inline }
+  /* on the phone the stake drops under the name instead of squeezing it */
+  .g194c.n{ flex-wrap:wrap; row-gap:3px; white-space:normal }
+  .g194c.n .h185nm{ flex:0 1 100%; }
+  .g194c.n .h32stk{ margin:0 }
+}
+
+/* ---- S6 + N2.5 · THE LIFE GRID RUNS TO 100, AS TALL AS IT NEEDS, THE UNLIVED WEEKS FAINT ----------------------
+   The phone's life card was capped at 200px (HT-30's `.h30cb #vLife`), which cut the y axis near 25 years. The cap
+   goes; the card is as tall as 100 rows need and never scrolls inside. The unlived weeks drop from the heavy
+   ground to a faint tone about a tenth of the way from the card to the ink; the gaps are the card itself, so the
+   grid lines are always fainter than the fill. The lived run and the today marker are unchanged. */
+.h30ins .h30cb #vLife{ max-height:none !important; overflow:visible }
+@media (max-width:1023px){
+  #vLife[data-h185], #vWeeks[data-h185]{ max-height:none; overflow:visible }
+  .h30ins .h30cb #vWeeks, html[data-simple] #h16Ins #vWeeks, html[data-simple] #h16Ins #vWeeks .wkscroll{ max-height:none }
+}
+svg.h185life .h194un, svg.wkg .h194un{ fill:var(--sunk); fill:color-mix(in srgb, var(--ink) 10%, var(--sheet)) }
+svg.h185life .h194foot, svg.wkg .h194foot{ fill:var(--ink2) }
+svg.wkg .h194f3{ font-size:7px; letter-spacing:-.4px }   /* `100` must fit the 16px age gutter (HT-20 P4) */
+
+/* ---- N2.6 + S7.3 · SETTINGS TILES: LABEL ABOVE CAPTION, NEVER OVER IT; THE LIVE MINI-CARD ---------------------------
+   The journal-mirror tiles have no swatch, so HT-32's two-column tile put `Nowhere` into the 22px swatch column,
+   on top of its own caption. Now every tile places its label and caption explicitly, and a tile with no swatch
+   (`.th194`) is one column. */
+.tbtn.th .thnm{ grid-column:2; grid-row:1 }
+.tbtn.th .thno{ grid-column:2; grid-row:2 }
+.tbtn.th.th194{ grid-template-columns:minmax(0,1fr) }
+.tbtn.th.th194 .thnm, .tbtn.th.th194 .thno{ grid-column:1 }
+.tbtn.th .thnm, .tbtn.th .thno{ min-width:0; overflow-wrap:anywhere }
+.tbtn.th .thmini{ grid-column:1 / -1; grid-row:3; display:flex; align-items:center; gap:8px; margin-top:6px;
+  padding:6px 8px; border:1px solid; font:400 12px/1.2 var(--sans); min-width:0 }
+.tbtn.th .thmini .thmb{ flex:0 0 16px; width:16px; height:16px; display:inline-flex; align-items:center;
+  justify-content:center; border:1px solid; font:700 11px/1 var(--sans); font-style:normal }
+.tbtn.th .thmini .thmn{ flex:1 1 auto; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap }
+.tbtn.th .thmini .thma{ flex:0 0 auto; font:500 10px/1 var(--mono); border:1px solid; padding:3px 5px; white-space:nowrap }

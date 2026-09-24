@@ -97,6 +97,7 @@ ROWS = """() => [...document.querySelectorAll('#log .li')].map(r => {
            on: r.classList.contains('li') && r.querySelector('[data-tog]').getAttribute('aria-pressed') === 'true',
            pat: !!r.querySelector('[data-ht31t]'), patTxt: (r.querySelector('[data-ht31t]')||{}).textContent || '',
            ck: ck ? ck.textContent : null, ckCls: ck ? ck.className : null, ckDis: ck ? ck.disabled : null,
+           v: (r.querySelector('.v194') || {}).textContent || null, dat: (r.querySelector('.dat') || {}).textContent || null,
            lk: r.querySelector('.lk179') ? { href: r.querySelector('.lk179').href, t: r.querySelector('.lk179').target,
                                              rel: r.querySelector('.lk179').rel } : null };
 })"""
@@ -151,37 +152,42 @@ async def main():
         chk('T2a . the day on screen is today and open, so the chooser is offered', st['date'] == st['today'] and not st['closed'], st)
         rows = await pg.evaluate(ROWS)
         timed = [r for r in rows if r['patTxt'] and re.search(r'\d:\d\d', r['patTxt']) and not r['on']]
-        chk('T2b . a timed, unchecked row carries the clock chip', timed and timed[0]['ck'] == '\u25f7', timed[:1])
+        # REWRITTEN BY HT-194 S1.4 (R67.2, Cory 2026-09-24 09:11: "the box that has the clock in the center of it ... you
+        # can remove that"). The clock chip is GONE; the three answers moved INTO the right-hand time chip's menu as a
+        # `Done at` block, shown while the row is checked today. Each check below asks its old question at the new address.
+        chk('T2b . a timed, unchecked row carries NO clock chip - the time chip is the one address', timed and timed[0]['ck'] is None
+            and not await pg.evaluate("() => document.querySelectorAll('#log .ck179').length"), timed[:1])
         h = timed[0]['id'] if timed else None
         if h:
-            await tap(pg, '[data-ck179="%s"]' % h)
-            opts = await pg.evaluate("() => [...document.querySelectorAll('#ck179pick [data-ck179a]')].map(b => b.getAttribute('data-ck179a'))")
-            chk('T2c . the chooser offers Now, Planned and Pick', opts == ['now', 'planned', 'pick'], opts)
-            await pg.evaluate("() => document.querySelector('#ck179pick [data-ck179a=\"planned\"]').click()")
+            await tap(pg, '[data-tog="%s"]' % h)
+            await tap(pg, '[data-ht31t="%s"]' % h)
+            opts = await pg.evaluate("() => [...document.querySelectorAll('#ht31pick .ck194done [data-ck179a]')].map(b => b.getAttribute('data-ck179a'))")
+            chk('T2c . checked today, the time chip\'s menu offers Done at: Now, Planned and Pick', opts == ['now', 'planned', 'pick'], opts)
+            await pg.evaluate("() => document.querySelector('#ht31pick .ck194done [data-ck179a=\"planned\"]').click()")
             await pg.wait_for_timeout(500)
             r = await row(pg, h)
-            chk('T2d . Planned checks the row and writes the planned time: variance \u00b10m, good, with a check',
-                r and r['on'] and '\u00b10m' in (r['ck'] or '') and '\u2713' in r['ck'] and 'good' in r['ckCls'], r)
+            chk('T2d . Planned writes the planned time: the small number reads 0 (194 N2.3: a number, no glyph, no colour)',
+                r and r['on'] and r['v'] == '0', r)
             # Pick: 45 minutes after the planned time
             m = re.search(r'(\d{1,2}):(\d\d)\s*\u202f?(AM|PM)', timed[0]['patTxt'].replace('\u202f', ' '))
-            await tap(pg, '[data-ck179="%s"]' % h)
+            await tap(pg, '[data-ht31t="%s"]' % h)
             H, M, AP = int(m.group(1)), int(m.group(2)) + 45, m.group(3)
             if M >= 60: M -= 60; H = H % 12 + 1
-            await pg.select_option('#ck179h', str(H)); await pg.select_option('#ck179m', str(M))
-            await pg.evaluate("(ap) => document.querySelector('#ck179pick [data-ap=\"' + ap + '\"]').click()", AP)
-            await pg.evaluate("() => document.querySelector('#ck179pick [data-ck179a=\"pick\"]').click()")
+            await pg.select_option('#ht31pick .ck194done #ck179h', str(H)); await pg.select_option('#ht31pick .ck194done #ck179m', str(M))
+            await pg.evaluate("(ap) => document.querySelector('#ht31pick .ck194done [data-ap=\"' + ap + '\"]').click()", AP)
+            await pg.evaluate("() => document.querySelector('#ht31pick .ck194done [data-ck179a=\"pick\"]').click()")
             await pg.wait_for_timeout(500)
             r = await row(pg, h)
-            section('T3', 'the variance, signed and coloured')
-            chk('T3a . Pick 45 min after the plan reads +45m, BAD colour, with a cross', r and '+45m' in (r['ck'] or '')
-                and 'bad' in r['ckCls'] and '\u2715' in r['ck'], r)
-            await tap(pg, '[data-ck179="%s"]' % h)
-            await pg.evaluate("() => document.querySelector('#ck179pick [data-ck179a=\"now\"]').click()")
+            section('T3', 'the variance, signed - one small number')
+            chk('T3a . Pick 45 min after the plan reads +45 - the number alone carries lateness (194 N2.3)',
+                r and r['v'] == '+45' and '\u2715' not in (r['dat'] or ''), r)
+            await tap(pg, '[data-ht31t="%s"]' % h)
+            await pg.evaluate("() => document.querySelector('#ht31pick .ck194done [data-ck179a=\"now\"]').click()")
             await pg.wait_for_timeout(400)
             r = await row(pg, h)
             now = await pg.evaluate("() => { const d = new Date(); return d.getHours()*60 + d.getMinutes(); }")
-            chk('T2e . Now writes the clock of this device (the row shows a time and a signed variance)',
-                r and re.search(r'\d:\d\d', r['ck'] or '') and re.search(r'[+\u2212\u00b1]\d+m', r['ck']), r)
+            chk('T2e . Now writes the clock of this device (the row shows a time and a signed number)',
+                r and re.search(r'\d:\d\d', r['dat'] or '') and re.search(r'^([+\u2212]\d+|0)$', r['v'] or ''), r)
             lab = await pg.evaluate("""() => { const L = window.__HT179.statsOf; return [
                 L([{checked:{a:'08:10'}, habits:[{id:'a', time_anchor:'08:00'}]}]),
                 L([{checked:{a:'07:40'}, habits:[{id:'a', time_anchor:'08:00'}]}]),
@@ -194,7 +200,7 @@ async def main():
             await tap(pg, '[data-tog="%s"]' % h)
             await pg.wait_for_timeout(400)
             r = await row(pg, h)
-            chk('T5a . the box unchecks and the chip is back to a clock, no time', r and not r['on'] and r['ck'] == '\u25f7', r)
+            chk('T5a . the box unchecks, and the time and its number are gone', r and not r['on'] and r['v'] is None and r['ck'] is None, r)
             chk('T3d . the variance never entered completion: the count line moved by the uncheck only',
                 bool(pct0), pct0)
         chk('T2f . no page error', not errs, errs[:3])
@@ -204,15 +210,16 @@ async def main():
         section('T4', 'a closed or past day is history (P4)')
         b, pg, errs = await open_page(pw)          # the fixture closes every day, today included
         st = await pg.evaluate('() => window.__HT179.state()')
-        n = await pg.evaluate("() => document.querySelectorAll('.ck179:not(.has)').length")
-        chk('T4a . a CLOSED today offers no chooser (%d open chips)' % n, st['closed'] and n == 0, st)
+        # REWRITTEN BY HT-194 S1.4: the chooser is the time chip's `Done at` block, and a closed day offers none
+        n = await pg.evaluate("() => [...document.querySelectorAll('#log .li')].filter(r => window.__HT179.doneBlock(r.getAttribute('data-h'))).length")
+        chk('T4a . a CLOSED today offers no Done-at block (%d rows offer one)' % n, st['closed'] and n == 0, st)
         await b.close()
         b, pg, errs = await open_page(pw, flags={'__NO_CLOSED_AT': True})
         await pg.evaluate("() => { const b = document.getElementById('hPrev'); if (b) b.click(); }")
         await pg.wait_for_timeout(700)
         st = await pg.evaluate('() => window.__HT179.state()')
-        n = await pg.evaluate("() => document.querySelectorAll('.ck179:not(:disabled)').length")
-        chk('T4b . YESTERDAY offers no chooser: every chip there is disabled or absent', st['date'] != st['today'] and n == 0, (st, n))
+        n = await pg.evaluate("() => [...document.querySelectorAll('#log .li')].filter(r => window.__HT179.doneBlock(r.getAttribute('data-h'))).length")
+        chk('T4b . YESTERDAY offers no Done-at block on any row (P4)', st['date'] != st['today'] and n == 0, (st, n))
         await b.close()
 
         # ------------------------------------------------------------------ T6
@@ -256,11 +263,13 @@ async def main():
         await b.close()
 
         # ------------------------------------------------------------------ T8
+        # REPOINTED BY HT-194 N2.1 (R67.2, Cory 2026-09-24 11:12): the four new schemes are Crimson . Moss . Gilt . Orchid,
+        # Classic is the default again, and the nine older files are retired. Same questions, his newer answers.
         section('T8', 'four new schemes, one default')
-        NEW = ['slate', 'ember', 'linen', 'mono']
+        NEW = ['crimson', 'moss', 'gilt', 'orchid']
         b, pg, errs = await open_page(pw)
         got = await pg.evaluate("() => document.documentElement.getAttribute('data-theme')")
-        chk('T8a . a fresh profile opens in Slate', got == 'slate', got)
+        chk('T8a . a fresh profile opens in Classic', got == 'classic', got)
         await b.close()
         for t in NEW:
             b, pg, errs = await open_page(pw, storage={'ht_theme': t})
@@ -271,19 +280,17 @@ async def main():
             want = re.search(r'--ground:\s*(#[0-9A-Fa-f]{6})', io.open(os.path.join(REPO, 'themes', t + '.css'), encoding='utf-8').read())
             chk('T8b . %s loads its own file (--ground %s) and carries four member colours' % (t, want and want.group(1)),
                 v['t'] == t and want and v['g'].lower() == want.group(1).lower() and v['m4'], v)
-            if t == 'mono':
-                def L(h):
-                    h = h.lstrip('#'); return sum(int(h[i:i + 2], 16) for i in (0, 2, 4))
-                same_hue = all(len(set(x.lstrip('#')[i:i + 2] for i in (0, 2, 4))) == 1 for x in (v['good'], v['bad']))
-                chk('T8c . Mono: good and bad are one hue (grey) and differ by lightness', same_hue and L(v['good']) != L(v['bad']), v)
+            import colorsys
+            gr = [int(v['good'].lstrip('#')[i:i + 2], 16) / 255.0 for i in (0, 2, 4)]
+            gh = colorsys.rgb_to_hls(*gr)[0] * 360
+            chk('T8c . %s: green is the good state (hue %.0f) - green only for done/proven (194 N2.1)' % (t, gh), 90 <= gh <= 170, v)
             await b.close()
         b, pg, errs = await open_page(pw)
         await pg.evaluate("() => document.getElementById('bSet').click()")
         await pg.wait_for_timeout(700)
         picks = await pg.evaluate("() => [...document.querySelectorAll('[data-theme-pick]')].map(x => x.getAttribute('data-theme-pick'))")
-        chk('T8d . the picker lists the four new first, then Classic, Graphite, Midnight, Paper (and the system pair)',
-            # 185 S2 put Neon (the extra) after the four new; the rule T8d holds is unchanged: new first, legacy after
-            picks[:9] == NEW + ['neon', 'classic', 'graphite', 'midnight', 'paper'], picks)
+        chk('T8d . the picker lists exactly five: Classic, then the four new (no Follow system)',
+            picks == ['classic'] + NEW, picks)
         await b.close()
 
         # ------------------------------------------------------------------ T9
@@ -330,12 +337,14 @@ async def main():
 
 
 # ============================================================================ PASTE 185 · T10-T14
+# REPOINTED BY HT-194 S5 (R67.2): the card is a grid of fixed columns, five of them (N2.4 took NEED out). The same four
+# questions - labels that never touch, values that never spill, the stake its own chip, the page fits - asked of the grid.
 GROUP_PROBE = """() => {
-  const t = [...document.querySelectorAll('table.h185gt')].find(x => x.getBoundingClientRect().width > 0);
+  const t = [...document.querySelectorAll('.g194')].find(x => x.getBoundingClientRect().width > 0);
   if (!t) return null;
   const rect = n => { const r = document.createRange(); r.selectNodeContents(n); const b = r.getBoundingClientRect();
                       return { l: b.left, r: b.right, t: b.top, b: b.bottom }; };
-  const ths = [...t.querySelectorAll('thead th')];
+  const ths = [...t.querySelectorAll('.g194h .g194c')];
   const labels = ths.map(th => ({ txt: th.textContent.trim(), box: rect(th) }));
   let touch = [];
   for (let i = 0; i + 1 < labels.length; i++) {
@@ -343,14 +352,15 @@ GROUP_PROBE = """() => {
     const sameLine = !(a.b <= b.t || b.b <= a.t);
     if (sameLine && b.l - a.r < 3) touch.push(labels[i].txt + '|' + labels[i + 1].txt + ' gap ' + Math.round(b.l - a.r));
   }
-  const spill = [...t.querySelectorAll('tbody td')].filter(td => td.scrollWidth > td.clientWidth + 1)
+  const spill = [...t.querySelectorAll('.g194r:not(.g194h) .g194c:not(.n)')].filter(td => td.scrollWidth > td.clientWidth + 1)
                   .map(td => td.textContent.trim().slice(0, 20));
   const stk = [...t.querySelectorAll('.h32stk')].map(c => {
-    const nm = c.closest('td').querySelector('.h185nm'); if (!nm) return 'no-name-box';
+    const nm = c.closest('.g194c').querySelector('.h185nm'); if (!nm) return 'no-name-box';
     const a = nm.getBoundingClientRect(), b = c.getBoundingClientRect();
     const overlap = !(a.right <= b.left || b.right <= a.left || a.bottom <= b.top || b.bottom <= a.top);
     return overlap ? 'overlap' : 'ok'; });
-  return { cols: t.querySelectorAll('colgroup col').length, ths: ths.length, touch, spill, stk,
+  const cols = getComputedStyle(t.querySelector('.g194r:not(.g194h)')).gridTemplateColumns.split(' ').length;
+  return { cols, ths: ths.length, touch, spill, stk,
            doc: document.documentElement.scrollWidth, vw: document.documentElement.clientWidth };
 }"""
 
@@ -382,12 +392,12 @@ AUTH_MD = r"""(() => {
 
 async def t10_to_t14(pw):
     # ------------------------------------------------------------------ T10
-    section('T10', 'the GROUP table - six columns that never run together')
+    section('T10', 'the GROUP card - five fixed columns that never run together')
     for w, h in ((390, 844), (360, 780), (1280, 900)):
         b, pg, errs = await open_group(pw, w, h)
         g = await pg.evaluate(GROUP_PROBE)
-        chk('T10a . at %d the group table has six columns and six labels (colgroup %s)' % (w, g and g['cols']),
-            g and g['cols'] == 6 and g['ths'] == 6, g)
+        chk('T10a . at %d the group grid has five columns and five labels (%s)' % (w, g and g['cols']),
+            g and g['cols'] == 5 and g['ths'] == 5, g)
         chk('T10b . at %d no two header labels touch on one line (TODAY|7 DAYS, NEED|LOGGED)' % w,
             g and not g['touch'], g and g['touch'])
         chk('T10c . at %d no value spills out of its cell (best 61%% | 4/7)' % w, g and not g['spill'], g and g['spill'])
@@ -395,7 +405,7 @@ async def t10_to_t14(pw):
             g and all(x == 'ok' for x in g['stk']) and g['doc'] <= g['vw'], g and (g['stk'], g['doc'], g['vw']))
         await b.close()
     b, pg, errs = await open_group(pw, 360, 780)
-    await pg.evaluate("""() => { const n = document.querySelector('table.h185gt tbody tr:nth-child(2) .h185nm');
+    await pg.evaluate("""() => { const n = ([...document.querySelectorAll('.g194 .g194r:not(.g194h)')][1] || document).querySelector('.h185nm');
         if (n) n.textContent = 'Bartholomew Maximilian Featherstonehaugh-Worthington'; }""")
     g = await pg.evaluate(GROUP_PROBE)
     chk('T10e . a very long member name ellipsizes inside MEMBER and moves no number (stress 7)',
@@ -413,19 +423,21 @@ async def t10_to_t14(pw):
     await pg.evaluate("() => document.getElementById('bSet').click()")
     await pg.wait_for_timeout(700)
     order = await pg.evaluate("() => [...document.querySelectorAll('[data-theme-pick]')].map(x => x.getAttribute('data-theme-pick')).filter(x => x !== 'system')")
-    chk('T11b . the picker order is Slate . Ember . Linen . Mono . Neon . Classic . Graphite . Midnight . Paper',
-        order == ['slate', 'ember', 'linen', 'mono', 'neon', 'classic', 'graphite', 'midnight', 'paper'], order)
+    chk('T11b . the picker order is Classic . Crimson . Moss . Gilt . Orchid (194 N2.1)',
+        order == ['classic', 'crimson', 'moss', 'gilt', 'orchid'], order)
     got = await pg.evaluate("() => document.documentElement.getAttribute('data-theme')")
-    chk('T11c . a fresh profile still opens in Slate', got == 'slate', got)
+    chk('T11c . a fresh profile opens in Classic', got == 'classic', got)
     await b.close()
     b, pg, errs = await open_page(pw, storage={'ht_theme': 'neon'})
     v = await pg.evaluate("() => ({ t: document.documentElement.getAttribute('data-theme'), g: getComputedStyle(document.documentElement).getPropertyValue('--ground').trim(), a: getComputedStyle(document.documentElement).getPropertyValue('--accent').trim() })")
-    chk('T11d . Neon loads its own file (#050507 ground, #FF2BD6 accent)',
-        v['t'] == 'neon' and v['g'].upper() == '#050507' and v['a'].upper() == '#FF2BD6', v)
+    og = re.search(r'--ground:\s*(#[0-9A-Fa-f]{6})', io.open(os.path.join(REPO, 'themes', 'orchid.css'), encoding='utf-8').read()).group(1)
+    sv = await pg.evaluate("() => localStorage.getItem('ht_theme')")
+    chk('T11d . a saved Neon (retired) resolves to Orchid, its own darker, calmer self - and is not rewritten (194 N2.1)',
+        v['t'] == 'orchid' and v['g'].upper() == og.upper() and sv == 'neon', (v, sv))
     await b.close()
     b, pg, errs = await open_page(pw, storage={'ht_theme': 'ember'})
     v = await pg.evaluate("() => document.documentElement.getAttribute('data-theme')")
-    chk('T11e . an existing choice is kept (ember stays ember)', v == 'ember', v)
+    chk('T11e . any other retired choice resolves to Classic (ember -> classic)', v == 'classic', v)
     await b.close()
 
     # ------------------------------------------------------------------ T12
@@ -436,7 +448,8 @@ async def t10_to_t14(pw):
         const rows = []; let n = g.nextElementSibling;
         while (n && !n.classList.contains('grp')) { rows.push(n); n = n.nextElementSibling; }
         const li = rows.filter(r => r.classList.contains('li')), add = rows.find(r => r.classList.contains('eadd'));
-        out[s] = { head: cs.color, weight: +cs.fontWeight, rail: cs.borderLeftColor, railW: cs.borderLeftWidth,
+        out[s] = { head: cs.color, weight: +cs.fontWeight, rail: cs.borderLeftColor, railW: cs.borderLeftWidth, line: cs.borderTopWidth,
+          gap: (() => { const p = g.previousElementSibling; return p ? Math.round(g.getBoundingClientRect().top - p.getBoundingClientRect().bottom) : null; })(),
           rowsTagged: li.every(r => r.getAttribute('data-sec') === s), rowRail: li.map(r => (getComputedStyle(r).boxShadow.match(/rgba?\([^)]*\)/) || [''])[0]),   /* 186: the row rail is an inset shadow */
           rowStyle: cs.borderLeftStyle || null,   /* 186: Mono's styles live on the section header's rail */
           add: add ? getComputedStyle(add).color : null, n: li.length };
@@ -450,19 +463,24 @@ async def t10_to_t14(pw):
         keys = sorted(sp.keys())
         chk('T12a . at %d all four sections are drawn (%s)' % (w, ','.join(keys)),
             keys == ['morning', 'night', 'standards', 'weekly'], sp)
-        chk('T12b . at %d every row carries its section and a rail in the header colour' % w,
-            all(x['rowsTagged'] and x['n'] > 0 and all(c == x['head'] for c in x['rowRail']) for x in sp.values()),
-            {k: (x['rowsTagged'], x['n'], x['head'], x['rowRail'][:2]) for k, x in sp.items()})
-        chk('T12c . at %d the four header colours are four different colours, headers heavy (>= 600)' % w,
-            len(set(x['head'] for x in sp.values())) == 4 and all(x['weight'] >= 600 for x in sp.values()),
-            {k: (x['head'], x['weight']) for k, x in sp.items()})
-        chk('T12d . at %d each `+ Add to` line is in its section colour' % w,
-            all(x['add'] == x['head'] for x in sp.values()), {k: (x['add'], x['head']) for k, x in sp.items()})
+        # REPOINTED BY HT-194 N2.2 (R67.2, Cory 2026-09-24 11:12): "the sections lose their colours but stay strongly
+        # separated". Every row still carries its section (the drag reads it); what separates them is STRUCTURE.
+        chk('T12b . at %d every row carries its section, and no row wears a colour rail' % w,
+            all(x['rowsTagged'] and x['n'] > 0 and not any(x['rowRail']) for x in sp.values()),
+            {k: (x['rowsTagged'], x['n'], x['rowRail'][:2]) for k, x in sp.items()})
+        chk('T12c . at %d the four headers share ONE colour (no tint), heavy (>= 600), with no colour rail' % w,
+            len(set(x['head'] for x in sp.values())) == 1 and all(x['weight'] >= 600 and x['railW'] == '0px' for x in sp.values()),
+            {k: (x['head'], x['weight'], x['railW']) for k, x in sp.items()})
+        chk('T12d . at %d a hairline above every header after the first, and >= 20 px of air' % w,
+            all(x['line'] == '1px' and (x['gap'] is None or x['gap'] >= 20) for k, x in sp.items() if k != 'morning'),
+            {k: (x['line'], x['gap']) for k, x in sp.items()})
         await b.close()
-    b, pg, errs = await open_page(pw, storage={'ht_theme': 'mono'}, flags=SECF)
+    # Mono is retired (194 N2.1); the same structure-not-hue rule is asked of the desktop at 1695: >= 24 px of air
+    b, pg, errs = await open_page(pw, 1695, 900, flags=SECF)
     sp = await pg.evaluate(SECP)
-    chk('T12e . Mono, with no hue, still tells the four apart by rail style (solid/double/dashed/dotted)',
-        len(set(x['rowStyle'] for x in sp.values())) == 4, {k: x['rowStyle'] for k, x in sp.items()})
+    chk('T12e . at 1695 the sections stand >= 24 px apart, each under a hairline, all one colour',
+        all(x['line'] == '1px' and (x['gap'] is None or x['gap'] >= 24) for k, x in sp.items() if k != 'morning')
+        and len(set(x['head'] for x in sp.values())) == 1, {k: (x['line'], x['gap'], x['head']) for k, x in sp.items()})
     await b.close()
 
     # ------------------------------------------------------------------ T13
@@ -519,13 +537,13 @@ async def t10_to_t14(pw):
     # 186: `setTheme` is closure-scoped too, so the theme is chosen the way Cory chooses it - from the picker
     await desk.evaluate("() => document.getElementById('bSet').click()")
     await desk.wait_for_timeout(500)
-    await desk.evaluate("() => document.querySelector('[data-theme-pick=\"ember\"]').click()")
+    await desk.evaluate("() => document.querySelector('[data-theme-pick=\"crimson\"]').click()")   # HT-194: ember retired
     await desk.wait_for_timeout(300)
     md = await desk.evaluate("() => localStorage.getItem('mock.user_md')")
-    chk('T14c . choosing a theme writes it to the ACCOUNT, not only this browser', md and '"ember"' in md, md)
+    chk('T14c . choosing a theme writes it to the ACCOUNT, not only this browser', md and '"crimson"' in md, md)
     res = await phone.evaluate("() => window.__HT185SYNC.pullTheme()")
     th = await phone.evaluate("() => document.documentElement.getAttribute('data-theme')")
-    chk('T14d . the phone adopts the account\'s newer theme on its next pull (%s -> %s)' % (res, th), th == 'ember', (res, th))
+    chk('T14d . the phone adopts the account\'s newer theme on its next pull (%s -> %s)' % (res, th), th == 'crimson', (res, th))
     st = await phone.evaluate("() => { window.__HT185SYNC.stamp(); const e = document.getElementById('h185sync'); return e ? e.textContent : null; }")
     chk('T14e . the header stamp reads `vNN . synced h:mma` (%s)' % st,
         bool(st) and re.match(r'^v\d+ · synced \d{1,2}:\d{2}[ap]$', st) is not None, st)
