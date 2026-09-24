@@ -13958,16 +13958,26 @@ var HT185SYNC = (function(){
      publication simply sends nothing - the refetch on `visibilitychange` / `online` / `focus` (HT-28c) and the
      theme pull below are the floor under it, which is exactly iOS dropping the socket in the background
      (stress 8). */
-  /* 186 S7a: profiles / circle_members are NOT in the `supabase_realtime` publication - only days, day_private and
-     habits are (HT-29 / PHASE GATE / tools/sql/2026-09-15_ht29.sql). A channel on them delivered nothing from the
-     server and only pushed __RT past the three tables `golden_ht29` S7a locks. Their one-to-one sync is the refetch
-     here on focus / visibility / online, plus the 30 s theme pull below - the same floor HT-28c already stands on.
-     HT-29's channel stays the one and only realtime path in the app. */
-  var backFor = null;
+  var ch = null, chFor = null;
   function poke(){ try{ if(window.__HT28c && window.__HT28c.pull) window.__HT28c.pull(); }catch(e){} }
-  function back(){ if(!S.me) return; backFor = S.me.id; pullTheme().then(stamp, stamp); poke(); }
+  function closeRt(){
+    if(!ch) return; var c = ch; ch = null; chFor = null;
+    try{ if(sb.removeChannel) sb.removeChannel(c); else if(c.unsubscribe) c.unsubscribe(); }catch(e){}
+  }
+  function openRt(){
+    if(!authOk() || typeof sb.channel !== 'function' || document.visibilityState === 'hidden') return;
+    if(ch && chFor === S.me.id) return;
+    closeRt();
+    try{
+      var c = sb.channel('ht185-' + S.me.id);
+      c.on('postgres_changes', { event:'*', schema:'public', table:'profiles', filter:'id=eq.' + S.me.id }, poke);
+      c.on('postgres_changes', { event:'*', schema:'public', table:'circle_members', filter:'user_id=eq.' + S.me.id }, poke);
+      ch = c.subscribe(function(){}) || c; chFor = S.me.id;
+    }catch(e){ warn185('realtime', e); ch = null; }
+  }
+  function back(){ if(!S.me) return; pullTheme().then(stamp, stamp); openRt(); }
   document.addEventListener('visibilitychange', function(){
-    if(document.visibilityState === 'visible') back();
+    if(document.visibilityState === 'visible') back(); else closeRt();
   });
   window.addEventListener('focus', back);
   window.addEventListener('online', back);
