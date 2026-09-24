@@ -3280,7 +3280,7 @@ html[data-simple] #h18Comp #log > .eadd[data-sec], html[data-simple] #log > .ead
 }
 svg.h185life .h194un, svg.wkg .h194un{ fill:var(--sunk); fill:color-mix(in srgb, var(--ink) 10%, var(--sheet)) }
 svg.h185life .h194foot, svg.wkg .h194foot{ fill:var(--ink2) }
-svg.wkg .h194f3{ font-size:7px; letter-spacing:-.4px }   /* `100` must fit the 16px age gutter (HT-20 P4) */
+/* svg.wkg .h194f3 - the `100` label's size is inline on the element: the grid's own `font` shorthand outranks a class here */
 
 /* ---- N2.6 + S7.3 · SETTINGS TILES: LABEL ABOVE CAPTION, NEVER OVER IT; THE LIVE MINI-CARD ---------------------------
    The journal-mirror tiles have no swatch, so HT-32's two-column tile put `Nowhere` into the 22px swatch column,
