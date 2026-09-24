@@ -216,9 +216,9 @@ async def u2(pw):
         else:
             # The copier lives in the CONTAINER repo (master-brain), reached through a second lease. When that lease
             # cannot be taken the app half still ships; this line says so BY NAME instead of a false pass, and becomes
-            # a PASS the day the copier moves (paste 194 S2.2 / stress 8). Receipt 194 carries the wall.
+            # a PASS the day the copier moves (paste 194 S2.2 / stress 8). 194's N3 moved the copier to paste 198.
             SEC[CUR[0]] = SEC.get(CUR[0], 0) + 1
-            print('  BLOCKED U2d . the vault copier still declares %s - its repo lease is the wall, named in receipt 194' % keys)
+            print('  BLOCKED U2d . the vault copier still declares %s - the copier moves under paste 198 (194 N3: tools/copiers left this wire)' % keys)
     else:
         chk('U2d . the vault copier is at %s' % cop, False, 'missing')
 
