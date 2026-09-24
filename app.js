@@ -11780,7 +11780,7 @@ var HT29_UPDATE_BANNER = true;
 /* The one place this build says what it is. `sw.js`'s cache name must equal it, and `golden_ht30` S0 reads
    both files and fails when they drift - a version on the screen that is not the version in the cache is
    worse than no version at all, because it is the thing you check when you are already unsure. */
-var HT30_VERSION = 'ht-v42';
+var HT30_VERSION = 'ht-v43';
 
 function warn30(what, e){ try{ console.warn('HT-30: ' + what, e); }catch(_){} }
 function h30El(id){ return document.getElementById(id); }
