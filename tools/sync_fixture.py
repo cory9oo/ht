@@ -59,10 +59,9 @@ DST = os.environ.get('HT_FIXTURE_DIR') or fixture_dir(find_estate(SRC))   # 179:
 # --ground, --ink or --accent at all. That is not a subtle drift: it is a blank instrument, and the
 # goldens that measure colour would have been measuring the absence of one.
 COPY = ['app.js', 'app.css', 'tokens.css', 'manifest.webmanifest', 'version.json',
-        'themes/classic.css', 'themes/paper.css', 'themes/graphite.css',
-        'themes/midnight.css', 'themes/terminal.css',
-        # paste 179 S6: the four new schemes
-        'themes/slate.css', 'themes/ember.css', 'themes/linen.css', 'themes/mono.css', 'themes/neon.css',
+        'themes/classic.css',
+        # paste 194 N2.1: the four schemes that replaced the nine (those are in themes/_retired/, never linked)
+        'themes/crimson.css', 'themes/moss.css', 'themes/gilt.css', 'themes/orchid.css',
         # HT-32 N4: the mirror registry is a declaration the PAGE reads at run time, so a fixture
         # without it has a Settings picker with nothing in it - and the test that proves a renderer
         # can be added by config alone would have had no config to add it to.

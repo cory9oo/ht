@@ -17,6 +17,32 @@ source palette, §2 the legacy name mapping, §5/§6/§7 the state and scrollbar
 | `linen.css` | **Linen** — off-white paper, ink, one blue accent, muted states | Paper, sharpened (179 S6) | yes · the light half of Follow system |
 | `mono.css` | **Mono** — no hue: accent and states differ by lightness and a glyph | new (179 S6) | yes |
 
+## PASTE 194 N2.1 (Thursday 2026-09-24) — FIVE SCHEMES, THE NINE RETIRED
+
+Cory, 11:12 CDT: keep Classic, retire the rest, add a cool darker red and a few more. **The picker offers exactly five:**
+
+| file | scheme | ground · accent · good | note |
+|---|---|---|---|
+| `classic.css` | **Classic** — today's look, **the default again** | #0A0C10 · #3FBF7F · #3FBF7F | unchanged |
+| `crimson.css` | **Crimson** — the one he asked for | #0D090A · #AE2443 (hue ~347) · #5CC08C | red IS the accent here by his word, so `--bad` is a burnt orange (#E8894F) that can never be read as it |
+| `moss.css` | **Moss** — green-black, sage | #080B08 · #6CAC5D (hue ~108) · #4FC39A | good-state green kept apart from the sage accent |
+| `gilt.css` | **Gilt** — true black, antique gold | #070707 · #CAAE44 (hue ~47) · #6CC08A | |
+| `orchid.css` | **Orchid** — aubergine-black, deep orchid | #0C080E · #903DAE (hue ~284) · #5CC795 | Neon made darker and calmer; **a saved `neon` resolves here** |
+
+**Retired, never deleted (DEC-037 / R70.138):** `slate · ember · linen · mono · neon · graphite · midnight · paper · terminal`
+are in `themes/_retired/`, in git, linked by nothing. Follow system is retired with them. A saved retired name RESOLVES
+and is never written back: Neon → Orchid, anything else → Classic (`THEME_RETIRED` in app.js, `_TRET` in index.html).
+
+**Sections carry no colour** (N2.2): every theme's `--sec-*` is its body text; a section is told apart by structure.
+
+**Measured:** `scheme_distance.py --check` — 6 enforced pairs among the four new, 0 alike (hue ≥ 60°); Classic is
+measured, not enforced, as before — and **Moss ↔ Classic measure alike (41°)**: five accents on ~220° of warm-and-green
+hue cannot all sit 60° apart once Classic's green is fixed. `contrast_ht32.py` — 430 pairs, 0 under 4.5:1.
+`lint_tokens.py` — 0 offences.
+
+*Rule 1 below ("the accent is never red") is superseded for Crimson ONLY, by Cory's explicit ask; `--bad` moves instead.*
+*The history below is kept as written.*
+
 ## Three things a later wire must not undo
 
 1. **The accent is never red.** `tokens.css` §1: *"RED IS STATE ONLY — it is `--bad` and the overdue

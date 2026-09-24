@@ -10,7 +10,7 @@
      start paints before any script runs. `color-scheme` per theme is set in the theme files
      themselves, where a light theme can say so; this static pair is only the first frame. -->
 <meta name="color-scheme" content="dark">
-<meta name="theme-color" content="#07090D">
+<meta name="theme-color" content="#0A0C10">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="HT">
 <meta name="mobile-web-app-capable" content="yes">
@@ -32,17 +32,14 @@ try{
    the one honest home for the default. It publishes the choice as `data-theme-default`, and app.js
    READS that rather than carrying a second copy. Two defaults in two files is not a style question:
    the later one wins AFTER the paint, so the page shows one theme and then changes its mind. */
-var _TDEF = 'slate';                          /* 179 S6 (was graphite, S6.14) · the switch is `user.theme` */
-var _TPAIR = { light:'linen', dark:'slate' };     /* EXTRA-1 · the system pair (179 S6) */
+var _TDEF = 'classic';                        /* 194 N2.1: Classic is the default again (179 had Slate) */
 try{
-  var _TH = ['slate','ember','linen','mono','neon','classic','graphite','midnight','paper','terminal'];
+  var _TH = ['classic','crimson','moss','gilt','orchid'];
+  /* 194 N2.1: a retired name RESOLVES and is never written back - Neon -> Orchid, anything else -> Classic */
+  var _TRET = { neon:'orchid' };
   document.documentElement.setAttribute('data-theme-default', _TDEF);
   var _t = localStorage.getItem('ht_theme') || _TDEF;
-  if(_t === 'system'){
-    _t = (window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches) ? _TPAIR.light : _TPAIR.dark;
-    document.documentElement.setAttribute('data-theme-follow','1');
-  }
-  if(_TH.indexOf(_t) < 0) _t = _TDEF;
+  if(_TH.indexOf(_t) < 0) _t = _TRET[_t] || _TDEF;
   document.documentElement.setAttribute('data-theme', _t);
 }catch(e){
   document.documentElement.setAttribute('data-theme-default', _TDEF);
@@ -77,16 +74,12 @@ try{
      and `[data-skin=y]` all have specificity (0,2,0), so the LATER file wins, and classic.css
      is the one carrying `[data-simple]` - the attribute the app sets on every simple-view load. -->
 <link rel="stylesheet" href="./themes/classic.css">
-<link rel="stylesheet" href="./themes/paper.css">
-<link rel="stylesheet" href="./themes/graphite.css">
-<link rel="stylesheet" href="./themes/midnight.css">
-<link rel="stylesheet" href="./themes/terminal.css">
-<!-- HT-179 S6 - the four schemes. AFTER classic.css for the reason above; each is `:root[data-theme=x]` only. -->
-<link rel="stylesheet" href="./themes/slate.css">
-<link rel="stylesheet" href="./themes/ember.css">
-<link rel="stylesheet" href="./themes/linen.css">
-<link rel="stylesheet" href="./themes/mono.css">
-<link rel="stylesheet" href="./themes/neon.css">   <!-- 185 S2 extra -->
+<!-- PASTE 194 N2.1 - the four new schemes, AFTER classic.css for the reason above; each is `:root[data-theme=x]` only.
+     The nine older files are in themes/_retired/ (kept, never linked). -->
+<link rel="stylesheet" href="./themes/crimson.css">
+<link rel="stylesheet" href="./themes/moss.css">
+<link rel="stylesheet" href="./themes/gilt.css">
+<link rel="stylesheet" href="./themes/orchid.css">
 <link rel="stylesheet" href="./app.css">
 </head>
 <body>

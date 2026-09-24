@@ -1,0 +1,20 @@
+/* MOSS - deep green-black ground, ONE sage accent (hue ~108), bone text.
+   194 N2. The good-state green (hue ~158) is kept visibly apart from the sage accent: 50 deg of hue and
+   more lightness, so done never reads as decoration.
+   Sections carry NO colour (194 N2.2): every --sec-* is the body text, so a header is told apart by its
+   structure (hairline, caps, air), never by a tint. Measured by tools/contrast_ht32.py and scheme_distance.py. */
+:root[data-theme="moss"]{
+  --ground:#080B08; --sheet:#0E130E; --sunk:#131A13; --sel:#1A221A;
+  --rule:#1F281F;   --rule2:#3D4A3C;
+  --ink:#E6E2D3;    --ink2:#AEB29E;  --ink3:#707A6A;
+  --accent:#6CAC5D; --accent-ink:#0A0F09; --accent-wash:#18241A;
+  --bad:#E27D66;    --good:#4FC39A;
+  --g0:#3A1E17; --g1:#6A3526; --g2:#2A3328; --g3:#48543F; --g4:#2A7A5E; --g5:#4FC39A;
+  --st-todo:#E6E2D3; --st-done:#4FC39A; --st-late:#D9B874; --st-skip:#AEB29E; --st-notdue:#AEB29E;
+  --st-secured:#4FC39A; --st-ontrack:#9CC486; --st-atrisk:#D9B874; --st-outofreach:#E27D66;
+  --m1:#9CC486; --m2:#D9B874; --m3:#D59A8C; --m4:#B7A6D9;
+  --sec-morning:#E6E2D3; --sec-night:#E6E2D3; --sec-weekly:#E6E2D3; --sec-standards:#E6E2D3;
+  --sb-thumb:rgba(174,178,158,.35); --sb-thumb-hover:rgba(174,178,158,1);
+  --panel:#0E130E; --panel-2:#131A13; --line:#1F281F; --dim:#707A6A; --accent-red:#E27D66;
+  color-scheme:dark;
+}

@@ -20,8 +20,13 @@ import argparse, colorsys, io, itertools, os, re, sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 REPO = os.path.dirname(HERE)
-NEW = ('slate', 'ember', 'linen', 'mono', 'neon')
-LEGACY = ('classic', 'graphite', 'midnight', 'paper')
+# PASTE 194 N2.1: the four that replaced the nine (those are in themes/_retired/ and are not offered). Classic stays
+# LEGACY - measured and printed, never failed - for the reason above: it is today's look, unchanged by ruling. And one
+# pair CANNOT pass by hue once Classic's green (150 deg) and a sage accent share a picker with gold and crimson: five
+# accents on 220 deg of warm-and-green hue cannot all sit 60 deg apart. Moss is therefore held apart from the other
+# three NEW schemes (enforced) and from Classic by its ground and its role only; the receipt names that pair.
+NEW = ('crimson', 'moss', 'gilt', 'orchid')
+LEGACY = ('classic',)
 HUE_MIN, L_MIN, ACHROMATIC_S = 60.0, 25.0, 0.12
 
 

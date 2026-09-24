@@ -1,0 +1,20 @@
+/* ORCHID - aubergine-black ground, ONE deep orchid accent (hue ~284).
+   194 N2: "the Neon he is using today, made darker and calmer" - a saved `neon` resolves HERE.
+   Same family as Neon's magenta, a third of its brightness; green only for done / proven.
+   Sections carry NO colour (194 N2.2): every --sec-* is the body text, so a header is told apart by its
+   structure (hairline, caps, air), never by a tint. Measured by tools/contrast_ht32.py and scheme_distance.py. */
+:root[data-theme="orchid"]{
+  --ground:#0C080E; --sheet:#130E16; --sunk:#19131D; --sel:#211926;
+  --rule:#2A1F30;   --rule2:#4B3A55;
+  --ink:#EDE3F1;    --ink2:#B8A6C0;  --ink3:#7C6B85;
+  --accent:#903DAE; --accent-ink:#FBF3FE; --accent-wash:#2A1533;
+  --bad:#EB7F79;    --good:#5CC795;
+  --g0:#3A1A1E; --g1:#6B2F36; --g2:#2E2436; --g3:#4A3A55; --g4:#2F7D5B; --g5:#5CC795;
+  --st-todo:#EDE3F1; --st-done:#5CC795; --st-late:#E3B866; --st-skip:#B8A6C0; --st-notdue:#B8A6C0;
+  --st-secured:#5CC795; --st-ontrack:#C58BE0; --st-atrisk:#E3B866; --st-outofreach:#EB7F79;
+  --m1:#C58BE0; --m2:#E3B866; --m3:#7FCBB6; --m4:#E58FA8;
+  --sec-morning:#EDE3F1; --sec-night:#EDE3F1; --sec-weekly:#EDE3F1; --sec-standards:#EDE3F1;
+  --sb-thumb:rgba(184,166,192,.35); --sb-thumb-hover:rgba(184,166,192,1);
+  --panel:#130E16; --panel-2:#19131D; --line:#2A1F30; --dim:#7C6B85; --accent-red:#EB7F79;
+  color-scheme:dark;
+}

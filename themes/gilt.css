@@ -1,0 +1,19 @@
+/* GILT - true black ground, ONE antique-gold accent (hue ~47), ivory text.
+   194 N2. Gold is the only colour spent on decoration; green only for done / proven.
+   Sections carry NO colour (194 N2.2): every --sec-* is the body text, so a header is told apart by its
+   structure (hairline, caps, air), never by a tint. Measured by tools/contrast_ht32.py and scheme_distance.py. */
+:root[data-theme="gilt"]{
+  --ground:#070707; --sheet:#0E0D0B; --sunk:#141310; --sel:#1C1A15;
+  --rule:#24211B;   --rule2:#48412F;
+  --ink:#F0EADB;    --ink2:#BDB39B;  --ink3:#7F775F;
+  --accent:#CAAE44; --accent-ink:#0E0B04; --accent-wash:#2A2312;
+  --bad:#E47866;    --good:#6CC08A;
+  --g0:#3A1B15; --g1:#6A3325; --g2:#2C2A22; --g3:#4C4633; --g4:#357A52; --g5:#6CC08A;
+  --st-todo:#F0EADB; --st-done:#6CC08A; --st-late:#D99A5E; --st-skip:#BDB39B; --st-notdue:#BDB39B;
+  --st-secured:#6CC08A; --st-ontrack:#D8B85E; --st-atrisk:#D99A5E; --st-outofreach:#E47866;
+  --m1:#D8B85E; --m2:#9CC4B0; --m3:#D99A84; --m4:#B9A5D6;
+  --sec-morning:#F0EADB; --sec-night:#F0EADB; --sec-weekly:#F0EADB; --sec-standards:#F0EADB;
+  --sb-thumb:rgba(189,179,155,.35); --sb-thumb-hover:rgba(189,179,155,1);
+  --panel:#0E0D0B; --panel-2:#141310; --line:#24211B; --dim:#7F775F; --accent-red:#E47866;
+  color-scheme:dark;
+}

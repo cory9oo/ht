@@ -1,0 +1,20 @@
+/* CRIMSON - near-black with a faint red cast, ONE deep crimson accent (the #a3202c family, hue ~347).
+   Cory 2026-09-24 (194 N2): "a cool darker red". Red is the ACCENT here by his word, so --bad moves to a
+   burnt orange that can never be read as the accent. Rose-grey text; green only for done / proven.
+   Sections carry NO colour (194 N2.2): every --sec-* is the body text, so a header is told apart by its
+   structure (hairline, caps, air), never by a tint. Measured by tools/contrast_ht32.py and scheme_distance.py. */
+:root[data-theme="crimson"]{
+  --ground:#0D090A; --sheet:#140E10; --sunk:#1A1315; --sel:#221719;
+  --rule:#2B1F22;   --rule2:#4D3A3E;
+  --ink:#EADCDE;    --ink2:#B8A1A5;  --ink3:#7D6A6E;
+  --accent:#AE2443; --accent-ink:#FBEFF1; --accent-wash:#2A1116;
+  --bad:#E8894F;    --good:#5CC08C;
+  --g0:#3A1A14; --g1:#6B3222; --g2:#3A2A2D; --g3:#5A4448; --g4:#2E7A55; --g5:#5CC08C;
+  --st-todo:#EADCDE; --st-done:#5CC08C; --st-late:#E0A15E; --st-skip:#B8A1A5; --st-notdue:#B8A1A5;
+  --st-secured:#5CC08C; --st-ontrack:#E07A8C; --st-atrisk:#E0A15E; --st-outofreach:#E8894F;
+  --m1:#E07A8C; --m2:#D9B26A; --m3:#8FC0A6; --m4:#C79BD6;
+  --sec-morning:#EADCDE; --sec-night:#EADCDE; --sec-weekly:#EADCDE; --sec-standards:#EADCDE;
+  --sb-thumb:rgba(184,161,165,.35); --sb-thumb-hover:rgba(184,161,165,1);
+  --panel:#140E10; --panel-2:#1A1315; --line:#2B1F22; --dim:#7D6A6E; --accent-red:#E8894F;
+  color-scheme:dark;
+}
