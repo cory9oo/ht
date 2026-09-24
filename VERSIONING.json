@@ -1,0 +1,10 @@
+{
+  "_why": "R70.381 line 7 (paste 196 S5): the app version is assigned at merge by `cc_finish --bump`, under merge.lock, from main's value - never typed by a paste. A paste says 'next version'.",
+  "file": "version.json",
+  "key": "version",
+  "pattern": "ht-v{n}",
+  "also": [
+    {"file": "sw.js", "regex": "const C='(ht-v)(\\d+)'"},
+    {"file": "app.js", "regex": "HT30_VERSION = '(ht-v)(\\d+)'"}
+  ]
+}
