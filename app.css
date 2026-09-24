@@ -3151,16 +3151,22 @@ html[data-simple] #log > [data-sec="weekly"]   { --sec:var(--sec-weekly,    var(
 html[data-simple] #log > [data-sec="standards"]{ --sec:var(--sec-standards, var(--accent)) }
 html[data-simple] #h18Comp #log > .grp[data-sec], html[data-simple] #log > .grp[data-sec]{
   color:var(--sec); font:700 11.5px/1.2 var(--sans); letter-spacing:.16em; text-transform:uppercase;
-  margin-top:12px; padding:9px 0 7px 9px; border-left:3px solid var(--sec); border-bottom:1px solid var(--rule) }
+  margin-top:12px; padding:6px 0 6px 9px; border-left:3px solid var(--sec); border-bottom:1px solid var(--rule) }
+/* 186: the ROW rail is an inset shadow, not a border. A border plus padding moved every row's contents 9px, which put
+   the `+ time` chip under the middle of the row (a tap there opened the picker instead of checking the task), and HT-20's
+   law is one separator per row and no box border. The shadow draws the same 3px rail and moves nothing. */
 html[data-simple] #h18Comp #log > .grp[data-sec]:first-child, html[data-simple] #log > .grp[data-sec]:first-child{ margin-top:0 }
 html[data-simple] #h18Comp #log > .li[data-sec], html[data-simple] #log > .li[data-sec]{
-  border-left:3px solid var(--sec); padding-left:6px }
+  box-shadow:inset 3px 0 0 var(--sec) }
 html[data-simple] #h18Comp #log > .eadd[data-sec], html[data-simple] #log > .eadd[data-sec]{
   color:var(--sec); font-weight:600; border-left:3px solid var(--sec); padding-left:9px }
-/* MONO has no hue to spend, so the four sections differ by the rail's STYLE as well as by lightness */
-html[data-theme="mono"][data-simple] #log > [data-sec="night"]{ border-left-style:double }
-html[data-theme="mono"][data-simple] #log > [data-sec="weekly"]{ border-left-style:dashed }
-html[data-theme="mono"][data-simple] #log > [data-sec="standards"]{ border-left-style:dotted }
+/* MONO has no hue to spend, so the four section HEADERS differ by their rail's STYLE as well as by lightness */
+html[data-theme="mono"][data-simple] #log > .grp[data-sec="night"],
+html[data-theme="mono"][data-simple] #log > .eadd[data-sec="night"]{ border-left-style:double }
+html[data-theme="mono"][data-simple] #log > .grp[data-sec="weekly"],
+html[data-theme="mono"][data-simple] #log > .eadd[data-sec="weekly"]{ border-left-style:dashed }
+html[data-theme="mono"][data-simple] #log > .grp[data-sec="standards"],
+html[data-theme="mono"][data-simple] #log > .eadd[data-sec="standards"]{ border-left-style:dotted }
 
 /* ---- S6 · the circle legend under the list (the row's own .dot29 classes, so it matches in every theme) ---- */
 .h185leg{ display:flex; flex-wrap:wrap; gap:6px 14px; padding:10px 2px 4px; font:400 11px/1.3 var(--sans); color:var(--ink2); min-width:0 }

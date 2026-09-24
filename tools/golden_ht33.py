@@ -437,8 +437,8 @@ async def t10_to_t14(pw):
         while (n && !n.classList.contains('grp')) { rows.push(n); n = n.nextElementSibling; }
         const li = rows.filter(r => r.classList.contains('li')), add = rows.find(r => r.classList.contains('eadd'));
         out[s] = { head: cs.color, weight: +cs.fontWeight, rail: cs.borderLeftColor, railW: cs.borderLeftWidth,
-          rowsTagged: li.every(r => r.getAttribute('data-sec') === s), rowRail: li.map(r => getComputedStyle(r).borderLeftColor),
-          rowStyle: li.map(r => getComputedStyle(r).borderLeftStyle)[0] || null,
+          rowsTagged: li.every(r => r.getAttribute('data-sec') === s), rowRail: li.map(r => (getComputedStyle(r).boxShadow.match(/rgba?\([^)]*\)/) || [''])[0]),   /* 186: the row rail is an inset shadow */
+          rowStyle: cs.borderLeftStyle || null,   /* 186: Mono's styles live on the section header's rail */
           add: add ? getComputedStyle(add).color : null, n: li.length };
       } return out; }"""
     # 186: the fixture needs the section column and a row in each of the four sections, or only two can draw

@@ -11766,6 +11766,20 @@ function h30Advanced(){
   var _pa = paintAll;
   paintAll = function(){ var out = _pa.apply(null, arguments); try{ chips(); }catch(e){ warn30('time chips', e); } return out; };
   document.addEventListener('click', function(){ setTimeout(chips, 30); }, true);
+  /* 186 N1: this used to be reached after load only because the name pass WROTE on load and repainted. With no
+     write on load, the chips follow the list itself: any change to #log's rows moves their time out of the name.
+     chips() moves nodes INSIDE a row, which is not a change to #log's own children, so it cannot re-trigger. */
+  (function(){
+    var mo = null;
+    function watch(){
+      var log = h30El('log'); if(!log || mo || typeof MutationObserver === 'undefined') return;
+      mo = new MutationObserver(function(){ try{ chips(); }catch(e){ warn30('time chips', e); } });
+      mo.observe(log, { childList:true });
+      chips();
+    }
+    if(document.readyState === 'loading') document.addEventListener('DOMContentLoaded', watch); else watch();
+    window.addEventListener('load', watch);
+  })();
   window.__HT30CHIP = { chips:chips };
 })();
 
@@ -11845,8 +11859,9 @@ var HT30TIME = (function(){
   function done(){ try{ return localStorage.getItem(key() + '_ran') === '1'; }catch(e){ return true; } }
   function markDone(){ try{ localStorage.setItem(key() + '_ran', '1'); }catch(e){} }
 
-  async function run(){
-    if(!HT30_NAME_TIMES || done()) return { ran:false, rows:[] };
+  /* 186 N1: `force` is the explicit request (never passed by a load or a paint) */
+  async function run(force){
+    if(!(HT30_NAME_TIMES || force === true) || done()) return { ran:false, rows:[] };
     if(!S.me || !S.loadOk || !S.hasTime) return { ran:false, rows:[] };
     var rows = plan(S.habits);
     markDone();                                        /* once per account per device, pass or empty */
@@ -13943,26 +13958,16 @@ var HT185SYNC = (function(){
      publication simply sends nothing - the refetch on `visibilitychange` / `online` / `focus` (HT-28c) and the
      theme pull below are the floor under it, which is exactly iOS dropping the socket in the background
      (stress 8). */
-  var ch = null, chFor = null;
+  /* 186 S7a: profiles / circle_members are NOT in the `supabase_realtime` publication - only days, day_private and
+     habits are (HT-29 / PHASE GATE / tools/sql/2026-09-15_ht29.sql). A channel on them delivered nothing from the
+     server and only pushed __RT past the three tables `golden_ht29` S7a locks. Their one-to-one sync is the refetch
+     here on focus / visibility / online, plus the 30 s theme pull below - the same floor HT-28c already stands on.
+     HT-29's channel stays the one and only realtime path in the app. */
+  var backFor = null;
   function poke(){ try{ if(window.__HT28c && window.__HT28c.pull) window.__HT28c.pull(); }catch(e){} }
-  function closeRt(){
-    if(!ch) return; var c = ch; ch = null; chFor = null;
-    try{ if(sb.removeChannel) sb.removeChannel(c); else if(c.unsubscribe) c.unsubscribe(); }catch(e){}
-  }
-  function openRt(){
-    if(!authOk() || typeof sb.channel !== 'function' || document.visibilityState === 'hidden') return;
-    if(ch && chFor === S.me.id) return;
-    closeRt();
-    try{
-      var c = sb.channel('ht185-' + S.me.id);
-      c.on('postgres_changes', { event:'*', schema:'public', table:'profiles', filter:'id=eq.' + S.me.id }, poke);
-      c.on('postgres_changes', { event:'*', schema:'public', table:'circle_members', filter:'user_id=eq.' + S.me.id }, poke);
-      ch = c.subscribe(function(){}) || c; chFor = S.me.id;
-    }catch(e){ warn185('realtime', e); ch = null; }
-  }
-  function back(){ if(!S.me) return; pullTheme().then(stamp, stamp); openRt(); }
+  function back(){ if(!S.me) return; backFor = S.me.id; pullTheme().then(stamp, stamp); poke(); }
   document.addEventListener('visibilitychange', function(){
-    if(document.visibilityState === 'visible') back(); else closeRt();
+    if(document.visibilityState === 'visible') back();
   });
   window.addEventListener('focus', back);
   window.addEventListener('online', back);

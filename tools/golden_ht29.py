@@ -878,9 +878,14 @@ async def sec_s7(pw):
 
     uid = await D.evaluate("async () => (await window.__MOCK_SB.auth.getUser()).data.user.id")
     subs = await D.evaluate("() => (window.__RT ? window.__RT.subs : []).map(s => [s.table, s.filter, s.event])")
-    chk('S7a · the app subscribes to its three tables, each filtered to the signed-in user and nobody else',
-        sorted(s[0] for s in subs) == ['day_private', 'days', 'habits']
-        and all(s[1] == 'user_id=eq.' + uid for s in subs) and all(s[2] == '*' for s in subs), subs)
+    # 186 (paste 185 S5.2: realtime on every table a phone renders): the three are still required, the profile and
+    # the group membership may join them, and the privacy half is unchanged - every one is the signed-in user's own
+    # rows (`profiles` is keyed by `id`, the rest by `user_id`) and nobody else's
+    own = {'profiles': 'id=eq.' + uid}
+    chk('S7a · the app subscribes to its three tables (+ profile, membership), each filtered to the signed-in user and nobody else',
+        {'day_private', 'days', 'habits'} <= set(s[0] for s in subs)
+        and set(s[0] for s in subs) <= {'day_private', 'days', 'habits', 'profiles', 'circle_members'}
+        and all(s[1] == own.get(s[0], 'user_id=eq.' + uid) for s in subs) and all(s[2] == '*' for s in subs), subs)
     chk('S7b · the socket is live while the page is visible - the JOIN is read, not assumed',
         await D.evaluate(LIVE) is True
         and await D.evaluate("() => window.__HT29RT.status()") == 'SUBSCRIBED',

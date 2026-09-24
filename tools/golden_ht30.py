@@ -265,6 +265,10 @@ async def sec_s2(pw):
     chk('S2a . the time is OUT of the name element', bool(shape) and not shape['insideName'], shape)
     chk('S2b . and sits to the RIGHT of it', bool(shape) and shape['right'], shape)
     chk('S2c . muted, not bold', bool(shape) and str(shape['weight']) in ('400', 'normal'), shape)
+    # 186 N1: the name pass no longer runs on load (no write without a user action); it runs on request, so the
+    # request is made here the way a person would make it, and the rule S2d holds is unchanged
+    await pg.evaluate("() => window.__HT30TIME.run(true)")
+    await pg.wait_for_timeout(700)
     names = await pg.eval_on_selector_all('#log .li .nm', 'ns => ns.map(n => n.textContent.trim())')
     left = [n for n in names if re.search(r'\d{1,2}:\d{2}', n)]
     chk('S2d . no rendered name carries a clock time', left == [], left[:3])
