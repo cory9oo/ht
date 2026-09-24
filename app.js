@@ -7603,7 +7603,7 @@ var HT32_CARDFIT = true;
     /* 194 S6.4: the age the grid runs to, at the FOOT of its axis - on the last row's bottom edge, inside the box the
        grid already fills, so the cells lose nothing */
     (function(){ var lf=Math.floor((YEARS-1)/rows), lr=(YEARS-1)%rows;
-      s+='<text class="wl h194foot h194f3" style="font-size:6.5px;letter-spacing:-.5px" x="'+(foldX(lf)+LEFT-4)+'" y="'+(TOP+(lr+1)*PH-GAP)+'" text-anchor="end">'+YEARS+'</text>'; })();   /* the same x as every age label (golden_ht18 S6b); three digits a size smaller so they fit the 16px gutter (app.css) */
+      s+='<text class="wl h194foot h194f3" style="font-size:6.5px;letter-spacing:-.5px" x="'+(foldX(lf)+LEFT-4)+'" y="'+(TOP+(lr+1)*PH-GAP)+'" text-anchor="end">'+YEARS+'</text>'; })();   /* the same x as every age mark - golden_ht18 S6b; three digits a size smaller so they fit the 16px gutter (app.css) */
     /* HT-18c (his note 5): "Life graph is missing x and y values - add them." The AGE axis (y) was
        already down the left. The WEEK axis (x) had never been drawn at all, so the grid carried one
        axis and read as a texture. Every ten weeks across the top, and the last one is 52 rather
