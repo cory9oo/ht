@@ -4331,7 +4331,11 @@ var HT32_CARDFIT = true;
     if(probed) return;                           /* already read (or reading) - nothing to do */
     if(S.me && S.me.id){
       await probe();
-      if(probed){ try{ paintAll(); }catch(e){} } /* the column is on the rows now - let it take the screen */
+      if(probed){ try{ paintLog(); }catch(e){} } /* the column is on the rows now - regroup by section (paintLog,
+                                                    NOT paintAll: paintAll runs boot28/boot28b - the HT-28c sync
+                                                    pull - and an extra pull on boot mislabels a failed-load blip
+                                                    as "Synced" (golden_ht28 R9). paintLog re-renders the log and
+                                                    regroups the sections, which is all the probe needs. */
       return;
     }
     if(_secTry < _secBackoff.length) setTimeout(ensureProbe, _secBackoff[_secTry++]);
