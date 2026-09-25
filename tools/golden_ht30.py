@@ -467,7 +467,11 @@ async def sec_s5(pw):
         inf == 6, inf)
     rows = await pg.evaluate("""async () => { const st = window.__HT25S3.state();
         const sab = (st.habits||[]).filter(h => /^\\s*sabbath\\b/i.test(h.name||''))[0];
-        if(sab) sab.cadence = 'daily';          /* due today, so "that day" can be today */
+        /* 209 S2d: a legacy DAILY Sabbath is now read Saturday-only (SAB_LEGACY_READ stays true - the
+           on-load daily->dow:6 migration is gone, 186 N1). To keep a Sabbath "due today" on any day the
+           way a non-Saturday Sabbath really is, give it that day's own cadence (kind `dow`, not the
+           legacy-daily read that would force Saturday). This tests the same rendering, under the new law. */
+        if(sab) sab.cadence = 'dow:' + new Date().getDay();
         await window.__HT30SAB.save(new Date().getDay());
         await new Promise(r => setTimeout(r, 700));
         return { rows: [...document.querySelectorAll('#log .li')].filter(r => !!r.offsetParent)

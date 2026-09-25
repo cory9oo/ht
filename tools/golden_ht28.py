@@ -800,13 +800,21 @@ async def sec_e(pw):
     chk("E · zero page errors", not errs, errs[:2])
     await b.close()
 
-    # E13 · a legacy daily Sabbath migrates to dow:6 once, under the signed-in session
+    # E13 · 186 N1 / paste 209 S2d: a legacy daily Sabbath is NO LONGER migrated on load or on a repaint.
+    # The old auto daily->dow:6 write ran on every paint and, when it did not stick, fired again (the
+    # live screen 2026-09-24 showed 13 such attempts in one day). A habit is written only on the person's
+    # own action; the capability stays reachable behind __HT28.migrate() for an explicit one.
     b, pg, errs = await open_page(pw, 390, 844, flags={'__SABBATH': True})
     await pg.wait_for_timeout(600)
     mg = await pg.evaluate("() => ({ st: window.__h28SabMig, ups: (window.__UPDATES||[]).filter(u=>u[0]==='habits' && u[1] && u[1].cadence).map(u=>u[1].cadence) })")
     await pg.evaluate("() => window.__HT28.repaint()"); await pg.wait_for_timeout(400)
     mg2 = await pg.evaluate("() => (window.__UPDATES||[]).filter(u=>u[0]==='habits' && u[1] && u[1].cadence).length")
-    chk("E13 · a Sabbath still stored as daily becomes dow:6 on load - once", mg['st'] == 'migrated' and mg['ups'] == ['dow:6'] and mg2 == 1, [mg, mg2])
+    chk("E13 · a legacy daily Sabbath is NOT migrated on load or repaint (186 N1 / 209 S2d)",
+        mg['ups'] == [] and mg2 == 0, [mg, mg2])
+    await pg.evaluate("() => window.__HT28.migrate()"); await pg.wait_for_timeout(400)
+    man = await pg.evaluate("() => ({ st: window.__h28SabMig, ups: (window.__UPDATES||[]).filter(u=>u[0]==='habits' && u[1] && u[1].cadence).map(u=>u[1].cadence) })")
+    chk("E13 · the migration is still available on an explicit action - one dow:6 write",
+        man['st'] == 'migrated' and man['ups'] == ['dow:6'], man)
     await b.close()
 
     # E13 · only the row HT-19 created: a person's own daily "Sabbath walk" is left exactly as saved
@@ -814,7 +822,7 @@ async def sec_e(pw):
     await pg.wait_for_timeout(600)
     own = await pg.evaluate("() => { " + VIS + " return { st: window.__h28SabMig, ups: (window.__UPDATES||[]).filter(u=>u[0]==='habits' && u[1] && u[1].cadence).length, shown: vis(document.querySelector('#log .li[data-h=\"h3\"]')), due: window.__HT24.dowOf({ name:'Sabbath walk', group_name:'Morning', cadence:'daily' }) }; }")
     chk("E13 · a person's own daily 'Sabbath walk' is not migrated, not read as Saturday-only, and shows today",
-        own['ups'] == 0 and own['shown'] and own['due'] is None and own['st'] in ('none', 'done-before'), own)
+        own['ups'] == 0 and own['shown'] and own['due'] is None and own['st'] in ('none', 'done-before', None), own)
     await b.close()
 
     # E15 + F18 · the editor's Days control and the rests-on-Sabbath switch

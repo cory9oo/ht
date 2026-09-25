@@ -4317,8 +4317,31 @@ var HT32_CARDFIT = true;
     decorate(); bind();
     if(S.hasWindow||S.hasNotes) paintLog();      /* the merged columns are on the rows now */
   }
-  if(document.readyState==='complete') setTimeout(boot,160);
-  else window.addEventListener('load',function(){ setTimeout(boot,160); });
+
+  /* HT-209 S2a · THE SECTION PROBE MUST NOT DEPEND ON THE LOGIN BEING READY AT +160ms.
+     v42 scheduled boot() exactly once, at load+160ms; a session that resolved LATER than that (a slow
+     sign-in) left `S.hasSection` unset for the whole session, and `sectionOf()` then fell back to the
+     device's `ht31_sections` and finally to the heuristic - so Cory's Morning/Night/Standards/Weekly
+     rows did not come back on a fresh load (the live screen 2026-09-24). ensureProbe() runs the probe
+     the moment the session is ready, again on the FIRST data load (the paintAll hook below), and backs
+     off 0.5·1·2·4·8s while it waits; when it lands it repaints so the SERVER'S sections take the screen.
+     probe() itself is read-only and idempotent - its own `probed` guard makes every extra call a no-op. */
+  var _secBackoff=[500,1000,2000,4000,8000], _secTry=0;
+  async function ensureProbe(){
+    if(probed) return;                           /* already read (or reading) - nothing to do */
+    if(S.me && S.me.id){
+      await probe();
+      if(probed){ try{ paintAll(); }catch(e){} } /* the column is on the rows now - let it take the screen */
+      return;
+    }
+    if(_secTry < _secBackoff.length) setTimeout(ensureProbe, _secBackoff[_secTry++]);
+    /* out of backoff steps -> the next data load calls ensureProbe again through the paintAll hook */
+  }
+  var _paBoot=paintAll;
+  paintAll=function(){ var out=_paBoot.apply(this,arguments); ensureProbe(); return out; };
+
+  if(document.readyState==='complete'){ setTimeout(boot,160); ensureProbe(); }
+  else window.addEventListener('load',function(){ setTimeout(boot,160); ensureProbe(); });
 })();
 
 /* ======================= HT-13 · VIEWS LAYER (PASTE 35 §2 · PASTE 32 §D 15–17) =======================
@@ -8688,7 +8711,13 @@ var HT32_CARDFIT = true;
     if(!S.me) return;
     whyBack();
     regroup28();
-    sabMigrate28();
+    /* HT-209 S2d · NOTHING WRITES A HABIT ON RENDER (186 N1). sabMigrate28() used to run here, so every
+       paint tried to turn a legacy daily Sabbath into `dow:6`; when the write did not stick it fired
+       again on the next paint (the live screen showed 13 such attempts in one day, none sticking). A
+       Sabbath cadence change now comes only from the person's own action on that row. The migration
+       stays reachable via `__HT28.migrate()` for an explicit action, and a legacy Sabbath still renders
+       Saturday-only through `dowOf` (SAB_LEGACY_READ), so nothing flashes on a weekday in the meantime.
+       Whether a legacy Sabbath SHOULD become dow:6 is a decision for SPEC, not a render-path write. */
     sabLine28();
     ringsLater();
   }
@@ -12833,7 +12862,8 @@ var HT31_VERSION_EVERY_MS = 60000;
 var HT31_SECTIONS_LOCAL = true;
 (function(){
   var KEY = 'ht31_sections';
-  var map = null;
+  var RETIRED = 'ht209_sections_retired';   /* set once the server's `section` column has taken over */
+  var map = null, _ret = null;
 
   function load(){
     if(map) return map;
@@ -12842,7 +12872,36 @@ var HT31_SECTIONS_LOCAL = true;
     return map;
   }
   function save(){ try{ localStorage.setItem(KEY, JSON.stringify(load())); }catch(e){ warn31('sections save', e); } }
-  function local(id){ return id ? (load()[String(id)] || '') : ''; }
+
+  /* HT-209 S2b · WHEN THE SERVER CARRIES `section`, THE DEVICE'S PLACEMENTS STEP ASIDE.
+     `sectionOf()` reads the server value first and this device copy second, so a STALE `ht31_sections`
+     entry used to override the server for any row whose server section was empty - a fresh load did not
+     follow the server (the live screen 2026-09-24). Once `S.hasSection` is true the column is
+     authoritative: the device map is archived ONCE to `ht186_sections_superseded` (with the time, the
+     186 N1 shape) and then `ht31_sections` is never read again. The `ht31_sections` key itself is left
+     in place, not deleted - it is only stepped aside, so a reload reads it zero times. This is a
+     localStorage-only change; it writes nothing to the server (186 N1 - no habit write on render). */
+  function retired(){
+    if(_ret != null) return _ret;
+    try{ _ret = localStorage.getItem(RETIRED) === '1'; }catch(e){ _ret = false; }
+    return _ret;
+  }
+  function retire(){
+    if(retired()){ map = {}; return; }
+    var m = {};
+    try{ m = JSON.parse(localStorage.getItem(KEY) || '{}') || {}; }catch(e){ m = {}; }
+    Object.keys(m).forEach(function(id){
+      var h = (S.habits || []).filter(function(x){ return String(x.id) === String(id); })[0];
+      ht186Superseded(id, m[id], (h && h.section) || '');   /* archive the old map, once, with the time */
+    });
+    try{ localStorage.setItem(RETIRED, '1'); }catch(e){}
+    _ret = true; map = {};
+  }
+  function local(id){
+    if(retired()) return '';                                /* already stepped aside - never read ht31_sections */
+    if(S && S.hasSection){ retire(); return ''; }           /* server is authoritative now - retire once, then '' */
+    return id ? (load()[String(id)] || '') : '';
+  }
   function place(id, sec){
     if(!id || !sec) return;
     load()[String(id)] = String(sec);

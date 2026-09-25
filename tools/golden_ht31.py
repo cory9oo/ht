@@ -259,8 +259,8 @@ async def sec_s2(pw):
     b, pg, errs = await open_page(pw, 390, 844, flags=dict(SQL, **dict(PLACED, **TIMES)))
     txt = await pg.evaluate("() => document.body.innerText")
     chk('S2b . an AM/PM clock is on the screen', bool(re.search(r'\d{1,2}:\d{2}[\s ](AM|PM)', txt)), txt[:80])
-    bare = re.findall(r'(?:^|[^\d:])([01]\d|2[0-3]):[0-5]\d(?![\s ]*[AP]M)', txt)
-    chk('S2c . and NOT ONE 24-hour clock is left on it', not bare, bare[:5])
+    bare = re.findall(r'(?:^|[^\d:])([01]\d|2[0-3]):[0-5]\d(?![\s ]*[AaPp])', txt)
+    chk('S2c . and NOT ONE 24-hour clock is left on it (a lowercase a/p suffix is a 12-hour clock, 209)', not bare, bare[:5])
     # MIDNIGHT AND NOON are the two a 12-hour clock trips on, and they are read off the picker's own
     # arithmetic - the same `to24`/`parts` pair that turns what Cory picks into what is stored.
     edges = await pg.evaluate("""() => { const T=window.__HT31TIME;
