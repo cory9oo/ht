@@ -419,7 +419,10 @@ async def sec_s3(pw):
 # S4 . INSIGHTS
 # =============================================================================================
 # AMENDED BY HT-194 S6.1 (R67.2, Cory 2026-09-24): the group card moves ABOVE the life grid
-FOUR = ['The month', 'The year', 'The group, side by side', 'The life']
+# AMENDED BY HT-228 (R67.2, Cory 2026-09-24 23:27 "these percentages ... belong to the top of the insight
+# tab ... it's too hidden and doesn't trigger enough emotion"): the day's-percent HERO card 'Today' is the
+# first thing under the Insights title, above his four; nothing else moves.
+FOUR = ['Today', 'The month', 'The year', 'The group, side by side', 'The life']
 
 
 async def sec_s4(pw):
@@ -436,7 +439,7 @@ async def sec_s4(pw):
         .map(n=>Math.round(n.getBoundingClientRect().width)))];
       return { cards:cards, more: !!(more && more.offsetParent), widths:w,
                sw:document.documentElement.scrollWidth, cw:document.documentElement.clientWidth }; }""")
-    chk('S4a . phone . exactly his four, in his order', page['cards'] == FOUR, page['cards'])
+    chk('S4a . phone . the Today hero first, then his four, in order (228)', page['cards'] == FOUR, page['cards'])
     chk('S4b . phone . and no More drawer under them', not page['more'], page)
     chk('S4c . phone . the four are one width - no ragged edges (R70.306)', len(page['widths']) == 1, page['widths'])
     chk('S4d . phone . no horizontal scroll at 390', page['sw'] <= page['cw'] + 1, page)

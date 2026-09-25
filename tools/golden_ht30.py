@@ -507,7 +507,10 @@ CARDS_HT30 = ['Month . completion', 'Month . rating', 'Completion and rating ove
 # HT-31 (paste 143 S4.13): Cory's four, in his order. The six above are what HT-30 put there and are
 # kept as a record of what the drawer now holds - S6e reads them back out of it.
 # AMENDED BY HT-194 S6.1 (R67.2, Cory 2026-09-24): the group card moves ABOVE the life grid on the phone
-CARDS_HT31 = ['The month', 'The year', 'The group, side by side', 'The life']
+# AMENDED BY HT-228 (R67.2, Cory 2026-09-24 23:27 "these percentages ... belong to the top of the insight
+# tab ... too hidden and doesn't trigger enough emotion"): the day's-percent HERO card 'Today' opens the
+# page, above his four; nothing else moves.
+CARDS_HT31 = ['Today', 'The month', 'The year', 'The group, side by side', 'The life']
 CARDS = CARDS_HT31
 
 

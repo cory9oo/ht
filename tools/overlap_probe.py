@@ -78,10 +78,22 @@ PROBE = r"""(sel) => {
            doc: document.documentElement.scrollWidth, vw: document.documentElement.clientWidth };
 }"""
 
-# surface -> (selector, how to reach it)
-GROUP = '.g194, #h18Group, [data-i29="group"]'
-SETTINGS = '#thPick, #h32mir'
-PLAN = [('group', 1695), ('group', 1280), ('group', 390), ('group', 360), ('settings', 1695), ('settings', 390)]
+# surface -> selector. PASTE 228 S3.1: the day-percent hero joins the probe on all four surfaces it draws.
+SEL = {
+    'group': '.g194, #h18Group, [data-i29="group"]',
+    'settings': '#thPick, #h32mir',
+    'inshero': '#h228Hero',    # the phone Insights hero card
+    'masthead': '#tStrip',     # the desktop masthead figure (the desktop day's-percent hero)
+    'todaybar': '#tStrip',     # the phone foot-of-Today bar
+}
+GROUP = SEL['group']
+SETTINGS = SEL['settings']
+# PASTE 228 S3.1: the day-percent hero on the surfaces it draws - the phone Insights card, the phone
+# foot bar, and the desktop masthead figure. (The desktop right-block card is not drawn: #h16Ins is
+# the full-height LIFE quadrant and ht18's cell floor leaves no room - see the wire's FOR SPEC.)
+PLAN = [('group', 1695), ('group', 1280), ('group', 390), ('group', 360), ('settings', 1695), ('settings', 390),
+        ('inshero', 390), ('inshero', 360),
+        ('masthead', 1695), ('masthead', 1280), ('todaybar', 390), ('todaybar', 360)]
 
 
 async def open_page(pw, url, w, scale):
@@ -100,13 +112,15 @@ async def open_page(pw, url, w, scale):
 
 
 async def reach(pg, surface, vw):
-    if surface == 'group' and vw < 1024:
+    # the phone Insights page (group card and the hero card both live there) is reached by a tap
+    if surface in ('group', 'inshero') and vw < 1024:
         await pg.evaluate("() => { const x = [...document.querySelectorAll('[data-t29]')].find(x => /insights/i.test(x.textContent)); if (x) x.click(); }")
         await pg.wait_for_timeout(1200)
     if surface == 'settings':
         await pg.evaluate("() => { const b = document.getElementById('bSet'); if (b) b.click(); }")
         await pg.wait_for_timeout(900)
-    sel = GROUP if surface == 'group' else SETTINGS
+    # masthead, rbhero and todaybar are on the main view - no nav; the hero/strip is already drawn
+    sel = SEL[surface]
     await pg.evaluate("(s) => { const n = document.querySelector(s); if (n) n.scrollIntoView({block:'center'}); }", sel)
     await pg.wait_for_timeout(200)
     return sel

@@ -238,8 +238,13 @@ async def s2(pw):
     try:
         strip = await pg.evaluate("""() => { const s=document.getElementById('tStrip');
             return s ? { vis: s.checkVisibility(), text: s.innerText, nums: window.__HT26.strip() } : null; }""")
-        chk('S2a · TODAY carries the three-number strip: today %, 7-day %, streak',
-            strip and strip['vis'] and all(w in strip['text'].upper() for w in ('TODAY', '7 DAYS', 'STREAK')), strip)
+        # AMENDED BY HT-228 (Cory 2026-09-24 23:27 "too hidden and doesn't trigger enough emotion"): the
+        # foot of Today is now the day's-percent BAR; the three numbers moved UP into the hero (the Insights
+        # card and the masthead). The strip still carries today's completion and still taps into Insights -
+        # repointed to the new element, same intent, not loosened (the % must equal __HT26.strip().today).
+        chk('S2a · the foot of Today is the day-percent bar: today % and a tap into Insights (228)',
+            strip and strip['vis'] and (str(strip['nums']['today']) + '%') in strip['text']
+            and 'INSIGHTS' in strip['text'].upper(), strip)
         await pg.click('#tStrip')
         await pg.wait_for_timeout(700)
         # HT-30 (paste 137 S6.14): HT-26's five and the journal ledger are ONE TAP DOWN now - Cory's

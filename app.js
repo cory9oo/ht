@@ -8340,21 +8340,20 @@ var HT32_CARDFIT = true;
     if(col.lastChild!==b) col.appendChild(b);
     return true;
   }
+  /* HT-228 (PASTE 228, Cory 2026-09-24 23:27 "too hidden and doesn't trigger enough emotion"): the strip
+     is no longer three small grey numbers - #tStrip is now the day's percent as the HERO, drawn by one
+     renderer (window.__HT228): the slim coloured BAR at the foot of Today on the phone, and the large
+     band-inked figure in the masthead on the desktop. The element, its id and its tap into Insights are
+     unchanged; the renderer chooses the size from the width. */
   function paintStrip(){
     var b=el('tStrip');
     if(!b){
-      b=document.createElement('button'); b.id='tStrip'; b.type='button'; b.className='tstrip';
+      b=document.createElement('button'); b.id='tStrip'; b.type='button';
       b.setAttribute('aria-label','open Insights');
       b.addEventListener('click', openInsights);
     }
     if(!placeStrip(b)) return;
-    var s=stripNums();
-    b.innerHTML='<span class="k">Today</span><b>'+(s.today==null?'—':s.today+'%')+'</b>'+
-      '<span class="k">7 days</span><b>'+(s.week==null?'—':s.week+'%')+'</b>'+
-      '<span class="k">Streak</span><b>'+s.streak+'</b>'+
-      /* HT-31 S4.15: the desktop's door to a page that is no longer there (Cory 9/21). The phone,
-         where Insights still is, keeps it. */
-      ((!HT31_DESK_INSIGHTS && !h31Phone()) ? '' : '<span class="go">Insights ›</span>');
+    if(window.__HT228 && window.__HT228.strip) window.__HT228.strip(b);
   }
   /* PHONE: Insights and the Journal are panels on the Views tab. DESKTOP: the quadrants are full, so they
      open in the app's own overlay - the panel NODES are moved in (HT-13's #vInsights rides inside
@@ -8510,7 +8509,7 @@ var HT32_CARDFIT = true;
   }
   var rsT=null;
   window.addEventListener('resize', function(){ clearTimeout(rsT);
-    rsT=setTimeout(function(){ var b=el('tStrip'); if(b) placeStrip(b); }, 150); });
+    rsT=setTimeout(function(){ paintStrip(); }, 150); });   /* HT-228: re-render too, so bar<->mast switches at 1024 */
   window.__HT26 = { md:journalMd, entries:function(q){ return entries(q).length; }, strip:stripNums,
                     five:function(){ return five().length; }, repaint:boot26 };
 
@@ -13262,8 +13261,10 @@ var HT31_GHOST_CHIP_SECTIONS = ['morning', 'night', 'standards', 'weekly'];
    data is untouched; `HT31_INSIGHTS_EXTRAS = true` brings the page straight back. */
 var HT31_INSIGHTS_EXTRAS = false;
 var HT31_DESK_INSIGHTS = false;
-/* PASTE 194 S6.1: Month . Year . GROUP . LIFE - the life grid last, so it can be as tall as 100 rows need */
-var HT31_INS_ORDER = ['h31Month', 'h31Year', 'h30Group', 'h30Life'];
+/* PASTE 194 S6.1: Month . Year . GROUP . LIFE - the life grid last, so it can be as tall as 100 rows need.
+   PASTE 228 (Cory 2026-09-24 23:27): the day's percent is the HERO and opens the page - `h228Hero` goes
+   FIRST, above the four, and nothing else moves. */
+var HT31_INS_ORDER = ['h228Hero', 'h31Month', 'h31Year', 'h30Group', 'h30Life'];
 var HT31_INS_HIDE = ['h30MonthC', 'h30MonthR', 'h30Trend', 'h30Rate'];
 function h31Phone(){ return window.innerWidth < 1024; }
 /* THE FLAG, AND A SEAM TO FLIP IT AT RUNTIME. `HT31_INSIGHTS_EXTRAS = true` brings HT-29's and
@@ -13284,6 +13285,10 @@ function h31Extras(){ return HT31_INSIGHTS_EXTRAS || window.__HT31_EXTRAS === tr
   function four(){
     if(h31Extras() || !h31Phone()) return;
     var body = h31El('h30InsBody'); if(!body) return;
+    /* PASTE 228: the hero card is the first thing under the Insights title. One renderer, so it is the
+       SAME element the desktop right block and the masthead draw from (window.__HT228). */
+    var hero = (window.__HT228 && window.__HT228.phoneCard) ? window.__HT228.phoneCard() : null;
+    if(hero && hero.parentNode !== body) body.appendChild(hero);
     /* the desktop's two line charts, brought over whole */
     var m = cardFor('h31Month', 'The month', h31El('h16Month'));
     var y = cardFor('h31Year', 'The year', h31El('h16Year'));
@@ -13696,6 +13701,94 @@ var HT32_WEEK = 'sun_fri';                /* Sunday..Friday; Saturday is the Sab
     };
   }
   window.__HT32NEED = { compute: compute, paint: paint, rowOf: rowOf };
+})();
+
+
+/* ================== HT-228 (PASTE 228) · THE DAILY PERCENT IS THE HERO ==================
+   Cory, Thursday 2026-09-24 23:27 CDT: "these percentages on the bottom belong to the top of the insight
+   tab ... clearly show ... the daily percent and make it color coded. Same request for desktop. It's too
+   hidden and doesn't trigger enough emotion." So ONE renderer draws the day's completion in three sizes:
+     card  the first card under the phone's Insights title, and the first child of the desktop right block
+     mast  the large band-inked figure at the head of the desktop masthead
+     bar   the slim coloured bar at the foot of Today on the phone
+   It invents no arithmetic: today/7-day/streak from __HT26.strip(), 30-day from __HT29GRP.you().m, the week
+   figure from __HT32NEED.compute() worded as the tape words it. THE BAND IS THE MONTH CHART'S (__HT16.rampIx),
+   never grade()/gcol(); the INK is the scheme's own token by band family, because the ramp hexes fail 4.5:1
+   as text (S1.3): bands 0-1 -> --bad, band 2 -> --st-atrisk, bands 3-4 -> --good. Tokens only (lint_tokens). */
+(function(){
+  var HERO = 'h228Hero';
+  function bandOf(p){ return (window.__HT16 && window.__HT16.rampIx) ? window.__HT16.rampIx(p) : null; }
+  function ink(band){
+    if(band == null) return 'var(--ink3)';   /* unlogged is never a bad day */
+    if(band <= 1) return 'var(--bad)';        /* 0-49% */
+    if(band === 2) return 'var(--st-atrisk)'; /* 50-74%, the scheme's muted mid */
+    return 'var(--good)';                     /* 75-100% */
+  }
+  function pctTxt(p){ return (p == null) ? '—' : (p + '%'); }
+  function heroBest(t){ return t.replace(' FOR THE WEEK', '').replace('BEST POSSIBLE ', 'BEST ').replace(' TODAY', ''); }
+  function data(){
+    var s = (window.__HT26 && window.__HT26.strip) ? window.__HT26.strip() : { today: 0, week: 0, streak: 0 };
+    var m = null;
+    try{ var y = window.__HT29GRP && window.__HT29GRP.you && window.__HT29GRP.you(); if(y) m = y.m; }catch(e){}
+    var wkTxt = null, wkCls = '';
+    try{ var n = window.__HT32NEED && window.__HT32NEED.compute && window.__HT32NEED.compute();
+      if(n && window.__HT32WEEK){ wkTxt = window.__HT32WEEK.needLabel(n); wkCls = window.__HT32WEEK.cls(n); } }catch(e){}
+    return { today: s.today, week: s.week, streak: s.streak, m: m, wkTxt: wkTxt, wkCls: wkCls };
+  }
+  function metric(lbl, val, color){
+    return '<span class="hero-m"><span class="hk">' + lbl + '</span> <b class="num"' +
+           (color ? ' style="color:' + color + '"' : '') + '>' + val + '</b></span>';
+  }
+  function subLine(d){
+    var parts = [ metric('7 days', pctTxt(d.week), ink(bandOf(d.week))),
+                  metric('30 days', pctTxt(d.m), ink(bandOf(d.m))),
+                  metric('Streak', (d.streak == null ? '—' : String(d.streak)), null) ];
+    if(d.wkTxt) parts.push('<span class="hero-m hero-best ' + d.wkCls + '">' + heroBest(d.wkTxt) + '</span>');
+    return parts.join('<i class="hero-dot">·</i>');
+  }
+  /* THE STRIP ELEMENT (#tStrip): bar on the phone, mast on the desktop. Same element, id and tap. */
+  function strip(b){
+    var d = data(), col = ink(bandOf(d.today));
+    if(window.innerWidth >= 1024){
+      b.className = 'hero-mast';
+      b.innerHTML = '<b class="num hero-num" style="color:' + col + '">' + pctTxt(d.today) + '</b>' +
+                    '<span class="hero-mrow">' + subLine(d) + '</span>';
+    } else {
+      b.className = 'hero-bar';
+      var w = (d.today == null) ? 0 : Math.max(0, Math.min(100, d.today));
+      b.innerHTML = '<span class="hero-track"><span class="hero-fill" style="width:' + w + '%;background:' + col + '"></span></span>' +
+                    '<b class="num hero-num" style="color:' + col + '">' + pctTxt(d.today) + '</b>' +
+                    '<span class="go">Insights ›</span>';
+    }
+  }
+  /* THE CARD (#h228Hero): one node, wrapped by HT-30's card builder so it keeps the .h30c/.lab shape every
+     Insights golden reads. `four()` orders it first on the phone; placeDesktop puts it first on the desktop. */
+  var heroInner = null;
+  function innerNode(){
+    if(!heroInner){ heroInner = document.createElement('div'); heroInner.className = 'stat-hero'; }
+    return heroInner;
+  }
+  function paintCard(){
+    if(!(window.__HT30INS && window.__HT30INS.card)) return null;
+    var d = data(), col = ink(bandOf(d.today));
+    var node = innerNode();
+    node.innerHTML = '<div class="num sh-pct" style="color:' + col + '">' + pctTxt(d.today) + '</div>' +
+                     '<div class="sh-sub">' + subLine(d) + '</div>';
+    return window.__HT30INS.card(HERO, 'Today', node);
+  }
+  /* THE DESKTOP HERO IS THE MASTHEAD FIGURE, not a card in #h16Ins. #h16Ins is the full-height LIFE
+     quadrant (golden_ht18): its life grid `#vWeeks` fills the box EXACTLY (measured main: 525px at
+     1920x855, the life cell already at ht18's floor of 4), so ANY card placed there drops the cell
+     below floor - and ht18 is never loosened (paste S2, stress 3/4). So on the desktop the day's
+     percent is the large band-inked `mast` figure at the head of the masthead (S2), the first thing
+     the eye lands on; the CARD size is the phone's Insights hero (four() places it) and the desktop
+     right-block card is NOT injected. (FOR SPEC in the receipt.) */
+  var rt = null;
+  window.addEventListener('resize', function(){ clearTimeout(rt); rt = setTimeout(function(){
+    try{ if(window.innerWidth < 1024 && window.__HT31INS && window.__HT31INS.four) window.__HT31INS.four(); }catch(e){}
+  }, 170); });
+  window.__HT228 = { strip: strip, phoneCard: paintCard, card: paintCard,
+                     data: data, ink: ink, band: bandOf, id: HERO };
 })();
 
 
