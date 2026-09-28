@@ -57,15 +57,16 @@ def fixture_dir(estate):
 FIX = fixture_dir(ESTATE)
 BASE = 'file://' + os.path.join(FIX, 'index.html').replace(os.sep, '/')
 
-# paste 179 S6 moved the ruling: eight offered, the four new schemes first, Slate the default, and the
-# system pair Linen by day / Slate by night. The checks below are unchanged; the ruling they hold is.
-# AMENDED BY HT-194 N2.1 (R67.2, Cory 2026-09-24 11:12): EXACTLY FIVE - Classic (the default again) + Crimson . Moss .
-# Gilt . Orchid. The nine older files and Follow system are RETIRED to themes/_retired/ (kept, never deleted, never
-# linked). The checks below hold the same rulings - one default, one address, applied before paint - over the five.
-THEMES = ['classic', 'crimson', 'moss', 'gilt', 'orchid']
+# AMENDED BY PASTE 300 (R67.2, Cory 2026-09-28 12:25 "only three distinct color themes"): EXACTLY THREE -
+# Crimson . Green (scheme id `moss`, label Green) . Graphite (the NEW DEFAULT; charcoal, silver/ice accent,
+# and the file that now carries [data-simple], so it is linked FIRST). Classic/Gilt/Orchid join the nine
+# already in themes/_retired/ (kept, never deleted, never linked). The checks below hold the same rulings -
+# one default, one address, applied before paint - over the three.
+THEMES = ['crimson', 'moss', 'graphite']
 ALL_THEMES = list(THEMES)
-RETIRED = ['slate', 'ember', 'linen', 'mono', 'neon', 'graphite', 'midnight', 'paper', 'terminal']
-DEFAULT_THEME = 'classic'
+RETIRED = ['slate', 'ember', 'linen', 'mono', 'neon', 'midnight', 'paper', 'terminal',
+           'classic', 'gilt', 'orchid']
+DEFAULT_THEME = 'graphite'
 
 RES = []
 SEC_COUNT = {}
@@ -176,11 +177,11 @@ async def sec_s6(pw):
     linked = re.findall(r'<link rel="stylesheet" href="\./themes/([a-z]+)\.css">', index)
     chk('S6d . every theme is linked from index.html', sorted(linked) == sorted(ALL_THEMES), linked)
     # LOAD ORDER IS LOAD-BEARING: `[data-theme=x]`, `[data-simple]` and `[data-skin=y]` all measure
-    # (0,2,0), so the later file wins. classic.css carries `[data-simple]` - the attribute the app
-    # sets on every simple-view load - so every other theme must come after it or the picker
-    # silently does nothing in the only view Cory uses.
-    chk('S6e . classic.css is linked FIRST, so a picked theme can beat [data-simple]',
-        linked and linked[0] == 'classic', linked)
+    # (0,2,0), so the later file wins. PASTE 300: graphite.css now carries `[data-simple]` (it is the
+    # new default) - the attribute the app sets on every simple-view load - so every other theme must
+    # come after it or the picker silently does nothing in the only view Cory uses.
+    chk('S6e . graphite.css is linked FIRST, so a picked theme can beat [data-simple]',
+        linked and linked[0] == 'graphite', linked)
 
     # ---- applied before the first paint ---------------------------------------------------
     boot = index.find("setAttribute('data-theme'")
@@ -208,7 +209,7 @@ async def sec_s6(pw):
     b, pg, errs = await open_page(pw)
     got = await pg.get_attribute('html', 'data-theme')
     vals = await pg.evaluate(TOKENS_READ, ['--ground', '--ink', '--accent'])
-    chk('S6i . a first load with nothing stored is Classic (194 N2.1 default)',
+    chk('S6i . a first load with nothing stored is Graphite (PASTE 300 default)',
         got == DEFAULT_THEME, got)
     chk('S6j . and the theme file actually LOADED - --ground resolves to the default theme file\'s own value',
         rgb(vals['--ground']) == rgb(theme_file_ground(DEFAULT_THEME)), vals)
@@ -236,9 +237,9 @@ async def sec_s6(pw):
     await b.close()
 
     # ---- EXTRA-1: follow the system light/dark pair ----------------------------------------
-    # AMENDED BY HT-194 N2.1: Follow system is retired with the nine. A saved `system` still RESOLVES - to Classic in
-    # either light - and nothing claims to follow; the saved value is left as it was (resolution never writes).
-    for scheme, want in (('light', 'classic'), ('dark', 'classic')):
+    # AMENDED BY PASTE 300: Follow system stays retired. A saved `system` still RESOLVES - to Graphite (the default)
+    # in either light - and nothing claims to follow; the saved value is left as it was (resolution never writes).
+    for scheme, want in (('light', 'graphite'), ('dark', 'graphite')):
         b, pg, _ = await open_page(pw, storage={'ht_theme': 'system'}, scheme=scheme)
         got = await pg.get_attribute('html', 'data-theme')
         follow = await pg.get_attribute('html', 'data-theme-follow')
@@ -253,7 +254,7 @@ async def sec_s6(pw):
     await pg.wait_for_timeout(900)
     picks = await pg.evaluate("() => [...document.querySelectorAll('[data-theme-pick]')]"
                               ".map(b => b.getAttribute('data-theme-pick'))")
-    chk('S6p . Settings -> Appearance offers exactly the five, and nothing else (194 N2.1)',
+    chk('S6p . Settings -> Appearance offers exactly the three, and nothing else (PASTE 300)',
         picks == THEMES, picks)
     pressed = await pg.evaluate("() => [...document.querySelectorAll('[data-theme-pick]')]"
                                 ".filter(b => b.getAttribute('aria-pressed')==='true')"
@@ -264,7 +265,7 @@ async def sec_s6(pw):
     chk('S6r . the old raw skin names are gone from Settings - a person picks a look, not a token set',
         not any(w in body for w in ('statement', 'carbon', 'blueprint')), body[:160])
 
-    await pg.evaluate("() => document.querySelector('[data-theme-pick=\"gilt\"]').click()")
+    await pg.evaluate("() => document.querySelector('[data-theme-pick=\"crimson\"]').click()")
     await pg.wait_for_timeout(400)
     after = await pg.evaluate("""() => ({
       attr: document.documentElement.getAttribute('data-theme'),
@@ -272,26 +273,26 @@ async def sec_s6(pw):
       ground: getComputedStyle(document.documentElement).getPropertyValue('--ground').trim(),
       meta: (document.querySelector('meta[name=theme-color]')||{}).content })""")
     chk('S6s . one tap switches it at once - attribute, resolved colour and the stored value agree',
-        after['attr'] == 'gilt' and after['stored'] == 'gilt'
-        and rgb(after['ground']) == rgb(theme_file_ground('gilt')), after)   # HT-194: was midnight (retired)
+        after['attr'] == 'crimson' and after['stored'] == 'crimson'
+        and rgb(after['ground']) == rgb(theme_file_ground('crimson')), after)   # PASTE 300: was gilt (retired)
     # the status bar is the one place a colour is COPIED, so it is the one place it can be stale
     chk('S6t . and <meta theme-color> follows, so the phone status bar is not the old theme',
-        rgb(after['meta']) == rgb(theme_file_ground('gilt')), after['meta'])
+        rgb(after['meta']) == rgb(theme_file_ground('crimson')), after['meta'])
     pressed2 = await pg.evaluate("() => [...document.querySelectorAll('[data-theme-pick]')]"
                                  ".filter(b => b.getAttribute('aria-pressed')==='true')"
                                  ".map(b => b.getAttribute('data-theme-pick'))")
     chk('S6u . the picker repaints its own pressed state - and a second tap still works, which a '
-        'per-button handler would have broken when innerHTML was rewritten', pressed2 == ['gilt'], pressed2)
-    await pg.evaluate("() => document.querySelector('[data-theme-pick=\"orchid\"]').click()")
+        'per-button handler would have broken when innerHTML was rewritten', pressed2 == ['crimson'], pressed2)
+    await pg.evaluate("() => document.querySelector('[data-theme-pick=\"moss\"]').click()")
     await pg.wait_for_timeout(400)
     twice = await pg.get_attribute('html', 'data-theme')
-    chk('S6v . the second tap lands too (the delegated listener survives the repaint)', twice == 'orchid', twice)   # HT-194: was paper (retired)
+    chk('S6v . the second tap lands too (the delegated listener survives the repaint)', twice == 'moss', twice)   # PASTE 300: was orchid (retired)
 
     await pg.reload()
     await pg.wait_for_timeout(1200)
     kept = await pg.get_attribute('html', 'data-theme')
     chk('S6w . and it survives a reload - HT-9a\'s dark lock no longer takes the choice back',
-        kept == 'orchid', kept)
+        kept == 'moss', kept)
     chk('S6x . zero page errors through the whole picker walk', not errs, errs[:2])
     await b.close()
 

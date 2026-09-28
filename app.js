@@ -221,28 +221,31 @@ var HT194_GRID = true;            /* 194 S5: the group card is a fixed-column gr
    resolve in CSS, because each theme file names its legacy selector beside the new one. */
 /* HT-179 S6: four new schemes, FIRST in the picker, then the four of HT-32. Nothing removed (R70.138). */
 /* 185 S2: Neon joins after Mono (the EXTRA - strike it by removing it here, in index.html and its file). */
-/* PASTE 194 N2.1 (Cory 2026-09-24 11:12): EXACTLY FIVE - Classic (the default, unchanged) + Crimson . Moss . Gilt .
-   Orchid. The nine older files and Follow system moved to `themes/_retired/` (kept in git, never deleted -
-   DEC-037 / R70.138). A saved retired name RESOLVES and is never written back: Neon -> Orchid (the same
-   family, darker and calmer), anything else -> Classic. See THEME_RETIRED. */
-var THEMES = ['classic','crimson','moss','gilt','orchid'];   /* offered, in picker order */
+/* PASTE 300 (SUPER HD, Cory 2026-09-28 12:25): EXACTLY THREE - Crimson . Green (today's Moss; the
+   scheme id stays `moss`, only the picker LABEL is Green) . Graphite (the new default; charcoal ground,
+   silver/ice accent). Classic/Gilt/Orchid join the nine already retired in `themes/_retired/` (kept in
+   git, never deleted - DEC-037 / R70.138). A saved retired name RESOLVES to the NEAREST of the three and
+   is never written back: classic -> graphite, gilt -> crimson, orchid/neon -> moss, anything else ->
+   graphite (the default). Mapping logged once on load (see applyTheme's caller). See THEME_RETIRED. */
+var THEMES = ['crimson','moss','graphite'];   /* offered, in picker order */
 var THEME_ALL = THEMES.slice();
-var THEME_RETIRED = { neon:'orchid', slate:'classic', ember:'classic', linen:'classic', mono:'classic',
-                      graphite:'classic', midnight:'classic', paper:'classic', terminal:'classic', system:'classic' };
+var THEME_RETIRED = { classic:'graphite', gilt:'crimson', orchid:'moss', neon:'moss',
+                      slate:'graphite', ember:'crimson', linen:'graphite', mono:'graphite',
+                      graphite:'graphite', midnight:'graphite', paper:'graphite', terminal:'graphite', system:'graphite' };
 /* READ, NOT DECLARED. index.html's pre-paint script owns the default and publishes it here; this
    file only needs to agree with it. The literal is the fallback for a page served without the
-   attribute, and `golden_ht32` S6 asserts the two spellings are the same word - because when they
+   attribute, and `golden_ht41` asserts the two spellings are the same word - because when they
    were not, the page painted one theme and app.js changed it a tick later, and no test saw it. */
 var THEME_DEFAULT = (function(){
-  try{ return document.documentElement.getAttribute('data-theme-default') || 'classic'; }
-  catch(e){ return 'classic'; }
+  try{ return document.documentElement.getAttribute('data-theme-default') || 'graphite'; }
+  catch(e){ return 'graphite'; }
 })();
-var THEME_LABEL = { classic:'Classic', crimson:'Crimson', moss:'Moss', gilt:'Gilt', orchid:'Orchid' };
-var THEME_NOTE = { classic:"today's look", crimson:'near-black, deep crimson', moss:'green-black, sage',
-                   gilt:'true black, antique gold', orchid:'aubergine-black, deep orchid' };
-/* 194 N2.1: Follow system is retired with the nine; the pair is kept only so an old `system` resolves */
-var THEME_LIGHT = 'classic', THEME_DARK = 'classic';
-var SKIN2THEME = { statement:'classic', carbon:'classic', blueprint:'classic', terminal:'classic' };
+var THEME_LABEL = { crimson:'Crimson', moss:'Green', graphite:'Graphite' };
+var THEME_NOTE = { crimson:'near-black, deep crimson', moss:'green-black, sage',
+                   graphite:'charcoal, silver/ice - clean and cool' };
+/* 194 N2.1: Follow system is retired; the pair is kept only so an old `system` resolves */
+var THEME_LIGHT = 'graphite', THEME_DARK = 'graphite';
+var SKIN2THEME = { statement:'graphite', carbon:'graphite', blueprint:'graphite', terminal:'graphite' };
 
 function themePref(){ try{ return localStorage.getItem('ht_theme') || THEME_DEFAULT; }catch(e){ return THEME_DEFAULT; } }
 function themeFollowsSystem(){ return false; }         /* 194 N2.1: Follow system is retired */
@@ -251,11 +254,19 @@ function systemIsLight(){
 }
 /* the theme actually ON the element right now - the one a swatch or a screenshot is about */
 function themeNow(){ return document.documentElement.getAttribute('data-theme') || THEME_DEFAULT; }
+/* PASTE 300: a retired scheme maps to the nearest of the three ON LOAD, and the mapping is logged ONCE
+   (per source name) - never an error, never a blank theme. Resolution still never writes the pref back. */
+var _themeMapLogged = {};
+function themeLogRetired(from, to){
+  if(_themeMapLogged[from]) return;
+  _themeMapLogged[from] = 1;
+  try{ console.info('[HT300] retired theme "' + from + '" → ' + to + ' (nearest of the three)'); }catch(e){}
+}
 /* the theme a preference RESOLVES to. `system` is the only one where those two differ. */
 function themeResolve(t){
   if(THEME_ALL.indexOf(t)>=0) return t;
-  if(THEME_RETIRED[t]) return THEME_RETIRED[t];          /* 194 N2.1: resolution never writes */
-  return THEME_ALL.indexOf(THEME_DEFAULT)<0 ? 'classic' : THEME_DEFAULT;
+  if(THEME_RETIRED[t]){ themeLogRetired(t, THEME_RETIRED[t]); return THEME_RETIRED[t]; }  /* resolution never writes */
+  return THEME_ALL.indexOf(THEME_DEFAULT)<0 ? 'graphite' : THEME_DEFAULT;
 }
 
 var _themeSwatch = null;

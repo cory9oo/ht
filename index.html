@@ -10,7 +10,7 @@
      start paints before any script runs. `color-scheme` per theme is set in the theme files
      themselves, where a light theme can say so; this static pair is only the first frame. -->
 <meta name="color-scheme" content="dark">
-<meta name="theme-color" content="#0A0C10">
+<meta name="theme-color" content="#0B0C0E">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="HT">
 <meta name="mobile-web-app-capable" content="yes">
@@ -32,11 +32,14 @@ try{
    the one honest home for the default. It publishes the choice as `data-theme-default`, and app.js
    READS that rather than carrying a second copy. Two defaults in two files is not a style question:
    the later one wins AFTER the paint, so the page shows one theme and then changes its mind. */
-var _TDEF = 'classic';                        /* 194 N2.1: Classic is the default again (179 had Slate) */
+var _TDEF = 'graphite';                       /* PASTE 300: THREE themes; Graphite is the new default */
 try{
-  var _TH = ['classic','crimson','moss','gilt','orchid'];
-  /* 194 N2.1: a retired name RESOLVES and is never written back - Neon -> Orchid, anything else -> Classic */
-  var _TRET = { neon:'orchid' };
+  var _TH = ['crimson','moss','graphite'];    /* PASTE 300: exactly three offered */
+  /* PASTE 300: a retired name RESOLVES to the nearest of the three and is never written back
+     (classic -> graphite, gilt -> crimson, orchid/neon -> moss); anything unknown -> _TDEF. */
+  var _TRET = { classic:'graphite', gilt:'crimson', orchid:'moss', neon:'moss',
+                slate:'graphite', ember:'crimson', linen:'graphite', mono:'graphite',
+                midnight:'graphite', paper:'graphite', terminal:'graphite', system:'graphite' };
   document.documentElement.setAttribute('data-theme-default', _TDEF);
   var _t = localStorage.getItem('ht_theme') || _TDEF;
   if(_TH.indexOf(_t) < 0) _t = _TRET[_t] || _TDEF;
@@ -69,17 +72,14 @@ try{
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Inter:wght@400;500;600&display=swap">
 <link rel="stylesheet" href="./tokens.css">
-<!-- HT-32 S6 - THE FOUR THEMES. `themes/README.md` says why classic.css is FIRST and why
-     re-ordering these five lines silently breaks the picker: `[data-theme=x]`, `[data-simple]`
-     and `[data-skin=y]` all have specificity (0,2,0), so the LATER file wins, and classic.css
-     is the one carrying `[data-simple]` - the attribute the app sets on every simple-view load. -->
-<link rel="stylesheet" href="./themes/classic.css">
-<!-- PASTE 194 N2.1 - the four new schemes, AFTER classic.css for the reason above; each is `:root[data-theme=x]` only.
-     The nine older files are in themes/_retired/ (kept, never linked). -->
+<!-- PASTE 300 - THREE THEMES. `themes/README.md` says why the file carrying `[data-simple]` is FIRST and
+     why re-ordering these lines silently breaks the picker: `[data-theme=x]`, `[data-simple]` and
+     `[data-skin=y]` all have specificity (0,2,0), so the LATER file wins. graphite.css is now the one
+     carrying `[data-simple]` (the new default), so it is linked FIRST and every other theme comes after
+     it. Classic/Gilt/Orchid are retired to themes/_retired/ (kept, never linked - DEC-037). -->
+<link rel="stylesheet" href="./themes/graphite.css">
 <link rel="stylesheet" href="./themes/crimson.css">
 <link rel="stylesheet" href="./themes/moss.css">
-<link rel="stylesheet" href="./themes/gilt.css">
-<link rel="stylesheet" href="./themes/orchid.css">
 <link rel="stylesheet" href="./app.css">
 </head>
 <body>

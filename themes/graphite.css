@@ -1,0 +1,33 @@
+/* GRAPHITE — PASTE 300 (SUPER HD). The third theme and the new DEFAULT: charcoal ground, cool
+   greys, ONE silver/ice accent — cool and sleek, no warmth to compete with Crimson, and by the
+   LOOK RULE (Cory 09-23) NOTHING BRIGHT: no pure-white text (--ink is #E6EAF0, off-white) and no
+   saturated blue accent (--accent is a desaturated ice-silver, not a klaxon blue).
+
+   THIS FILE CARRIES `[data-simple]` and is LINKED FIRST (themes/README.md, "load order is
+   load-bearing"). Classic used to be that file; Classic is retired by paste 300, so its job — being
+   the base every picked theme must be able to beat, and the render a load with no theme yet falls
+   back to — moves here, because Graphite is now the default. Every other theme is `:root[data-theme=x]`
+   only and is linked AFTER this, so at equal specificity (0,2,0) it wins.
+
+   RED IS STATE ONLY (tokens.css §1): the accent is deliberately not red; `--bad`/out-of-reach own red.
+   The legacy `[data-skin="carbon"]` selector is named beside the new one so a preference saved before
+   HT-32 keeps resolving without a migration. Measured by tools/contrast_ht32.py (≥ 4.5:1). */
+:root[data-theme="graphite"],
+:root[data-skin="carbon"],
+:root[data-simple]{
+  --ground:#0B0C0E; --sheet:#111317; --sunk:#171A1F; --sel:#1A1E24;
+  --rule:#23272E;   --rule2:#3A404A;
+  --ink:#E6EAF0;    --ink2:#9AA3AF;  --ink3:#626B77;
+  --accent:#A6C2D2; --accent-ink:#0B0C0E; --accent-wash:#17242B;
+  --bad:#E06A5E;    --good:#7FC0A0;
+  --g0:#5E2F2B; --g1:#8A4139; --g2:#B4604F; --g3:#C4954F; --g4:#5A9E7B; --g5:#7FC0A0;
+  --st-todo:#E6EAF0; --st-done:#7FC0A0; --st-late:#C9A063; --st-skip:#9AA3AF; --st-notdue:#7F8792;
+  --st-secured:#7FC0A0; --st-ontrack:#8FB8D9; --st-atrisk:#C9A063; --st-outofreach:#E06A5E;
+  --m1:#8FB8D9; --m2:#C9A6F5; --m3:#E9C46E; --m4:#7FD6C6;
+  /* 194 N2.2: sections carry NO colour — every --sec-* is the body text, told apart by structure. */
+  --sec-morning:#E6EAF0; --sec-night:#E6EAF0; --sec-weekly:#E6EAF0; --sec-standards:#E6EAF0;
+  --sb-thumb:rgba(154,163,175,.35); --sb-thumb-hover:rgba(154,163,175,1);
+  /* the four names the simple view's own rules still read by their old spelling */
+  --panel:#111317; --panel-2:#171A1F; --line:#23272E; --dim:#626B77; --accent-red:#E06A5E;
+  color-scheme:dark;
+}
