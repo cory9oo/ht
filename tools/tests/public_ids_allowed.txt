@@ -1,0 +1,7 @@
+# public_id_scan allowlist for the tracker (a PUBLIC repo) - exact tokens, one per line, each with its reason.
+# Added by WIRE HT-293 (paste 293), Monday 2026-09-28: a BEV party note of type PERSON whose title ends in the word
+# "Profile" made the scanner read that WORD as a surname, so every `profile_private` (a table in schema public, named
+# since HT-29) and every "profile" in the SQL counted as a person's name - 119 hits already on main. The word is a
+# schema name, not an identifier. The note is the BEV lane's to retype (FOR SPEC, receipt 293); remove these two lines then.
+profile
+Profile
