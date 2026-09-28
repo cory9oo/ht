@@ -79,6 +79,24 @@
   --row-h-desk:26.5px;     /* >= 1024px */
   --row-pad:0 2px;
   --gut:18px;
+
+  /* ========== PASTE 300 · SUPER HD — the shared metric scale (one address) ==========
+     Cory 2026-09-28: "super HD, clean and sleek, super modern ... real depth". These are the
+     structural tokens the HD block in app.css reads; they are shared (not per-theme) because a
+     hairline, a radius and an easing are the same in every theme — only colour changes per skin.
+
+     RADIUS: a 4-step scale. The pill (--r4) is a full-round control (44px tall / 22px radius),
+     kept as its own step so a pill never squares off; cards/panels use --r1..--r3. Circles stay 50%.
+     DEPTH WITHOUT GLASS: three soft, real shadows (no blur filter on anything, no backdrop glass) —
+     black alpha reads correctly on every dark ground. HAIRLINE: one device pixel. MOTION: one easing,
+     one duration ≤ 200ms, on the things that already animate. */
+  --r1:2px; --r2:4px; --r3:10px; --r4:22px;      /* radius scale: card-sm · card · panel · pill */
+  --hair:1px;                                     /* a hairline is exactly one device pixel */
+  --elev-1:0 1px 2px rgba(0,0,0,.30);             /* rest / cards */
+  --elev-2:0 6px 18px rgba(0,0,0,.36);            /* raised card */
+  --elev-3:0 18px 48px rgba(0,0,0,.46);           /* sheet / overlay */
+  --ease:cubic-bezier(.2,0,0,1);                  /* the one easing */
+  --dur:180ms;                                    /* the one duration, ≤ 200ms */
 }
 
 /* ---------------------------------------------------------------------------

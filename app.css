@@ -129,7 +129,7 @@ svg{display:block}
   border-left:1.5px solid var(--accent-ink);border-bottom:1.5px solid var(--accent-ink);
   width:7px;height:4px;left:2px;top:3px;transform:rotate(-45deg)
 }
-.li .nm{flex:1;min-width:0;font-size:12.5px;line-height:1.25;color:var(--ink);
+.li .nm{flex:1;min-width:0;font-size:12px;line-height:1.25;color:var(--ink);
   overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .li.on .nm{color:var(--ink3)}
 .li .gp{font:500 8.5px/1 var(--mono);letter-spacing:.09em;text-transform:uppercase;color:var(--ink3);flex:0 0 auto}
@@ -183,7 +183,7 @@ svg{display:block}
 
 /* ---------------- key/value table ---------------- */
 .kv{width:100%;border-collapse:collapse;table-layout:fixed}
-.kv td{padding:5px 0;border-bottom:1px solid var(--rule);font-size:11.5px;vertical-align:middle}
+.kv td{padding:5px 0;border-bottom:1px solid var(--rule);font-size:11px;vertical-align:middle}
 .kv tr:last-child td{border-bottom:0}
 .kv td.k{color:var(--ink2)}
 .kv td.trunc{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -209,7 +209,7 @@ svg{display:block}
 .fld .lab{display:block;margin-bottom:4px}
 .fld input,.fld select,.fld textarea{
   width:100%;background:var(--sunk);border:1px solid var(--rule);padding:7px 8px;
-  font:400 12.5px/1.3 var(--sans);color:var(--ink)
+  font:400 12px/1.3 var(--sans);color:var(--ink)
 }
 .fld textarea{resize:vertical;min-height:60px}
 .btn{
@@ -225,7 +225,7 @@ svg{display:block}
 .ed{display:grid;grid-template-columns:16px 1fr 52px 84px 62px 24px;gap:6px;align-items:center;
   padding:5px 0;border-bottom:1px solid var(--rule)}
 .ed input,.ed select{background:var(--sunk);border:1px solid var(--rule);padding:5px 6px;
-  font:400 11.5px/1.2 var(--sans);color:var(--ink);width:100%;min-width:0}
+  font:400 11px/1.2 var(--sans);color:var(--ink);width:100%;min-width:0}
 .ed .hnd{font:400 9px/1 var(--mono);color:var(--ink3);cursor:grab}
 .ed .x{color:var(--ink3);font:400 14px/1 var(--mono);text-align:center}
 .ed .x:hover{color:var(--accent)}
@@ -239,7 +239,7 @@ svg{display:block}
 
 /* ---------------- overlay ---------------- */
 .ov{position:fixed;inset:0;width:100%;z-index:80;background:var(--ground);overflow-y:auto;
-  transform:translateY(100%);transition:transform .22s cubic-bezier(.2,0,0,1);
+  transform:translateY(100%);transition:transform var(--dur) var(--ease);
   -webkit-overflow-scrolling:touch}
 .ov.on{transform:none}
 .ov .inner{max-width:900px;margin:0 auto;padding:0 var(--gut) 70px}
@@ -255,7 +255,7 @@ svg{display:block}
 .toast.on{opacity:1;transform:translate(-50%,0)}
 
 /* ---------------- notes ---------------- */
-.note{font-size:11.5px;line-height:1.5;color:var(--ink2)}
+.note{font-size:11px;line-height:1.5;color:var(--ink2)}
 .note b{color:var(--ink);font-weight:600}
 .empty{padding:16px 0;font:400 11px/1.5 var(--mono);color:var(--ink3)}
 
@@ -363,10 +363,10 @@ section{scroll-margin-top:56px}
 .bud .t i{position:absolute;inset:0 auto 0 0;display:block}
 .bud .t u{position:absolute;top:-3px;bottom:-3px;width:1px;background:var(--ink3);text-decoration:none}
 .bud .v{font:500 14px/1 var(--mono)}
-.bud .k{font:400 11.5px/1.45 var(--sans);color:var(--ink2)}
+.bud .k{font:400 11px/1.45 var(--sans);color:var(--ink2)}
 
 /* next move */
-.nm{font-size:12.5px;line-height:1.5}
+.nm{font-size:12px;line-height:1.5}
 .nm b{color:var(--accent)}
 .nm .big{font:600 18px/1.1 var(--mono);display:block;padding:2px 0 6px}
 
@@ -389,7 +389,7 @@ section{scroll-margin-top:56px}
 .kpim .s{font-size:11px;color:var(--ink3)}
 /* .ed is a GRID with named areas (not flex) — the cue is an extra child with no area, so it
    must be told to span the whole row or auto-placement squeezes it into a 14px sliver. */
-.ed .eq{grid-column:1/-1;order:9;font-size:11.5px;color:var(--ink2)}
+.ed .eq{grid-column:1/-1;order:9;font-size:11px;color:var(--ink2)}
 .ed .eq::placeholder{color:var(--ink3)}
 /* SMALL VIEW — the instrument wall is one tap away, never gone */
 body.small .colR{display:none}
@@ -620,7 +620,7 @@ html[data-simple][data-vtab="views"] .vViews{ display:block }
 
 .vViews section{ min-width:0 }
 .vViews .vnav{ font:400 10px/1 var(--mono); color:var(--ink3); padding:2px 0 0 }
-.vViews .vempty{ font-size:11.5px; color:var(--ink3); padding:10px 2px }
+.vViews .vempty{ font-size:11px; color:var(--ink3); padding:10px 2px }
 .vViews .vabout{ padding:7px 0 0 }
 .vViews .vabout a, .vViews a{ color:var(--ink2); text-decoration:underline;
   text-decoration-color:var(--rule2); text-underline-offset:2px }
@@ -862,7 +862,7 @@ html[data-simple] .wkscroll.natural > svg.wkg{ width:auto; height:auto; margin:0
 html[data-simple] .wkg .wl{ font:400 8.5px/1 var(--mono); fill:var(--muted); shape-rendering:auto }
 html[data-simple] .wkg .cw{ shape-rendering:geometricPrecision }
 /* the insight strip: tokens only, no caption, no sentence explaining it (R-NOFLUFF) */
-.h16ins{ font:400 11.5px/1.6 var(--mono); color:var(--text); padding:4px 0 }
+.h16ins{ font:400 11px/1.6 var(--mono); color:var(--text); padding:4px 0 }
 .h16ins2{ color:var(--muted); border-top:1px solid var(--border); padding-top:8px; margin-top:4px }
 #h16InsC .h16leg{ margin-left:0 }
 
@@ -1089,7 +1089,7 @@ html[data-simple] .li .bx, html[data-simple] .li .edp{ align-self:center }
   border-bottom:1px solid var(--border); font:400 11px/1.5 var(--sans); color:var(--muted) }
 .h17dr .h17dg b{ color:var(--ink); font-weight:500 }
 .h17dr .h17dt{ flex:1 1 auto; min-height:0; overflow-y:auto; display:block;
-  width:100%; border-collapse:collapse; font-size:11.5px }
+  width:100%; border-collapse:collapse; font-size:11px }
 .h17dr .h17dt thead th{ position:sticky; top:0; background:var(--surface); text-align:left;
   font:500 9px/1 var(--mono); letter-spacing:.12em; text-transform:uppercase; color:var(--muted);
   padding:8px 6px 6px; border-bottom:1px solid var(--border) }
@@ -1321,7 +1321,7 @@ html[data-simple] .li .bx, html[data-simple] .li .edp{ align-self:center }
   html[data-simple] #h16Ins > #h18Draw > #h16Score{ display:flex; overflow:visible }
   html[data-simple] #h18Draw #h16Score .h16p, html[data-simple] #h18Draw > #h16Score{
     min-height:0; overflow:visible }
-  html[data-simple] #h18Draw .h18dt{ width:100%; border-collapse:collapse; font-size:11.5px;
+  html[data-simple] #h18Draw .h18dt{ width:100%; border-collapse:collapse; font-size:11px;
     margin-top:10px; display:table }
   html[data-simple] #h18Draw .h18dt thead th{ position:sticky; top:0; background:var(--surface);
     text-align:left; font:500 9px/1 var(--mono); letter-spacing:.12em; text-transform:uppercase;
@@ -1429,8 +1429,8 @@ html[data-simple] .li .bx, html[data-simple] .li .edp{ align-self:center }
   html[data-simple] #h18Comp #log > .eadd:last-child,
   html[data-simple] #h18Comp #log > [data-add]:last-child,
   html[data-simple] #h18Comp #log > .li:last-child{ padding-bottom:0; margin-bottom:0 }
-  html[data-simple] #h18Comp .li{ min-height:var(--h19row); padding:2px 6px; font-size:13.5px }
-  html[data-simple] #h18Comp .li .nm{ font-size:13.5px; line-height:1.22 }
+  html[data-simple] #h18Comp .li{ min-height:var(--h19row); padding:2px 6px; font-size:13px }
+  html[data-simple] #h18Comp .li .nm{ font-size:13px; line-height:1.22 }
   html[data-simple] #h18Comp .h16load{ padding:4px 0 4px }
   html[data-simple] #h18Comp > .blk > .sh{ padding-top:0; padding-bottom:0 }
   html[data-simple] #h18Comp > .blk > .sh h2{ padding-top:0 }
@@ -1634,7 +1634,7 @@ html[data-simple] .li .bx, html[data-simple] .li .edp{ align-self:center }
     cursor:pointer; text-transform:uppercase }
   html[data-simple] #h18Group .h18more:hover{ color:var(--text); border-color:var(--grey) }
   html[data-simple] #h18Group .h18gt{ width:100%; border-collapse:collapse;
-    font:400 11.5px/1 var(--sans) }
+    font:400 11px/1 var(--sans) }
   html[data-simple] #h18Group .h18gt th{ text-align:left; font:500 8.5px/1 var(--mono);
     letter-spacing:.12em; text-transform:uppercase; color:var(--muted); padding:0 0 5px }
   html[data-simple] #h18Group .h18gt th:not(:first-child),
@@ -1642,7 +1642,7 @@ html[data-simple] .li .bx, html[data-simple] .li .edp{ align-self:center }
   html[data-simple] #h18Group .h18gt td{ padding:4px 0; color:var(--ink2);
     border-top:1px solid var(--border) }
   html[data-simple] #h18Group .h18gt td.n{ color:var(--ink) }
-  html[data-simple] #h18Group .h18gt td.p{ font:400 11.5px/1 var(--mono) }
+  html[data-simple] #h18Group .h18gt td.p{ font:400 11px/1 var(--mono) }
   html[data-simple] #h18Group .h18gt td.p i{ display:inline-block; width:7px; height:7px;
     margin-right:6px; vertical-align:0 }
   html[data-simple] #h18Group .h18gt tr.h18me td{ color:var(--text) }
@@ -1785,7 +1785,7 @@ html[data-simple] .grid > #h16Ins{ padding-bottom:12px }
    P5 · THE RULES BREATHE AND THE ROWS STOP SHOUTING (R70.255 + R70.262)
    MEASURED BEFORE: a group rule was `padding:4px 0 0` — four pixels above the label and NOTHING
    below it, so the first standard of a group sat on the rule; the row text ran at line-height
-   1.18 (15.93px on 13.5px), which clips descenders on a name with a `g` or a `y`; the
+   1.18 (15.93px on 13px), which clips descenders on a name with a `g` or a `y`; the
    "+ ADD STANDARD TO x" control had zero top padding and hung off the row above it as a caption;
    and every row carried a 1px-bordered 44x44 box around its pencil, which is what made a list of
    plain sentences read as a grid of cells.
@@ -1843,7 +1843,7 @@ html[data-simple] .h20unk{ font:500 10px/1.35 var(--mono); letter-spacing:.1em; 
 html[data-simple] .h20sp svg{ display:block; width:100%; height:20px }
 html[data-simple] .h20list{ list-style:none; margin:0; padding:4px 0 0 }
 html[data-simple] .h20list li{ display:flex; gap:8px; align-items:baseline;
-  font-size:12.5px; line-height:1.35; padding:2px 0; border-bottom:1px solid var(--rule) }
+  font-size:12px; line-height:1.35; padding:2px 0; border-bottom:1px solid var(--rule) }
 html[data-simple] .h20list li:last-child{ border-bottom:0 }
 html[data-simple] .h20list li span{ flex:1 1 auto; min-width:0; overflow-wrap:anywhere }
 html[data-simple] .h20list li b{ flex:0 0 auto; font-weight:500; color:var(--muted) }
@@ -1891,7 +1891,7 @@ html[data-simple] .h20wkh .sp{ flex:1 1 auto }
 html[data-simple] .h20wkb{ display:flex; flex-direction:column }
 html[data-simple] .h20wkd{ display:flex; align-items:baseline; gap:8px; width:100%;
   text-align:left; background:none; border:0; border-bottom:1px solid var(--rule);
-  color:var(--ink); font-size:12.5px; line-height:1.35; padding:6px 2px; cursor:pointer }
+  color:var(--ink); font-size:12px; line-height:1.35; padding:6px 2px; cursor:pointer }
 html[data-simple] .h20wkd:last-child{ border-bottom:0 }
 html[data-simple] .h20wkd:hover{ background:var(--sel) }
 html[data-simple] .h20wkd.on{ box-shadow:inset 2px 0 0 var(--accent) }
@@ -2079,7 +2079,7 @@ html[data-simple] #iosHint{ position:relative; z-index:40 }
 html[data-simple] .iosh{ display:flex; align-items:flex-start; gap:10px;
   padding:10px 12px; background:var(--surface-2); border-bottom:1px solid var(--rule) }
 html[data-simple] .ioshb{ display:flex; flex-direction:column; gap:3px; min-width:0; flex:1 1 auto }
-html[data-simple] .ioshb b{ font-size:12.5px; color:var(--ink) }
+html[data-simple] .ioshb b{ font-size:12px; color:var(--ink) }
 html[data-simple] .ioshb span{ font-size:12px; line-height:1.45; color:var(--ink2) }
 html[data-simple] .iosx{ flex:0 0 32px; width:32px; height:32px; padding:0; cursor:pointer;
   font-size:16px; line-height:1; color:var(--ink3); background:none;
@@ -2207,7 +2207,7 @@ textarea{ -webkit-overflow-scrolling:touch }
 .vje .h{ display:flex; gap:10px; align-items:baseline; font-size:12px }
 .vje .h s{ text-decoration:none; font:500 11px/1 var(--mono); color:var(--ink3) }
 .vje .h span{ margin-left:auto; font:500 11px/1 var(--mono); color:var(--ink3) }
-.vje p{ margin:4px 0 0; font-size:12.5px; line-height:1.45; white-space:pre-wrap; overflow-wrap:anywhere }
+.vje p{ margin:4px 0 0; font-size:12px; line-height:1.45; white-space:pre-wrap; overflow-wrap:anywhere }
 .vje p .lab{ display:block; font:500 9px/1 var(--mono); letter-spacing:.12em; text-transform:uppercase;
   color:var(--ink3); margin-bottom:2px }
 /* HT-26 S2 panels: like #h16Ins - off the phone's Today tab (R70.17: no output above an input), on its
@@ -2282,7 +2282,7 @@ html[data-simple] #log .li.h28sab .nm{ flex:1 1 auto }
 .dowqb{ padding:5px 9px; border:1px solid var(--rule); color:var(--ink2); font:500 10px/1 var(--mono);
   letter-spacing:.1em; text-transform:uppercase; background:transparent }
 .dowqb:active{ border-color:var(--accent); color:var(--ink) }
-.h28rest .h28sw{ display:flex; align-items:center; gap:8px; font-size:12.5px; color:var(--ink2) }
+.h28rest .h28sw{ display:flex; align-items:center; gap:8px; font-size:12px; color:var(--ink2) }
 .h28rest .h28sw input{ width:auto; accent-color:var(--accent) }
 /* F18 · `.fld{display:block}` out-ranks the browser's [hidden], so the sheet's hidden fields (the rests switch
    on a weekly, the day picker on an every-day standard) still showed. One rule for the whole sheet. */
@@ -2304,7 +2304,7 @@ html[data-simple] #log .li.h28sab .nm{ flex:1 1 auto }
   align-items:baseline; padding:7px 0; border-bottom:1px solid var(--rule); font-size:14px; line-height:1.35 }
 .h28first .h28seed .fl i, #log .h28ex .fl i{ font:400 11px/1.3 var(--mono); color:var(--ink3); font-style:normal }
 .h28first .h28seed .fl b{ font-weight:500; color:var(--ink); letter-spacing:.04em }
-.h28first .h28seed .fl em{ display:block; font-style:normal; font-size:12.5px; color:var(--ink2); padding-top:2px }
+.h28first .h28seed .fl em{ display:block; font-style:normal; font-size:12px; color:var(--ink2); padding-top:2px }
 .h28first .h28seed .fl u, #log .h28ex .fl b{ text-decoration:none; font:500 9.5px/1.3 var(--mono);
   letter-spacing:.12em; text-transform:uppercase; color:var(--muted) }
 .h28first .h28seed .fl.on{ opacity:.55 }
@@ -2362,7 +2362,7 @@ html[data-simple] #log .li.h28sab .nm{ flex:1 1 auto }
     font:400 13px/1.35 var(--sans); color:var(--ink2) }
   html[data-simple] #h18Group .h18gt td.n{ color:var(--ink) }
   html[data-simple] #h18Group .h18gt th:not(:first-child), html[data-simple] #h18Group .h18gt td.p{ text-align:right }
-  html[data-simple] #h18Group .h18gt td.p{ font:400 12.5px/1.35 var(--mono); white-space:nowrap }
+  html[data-simple] #h18Group .h18gt td.p{ font:400 12px/1.35 var(--mono); white-space:nowrap }
   html[data-simple] #h18Group .h18gt td.p i{ display:inline-block; width:7px; height:7px; margin-right:6px }
   html[data-simple] #h18Group .h18gt tr.h18me td{ color:var(--text) }
   html[data-simple] #h18Group .h18gt tr.h18none td{ color:var(--muted); font-size:12px }
@@ -2401,7 +2401,7 @@ html[data-simple] #log .li.h28sab .nm{ flex:1 1 auto }
   .h17dr .h28gt th:first-child{ text-align:left }
   .h17dr .h28gt td{ padding:9px 0; border-bottom:1px solid var(--border); vertical-align:top;
     font:400 13px/1.35 var(--sans); color:var(--ink) }
-  .h17dr .h28gt td.v{ text-align:right; font:400 12.5px/1.35 var(--mono); color:var(--ink2); white-space:nowrap }
+  .h17dr .h28gt td.v{ text-align:right; font:400 12px/1.35 var(--mono); color:var(--ink2); white-space:nowrap }
   .h17dr .h28gt td.v i{ display:inline-block; width:7px; height:7px; margin-right:5px }
   .h17dr .h28gnote{ padding:10px 0 0; font:400 12px/1.45 var(--sans); color:var(--muted) }
 }
@@ -2417,7 +2417,7 @@ html[data-simple] #log .li.h28sab .nm{ flex:1 1 auto }
   html[data-simple] #h18Comp .h16load{ font-size:9.5px; padding-top:3px; padding-bottom:3px }
   html[data-simple] #h18Comp #log > .grp{ font-size:8.5px }
   html[data-simple] #h18Comp .li{ min-height:30px; padding:1px 5px; font-size:12px }
-  html[data-simple] #h18Comp .li .nm, html[data-simple] #h18Comp .li a.nm{ font-size:12.5px; line-height:17px }
+  html[data-simple] #h18Comp .li .nm, html[data-simple] #h18Comp .li a.nm{ font-size:12px; line-height:17px }
   html[data-simple] #h18Comp .li .nm .pat{ font-size:9.5px; min-width:34px; margin-right:7px }
   html[data-simple] #h18Comp .li .nm .dat{ font-size:9px }
   html[data-simple] #h18Comp .li .tpfx{ font-size:9px }
@@ -2447,7 +2447,7 @@ html[data-simple] #log > .eadd[data-sec]{ text-transform:none }
 .h29off{ display:none !important }                    /* A24 the GROUP card's DETAIL button - one door, not two */
 html[data-simple] #h18Group .h29gt, .h29ins .h29gt{ width:100%; border-collapse:collapse; table-layout:fixed }
 html[data-simple] .h29gt col.n{ width:34% }
-html[data-simple] .h29gt td.l{ text-align:right; font:400 11.5px/1 var(--mono); color:var(--ink2); white-space:nowrap }
+html[data-simple] .h29gt td.l{ text-align:right; font:400 11px/1 var(--mono); color:var(--ink2); white-space:nowrap }
 html[data-simple] .h29gt th:nth-child(5){ text-align:right }
 html[data-simple] .h29gt td.p{ white-space:nowrap }
 html[data-simple] .h29gt tr[data-h29m]{ cursor:pointer }
@@ -2548,7 +2548,7 @@ html[data-simple] #vYearNav .h16leg{ display:none !important }                /*
 .h29ins .h29gt th:first-child{ text-align:left }
 .h29ins .h29gt td{ padding:8px 0; border-bottom:1px solid var(--border); color:var(--ink2); vertical-align:middle }
 .h29ins .h29gt td.n{ color:var(--ink); font:400 14px/1.3 var(--sans); overflow:hidden; text-overflow:ellipsis; white-space:nowrap }
-.h29ins .h29gt td.p{ text-align:right; font:400 12.5px/1 var(--mono); white-space:nowrap }
+.h29ins .h29gt td.p{ text-align:right; font:400 12px/1 var(--mono); white-space:nowrap }
 .h29ins .h29gt td.p i{ display:inline-block; width:7px; height:7px; margin-right:5px; vertical-align:middle }
 .h29ins .h29gt td.l{ text-align:right; font:400 12px/1 var(--mono); color:var(--ink2) }
 .h29ins .h29gt tr.h18me td{ color:var(--text) }
@@ -2774,7 +2774,7 @@ html[data-simple] .li .drg{ flex:0 0 36px; width:36px; font-size:12px }
   html[data-simple] .li{ min-height:var(--row-h-desk); padding:var(--row-pad) }
   /* the desktop row's floor was never the token - it was the name's own 5px of vertical padding
      (measured: a 17px line box in a 27px element, so the row could not go below 29px whatever the
-     token said). The padding is what gives way; the 12.5px type does not move. */
+     token said). The padding is what gives way; the 12px type does not move. */
   html[data-simple] .li .nm{ padding:2px 0 }
   /* the `height:auto` is repeated INSIDE this query on purpose: HT-30's own desktop block sets
      `height:28px` here, and a rule that lives in a media query is the one a reader looks at when
@@ -2812,8 +2812,8 @@ html[data-simple] .li .ht31ghost:focus-visible, html[data-simple] .li .ht31ghost
    Ours, not the device's: `<input type="time">` follows the device locale and shows 24-hour on a
    24-hour phone whatever this app renders, which is the complaint. Everything here is >= 16px on a
    phone so iOS does not zoom the page on focus (128 A1). */
-.ht31pick{ z-index:60; background:var(--bg); border:1px solid var(--border); border-radius:6px;
-  box-shadow:0 8px 28px rgba(0,0,0,.28); padding:10px }
+.ht31pick{ z-index:60; background:var(--bg); border:1px solid var(--border); border-radius:var(--r2);
+  box-shadow:var(--elev-2); padding:10px }
 .ht31pr{ display:flex; align-items:center; gap:6px }
 .ht31pick select, .ht31pick input{ font:400 16px/1.2 var(--mono); padding:6px 4px; min-height:32px;
   background:var(--bg); color:var(--text); border:1px solid var(--border); border-radius:4px }
@@ -2980,7 +2980,7 @@ html[data-simple] .mast #tape .tp .v.h32out{     color:var(--st-outofreach) }
 }
 /* the accent pip: the one thing that tells Graphite from Midnight at swatch size */
 .tbtn.th .thsw i{position:absolute;right:2px;bottom:2px;width:7px;height:7px;display:block}
-.tbtn.th .thnm{font:500 12.5px/1.2 var(--sans);color:var(--ink);align-self:end}
+.tbtn.th .thnm{font:500 12px/1.2 var(--sans);color:var(--ink);align-self:end}
 .tbtn.th .thno{font:400 10.5px/1.2 var(--sans);color:var(--ink3);align-self:start}
 
 
@@ -3167,7 +3167,7 @@ html[data-simple] #h18Group .h185gt td.n, .h29ins .h185gt td.n, html[data-simple
 .h185gt .h185nm{ display:inline-block; max-width:100%; overflow:hidden; text-overflow:ellipsis;
   white-space:nowrap; vertical-align:bottom }
 /* the NEED value is the longest word in the row ("best 61%"): it may break onto two lines, never spill */
-.h185gt td.h32ndc{ white-space:normal !important; line-height:1.15; font-size:11.5px }
+.h185gt td.h32ndc{ white-space:normal !important; line-height:1.15; font-size:11px }
 /* `stakes` is a chip of its own: bordered, spaced, and on its own line when the name needs the room */
 .h185gt .h32stk{ display:inline-block; margin:3px 0 0 0; padding:3px 7px; border:1px solid var(--border);
   border-radius:10px; line-height:1; white-space:nowrap; max-width:100%; overflow:hidden; text-overflow:ellipsis }
@@ -3183,7 +3183,7 @@ html[data-simple] #log > [data-sec="night"]    { --sec:var(--sec-night,     var(
 html[data-simple] #log > [data-sec="weekly"]   { --sec:var(--sec-weekly,    var(--accent)) }
 html[data-simple] #log > [data-sec="standards"]{ --sec:var(--sec-standards, var(--accent)) }
 html[data-simple] #h18Comp #log > .grp[data-sec], html[data-simple] #log > .grp[data-sec]{
-  color:var(--sec); font:700 11.5px/1.2 var(--sans); letter-spacing:.16em; text-transform:uppercase;
+  color:var(--sec); font:700 11px/1.2 var(--sans); letter-spacing:.16em; text-transform:uppercase;
   margin-top:12px; padding:6px 0 6px 9px; border-left:3px solid var(--sec); border-bottom:1px solid var(--rule) }
 /* 186: the ROW rail is an inset shadow, not a border. A border plus padding moved every row's contents 9px, which put
    the `+ time` chip under the middle of the row (a tap there opened the picker instead of checking the task), and HT-20's
@@ -3232,7 +3232,7 @@ svg.h185life text{ font:500 8.5px/1 var(--mono); fill:var(--ink3) }
    `+ Add to ...` line closing the section. The rows keep `data-sec` (HT185SEC) - it is what the drag reads. */
 html[data-simple] #log > [data-sec]{ --sec:var(--ink) }
 html[data-simple] #h18Comp #log > .grp[data-sec], html[data-simple] #log > .grp[data-sec]{
-  color:var(--ink); font:700 11.5px/1.2 var(--sans); letter-spacing:.16em; text-transform:uppercase;
+  color:var(--ink); font:700 11px/1.2 var(--sans); letter-spacing:.16em; text-transform:uppercase;
   margin-top:24px; padding:6px 0; border-left:0; border-top:1px solid var(--rule2);
   border-bottom:1px solid var(--rule) }            /* HT-20 P5 still holds: 6px each side, the rows' own separator under it */
 html[data-simple] #h18Comp #log > .grp[data-sec]:first-child, html[data-simple] #log > .grp[data-sec]:first-child{
@@ -3425,3 +3425,41 @@ html[data-h293sab="1"] #log .eadd{ display:none !important }
 .sh .h293lt{ padding:0 6px; height:14px; line-height:12px; margin:-4px 0 -4px 8px; align-self:center; flex:0 0 auto }
 /* PASTE 293 S1.1 · Scheduled wears the colour the Morning routine wore (--sec-morning, every theme carries it) */
 html[data-simple] #log > [data-sec="scheduled"]{ --sec:var(--sec-morning, var(--accent)) }
+
+/* ============================================================================================
+   PASTE 300 · SUPER HD — how the tracker is DRAWN (nothing that 293 laid out moves; only its look).
+   Cory 2026-09-28: "super HD, clean and sleek, super modern ... real depth ... it looks artificial".
+   Additive, last in the cascade, tokens only (no raw hex — lint_tokens). The metric scale lives in
+   tokens.css §metrics (--r1..--r4 · --elev-1..3 · --ease · --dur · --hair).
+   ============================================================================================ */
+
+/* 1 · ONE TEXTURE — a soft radial haze behind the hero, applied ONCE on the body's own background so
+   it sits BEHIND every element and never over body text. Fixed, so it reads as ambient light rather
+   than something that scrolls. --accent-wash is each theme's own near-ground tint, so the haze is
+   quiet in every skin and the measured contrast (contrast_ht32, tokens only) is untouched. */
+body{
+  background:
+    radial-gradient(150% 82% at 50% -14%, var(--accent-wash) 0%, transparent 54%) fixed,
+    var(--ground);
+}
+
+/* 2 · DEPTH WITHOUT GLASS — three real, soft shadows (no blur filter, no backdrop glass anywhere).
+   A floating masthead, lifted cards, and a sheet/overlay that reads as a layer above the page. */
+.mast{ box-shadow:var(--elev-1) }
+.h30c, .h30ins .h30c{ box-shadow:var(--elev-1) }
+.esheet .ebody{ box-shadow:var(--elev-3) }
+.ht31pick{ box-shadow:var(--elev-2) }
+
+/* 3 · TABULAR NUMERALS everywhere a number sits — the body sets it (app.css:6), but a `font:` SHORTHAND
+   resets font-variant-numeric to `normal`, and the hero number (`.hero-bar .hero-num`) carries one — so
+   its digits were proportional. Re-declared here at matching-or-higher specificity, LAST in the cascade,
+   for the three the brief names: the hero number, the bar, and the ledger. golden_ht41 T5 holds it. */
+.mast .hero-mast .hero-num, .hero-mast .hero-num, .hero-bar .hero-num,
+.stat-hero .sh-pct, .hero-bar, .hero-m, .hero-num,
+.h16sc, .h16sc td, .h16sc td.num, #log .li{
+  font-variant-numeric:tabular-nums;
+}
+
+/* 4 · MOTION — one easing, one duration ≤ 200ms, on the things that already animate (the sheet slide
+   uses var(--dur)/var(--ease) at its own rule; nothing new moves). */
+
