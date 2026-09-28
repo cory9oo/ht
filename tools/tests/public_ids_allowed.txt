@@ -5,3 +5,4 @@
 # schema name, not an identifier. The note is the BEV lane's to retype (FOR SPEC, receipt 293); remove these two lines then.
 profile
 Profile
+PROFILE
