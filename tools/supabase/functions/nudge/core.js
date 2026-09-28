@@ -57,7 +57,10 @@ export function parseCadence(c) {
 
 export function sectionOf(h) {
   const s = String(h.section || '').toLowerCase();
-  if (['morning', 'night', 'standards', 'weekly'].includes(s)) return s;
+  // PASTE 293: once 2026-09-28_ht293_sections.sql runs, morning and night are stored as `scheduled`; this sender's
+  // noon count still asks "morning", so a Scheduled row answers it until the message is re-worded.
+  const t = s === 'scheduled' ? 'morning' : s;
+  if (['morning', 'night', 'standards', 'weekly'].includes(t)) return t;
   if (/^\s*sabbath\b/i.test(String(h.name || '')) || /^sabbath$/i.test(String(h.group_name || ''))) return 'night';
   if (h.cadence === 'weekly') return 'weekly';
   // HT-31 S1.6 (Cory 9/21): a planned time never decides a section. The line that read

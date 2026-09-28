@@ -39,8 +39,10 @@ ESTATE = find_estate(REPO)
 def fixture_dir(estate):
     """The headless fixture. R70.345 (2026-09-10) moved it with the machinery to <BEV>/_machine/ht3;
     the old <BEV>/ht3 is the fallback, so this runs in either layout."""
-    for d in (os.path.join(estate, '_machine', 'ht3'), os.path.join(estate, 'ht3')):
-        if os.path.isdir(d):
+    # PASTE 293: a private fixture when asked (179's HT_FIXTURE_DIR, which ht33-36 already honour), so a wire can
+    # iterate while another run holds the shared ht3
+    for d in (os.environ.get('HT_FIXTURE_DIR'), os.path.join(estate, '_machine', 'ht3'), os.path.join(estate, 'ht3')):
+        if d and os.path.isdir(d):
             return d
     return os.path.join(estate, '_machine', 'ht3')
 
@@ -464,8 +466,11 @@ async def S2(pw):
         idx = after.index(dragged) if dragged in after else -1
         if idx <= 0 or sorted(after) != sorted(before):
             wrongway.append({'n': n, 'landed': idx, 'conserved': sorted(after) == sorted(before)})
-    chk("S2n " + u"·" + " on ragged four-line names a drag down always moves down, and the list is conserved",
-        len(set(ragged)) > 1 and not wrongway, {'heights': sorted(set(ragged))[:4], 'bad': wrongway[:2]})
+    # AMENDED BY PASTE 293 S2.3 (R67.2, Cory 2026-09-28: "I would rather the rows expand horizontally, more than
+    # vertically"): Cory's four-line names are ONE line now, with an ellipsis, so the list is no longer ragged on the
+    # phone - by his ask. What this line protects is unchanged: a drag down always moves down and the list is conserved.
+    chk("S2n " + u"·" + " on Cory's long names (one line each now) a drag down always moves down, and the list is conserved",
+        len(ragged) > 0 and not wrongway, {'heights': sorted(set(ragged))[:4], 'bad': wrongway[:2]})
     chk("S2o " + u"·" + " zero page errors on the ragged list too", not errs3, errs3[:3])
     await b.close()
 
@@ -585,8 +590,10 @@ async def C1(pw):
     # AMENDED BY NAME, HT-30 (paste 137 S1.4), 2026-09-20: Cory's review reorders the last two
     # and renames the fourth. What C1f asserts - the list is grouped into THESE sections and no
     # others - is unchanged.
-    SECS29 = ('Morning routine', 'Night routine', 'Weekly routine', 'Standards')
-    chk("C1f " + u"·" + " the list is grouped into the four sections and nothing else",
+    # AMENDED BY PASTE 293 (R67.2, Cory 2026-09-28 09:23: "one category to be called Scheduled and then another one to
+    # be weekly and then another one to be standards"): three sections, and still no others.
+    SECS29 = ('Scheduled', 'Weekly', 'Standards')
+    chk("C1f " + u"·" + " the list is grouped into the three sections and nothing else",
         heads and all(h in SECS29 for h in heads), heads)
     chk("C1g " + u"·" + " there is NO Sabbath section", not any('SABBATH' in h for h in (heads or [])),
         heads)

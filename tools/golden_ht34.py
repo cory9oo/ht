@@ -197,9 +197,10 @@ async def u2(pw):
     b, pg, errs = await open_page(pw, 1280, 900, flags={'__NO_CLOSED_AT': True, '__SECTION': True,
                                                         '__SECTIONS': {'h0': 'morning', 'h1': 'night', 'h2': 'weekly'}})
     order = await pg.evaluate("() => [...document.querySelectorAll('#log > .grp[data-sec]')].map(x => x.getAttribute('data-sec'))")
-    chk('U2a . Today renders Morning . Night . Standards . Weekly', order == ['morning', 'night', 'standards', 'weekly'], order)
+    # AMENDED BY PASTE 293 (R67.2, Cory 2026-09-28 09:23: "one category to be called Scheduled and then another one to be weekly and then another one to be standards"): three, in his new order.
+    chk('U2a . Today renders Scheduled . Weekly . Standards', order == ['scheduled', 'weekly', 'standards'], order)
     names = await pg.evaluate("() => [...document.querySelectorAll('#log > .grp[data-sec]')].map(x => x.textContent.trim())")
-    chk('U2b . the names are unchanged (never renamed)', names == ['Morning routine', 'Night routine', 'Standards', 'Weekly routine'], names)
+    chk('U2b . the names are exactly his', names == ['Scheduled', 'Weekly', 'Standards'], names)
     md = await pg.evaluate("() => (window.__HT29MD && window.__HT29MD.SECTIONS) ? window.__HT29MD.SECTIONS.map(s => s.key || s[0] || s) : null")
     chk('U2c . the markdown shape reads the same order', md is None or [str(x).lower() for x in md][:4] == ['morning', 'night', 'standards', 'weekly'], md)
     await b.close()
@@ -225,13 +226,15 @@ async def u2(pw):
 
 async def u3(pw):
     section('U3', 'drag a task into another section')
+    # AMENDED BY PASTE 293 (R67.2, Cory 2026-09-28 09:23: "one category to be called Scheduled and then another one to be weekly and then another one to be standards"): the weekly rows are placed in Standards,
+    # so Weekly is the EMPTY section above Standards - the same crossing the check always made, under the new names.
     b, pg, errs = await open_page(pw, 1280, 900, flags={'__NO_CLOSED_AT': True, '__SECTION': True,
-                                                        '__SECTIONS': {'h0': 'morning'}})
+                                                        '__SECTIONS': dict(('h%d' % i, 'standards') for i in range(10, 26))})
     w0 = len(await pg.evaluate(HABIT_WRITES))
     chk('U3a . loading the app wrote nothing to habits (186 N1)', w0 == 0, w0)
     empty = await pg.evaluate("""() => { const hs = [...document.querySelectorAll('#log > .grp[data-sec]')];
         return hs.filter(h => { const n = h.nextElementSibling; return n && n.classList.contains('eadd'); }).map(h => h.getAttribute('data-sec')); }""")
-    chk('U3b . an EMPTY section still renders its header and `+ Add` (stress 3): %s' % empty, 'night' in empty, empty)
+    chk('U3b . an EMPTY section still renders its header and `+ Add` (stress 3): %s' % empty, 'weekly' in empty, empty)
     first = await pg.evaluate("""() => { const hd = document.querySelector('#log > .grp[data-sec="standards"]'); let n = hd && hd.nextElementSibling;
         return n && n.classList.contains('li') ? n.getAttribute('data-h') : null; }""")
     ok = False
@@ -244,17 +247,18 @@ async def u3(pw):
         gw = [w for w in ws if isinstance(w[2], dict) and 'group_name' in w[2]]
         now = await pg.evaluate("""(id) => { const r = document.querySelector('#log .li[data-h="' + id + '"]'); let s = r && r.previousElementSibling;
             while (s && !s.classList.contains('grp')) s = s.previousElementSibling; return s ? s.getAttribute('data-sec') : null; }""", first)
-        chk('U3c . Up at the top of Standards crosses into Night (the empty section above) - keyboard parity', now == 'night', now)
-        chk('U3d . exactly ONE section write, on the moved row, section:"night"',
-            len(secw) == 1 and secw[0][2].get('section') == 'night', ws[:4])
+        chk('U3c . Up at the top of Standards crosses into Weekly (the empty section above) - keyboard parity', now == 'weekly', now)
+        chk('U3d . exactly ONE section write, on the moved row, section:"weekly"',
+            len(secw) == 1 and secw[0][2].get('section') == 'weekly', ws[:4])
         chk('U3e . and no group_name write anywhere', not gw, gw[:3])
         ok = True
     chk('U3f . the fixture has a Standards row to move', ok, first)
     await b.close()
     # the pointer: drop onto an empty section's header
-    b, pg, errs = await open_page(pw, 1280, 900, flags={'__NO_CLOSED_AT': True, '__SECTION': True, '__SECTIONS': {}})
+    b, pg, errs = await open_page(pw, 1280, 900, flags={'__NO_CLOSED_AT': True, '__SECTION': True,
+                                                        '__SECTIONS': dict(('h%d' % i, 'standards') for i in range(10, 26))})
     w0 = len(await pg.evaluate(HABIT_WRITES))
-    pos = await pg.evaluate("""() => { const hd = document.querySelector('#log > .grp[data-sec="morning"]');
+    pos = await pg.evaluate("""() => { const hd = document.querySelector('#log > .grp[data-sec="weekly"]');
         const r = [...document.querySelectorAll('#log .li')].find(x => { let s = x.previousElementSibling; while (s && !s.classList.contains('grp')) s = s.previousElementSibling; return s && s.getAttribute('data-sec') === 'standards'; });
         if (!hd || !r) return null; hd.scrollIntoView({block:'center'});
         const g = r.querySelector('.drg'), a = g.getBoundingClientRect(), h = hd.getBoundingClientRect();
@@ -268,10 +272,10 @@ async def u3(pw):
             while (s && !s.classList.contains('grp')) s = s.previousElementSibling; return s ? s.getAttribute('data-sec') : null; }""", pos['id'])
         ws = (await pg.evaluate(HABIT_WRITES))[w0:]
         secw = [w for w in ws if isinstance(w[2], dict) and 'section' in w[2]]
-        chk('U3g . a drag released on the empty Morning header lands as its only row, one section write (%s)' % sec,
-            sec == 'morning' and len(secw) == 1 and secw[0][2]['section'] == 'morning', (sec, ws[:4]))
+        chk('U3g . a drag released on the empty Weekly header lands as its only row, one section write (%s)' % sec,
+            sec == 'weekly' and len(secw) == 1 and secw[0][2]['section'] == 'weekly', (sec, ws[:4]))
     else:
-        chk('U3g . the fixture has an empty Morning header and a Standards row', False, pos)
+        chk('U3g . the fixture has an empty Weekly header and a Standards row', False, pos)
     chk('U3h . no page error', not errs, errs[:3])
     await b.close()
 
@@ -315,7 +319,9 @@ async def u5(pw):
     for w, h in ((1695, 900), (390, 844), (360, 780)):
         b, pg, errs = await open_page(pw, w, h)
         if w < 1024:
-            await insights(pg)
+            # AMENDED BY PASTE 293 S2.7 (R67.2, Cory 2026-09-28: "a group tab as a third tab"): reached by the Group tab.
+            await pg.evaluate("() => { const x = document.querySelector('#h29Bar [data-t293=group]'); if (x) x.click(); }")
+            await pg.wait_for_timeout(1200)
         g = await pg.evaluate("""() => { const t = [...document.querySelectorAll('.g194')].find(x => x.getBoundingClientRect().width > 0);
             if (!t) return null; const hd = t.querySelector('.g194h');
             const cols = getComputedStyle(t.querySelector('.g194r:not(.g194h)')).gridTemplateColumns.split(' ').length;
@@ -356,10 +362,16 @@ async def u6(pw):
             m.get('svg') and m['rows'] == 100 and m['cell'] >= 5, m)
         chk('U6b . at %d the y axis runs 0..90 by tens and `100` is VISIBLE at its foot' % w,
             m.get('svg') and m['ys'][:10] == [str(i) for i in range(0, 100, 10)] and m['foot'] and m['footVis'], m)
-        chk('U6c . at %d the x axis ticks every 13 weeks: 0 . 13 . 26 . 39 . 52' % w, m.get('svg') and m['xs'] == ['0', '13', '26', '39', '52'], m.get('xs'))
+        # AMENDED BY PASTE 293 S2.8 (R67.2, Cory 2026-09-28 09:31: "make sure X and Y on desktop and on phone app are
+        # identical"): the phone ticks the desktop's own weeks.
+        chk('U6c . at %d the x axis ticks the desktop\'s weeks: 0 . 10 . 20 . 30 . 40 . 52' % w, m.get('svg') and m['xs'] == ['0', '10', '20', '30', '40', '52'], m.get('xs'))
         chk('U6d . at %d no inner scroll, nothing cut, no sideways page (card %spx tall)' % (w, m.get('h')),
             m.get('svg') and not m['innerScroll'] and not m['cut'] and m['doc'] <= m['vw'] + 1, m)
-        chk('U6e . at %d the group card sits ABOVE the life grid' % w, m.get('groupAbove'), m.get('groupAbove'))
+        # AMENDED BY PASTE 293 S2.7: the group card is on its own tab now, so Insights ends on the life grid - nothing of
+        # the group is on this page (golden_ht38 S2 holds the tab).
+        onpage = await pg.evaluate("() => { const g = document.getElementById('h30Group'); return !!(g && g.offsetParent && g.closest('#h30Ins')); }")
+        chk('U6e . at %d the group card is not on Insights (it has its own tab) and the life grid is the last card' % w,
+            not onpage and m.get('svg'), onpage)
         await b.close()
     js = io.open(os.path.join(REPO, 'app.js'), encoding='utf-8').read()
     decl = re.findall(r'var\s+DEFAULT_TARGET\s*=\s*(\d+)', js)

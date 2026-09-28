@@ -11,7 +11,8 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 import schema_check as sc
 
-ORDER = ['2026-09-15_ht29.sql', '2026-09-20_ht30.sql', '2026-09-22_ht31.sql', '2026-09-23_ht32.sql']
+ORDER = ['2026-09-15_ht29.sql', '2026-09-20_ht30.sql', '2026-09-22_ht31.sql', '2026-09-23_ht32.sql',
+         '2026-09-28_ht293_sections.sql']   # PASTE 293: the builder's own list, so the copy it tests can build
 STACK = ''.join(io.open(os.path.join(HERE, n), encoding='utf-8').read() for n in ORDER)
 SNAP = sc.load_snapshot()
 n_pass = n_fail = 0

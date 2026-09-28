@@ -3330,3 +3330,98 @@ svg.h185life .h194foot, svg.wkg .h194foot{ fill:var(--ink2) }
   justify-content:center; border:1px solid; font:700 11px/1 var(--sans); font-style:normal }
 .tbtn.th .thmini .thmn{ flex:1 1 auto; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap }
 .tbtn.th .thmini .thma{ flex:0 0 auto; font:500 10px/1 var(--mono); border:1px solid; padding:3px 5px; white-space:nowrap }
+
+
+/* ======================= PASTE 293 · THE TRACKER READS CORY'S WAY (Monday 2026-09-28) ======================= */
+/* S1.1 · a time hidden on a Weekly or Standards row is hidden for real: several rules give the chip a display,
+   and an author display out-ranks the UA's [hidden] (the HT-19 lesson) */
+[data-h293t]{ display:none !important }
+
+/* S2.5 · TODAY'S TICK ON EVERY WIDTH. The desktop's own rule (the 1024px block above) carried the class; the phone
+   drew the class and styled nothing. Same class, same ink, now on the phone too. */
+html[data-simple] .chart text.xl-today tspan{ fill:var(--text); font-weight:600 }
+html[data-simple] .chart text.xl2-today{ fill:var(--text); font-weight:600 }
+
+/* S2.6 · SETTINGS DOES NOT SWAY. The overlay scrolled vertically and nothing stopped a child wider than the
+   screen from panning it sideways under a thumb - Cory's "shakes the screen to the left and right". */
+.ov{ overscroll-behavior-x:none; touch-action:pan-y pinch-zoom }
+/* measured: no child of the overlay is wider than the screen - the sway is iOS's elastic HORIZONTAL bounce on a
+   vertical scroller, which these two stop. Nothing is clipped: golden_ht20 P10a's rule (fit, never hide) holds. */
+
+@media (max-width:1023px){
+  /* S2.1 · the bar opens Today, full width, and no longer says "Insights" */
+  html[data-simple] .colL > #tStrip.hero-bar{ width:100%; margin:0 0 10px }
+  html[data-simple] #tStrip .go{ display:none }
+
+  /* S2.2 · EVERY ROW IS RED UNTIL IT IS DONE, THEN GREEN. The white rows were a linked name: `a.nm` took --ink at
+     (0,3,2) and out-ranked the done colour. One rule per state, above every earlier one. */
+  html[data-simple] #log .li .nm,
+  html[data-simple] #log .li a.nm,
+  html[data-simple] #log .li.h16-over .nm{ color:var(--bad) }
+  html[data-simple] #log .li.on .nm,
+  html[data-simple] #log .li.on a.nm{ color:var(--good) }
+
+  /* S2.3 · wider, not taller: one scale step down (14 -> 13, never below), one line, an ellipsis */
+  html[data-simple] #log .li .nm{ font-size:13px; line-height:1.36; flex:1 1 auto; min-width:0;
+    white-space:nowrap; overflow:hidden; text-overflow:ellipsis }
+  html[data-simple] #log .li .nm *{ white-space:nowrap }
+
+  /* S2.4 · DRAG · EDIT · TIME, ONE STRAIGHT COLUMN AT THE RIGHT EDGE. Flex order puts the three last, in that
+     order; the time slot is a fixed width on every row, and a row with no chip keeps an empty one (.t293e). */
+  html[data-simple] #log .li > .bxw{ order:0 }
+  html[data-simple] #log .li > .nm{ order:1 }
+  html[data-simple] #log .li > *{ order:2 }
+  html[data-simple] #log .li > .sp16{ order:3; flex:0 0 0; min-width:0 }
+  html[data-simple] #log .li > .drg{ order:20; flex:0 0 36px; width:36px }
+  html[data-simple] #log .li > .edp{ order:21; flex:0 0 36px; width:36px }
+  html[data-simple] #log .li > .pat30,
+  html[data-simple] #log .li > .t293e{ order:22; flex:0 0 52px; width:52px; min-width:52px; margin:0;
+    text-align:right; box-sizing:border-box; padding-right:4px }
+  html[data-simple] #log .li > .t293e{ display:block; align-self:stretch }
+
+  /* S2.7 · THE GROUP TAB: its page shows alone; Insights no longer carries the group; three tabs fit at 360 */
+  html[data-simple][data-vtab="views"][data-h293tab="group"] .grid > section#h293Grp.h30ins.h293grp{ display:block }
+  html[data-simple][data-vtab="views"][data-h293tab="group"] .grid > #h30Ins{ display:none }
+  html[data-simple]:not([data-h293tab="group"]) .grid > #h293Grp,
+  html[data-simple][data-vtab="today"] .grid > #h293Grp{ display:none }
+  html[data-simple] #h29Bar button[data-t293]{ flex:1 1 0 }
+  html[data-simple] #h293Grp{ padding-bottom:72px }
+}
+@media (max-width:374px){
+  html[data-simple] #h29Bar button{ font-size:11px; letter-spacing:.04em }
+}
+/* S2.7 · on the Group page the Insights button is not the current one, whichever layer re-marked it last */
+@media (max-width:1023px){
+  html[data-simple][data-h293tab="group"] .h29bar button[data-t29="insights"].on{ color:var(--muted); box-shadow:none }
+}
+
+/* S3.2 · THE LEDGER - its own screen, opened from the journal's title; a sticky month header, one row per day */
+.h293lt{ margin-left:8px; font:500 10px/1 var(--mono); letter-spacing:.1em; text-transform:uppercase;
+  color:var(--accent); background:none; border:1px solid var(--border); padding:4px 8px; cursor:pointer }
+.h293led{ position:fixed; inset:0; z-index:60; background:var(--bg); overflow-y:auto;
+  overscroll-behavior:contain; touch-action:pan-y pinch-zoom; padding:0 16px 96px }
+.h293led[hidden]{ display:none }
+html.h293ledon, html.h293ledon body{ overflow:hidden }
+.h293lh{ display:flex; align-items:center; gap:10px; padding:14px 0 10px; position:sticky; top:0; z-index:2;
+  background:var(--bg); border-bottom:1px solid var(--rule) }
+.h293lh h2{ margin:0; font:600 13px/1 var(--mono); letter-spacing:.12em; text-transform:uppercase; color:var(--text) }
+.h293lh .c{ flex:1 1 auto; font:400 11px/1 var(--mono); color:var(--muted) }
+.h293moh{ position:sticky; top:42px; z-index:1; background:var(--bg); padding:12px 0 6px;
+  font:600 11px/1 var(--mono); letter-spacing:.12em; text-transform:uppercase; color:var(--muted);
+  border-bottom:1px solid var(--rule) }
+.h293ld{ display:flex; align-items:center; gap:10px; width:100%; min-height:44px; padding:6px 0; background:none;
+  border:0; border-bottom:1px solid var(--rule); color:var(--text); text-align:left; cursor:pointer }
+.h293dt{ flex:0 0 52px; font:500 12px/1.2 var(--mono); color:var(--muted) }
+.h293fl{ flex:1 1 auto; min-width:0; font-size:13px; line-height:1.3; white-space:nowrap; overflow:hidden; text-overflow:ellipsis }
+.h293mk{ flex:0 0 auto; display:flex; gap:4px }
+.h293mk i{ width:7px; height:7px; border:1px solid var(--muted); border-radius:50% }
+.h293mk i.on{ background:var(--good); border-color:var(--good) }
+/* S1.2 · ON THE SABBATH: one row, one box - no section headers, no "+ Add" */
+html[data-h293sab="1"] #log > .grp,
+html[data-h293sab="1"] #log .eadd{ display:none !important }
+/* S1.2 · on the Sabbath the other rows are hidden at render, never removed (R70.138) */
+#log .li.h293sabhide{ display:none !important }
+/* S3.2 · the Ledger tap costs the journal's header no height (golden_ht28 A5: the journal keeps its size) */
+.sh .h293lt{ padding:0 6px; height:14px; line-height:12px; margin:-4px 0 -4px 8px; align-self:center; flex:0 0 auto }
+/* PASTE 293 S1.1 · Scheduled wears the colour the Morning routine wore (--sec-morning, every theme carries it) */
+html[data-simple] #log > [data-sec="scheduled"]{ --sec:var(--sec-morning, var(--accent)) }

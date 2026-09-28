@@ -39,8 +39,10 @@ def find_estate(start):
 def fixture_dir(estate):
     """The headless fixture. R70.345 (2026-09-10) moved it with the machinery to <BEV>/_machine/ht3;
     the old <BEV>/ht3 is the fallback, so this runs in either layout."""
-    for d in (os.path.join(estate, '_machine', 'ht3'), os.path.join(estate, 'ht3')):
-        if os.path.isdir(d):
+    # PASTE 293: a private fixture when asked (179's HT_FIXTURE_DIR, which ht33-36 already honour), so a wire can
+    # iterate while another run holds the shared ht3
+    for d in (os.environ.get('HT_FIXTURE_DIR'), os.path.join(estate, '_machine', 'ht3'), os.path.join(estate, 'ht3')):
+        if d and os.path.isdir(d):
             return d
     return os.path.join(estate, '_machine', 'ht3')
 
@@ -242,9 +244,12 @@ async def s2(pw):
         # foot of Today is now the day's-percent BAR; the three numbers moved UP into the hero (the Insights
         # card and the masthead). The strip still carries today's completion and still taps into Insights -
         # repointed to the new element, same intent, not loosened (the % must equal __HT26.strip().today).
-        chk('S2a · the foot of Today is the day-percent bar: today % and a tap into Insights (228)',
+        # AMENDED BY PASTE 293 S2.1 (R67.2, Cory 2026-09-28: "I want it to be at the top of the today tab" and "remove the
+        # insights ... verbiage"): the bar opens Today now and carries no words; its tap into Insights is the next check.
+        chk('S2a · the TOP of Today is the day-percent bar: today %, no words, and a tap into Insights (293)',
             strip and strip['vis'] and (str(strip['nums']['today']) + '%') in strip['text']
-            and 'INSIGHTS' in strip['text'].upper(), strip)
+            and 'INSIGHTS' not in strip['text'].upper()
+            and await pg.evaluate("() => document.querySelector('.colL').firstElementChild.id === 'tStrip'"), strip)
         await pg.click('#tStrip')
         await pg.wait_for_timeout(700)
         # HT-30 (paste 137 S6.14): HT-26's five and the journal ledger are ONE TAP DOWN now - Cory's

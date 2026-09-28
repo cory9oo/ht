@@ -437,6 +437,10 @@ function dueDay(h, k){ return isWeekly(h) || dueOn(h, k); }
    a `dow:` item is due only on its days; anything else is daily and always due. */
 function dueOn(h, k){
   if(!h) return false;
+  /* PASTE 293 S1.2: with a Sabbath day chosen, the Sabbath row is due on THAT day and no other - whatever its own
+     cadence says (the legacy daily Sabbath, a `dow:6` row after the day moved to Sunday) - so it is never a
+     duplicate and never a second checkbox */
+  if(ht293IsSabRow(h) && ht293SabDow() != null) return ht293IsSab(k || S.date);
   if(isWeekly(h)) return true;
   var d = dowOf(h);
   if(!d) return true;
@@ -607,6 +611,139 @@ function nowClock(){
 function pctOf(ck,ids){ if(!ids||!ids.length) return 0; var n=0;
   for(var i=0;i<ids.length;i++) if(ck[ids[i]]) n++;
   return Math.round(n/ids.length*100); }
+/* ---- PASTE 293 S1.4 · ONE PERCENT ENGINE (Cory 2026-09-28 09:23: "the percentages are an issue ... make sure
+   that the graphs, the life charts and the percentage calculations in the average 30 and seven day ... are not
+   bugged") ------------------------------------------------------------------------------------------------------
+   S0 counted SIX engines that each decided a day's percent on their own terms: the stored `pct`, written 450 ms
+   AFTER the repaint and never repainted after (his Sabbath: ticked, still 0%); `loggedOn`, which dropped today
+   until a sync pull; a Sabbath day graded against every standard while `sabbath_dow` was still loading; and
+   averages that divided a day with nothing due by seven as a zero. Now there is ONE:
+     ht293Due(k)  - the ids due on day k: category · Sabbath · per-task schedule · the "Show on Sabbath" flag.
+                    A past day keeps the set it was graded on (`active_set`, P4 - no past day is repriced) EXCEPT
+                    where that set was the bug: the Sabbath rule is re-applied to it.
+     ht293Pct(k)  - done / due, rounded; null when nothing is due (never a zero), in the future, or before the
+                    account's first day.
+     ht293Sync()  - writes that number onto every loaded day's `pct` before every repaint, so every chart, the
+                    life grid, the hero, the group row and the export read the SAME value - they were already
+                    readers of `pct`; they stop being engines (ADD-ON LAW: the old functions are thin wrappers).
+     ht293Avg(n)  - the 7- and 30-day figure: a day with nothing due is SKIPPED, an unopened day after the first
+                    is a zero (133 Ruling 1), days before the account existed do not exist.
+     ht293Streak  - consecutive days at or over a threshold; a nothing-due day neither breaks nor extends it. */
+function ht293SabDow(){
+  try{ if(typeof HT30SAB !== 'undefined' && HT30SAB && HT30SAB.known) return HT30SAB.known(); }catch(e){}
+  return null;
+}
+/* THE Sabbath row: the legacy HT-19 row or a one-day Sabbath standard - never a person's own daily "Sabbath walk"
+   that merely starts with the word (review of this diff: a name match picked the walk and rewrote its cadence) */
+function ht293SabStd(){ return (S.habits || []).filter(ht293IsSabRow)[0] || null; }
+/* THE SABBATH ROW ITSELF - the legacy HT-19 row, or a Sabbath standard kept on one day. A person's own DAILY
+   "Sabbath walk" is a standard that happens to share the word, and keeps its own days (golden_ht28 E13). */
+function ht293IsSabRow(h){
+  if(!isSabbathStd(h)) return false;
+  if(isLegacySabbath(h)) return true;
+  var d = parseCadence(h.cadence);
+  return d.kind === 'dow' && d.days.length === 1;
+}
+/* the Sabbath rule is live when the person keeps one AND has the Sabbath row to check */
+function ht293SabOn(){ return ht293SabDow() != null && !!ht293SabStd(); }
+function ht293IsSab(k){ var d = ht293SabDow(); return d != null && dnum(k || S.date).getDay() === +d; }
+function ht293ShowSab(h){
+  if(!h) return false;
+  if(h.show_on_sabbath === true) return true;
+  /* the device's "yes" survives the migration's default false (review of this diff) - a switch he turned on before
+     the column existed is not turned off by the column arriving */
+  try{ var m = JSON.parse(localStorage.getItem('ht293_sab_show') || '{}'); return !!m[h.id]; }catch(e){ return false; }
+}
+function ht293First(){
+  var f = null;
+  (S.days || []).forEach(function(r){ if(r && r.date && (f == null || r.date < f)) f = r.date; });
+  return f || today();
+}
+function ht293Due(k, fresh){
+  k = k || S.date;
+  var hs = S.habits || [], by = {}, r = S.byDate && S.byDate[k], cand;
+  hs.forEach(function(h){ by[String(h.id)] = h; });
+  /* `fresh`: the save of the day ON SCREEN re-derives its set, exactly as saveDay always has (logging back included) */
+  var snap = (!fresh && k < today() && r && r.active_set && r.active_set.length) ? r.active_set.map(String) : null;
+  if(snap){
+    cand = snap.map(function(id){ return by[id] || { id:id, _gone:true }; });
+  }else{
+    cand = hs.filter(function(h){ return !isWeekly(h) && dueOn(h, k); });
+  }
+  if(!ht293SabOn()) return cand.map(function(h){ return String(h.id); });
+  var std = ht293SabStd(), sid = String(std.id);
+  /* P4 STANDS FOR A PAST DAY: its snapshot is re-graded by the Sabbath rule ONLY where the snapshot itself carries
+     the Sabbath row on today's-rule Sabbath (the load race graded that day against everything). A snapshot without
+     the row is left exactly as graded - moving the Sabbath or adding the row never reprices history. */
+  if(snap && (snap.indexOf(sid) < 0 || !ht293IsSab(k))) return snap.slice();
+  if(ht293IsSab(k)){
+    var out = [sid];
+    cand.forEach(function(h){ if(h && !h._gone && String(h.id) !== sid && ht293ShowSab(h)) out.push(String(h.id)); });
+    return out;
+  }
+  return cand.filter(function(h){ return String(h.id) !== sid; }).map(function(h){ return String(h.id); });
+}
+/* THE LIST SAYS WHAT THE SCORE SAYS: on the Sabbath the rows are the Sabbath and the flagged standards - decided
+   where the rows are chosen (paintLog), so no later repaint can bring a hidden row back */
+function ht293Listed(h, k){
+  var ordinary = isWeekly(h) || dueOn(h, k);
+  if(!ht293SabOn() || !ht293IsSab(k) || (typeof h30Advanced === 'function' && h30Advanced())) return ordinary;
+  if(ht293IsSabRow(h)) return true;
+  return ordinary && ht293ShowSab(h);
+}
+function ht293Pct(k){
+  if(k > today() || k < ht293First()) return null;
+  var ids = ht293Due(k); if(!ids.length) return null;
+  var ck = ckOf(k), n = 0;
+  ids.forEach(function(i){ if(ck[i]) n++; });
+  return Math.round(n / ids.length * 100);
+}
+function ht293Sync(){
+  if(!S || !S.byDate) return;
+  Object.keys(S.byDate).forEach(function(k){ var r = S.byDate[k]; if(r) r.pct = ht293Pct(k); });
+}
+/* one averaging rule for a date -> pct map (this account's, or a member's rows from `days`) */
+function ht293AvgMap(map, n, upto){
+  var end = upto || today(), first = null, sum = 0, c = 0;
+  Object.keys(map || {}).forEach(function(k){ if(first == null || k < first) first = k; });
+  if(first == null) return null;
+  for(var i = 0; i < n; i++){
+    var k = shift(end, -i);
+    if(k < first || k > today()) continue;
+    if(!(k in map)){ c++; continue; }                          /* unopened after the first day: a zero */
+    if(map[k] == null) continue;                               /* nothing was due: skipped, never a zero */
+    sum += +map[k]; c++;
+  }
+  return c ? Math.round(sum / c) : null;
+}
+function ht293Map(){
+  var m = {};
+  Object.keys(S.byDate || {}).forEach(function(k){
+    var r = S.byDate[k]; if(!r) return;
+    if(S.days.indexOf(r) >= 0 || k === today()) m[k] = ht293Pct(k);
+  });
+  return m;
+}
+function ht293Avg(n, upto){ return ht293AvgMap(ht293Map(), n, upto); }
+function ht293Streak(th){
+  var k = today(), n = 0, first = ht293First(), guard = 0, p = ht293Pct(k);
+  if(p == null || p < th) k = shift(k, -1);                    /* today joins only once it is met */
+  while(k >= first && guard++ < 5000){
+    var r = S.byDate[k], v = r ? ht293Pct(k) : 0;              /* an unopened day is a zero and ends it */
+    if(v == null){ k = shift(k, -1); continue; }
+    if(v < th) break;
+    n++; k = shift(k, -1);
+  }
+  return n;
+}
+window.__HT293 = { due:ht293Due, pct:ht293Pct, sync:ht293Sync, avg:ht293Avg, avgMap:ht293AvgMap,
+                   streak:ht293Streak, first:ht293First, isSab:ht293IsSab, sabDow:ht293SabDow, showSab:ht293ShowSab };
+/* PASTE 293 S2.8 · THE LIFE CHART'S AXES, DECLARED ONCE for the desktop grid (paintLife18) and the phone's
+   (HT185LIFE): 100 rows, ages every ten with 100 at the foot, weeks 0 10 20 30 40 and 52 across the top */
+var HT293_LIFE_ROWS = 100, HT293_LIFE_WEEK_TICKS = [0, 10, 20, 30, 40];
+/* PASTE 293 S3.3: the tracker's Google sign-in id is PUBLIC by design (a browser client id, no secret). Empty until
+   BEV/HT_GOOGLE_CLIENT_ID exists; `app_config.google_client_id` still wins, so turning it on needs no deploy. */
+var HT293_GOOGLE_CLIENT_ID = '';
 /* HT-20 P2 (R70.263): ONE traversal of the period, and it returns WHICH DAY rather than a
    boolean, because unchecking a weekly has to reach the day the completion was actually logged
    on. The most recent one wins — a period holds at most one completion, and if an older build
@@ -622,6 +759,7 @@ function weekCheckDay(hid,k){
 function weekDone(hid,k){ return weekCheckDay(hid,k)!=null; }
 function doneOn(h,k){ return isWeekly(h) ? weekDone(h.id,k) : !!ckOf(k)[h.id]; }
 function rolling(n,upto){
+  return ht293Avg(n, upto);                     /* PASTE 293 S1.4: one averaging rule (below kept, unreached) */
   var end=upto||today(), a=[];
   for(var i=n-1;i>=0;i--){ var k=shift(end,-i), r=S.byDate[k];
     if(r&&r.pct!=null&&k<=today()) a.push(r.pct); }
@@ -634,6 +772,7 @@ function remaining(k){
   return daily().reduce(function(t,h){ return t+(ck[h.id]?0:(h.minutes||0)); },0);
 }
 function currentStreak(){
+  return ht293Streak(80);                       /* PASTE 293 S1.4: one engine; a nothing-due day neither breaks nor extends */
   var n=0,k=today();
   if(!S.byDate[k]||S.byDate[k].pct==null||S.byDate[k].pct<80) k=shift(k,-1);
   while(S.byDate[k]&&S.byDate[k].pct!=null&&S.byDate[k].pct>=80){ n++; k=shift(k,-1); }
@@ -996,8 +1135,11 @@ function rollRate(n,upto){
    `S.hasClosedAt` is probed in load(): a missing column would fail the whole upsert and silently
    stop the day from saving at all, which is a far worse bug than a missing timestamp. */
 async function saveDay(opts){
-  var r=S.byDate[S.date], ids=daily().map(function(h){return h.id;});
-  r.pct = pctOf(r.checked||{}, ids);
+  /* PASTE 293 S1.4: the due set and the grade come from the one engine - the Sabbath rule included, so a
+     Saturday saved before `sabbath_dow` loaded can no longer be graded against every standard */
+  var r=S.byDate[S.date], ids=ht293Due(S.date, true);
+  r.active_set = ids;                            /* the set it is graded on, now - and what ht293Pct reads back */
+  r.pct = ht293Pct(S.date);
   var row = { user_id:S.me.id, date:S.date, checked:r.checked||{}, active_set:ids, pct:r.pct };
   if(opts && opts.close && S.hasClosedAt){
     row.closed_at = new Date().toISOString();
@@ -1016,9 +1158,8 @@ async function saveDay(opts){
 async function saveDayFor(k){
   if(k===S.date) return saveDay();
   var r=S.byDate[k]; if(!r || !S.me) return null;
-  var ids=(r.active_set && r.active_set.length) ? r.active_set
-                                               : daily().map(function(h){return h.id;});
-  r.pct = pctOf(r.checked||{}, ids);
+  var ids=ht293Due(k);                          /* PASTE 293: active_set is read inside the engine (P4) */
+  r.pct = ht293Pct(k);
   var res = await sb.from('days').upsert(
     { user_id:S.me.id, date:k, checked:r.checked||{}, active_set:ids, pct:r.pct },
     { onConflict:'user_id,date' });
@@ -1030,8 +1171,8 @@ async function saveDayFor(k){
 function paintMast(){
   var d=dnum(S.date), t=(S.date===today());
   el('mDate').textContent = WD[d.getDay()]+' '+MO[d.getMonth()]+' '+d.getDate()+(t?'':' · logging back');
-  var r=S.byDate[S.date]||{}, ids=daily().map(function(h){return h.id;});
-  var pct=pctOf(r.checked||{},ids), g=grade(pct);
+  var r=S.byDate[S.date]||{}, ids=ht293Due(S.date);          /* PASTE 293 S1.4 */
+  var pct=ht293Pct(S.date); if(pct==null) pct=0; var g=grade(pct);
   var wk=weekly(), wkDone=wk.filter(function(h){return weekDone(h.id,S.date);}).length;
   var r7=rolling(7), r30=rolling(30), r90=rolling(90);
   var com=committed(), rem=remaining(S.date);
@@ -1192,7 +1333,9 @@ function paintLog(){
     var nm = h.link
       ? '<a class="nm lnk" href="'+esc(h.link)+'" target="_blank" rel="noopener">'+nmIn+'</a>'
       : '<span class="nm">'+nmIn+'</span>';
-    return '<div class="li'+(on?' on':'')+(h.id===nx?' nx':'')+'" data-h="'+h.id+'">'+
+    /* PASTE 293 S1.2: on the Sabbath a row that is not the Sabbath (or flagged) is HIDDEN at render - still in the DOM,
+       never removed (R70.138) - so no later repaint can bring it back */
+    return '<div class="li'+(on?' on':'')+(h.id===nx?' nx':'')+(ht293Listed(h,S.date)?'':' h293sabhide')+'" data-h="'+h.id+'">'+
       '<button class="bxw" type="button" data-tog="'+h.id+'" aria-pressed="'+(on?'true':'false')+
         '" title="'+esc(nameOf(h.name))+'"><span class="bx"></span></button>'+
       nm+
@@ -2091,10 +2234,9 @@ function openSettings(){
       '<input id="h32mw_rw" placeholder="the reward"></label>'+
     '<label class="fld"><span class="lab">If I do not</span>'+
       '<input id="h32mw_cs" placeholder="the consequence"></label>'+
-    '<label class="fld"><span class="lab">My day closes at</span>'+
-      '<select id="h32mw_hr">'+(function(){ var o=''; for(var h=0;h<24;h++){
-         var lab=(h%12||12)+':00 '+(h>=12?'PM':'AM');
-         o+='<option value="'+h+'">'+lab+'</option>'; } return o; })()+'</select></label>'+
+    /* PASTE 293 S1.3 (Cory 9/28): "take away my day closes at time feature - assume each day starts the next day
+       at 12 AM". The control is gone; `profiles.report_hour` stays stored and is no longer offered (DEC-037). The
+       day key was always the device's own calendar date - S0 measured that no check-off was ever bucketed by it. */
     '<div class="note" id="h32mw_tz" style="padding:2px 0 8px"></div>'+
 
     /* N4 - WHERE MY JOURNAL MIRRORS. The list is `shared/mirrors.js` and NOTHING here names a
@@ -2729,7 +2871,9 @@ var HT_FORFEIT = { enabled:false, referee:null, stake:null,
    record-keeping, not the man. */
 var STREAK = { freezePer30:2, formedAt:66 };   /* 66 = the median automaticity figure */
 
-function loggedOn(k){ var r=S.byDate[k]; return !!(r && S.days.indexOf(r)>=0); }
+/* PASTE 293 S1.4: TODAY IS LOGGED THE MOMENT IT HAS A ROW. Gated on the sync pull, a morning's first ticks read
+   0% on the strip, the hero and the charts until the 30 s pull put today's row into S.days. */
+function loggedOn(k){ var r=S.byDate[k]; return !!(r && (S.days.indexOf(r)>=0 || (k===today() && r.pct!=null))); }
 function streakForgiving(){
   /* walks back from today; an unlogged or sub-80 day spends a freeze instead of
      ending the run, up to freezePer30 inside any trailing 30 days. */
@@ -3580,7 +3724,7 @@ var HT32_CARDFIT = true;
        STANDARDS and WEEKLY are also legacy group names, so the check is on the COMPUTED set,
        not on the string alone - and it runs first. */
     /* HT-29 S2: the four sections are computed headers too - a drag across one sets `section`, never a group */
-    if(['TIMED','ANYTIME','STANDARDS','WEEKLY','MORNING ROUTINE','NIGHT ROUTINE'].indexOf(t.toUpperCase()) >= 0
+    if(['TIMED','ANYTIME','STANDARDS','WEEKLY','MORNING ROUTINE','NIGHT ROUTINE','SCHEDULED'].indexOf(t.toUpperCase()) >= 0
        && document.documentElement.hasAttribute('data-ht9a')) return null;
     var hit=GROUPS.filter(function(g){ return g.toUpperCase()===t.toUpperCase(); })[0];
     if(hit) return hit;
@@ -3614,6 +3758,13 @@ var HT32_CARDFIT = true;
     S.hasSection = !sc.error;
     if(S.hasSection) (sc.data||[]).forEach(function(r){
       var h=hby(r.id); if(h){ h.section=r.section; } });
+    /* PASTE 293 S1.2: a fifth probe - `show_on_sabbath`, added by 2026-09-28_ht293_sections.sql. Absent -> the
+       switch lives on this device (localStorage ht293_sab_show) and nothing is sent to a column that is not there. */
+    var ss = await sb.from('habits').select('id,show_on_sabbath')
+              .eq('user_id',S.me.id).eq('active',true).order('sort_order');
+    S.hasShowSab = !ss.error;
+    if(S.hasShowSab) (ss.data||[]).forEach(function(r){
+      var h=hby(r.id); if(h && r.show_on_sabbath != null){ h.show_on_sabbath=!!r.show_on_sabbath; } });
     /* merge what exists onto the rows load() already has — HCOLS is fixed and golden-verified */
     if(S.hasWindow) (w.data||[]).forEach(function(r){
       var h=hby(r.id); if(h){ h.planned_start=r.planned_start; h.planned_end=r.planned_end; } });
@@ -3709,9 +3860,14 @@ var HT32_CARDFIT = true;
               return '<button type="button" class="dowb'+(on?' on':'')+'" data-d="'+i+'" '+
                      'aria-pressed="'+(on?'true':'false')+'">'+nm+'</button>';
             }).join('')+'</div></div>'+
-          (sab ? '' : '<label class="fld h28rest" id="eRestFld"'+(cad==='weekly'?' hidden':'')+'>'+
+          /* PASTE 293 S1.2: with a Sabbath day chosen, every standard rests on it by default, so "Rests on Sabbath"
+             is hidden (never removed) and its opposite is offered: Show on Sabbath, per task, default off. */
+          (sab ? '' : '<label class="fld h28rest" id="eRestFld"'+((cad==='weekly'||ht293SabDow()!=null)?' hidden':'')+'>'+
             '<span class="lab">Rests on Sabbath</span>'+
-            '<span class="h28sw"><input type="checkbox" id="eRest"'+(rests?' checked':'')+'> not due on Saturdays</span></label>'); }
+            '<span class="h28sw"><input type="checkbox" id="eRest"'+(rests?' checked':'')+'> not due on Saturdays</span></label>')+
+          (sab ? '' : '<label class="fld h28rest h293sab" id="eSabShowFld"'+((cad==='weekly'||ht293SabDow()==null)?' hidden':'')+'>'+
+            '<span class="lab">Show on Sabbath</span>'+
+            '<span class="h28sw"><input type="checkbox" id="eSabShow"'+(ht293ShowSab(h)?' checked':'')+'> due on your Sabbath too</span></label>'); }
       })()+
       /* PASTE 194 S4.2: Planned time left the sheet entirely - the chip on the row is its one address (S1). */
       (S.hasTime && !HT194_SHEET ? '<div class="fld" id="eTimeFld"><span class="lab">Planned time</span>'+
@@ -3891,6 +4047,16 @@ var HT32_CARDFIT = true;
         if(isNew) window.__HT31SEC.pendingNew(rec.name, secPick);
         else window.__HT31SEC.place(h.id, secPick);
       }
+    }
+    /* PASTE 293 S1.2: Show on Sabbath - to the column once tools/sql/2026-09-28_ht293_sections.sql has added it,
+       and to this device in every case, so the switch works before the migration and after it */
+    var sabShow = document.getElementById('eSabShow');
+    if(sabShow){
+      if(S.hasShowSab) rec.show_on_sabbath = !!sabShow.checked;
+      if(h && h.id){ try{ var sm = JSON.parse(localStorage.getItem('ht293_sab_show') || '{}');
+        if(sabShow.checked) sm[h.id] = 1; else delete sm[h.id];
+        localStorage.setItem('ht293_sab_show', JSON.stringify(sm)); }catch(e){} }
+      if(h && S.hasShowSab) h.show_on_sabbath = !!sabShow.checked;
     }
     /* S2: one minutes box now. It writes BOTH `minutes` (what committed()/remaining() read)
        and `minutes_planned` (what planOf() prefers), so the two can never drift apart — which is
@@ -5692,6 +5858,9 @@ var HT32_CARDFIT = true;
     var dowChars = stepPx >= 22 ? 3 : 1;
     var todayIx = -1;
     pts.forEach(function(p,i){ if(p.key===today()) todayIx=i; });
+    /* PASTE 293 S2.5: the YEAR chart marks this month too - its keys are "0".."11", so a date never matched */
+    if(todayIx < 0 && opts.attr === 'data-vgy' && String(S.vYear || '') === String(dnum(today()).getFullYear()))
+      pts.forEach(function(p,i){ if(p.key===String(dnum(today()).getMonth())) todayIx=i; });
     /* TODAY is always kept, and the strided label beside it gives way rather than colliding —
        measured as one overlapping pair on the MONTH axis before this. */
     var kept = {};
@@ -7489,7 +7658,10 @@ var HT32_CARDFIT = true;
      folds. Every candidate is printed as data-plan so the choice can be read rather than trusted. */
   /* TOP was 2px because nothing was drawn above the grid. HT-18c puts the WEEK axis
      there, so it needs a line's worth of headroom. */
-  var YEARS=100, WEEKS=52, GAP=1, MINCELL=3, LEFT=16, TOP=12, FOLDGAP=14;
+  /* PASTE 293 S2.8 (Cory 9/28: "show age 100 at the bottom of the Y axis ... it only shows up to 90"): the grid always
+     had 100 rows, but its `100` was a 6.5px label on the last row's edge, clipped 2px by the quadrant. The gutter
+     widens to 20 (the phone's), and `100` is drawn at the size of every other age on the grid's bottom edge (a reserved foot cost 0.1px of cell and broke ht18's floor - measured, so FOOT is 0). */
+  var YEARS=HT293_LIFE_ROWS, WEEKS=52, GAP=1, MINCELL=3, LEFT=20, TOP=12, FOLDGAP=14, FOOT=0;
 
   function foldPlan(availW, availH){
     var plans=[1,2,3].map(function(f){
@@ -7580,7 +7752,7 @@ var HT32_CARDFIT = true;
        Sub-pixel rects are exactly what SVG is for; the 1px gap between cells is still a whole
        pixel, so the grid reads as a grid and not as a blur. */
     var cellW=Math.max(0.5, (availW - LEFT - (WEEKS-1)*GAP) / WEEKS);
-    var cellH=Math.max(0.5, (availH - TOP  - (YEARS-1)*GAP) / YEARS);
+    var cellH=Math.max(0.5, (availH - TOP - FOOT - (YEARS-1)*GAP) / YEARS);   /* PASTE 293: FOOT holds the `100` */
     var PW=cellW+GAP, PH=cellH+GAP;
     var plan={ f:1, rows:YEARS, cols:WEEKS, cell:cellW, cellW:cellW, cellH:cellH,
                P:PW, fits:true, scale:1, eff:Math.min(cellW,cellH),
@@ -7630,7 +7802,7 @@ var HT32_CARDFIT = true;
     /* 194 S6.4: the age the grid runs to, at the FOOT of its axis - on the last row's bottom edge, inside the box the
        grid already fills, so the cells lose nothing */
     (function(){ var lf=Math.floor((YEARS-1)/rows), lr=(YEARS-1)%rows;
-      s+='<text class="wl h194foot h194f3" style="font-size:6.5px;letter-spacing:-.5px" x="'+(foldX(lf)+LEFT-4)+'" y="'+(TOP+(lr+1)*PH-GAP)+'" text-anchor="end">'+YEARS+'</text>'; })();   /* the same x as every age mark - golden_ht18 S6b; three digits a size smaller so they fit the 16px gutter (app.css) */
+      s+='<text class="wl h194foot h293foot" x="'+(foldX(lf)+LEFT-4)+'" y="'+(TOP+(lr+1)*PH-GAP+FOOT)+'" text-anchor="end">'+YEARS+'</text>'; })();   /* the same x as every age mark - golden_ht18 S6b; three digits a size smaller so they fit the 16px gutter (app.css) */
     /* HT-18c (his note 5): "Life graph is missing x and y values - add them." The AGE axis (y) was
        already down the left. The WEEK axis (x) had never been drawn at all, so the grid carried one
        axis and read as a texture. Every ten weeks across the top, and the last one is 52 rather
@@ -7672,7 +7844,7 @@ var HT32_CARDFIT = true;
            ' stroke-width="1.5"/>';
     }
 
-    var W=f*foldW+(f-1)*FOLDGAP, H=TOP+rows*PH-GAP;
+    var W=f*foldW+(f-1)*FOLDGAP, H=TOP+rows*PH-GAP+FOOT;          /* PASTE 293: the foot is drawn, not clipped */
     /* the drawn size IS the viewBox size, so preserveAspectRatio has nothing left to letterbox:
        one user unit is one CSS pixel and the grid ends where the box ends. */
     var dW=Math.round(W), dH=Math.round(H);
@@ -8273,6 +8445,7 @@ var HT32_CARDFIT = true;
     return n ? Math.round(on/n*100) : null;
   }
   function streak(){                           /* days in a row at 100%; today joins only once complete */
+    return ht293Streak(100);                   /* PASTE 293 S1.4: the one engine */
     var k=today(), n=0;
     if(pctOn(k)!==100) k=shift(k,-1);
     for(var i=0;i<1000 && pctOn(k)===100;i++){ n++; k=shift(k,-1); }
@@ -8281,9 +8454,10 @@ var HT32_CARDFIT = true;
   function stripNums(){
     /* HT-29 (PASTE 133 Ruling 1): a day with nothing checked is 0%, and an average never skips an unlogged day -
        the strip's 7 days divides by seven, the same arithmetic as the group's lines */
-    var t=pctOn(today());
-    var w=lastDays(7).map(function(k){ var v=pctOn(k); return v==null ? 0 : v; });
-    return { today:(t==null?0:t), week:Math.round(mean(w)), streak:streak() };
+    /* PASTE 293 S1.4: today, the week and the streak from the one engine - a day with nothing due is skipped by
+       the week (never a zero), an unopened day after the first is still a zero (Ruling 1 stands) */
+    var t=ht293Pct(today()), w=ht293Avg(7);
+    return { today:(t==null?0:t), week:(w==null?0:w), streak:streak() };
   }
   function perStandard(){
     var cur=lastDays(30), prev=lastDays(30, shift(today(),-30));
@@ -8336,8 +8510,10 @@ var HT32_CARDFIT = true;
       if(d.nextSibling!==b) d.parentNode.insertBefore(b, d.nextSibling);
       return true;
     }
+    /* PASTE 293 S2.1 (Cory 9/28): "I want it to be at the top of the Today tab" - the first thing in Today's
+       column, full width, above the journal and the first section; its tap into Insights is unchanged. */
     var col=document.querySelector('.colL'); if(!col) return false;
-    if(col.lastChild!==b) col.appendChild(b);
+    if(col.firstChild!==b) col.insertBefore(b, col.firstChild);
     return true;
   }
   /* HT-228 (PASTE 228, Cory 2026-09-24 23:27 "too hidden and doesn't trigger enough emotion"): the strip
@@ -8447,7 +8623,8 @@ var HT32_CARDFIT = true;
   }
 
   /* ---- C3a · THE JOURNAL ---------------------------------------------------------------------- */
-  var FIELDS=[['why','Why'],['tasks','Completed'],['brain_dump','Journal'],['prayer','Prayer']];   /* HT-30 S4.10 */
+  /* PASTE 293 S3.1 (Cory 9/28): "journal ... then completed ... and then prayer" - the trifecta order, everywhere */
+  var FIELDS=[['brain_dump','Journal'],['tasks','Completed'],['prayer','Prayer'],['why','Why']];
   function entries(q){
     q=(q||'').trim().toLowerCase();
     return Object.keys(S.privAll).filter(function(k){
@@ -8770,8 +8947,9 @@ var HT32_CARDFIT = true;
        first time. Before this the headers were the only explanation of themselves, and a new account
        met four of them with nothing said - which is the moment someone decides an app is fussy. It
        also says the thing Cory's 9/15 ruling turns on: HE places them, and nothing else does. */
-    'Your day has four parts \u2014 Morning routine, Night routine, Weekly routine and Standards \u2014 ' +
-      'and you put each standard where you want it; nothing moves it on its own.',
+    /* PASTE 293 (Cory 9/28): three parts, and only Scheduled carries a time */
+    'Your day has three parts \u2014 Scheduled, Weekly and Standards \u2014 ' +
+      'and you put each standard where you want it; only Scheduled ones carry a time, and nothing moves on its own.',
     'Your journal is yours. The app never shows it to anyone else \u2014 including Cory.'
   ];
 
@@ -8832,6 +9010,8 @@ var HT32_CARDFIT = true;
         if(d!==null && d.length>300) return [];
         /* HT-29 S2.10: `s` names a section; anything else is refused whole, like a bad time */
         var sec=(x.s==null||x.s==='')?null:String(x.s);
+        /* PASTE 293: a link written before Scheduled existed still says morning / night - it reads as Scheduled */
+        if(sec!==null && HT29SEC.LEGACY[sec]) sec=HT29SEC.LEGACY[sec];
         if(sec!==null && HT29SEC.ORDER.indexOf(sec)<0) return [];
         out.push({ name:n, time:tm, notes:d, cadence:(x.c==='weekly'?'weekly':'daily'), section:sec });
       }
@@ -9818,12 +9998,17 @@ var HT29SEC = (function(){
      both. THE ORDER IS DECLARED ONCE HERE and read by every renderer, by the markdown shape (HT29MD's
      SECTIONS) and by the nudge sender - `golden_ht30` S1 reads all three and fails the moment they drift. */
   /* PASTE 194 S2 (Cory 2026-09-24): Morning routine . Night routine . Standards . Weekly routine. Names unchanged. */
-  var ORDER = ['morning','night','standards','weekly'];
-  var NAMES = { morning:'Morning routine', night:'Night routine', weekly:'Weekly routine', standards:'Standards' };
+  /* PASTE 293 S1.1 (Cory 2026-09-28 09:23, names confirmed 09:31): "one category to be called Scheduled and then
+     another one to be weekly and then another one to be standards". THREE, in that order. Read-side mapping:
+     morning · night · anytime · timed · null -> scheduled; the stored value is never rewritten by a read. */
+  var ORDER = ['scheduled','weekly','standards'];
+  var NAMES = { scheduled:'Scheduled', weekly:'Weekly', standards:'Standards' };
+  var LEGACY = { morning:'scheduled', night:'scheduled', anytime:'scheduled', timed:'scheduled' };
   function sectionOf(h){
     var s = String((h && h.section) || '').toLowerCase();
     if(NAMES[s]) return s;
-    if(!h) return 'standards';
+    if(LEGACY[s]) return LEGACY[s];
+    if(!h) return 'scheduled';
     /* HT-31 S1.6 · THE LAW: nothing but the section field decides the section.
        The line that used to sit at the foot of this function - `if(winStartMin(h) != null) return
        'morning';` - is the defect Cory reported on 9/21: with `habits.section` absent (the HT-29 SQL
@@ -9831,14 +10016,27 @@ var HT29SEC = (function(){
        clock, which his 9/15 ruling forbids outright. A placement the PERSON made is kept on the
        device until the column exists to hold it, and it is read here first. Cadence and the Sabbath
        stay: they are fields, not clocks. Everything else is Standards, where he can move it. */
-    var own = (window.__HT31SEC && window.__HT31SEC.local(h.id)) || '';
+    var own = String((window.__HT31SEC && window.__HT31SEC.local(h.id)) || '').toLowerCase();
     if(NAMES[own]) return own;
-    if(isSabbathStd(h)) return 'night';
+    if(LEGACY[own]) return LEGACY[own];
+    /* PASTE 293 stress 1: an unknown or empty section is Scheduled without a time - never dropped. Cadence is a
+       field, not a clock, so a weekly still lands in Weekly. */
     if(isWeekly(h)) return 'weekly';
-    return 'standards';
+    return 'scheduled';
+  }
+  /* THE STORED VALUE (PASTE 293 S1.1). The live `habits_section_ht29` constraint admits morning · night ·
+     standards · weekly only until tools/sql/2026-09-28_ht293_sections.sql runs, and that needs a key this build
+     does not have. So Scheduled is WRITTEN as `morning` - legal before the migration and after it, read back as
+     Scheduled - until a row carrying `scheduled` proves the migration ran; from then on it is written as itself. */
+  function store(v){
+    var s = String(v || '').toLowerCase();
+    if(LEGACY[s]) s = LEGACY[s];
+    if(s !== 'scheduled') return s || null;
+    var migrated = (S.habits || []).some(function(h){ return String(h && h.section || '').toLowerCase() === 'scheduled'; });
+    return migrated ? 'scheduled' : 'morning';
   }
   function dotOf(m){ return m == null ? null : (m <= 15 ? 'ontime' : (m <= 60 ? 'late' : 'beyond')); }
-  return { ORDER:ORDER, NAMES:NAMES, sectionOf:sectionOf, dotOf:dotOf };
+  return { ORDER:ORDER, NAMES:NAMES, LEGACY:LEGACY, sectionOf:sectionOf, store:store, dotOf:dotOf };
 })();
 
 (function(){
@@ -9875,7 +10073,8 @@ var HT29SEC = (function(){
       return (x==null?1e9:x) - (y==null?1e9:y) || so(a) - so(b) || a.i - b.i;
     }
     function byOrder(a, b){ return so(a) - so(b) || a.i - b.i; }
-    B.morning.sort(byTime); B.night.sort(byTime); B.standards.sort(byOrder); B.weekly.sort(byOrder);
+    /* PASTE 293: inside Scheduled the planned time orders the rows (as Morning and Night did); elsewhere the drag */
+    B.scheduled.sort(byTime); B.standards.sort(byOrder); B.weekly.sort(byOrder);
     var frag = document.createDocumentFragment();
     HT29SEC.ORDER.forEach(function(s){
       /* 194 S3.1 / stress 3: an EMPTY section is still a section - header and `+ Add` - because a drop on its
@@ -10021,7 +10220,7 @@ var HT32SET = (function(){
 
   function paint(){
     var z = el('h32mw_tz');
-    if(z) z.textContent = tz() ? ('Times are in ' + tz() + ', detected from this device.')
+    if(z) z.textContent = tz() ? ('Days roll at midnight in ' + tz() + ', detected from this device.')
                                : 'Times are in this device\u2019s own zone.';
     var hr = el('h32mw_hr');
     if(hr) hr.value = String((S.me && S.me.report_hour != null) ? S.me.report_hour : HT32_REPORT_HOUR);
@@ -10441,8 +10640,8 @@ var HT29GRP = (function(){
   function setCircle(c){ circle = c; }
   function setState(s){ state = s; }
   function calMean(map, n){
-    var sum = 0; for(var i = 0; i < n; i++){ var v = map[shift(today(), -i)]; sum += (v == null ? 0 : +v); }
-    return Math.round(sum / n);
+    /* PASTE 293 S1.4: the one averaging rule (ht293AvgMap) - nothing due is skipped, unopened is a zero */
+    var v = ht293AvgMap(map, n); return v == null ? 0 : v;
   }
   /* LOGGED counts RATED days - that is what makes a skipped day visible (Ruling 1). Before the SQL runs there
      is no ratings function, and days-with-a-row is the honest stand-in. A FAILED ratings call is NOT that case:
@@ -10480,10 +10679,10 @@ var HT29GRP = (function(){
              ratedBy:!!ratingMap, days:dayMap, p:calMean(dayMap, 30) };
   }
   function you(){
-    var dm = {}, rm = {};
-    Object.keys(S.byDate || {}).forEach(function(k){ var r = S.byDate[k]; if(r && r.pct != null) dm[k] = r.pct; });
+    var dm = ht293Map(), rm = {};                 /* PASTE 293 S1.4: this account's days from the one engine */
     Object.keys(S.privAll || {}).forEach(function(k){ var p = S.privAll[k]; if(p && p.rating != null) rm[k] = p.rating; });
-    return { id:S.me && S.me.id, n:'You', t:(dm[today()] == null ? 0 : Math.round(+dm[today()])),
+    var t293 = ht293Pct(today());
+    return { id:S.me && S.me.id, n:'You', t:(t293 == null ? 0 : t293),
              w:calMean(dm, 7), m:calMean(dm, 30), logged:loggedN(rm, dm, 7), you:true, days:dm };
   }
   function pc(v){ return v + '%'; }
@@ -10662,7 +10861,7 @@ var HT29GRP = (function(){
       var list = due.filter(function(h){ return HT29SEC.sectionOf(h) === s; });
       if(!list.length) return;
       list.sort(function(a, b){
-        var x = (s === 'morning' || s === 'night') ? winStartMin(a) : null, y = (s === 'morning' || s === 'night') ? winStartMin(b) : null;
+        var x = (s === 'scheduled') ? winStartMin(a) : null, y = (s === 'scheduled') ? winStartMin(b) : null;   /* PASTE 293 */
         return (x == null ? 1e9 : x) - (y == null ? 1e9 : y) || (a.sort_order || 0) - (b.sort_order || 0);
       });
       out += '<div class="grp" data-sec="' + s + '">' + HT29SEC.NAMES[s] + '</div>';
@@ -11116,7 +11315,12 @@ var HT29MD = (function(){
   /* HT-30 S1.4: the SAME order HT29SEC declares. PASTE 194 S2: READ from it, never copied - it was a second literal,
      and "declared once" meant one array, every reader. The vault copier (tools/copiers/_ht.py) is the Python half and
      `golden_ht29` S6 compares the bytes. */
-  var SECTIONS = HT29SEC.ORDER.map(function(k){ return [k, HT29SEC.NAMES[k]]; });
+  /* PASTE 293 S1.1: THE VAULT'S SHAPE STAYS THE COPIER'S until the BEV lane moves tools/copiers/_ht.py to Scheduled ·
+     Weekly · Standards. This file is the JS half of one format and `golden_ht29` S6 compares the bytes; changing
+     only this half would write a vault note the copier cannot read back. So the markdown keeps the four headings
+     it shares with the copier (a `scheduled` row files under Morning routine), and one line moves it when the
+     copier moves: `var SECTIONS = HT29SEC.ORDER.map(...)`. */
+  var SECTIONS = [['morning','Morning routine'],['night','Night routine'],['standards','Standards'],['weekly','Weekly routine']];
   var DAYS = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
 
   function hhmm(v){
@@ -11132,6 +11336,7 @@ var HT29MD = (function(){
        of the three languages that must agree - HT29SEC.sectionOf, this, the copier's section_of and
        the sender's core.js - and all four moved in the same wire. */
     var s = String(h.section || '').toLowerCase();
+    if (s === 'scheduled') return 'morning';          /* PASTE 293: the copier's name for it, until it learns the new one */
     if (s === 'morning' || s === 'night' || s === 'standards' || s === 'weekly') return s;
     if (isSabbath(h)) return 'night';
     if (String(h.cadence || '') === 'weekly') return 'weekly';
@@ -11335,6 +11540,16 @@ var HT29DRIVE = (function(){
       });
     });
   }
+  /* PASTE 293 S3.3: the same request, answered as TEXT - a Doc exported as text/plain is not JSON */
+  function callText(method, url){
+    var opts = { method: method, headers: { Authorization: 'Bearer ' + token } };
+    try{ if (AbortSignal && AbortSignal.timeout) opts.signal = AbortSignal.timeout(30000); }catch(e){}
+    return fetch(url, opts).then(function(r){
+      if (r.status === 401){ token = null; throw new Error('Google sign-in expired'); }
+      if (!r.ok) throw new Error('Drive answered ' + r.status);
+      return r.text();
+    });
+  }
   function call(method, url, body, headers){
     /* A REQUEST THAT NEVER ANSWERS MUST STILL END. Without a deadline a hung Drive call leaves the promise
        pending for the life of the page: no toast, no error, and the button sitting there as if nothing were
@@ -11397,7 +11612,9 @@ var HT29DRIVE = (function(){
   }
   function setDoc(on){ var s = state(); s.doc = !!on; save(s); }
   return { available: available, setClientId: setClientId, signIn: signIn, hasToken: hasToken, write: write,
-           disconnect: disconnect, state: state, setDoc: setDoc, FOLDER: FOLDER };
+           disconnect: disconnect, state: state, setDoc: setDoc, FOLDER: FOLDER,
+           /* PASTE 293 S3.3: the Docs mirror rides this client - one token, one scope, one request path */
+           call: call, callText: callText, q: q, qesc: qesc, API: API, UP: UP, save: save };
 })();
 
 /* ---- HT-29 S6 · A JOURNAL GOES HOME ---------------------------------------------------------------------------
@@ -11456,6 +11673,7 @@ var HT29DRIVE = (function(){
         var r = await sb.from('app_config').select('key,value');
         if(r.error){ warn29('app_config read failed', r.error); return cfg; }
         (r.data || []).forEach(function(x){ if(x.key === 'google_client_id') cfg.googleId = x.value || ''; if(x.key === 'vault_user') cfg.vaultUser = x.value || ''; });
+        if(!cfg.googleId && HT293_GOOGLE_CLIENT_ID) cfg.googleId = HT293_GOOGLE_CLIENT_ID;   /* PASTE 293 S3.3: a committed public id, once there is one */
         HT29DRIVE.setClientId(driveAllowed() ? cfg.googleId : '');
         cfg.loaded = true;
       }catch(e){ warn29('app_config read failed', e); }
@@ -11484,8 +11702,11 @@ var HT29DRIVE = (function(){
           ? '<div class="tools"><button class="btn pri" id="j29Write" type="button">Write to Drive</button>' +
               '<button class="btn" id="j29Disc" type="button">Disconnect</button></div>' +
             '<label class="fld h28rest"><span class="lab">Also as Google Doc</span><span class="h28sw"><input type="checkbox" id="j29Doc"' + (s.doc ? ' checked' : '') + '> one Doc a month</span></label>' +
+            /* PASTE 293 S3.3: one Doc per day, both ways - the entry is saved first, the Doc follows */
+            '<label class="fld h28rest"><span class="lab">Mirror to Google Docs</span><span class="h28sw"><input type="checkbox" id="h293Docs"' + (s.mirror ? ' checked' : '') + '> one Doc a day, edit it either place</span></label>' +
             (s.last ? '<div class="note">Last written ' + esc(String(s.last).slice(0, 16).replace('T', ' ')) + '</div>' : '')
           : '<div class="tools"><button class="btn pri" id="j29Conn" type="button">Connect Google Drive</button></div>' +
+            '<label class="fld h28rest"><span class="lab">Mirror to Google Docs</span><span class="h28sw"><input type="checkbox" id="h293Docs"' + (s.mirror ? ' checked' : '') + '> one Doc a day, edit it either place</span></label>' +
             '<div class="note">Your journal, into a folder in YOUR Drive. The app sees only the files it makes.</div>')
         : '');
     return '<div class="lab">Journal</div>' +
@@ -11508,6 +11729,15 @@ var HT29DRIVE = (function(){
     };
     var d = el('j29Disc'); if(d) d.onclick = function(){ HT29DRIVE.disconnect(); refresh(); };
     var doc = el('j29Doc'); if(doc) doc.onchange = function(){ HT29DRIVE.setDoc(doc.checked); };
+    var mir = el('h293Docs'); if(mir) mir.onchange = function(){
+      var st = HT29DRIVE.state(); st.mirror = !!mir.checked; HT29DRIVE.save(st);
+      if(!mir.checked || !window.__HT293DOCS) return;
+      /* inside the tap: Google may open its own window */
+      (HT29DRIVE.hasToken() ? Promise.resolve() : HT29DRIVE.signIn())
+        .then(function(){ return window.__HT293DOCS.push(S.date); })
+        .then(function(){ toast('journal mirrors to Google Docs'); refresh(); })
+        .catch(function(e){ toast('Docs: ' + String(e && e.message || e).slice(0, 60)); });
+    };
   }
   function refresh(){ var p = el('j29Set'); if(p){ p.innerHTML = panelHtml(); bindPanel(); } }
   var _os = openSettings;
@@ -12221,7 +12451,9 @@ var HT30_SHEET_MORE = false;           /* 194 S4.1: retired - the sheet is five 
 var HT30_SABBATH = true;
 var HT30SAB = (function(){
   var DOW = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-  var LINE = 'No other standards take place on your Sabbath — only the Sabbath check-off shows that day.';
+  /* PASTE 293 S1.2 (Cory 9/28): "only one task completion checkbox ... unless in the settings, we change it per
+     task to say yes, appear on the Sabbath" */
+  var LINE = 'On your Sabbath only the Sabbath check-off shows — and any standard whose own sheet says Show on Sabbath.';
   var dow = null, loaded = false, hasCol = false;
 
   function lkey(){ return 'ht30_sab_' + ((S.me && S.me.id) || 'anon'); }
@@ -12232,7 +12464,7 @@ var HT30SAB = (function(){
 
   /* the account's own answer when it has never been asked: the day its Sabbath standard is due */
   function inferred(){
-    var h = (S.habits || []).filter(isSabbathStd)[0];
+    var h = (S.habits || []).filter(ht293IsSabRow)[0];      /* PASTE 293: the Sabbath ROW, not a name match */
     if(!h) return null;
     var d = dowOf(h);
     if(d && d.length === 1) return d[0];
@@ -12271,21 +12503,67 @@ var HT30SAB = (function(){
   }
 
   function on(){ return HT30_SABBATH && dow != null; }
+  /* PASTE 293 S1.2 · THE DAY IS KNOWN BEFORE THE COLUMN ANSWERS. Until load() returns, `dow` was null and the
+     Sabbath read as an ordinary day - a Saturday saved in that window was graded against every standard. The
+     device copy (or the account's own Sabbath standard) answers synchronously; the column still wins on load. */
+  function known(){
+    if(!HT30_SABBATH) return null;
+    if(loaded) return dow;
+    var d = fromDevice(); if(d != null) return d;
+    return inferred();
+  }
   function isDay(k){
     if(!on()) return false;
     var d = dnum(k || S.date);
     return !!d && !isNaN(d) && d.getDay() === dow;
   }
-  function theStd(){ return (S.habits || []).filter(isSabbathStd)[0] || null; }
+  function theStd(){ return ht293SabStd(); }                 /* PASTE 293: one picker for the Sabbath row */
+  /* PASTE 293 S1.2: choosing a day gives the account its one Sabbath row if it has none - a person's own
+     choice, made in Settings, never an insert on load (HT-28 G21 stands) */
+  /* ONE AT A TIME (review of this diff): two quick changes of the day each saw "no row yet" and inserted one - the
+     HT-20 P1a five-row duplicate by another road */
+  var ensuring = null;
+  function ensureStd(d){
+    if(ensuring) return ensuring.then(function(){ return ensureStd1(d); });
+    ensuring = ensureStd1(d).then(function(x){ ensuring = null; return x; }, function(e){ ensuring = null; throw e; });
+    return ensuring;
+  }
+  async function ensureStd1(d){
+    var cur = theStd();
+    /* the row follows the day: a Sabbath moved to Sunday is due on Sunday, never still on a Saturday */
+    if(cur && S.me && serializeCadence({ kind:'dow', days:[+d] }) !== serializeCadence(parseCadence(cur.cadence))){
+      try{
+        var u = await sb.from('habits').update({ cadence:'dow:' + (+d) }).eq('id', cur.id).eq('user_id', S.me.id);
+        if(u && u.error) warn30('sabbath day not moved', u.error); else { cur.cadence = 'dow:' + (+d); try{ paintAll(); }catch(e){} }
+      }catch(e){ warn30('sabbath day move failed', e); }
+      return cur;
+    }
+    if(cur || !S.me || S.loadOk !== true) return cur;
+    var orders = (S.habits || []).map(function(x){ return x.sort_order || 0; });
+    var rec = { user_id:S.me.id, name:'Sabbath', group_name:'Standards', cadence:'dow:' + (+d),
+                minutes:0, active:true, sort_order:(orders.length ? Math.max.apply(null, orders) + 1 : 0) };
+    if(S.hasSection) rec.section = 'standards';
+    try{
+      var r = await sb.from('habits').insert(rec);
+      if(r && r.error){ warn30('sabbath row not created', r.error); return null; }
+      if(typeof reload === 'function') await reload();
+      try{ paintAll(); }catch(e){}
+    }catch(e){ warn30('sabbath row failed', e); }
+    return theStd();
+  }
 
   /* THE DUE SET, on that day, is the Sabbath standard alone - which is both what is drawn and what the
      denominator counts, so the day cannot read 0% for standards the person was told not to keep. */
   var _daily = daily;
   daily = function(){
     var all = _daily.apply(null, arguments);
-    if(h30Advanced() || !on() || !isDay(S.date)) return all;
-    var only = all.filter(isSabbathStd);
-    return only.length ? only : all;            /* no Sabbath standard yet: change nothing (HT-18e) */
+    if(h30Advanced() || known() == null || !window.__HT293 || !window.__HT293.isSab(S.date)) return all;
+    /* PASTE 293 S1.2: the Sabbath row, plus every standard whose own sheet says "Show on Sabbath" */
+    var std = theStd(); if(!std) return all;       /* no Sabbath standard yet: change nothing (HT-18e) */
+    var keep = {}; ht293Due(S.date).forEach(function(i){ keep[i] = 1; });
+    var out = all.filter(function(h){ return keep[String(h.id)]; });
+    if(!out.some(function(h){ return String(h.id) === String(std.id); })) out.unshift(std);
+    return out;
   };
 
   /* THE LIST SAYS THE SAME THING THE SCORE SAYS. `daily()` above is the denominator; `paintLog`
@@ -12296,11 +12574,12 @@ var HT30SAB = (function(){
      that one is global and Saturday-only, which is the thing this replaces. */
   function paint(){
     var log = h30El('log'); if(!log) return;
-    var narrow = on() && isDay(S.date) && !h30Advanced() && !!theStd();
-    var keep = narrow ? theStd().id : null;
+    var narrow = known() != null && ht293IsSab(S.date) && !h30Advanced() && !!theStd();
+    /* PASTE 293 S1.2: the Sabbath row and every flagged standard stay; the rest are hidden, never removed */
+    var by = {}; (S.habits || []).forEach(function(h){ by[String(h.id)] = h; });
     Array.prototype.slice.call(log.querySelectorAll('.li')).forEach(function(li){
       var b = li.querySelector('[data-tog]'), id = b ? b.getAttribute('data-tog') : null;
-      li.hidden = narrow ? (id !== keep) : false;
+      li.hidden = narrow ? !ht293Listed(by[String(id)], S.date) : false;
     });
     Array.prototype.slice.call(log.querySelectorAll('.grp, .eadd, [data-add]')).forEach(function(e){
       e.hidden = narrow; });
@@ -12311,25 +12590,25 @@ var HT30SAB = (function(){
     var ov = document.querySelector('.ov.on .inner'); if(!ov || h30El('h30Sab')) return;
     var n = document.createElement('div');
     n.id = 'h30Sab'; n.className = 'h16p h30p';
+    /* PASTE 293 S1.2: ONE control - `Sabbath day: none · Sunday … Saturday`. The switch HT-30 paired with it is
+       kept, hidden (R70.138), and follows the select. */
     n.innerHTML = '<div class="sh"><h2>Sabbath</h2><span class="ln"></span>' +
       '<span class="c">' + (on() ? DOW[dow] : 'off') + '</span></div>' +
-      '<label class="fld"><span class="lab">Keep a Sabbath</span>' +
-      '<span class="h28sw"><input type="checkbox" id="h30SabOn"' + (on() ? ' checked' : '') + '> ' +
-      'one day a week, set apart</span></label>' +
-      '<label class="fld" id="h30SabDayF"' + (on() ? '' : ' hidden') + '><span class="lab">Which day</span>' +
-      '<select id="h30SabDay">' + DOW.map(function(d, i){
-        return '<option value="' + i + '"' + (i === dow ? ' selected' : '') + '>' + d + '</option>'; }).join('') +
+      '<input type="checkbox" id="h30SabOn" hidden' + (on() ? ' checked' : '') + '>' +
+      '<label class="fld" id="h30SabDayF"><span class="lab">Sabbath day</span>' +
+      '<select id="h30SabDay"><option value=""' + (on() ? '' : ' selected') + '>None</option>' + DOW.map(function(d, i){
+        return '<option value="' + i + '"' + (on() && i === dow ? ' selected' : '') + '>' + d + '</option>'; }).join('') +
       '</select></label>' +
       '<div class="note" style="padding:6px 0 0">' + esc(LINE) + '</div>' +
       (hasCol ? '' : '<div class="note" style="padding:6px 0 0">Kept on this device until one migration lands; ' +
                      'everything else about the day already syncs.</div>');
     ov.appendChild(n);
-    var sw = h30El('h30SabOn'), sel = h30El('h30SabDay'), fld = h30El('h30SabDayF');
-    sw.onchange = function(){
-      if(sw.checked){ if(fld) fld.hidden = false; save(sel ? +sel.value : 6); }
-      else{ if(fld) fld.hidden = true; save(null); }
+    var sw = h30El('h30SabOn'), sel = h30El('h30SabDay');
+    if(sel) sel.onchange = function(){
+      var v = sel.value === '' ? null : +sel.value;
+      if(sw) sw.checked = v != null;
+      save(v).then(function(){ if(v != null) return ensureStd(v); });
     };
-    if(sel) sel.onchange = function(){ save(+sel.value); };
   }
   var _os = openSettings;
   openSettings = function(){ var out = _os.apply(null, arguments); setTimeout(settings, 95); return out; };
@@ -12349,7 +12628,8 @@ var HT30SAB = (function(){
   };
 
   return { DOW:DOW, LINE:LINE, load:load, save:save, on:on, isDay:isDay, theStd:theStd, paint:paint,
-           inferred:inferred, state:function(){ return { dow:dow, hasCol:hasCol, loaded:loaded }; } };
+           inferred:inferred, known:known, settings:settings,
+           state:function(){ return { dow:dow, hasCol:hasCol, loaded:loaded }; } };
 })();
 window.__HT30SAB = HT30SAB;
 
@@ -12465,7 +12745,11 @@ var HT30INS = (function(){
       if(t){ remember(t); var ct = card('h30Trend', 'Completion and rating over time', t); if(ct.parentNode !== body) body.appendChild(ct); }
       var vLife = h30El('vLife');
       if(vLife){ remember(vLife); var cl = card('h30Life', 'The life', vLife); if(cl.parentNode !== body) body.appendChild(cl); }
-      if(g){ remember(g); var cg = card('h30Group', 'The group, side by side', g); if(cg.parentNode !== body) body.appendChild(cg); }
+      /* PASTE 293 S2.7 (Cory 9/28): "a group tab as a third tab" - the group card is MOVED to the Group page, not
+         copied; Insights keeps the hero, the month, the year and the life. */
+      if(g){ remember(g); var cg = card('h30Group', 'The group, side by side', g);
+             var gh = (window.__HT293 && window.__HT293.groupHost) ? window.__HT293.groupHost() : null;
+             if(gh){ if(cg.parentNode !== gh) gh.appendChild(cg); } else if(cg.parentNode !== body) body.appendChild(cg); }
       if(r){ remember(r); var cq = card('h30Rate', 'What makes a good day', r); if(cq.parentNode !== body) body.appendChild(cq); }
     }else{
       var vLife2 = h30El('vLife');
@@ -12990,6 +13274,9 @@ var HT31_SECTIONS_LOCAL = true;
     return (+s.slice(0, 2)) * 60 + (+s.slice(3, 5));
   }
   function suspect(h){
+    /* PASTE 293 S1.1: morning and night are one Scheduled now, so no timed task can sit in the wrong one of
+       them - this review has nothing left to find. Kept whole behind the flag (R70.138). */
+    if(!HT293_OLD_SECTIONS) return false;
     if(!h || String(h.section || '').toLowerCase() !== 'morning') return false;
     var m = pm(h);
     if(m == null) return false;
@@ -13051,7 +13338,9 @@ var HT31_TIME_PICKER = true;
 /* HT-179 S1 (paste 179, Cory 2026-09-23 13:53 "we're still missing the time for the tasks"): the ghost
    `+ time` is on EVERY section now. Standards and Weekly had a chip only once a time existed, so a
    standard with no time offered no way to give it one from the row - which is what he was missing. */
-var HT31_GHOST_CHIP_SECTIONS = ['morning', 'night', 'standards', 'weekly'];
+/* PASTE 293 S1.1 (Cory 9/28): "any task that is pulled into weekly or standards doesn't have a time; any task that is
+   pulled into Scheduled presents the time option" - the chip, ghost or real, is on Scheduled rows only. */
+var HT31_GHOST_CHIP_SECTIONS = ['scheduled'];
 (function(){
   var open = null;                    /* {id, chip, node} while a picker is on screen */
 
@@ -13213,6 +13502,22 @@ var HT31_GHOST_CHIP_SECTIONS = ['morning', 'night', 'standards', 'weekly'];
     if(log.classList.contains('reordering') || log.querySelector('.li.dragging')) return;
     Array.prototype.slice.call(log.querySelectorAll('.li')).forEach(function(r){
       var id = r.getAttribute('data-h'); if(!id) return;
+      /* PASTE 293 S1.1: a Weekly or Standards row NEVER shows a time. A time it already carries is kept in the
+         data, hidden here - never deleted (DEC-037) - and comes back the moment the row returns to Scheduled. */
+      var sch = sectionOfRow(r) === 'scheduled';
+      Array.prototype.slice.call(r.querySelectorAll('.pat, .pat30, .dot29, .dat')).forEach(function(n){
+        if(sch){ if(n.hasAttribute('data-h293t')){ n.removeAttribute('hidden'); n.removeAttribute('data-h293t'); } }
+        else if(!n.hasAttribute('hidden')){ n.setAttribute('hidden', ''); n.setAttribute('data-h293t', ''); }
+      });
+      r.classList.toggle('h293sch', sch);
+      /* PASTE 293 S2.4: a row with no chip keeps the chip's width, so drag · edit · time is one straight column */
+      var ph = r.querySelector('.t293e');
+      if(!sch){
+        var gh = r.querySelector('.ht31ghost'); if(gh) gh.parentNode.removeChild(gh);
+        if(!ph){ ph = document.createElement('i'); ph.className = 't293e'; ph.setAttribute('aria-hidden', 'true'); r.appendChild(ph); }
+        return;
+      }
+      if(ph) ph.parentNode.removeChild(ph);
       var pat = r.querySelector('.pat30') || r.querySelector('.pat');
       if(pat){
         pat.setAttribute('data-ht31t', id);
@@ -13264,7 +13569,8 @@ var HT31_DESK_INSIGHTS = false;
 /* PASTE 194 S6.1: Month . Year . GROUP . LIFE - the life grid last, so it can be as tall as 100 rows need.
    PASTE 228 (Cory 2026-09-24 23:27): the day's percent is the HERO and opens the page - `h228Hero` goes
    FIRST, above the four, and nothing else moves. */
-var HT31_INS_ORDER = ['h228Hero', 'h31Month', 'h31Year', 'h30Group', 'h30Life'];
+/* PASTE 293 S2.7: `h30Group` leaves - it is the Group tab's page now */
+var HT31_INS_ORDER = ['h228Hero', 'h31Month', 'h31Year', 'h30Life'];
 var HT31_INS_HIDE = ['h30MonthC', 'h30MonthR', 'h30Trend', 'h30Rate'];
 function h31Phone(){ return window.innerWidth < 1024; }
 /* THE FLAG, AND A SEAM TO FLIP IT AT RUNTIME. `HT31_INSIGHTS_EXTRAS = true` brings HT-29's and
@@ -13360,6 +13666,9 @@ var HT31_DESK_WHY = false;
      Settings -> Journal, because this wire took away both of the doors it used to have. It is moved
      once, when Settings opens, and `#ov #h26Jrn` (app.css, HT-26's own rule) is what shows it there. */
   function jrnToSettings(){
+    /* PASTE 293 S3.2 (Cory 9/28): "I do not want to see a journal list entry ... in the settings" - the archive
+       leaves Settings for the Ledger on the journal's title. Kept whole behind the flag (R70.138). */
+    if(!HT293_OLD_SECTIONS) return;
     if(HT31_DESK_INSIGHTS) return;                 // the tab is back: leave the archive where it was
     var j = h31El('h26Jrn'), host = h31El('j29Set');
     if(!j || !host || j.parentNode === host) return;
@@ -13667,10 +13976,9 @@ var HT32_WEEK = 'sun_fri';                /* Sunday..Friday; Saturday is the Sab
   function rowOf(k){
     var r = (typeof S !== 'undefined' && S.byDate) ? S.byDate[k] : null;
     if(!r) return null;
-    var due = null;
-    if(r.active_set && r.active_set.length != null) due = r.active_set.length;
-    if(due == null){ try{ due = daily().length; }catch(e){ due = 1; } }
-    return { pct: (r.pct == null ? null : +r.pct), logged: loggedOn(k), due: due };
+    /* PASTE 293 S1.4: the due count and the grade from the one engine (the Sabbath rule included) */
+    var due = ht293Due(k).length, p = ht293Pct(k);
+    return { pct: p, logged: loggedOn(k) || due === 0, due: due };
   }
   function compute(){
     if(!window.__HT32WEEK) return null;
@@ -13757,8 +14065,9 @@ var HT32_WEEK = 'sun_fri';                /* Sunday..Friday; Saturday is the Sab
       b.className = 'hero-bar';
       var w = (d.today == null) ? 0 : Math.max(0, Math.min(100, d.today));
       b.innerHTML = '<span class="hero-track"><span class="hero-fill" style="width:' + w + '%;background:' + col + '"></span></span>' +
-                    '<b class="num hero-num" style="color:' + col + '">' + pctTxt(d.today) + '</b>' +
-                    '<span class="go">Insights ›</span>';
+                    '<b class="num hero-num" style="color:' + col + '">' + pctTxt(d.today) + '</b>';
+      /* PASTE 293 S2.1: the words that pointed at Insights are gone - "I can already get to insights by clicking
+         on the tab at the bottom". The bar still opens it on a tap. */
     }
   }
   /* THE CARD (#h228Hero): one node, wrapped by HT-30's card builder so it keeps the .h30c/.lab shape every
@@ -14140,7 +14449,7 @@ window.__HT186N1 = { changed:ht186Changed, norm:ht186Norm };
    above it - so this reads exactly that, after every child-list change, and writes an attribute (which is not
    a child-list change, so it cannot re-trigger itself). It never MOVES a row and never renames a section. */
 var HT185SEC = (function(){
-  var SECS = { morning:1, night:1, weekly:1, standards:1 };
+  var SECS = { scheduled:1, morning:1, night:1, weekly:1, standards:1 };   /* PASTE 293: Scheduled is a section */
   function tag(log){
     log = log || document.getElementById('log'); if(!log) return 0;
     var cur = null, n = 0;
@@ -14359,7 +14668,10 @@ var HT185LIFE = (function(){
   var HOSTS = ['vLife', 'vWeeks'], AX = 20, AXT = 13, GAP = 1, WEEKS = 52, MIN = 5;
   function phone(){ return window.innerWidth < 1024; }
   function birthD(){ var b = S.priv0 && S.priv0.birth_date; return b ? new Date(b + 'T12:00:00') : null; }
-  function years(){ var t = S.priv0 && S.priv0.target_age; return (t == null || t === '') ? DEFAULT_TARGET : Math.max(20, Math.min(120, +t)); }
+  /* PASTE 293 S2.8 (Cory 9/28 09:31): "make sure X and Y on desktop and on phone app are identical" - the phone ran
+     to the account's target age (90 for some), the desktop to 100. Both run to 100 now, the desktop's constant
+     (R70.95); the stored target age is untouched. */
+  function years(){ return HT293_LIFE_ROWS; }
   function weekIdx(k, b){
     if(window.__HT16 && window.__HT16.weekIndex) return window.__HT16.weekIndex(k, b);
     var d = (k instanceof Date) ? k : new Date(k + 'T12:00:00');
@@ -14373,7 +14685,7 @@ var HT185LIFE = (function(){
     var Y = years();
     var cellP = (W - AX) / WEEKS;                        /* the pitch: a cell plus its gap */
     /* 194 S6.3: a tick every 13 weeks, always; at 360 wide the GAP gives way before the 5 px cell does (stress 5) */
-    var tickW = 13, gap = GAP;
+    var tickW = 10, gap = GAP;                   /* PASTE 293: the desktop's tick, not 13 */
     if(cellP - gap < MIN) gap = Math.max(0.25, Math.round((cellP - MIN) * 100) / 100);
     var cell = Math.max(MIN, Math.floor((cellP - gap) * 100) / 100), P = cell + gap;
     var FOOT = 12;                                        /* room for the `100` under the last row */
@@ -14409,9 +14721,9 @@ var HT185LIFE = (function(){
       s += '<rect class="h185wk" data-wk="' + wi + '" x="' + (AX + wk * P) + '" y="' + (AXT + yr * P) + '" width="' + cell +
            '" height="' + cell + '" fill="' + fill(m) + '"><title>week ' + wi + ' · ' + Math.round(m) + '%</title></rect>';
     });
-    /* the x axis: weeks */
-    for(var x = 0; x <= WEEKS - tickW; x += tickW)
-      s += '<text class="h185x" x="' + (AX + x * P) + '" y="' + (AXT - 3) + '" text-anchor="start">' + x + '</text>';
+    /* the x axis: weeks - PASTE 293 S2.8: the desktop's own ticks, 0 10 20 30 40 and 52, so the axes are identical */
+    HT293_LIFE_WEEK_TICKS.forEach(function(x){ if(x >= WEEKS) return;
+      s += '<text class="h185x" x="' + (AX + x * P) + '" y="' + (AXT - 3) + '" text-anchor="start">' + x + '</text>'; });
     s += '<text class="h185x" x="' + (AX + gridW) + '" y="' + (AXT - 3) + '" text-anchor="end">' + WEEKS + '</text>';
     /* today */
     var cy = Math.floor(nowW / WEEKS), cw = nowW % WEEKS;
@@ -14522,5 +14834,414 @@ var HT194 = (function(){
   return { rows: rows, num: num, probe: probe };
 })();
 window.__HT194 = HT194;
+
+/* ======================= PASTE 293 · THE TRACKER READS CORY'S WAY (WIRE HT-293, Monday 2026-09-28) =======================
+   Cory's sixteen edits of 09:23-09:35, in one paste on his word ("one fell swoop"). The day model (S1) changes
+   in place where it is declared - HT29SEC, the Sabbath layer, the one percent engine beside pctOf - and this
+   block holds what has to run LAST: the write-side section mapping, the sync that puts the engine's number on
+   every day before any layer paints, the midnight roll, and (S2/S3) the phone's Today, the Group tab, the life
+   chart and the journal's Ledger. */
+var HT293_OLD_SECTIONS = false;          /* true brings back the Morning/Night misplacement review, untouched */
+(function(){
+  function warn(m, e){ try{ console.warn('HT-293 ' + m, e); }catch(_){} }
+
+  /* ---- S1.1 · ONE WRITE PATH FOR A SECTION ---------------------------------------------------------------------
+     Six call sites write `habits.section` (the sheet, a drag across a header, the add-link, the device copy's
+     write-up, the one-tap move). Rather than six edits that the next site forgets, every habits write passes its
+     payload through HT29SEC.store() here: Scheduled goes out as `morning` until the migration is proven. */
+  function mapSec(p){
+    if(!p || typeof p !== 'object') return p;
+    if(Array.isArray(p)) return p.map(mapSec);
+    if(!('section' in p) || p.section == null) return p;
+    var o = {}; Object.keys(p).forEach(function(k){ o[k] = p[k]; });
+    o.section = HT29SEC.store(p.section);
+    return o;
+  }
+  try{
+    if(sb && typeof sb.from === 'function' && !sb.__h293){
+      var _from = sb.from.bind(sb);
+      sb.from = function(t){
+        var q = _from(t);
+        if(t !== 'habits' || !q) return q;
+        ['insert', 'update', 'upsert'].forEach(function(m){
+          if(typeof q[m] !== 'function') return;
+          var f = q[m];
+          q[m] = function(payload){ var a = Array.prototype.slice.call(arguments); a[0] = mapSec(payload); return f.apply(q, a); };
+        });
+        return q;
+      };
+      sb.__h293 = true;
+    }
+  }catch(e){ warn('section write mapping', e); }
+
+  /* ---- S1.3 · MIDNIGHT ---------------------------------------------------------------------------------------------
+     S.date was set once at load and never rolled, so a page left open past midnight kept ticking yesterday while
+     "today" pointed at an empty day - one of the "0%" readings. Only while the page is VISIBLE (PHASE GATE): a local
+     clock, never a fetch. A person looking at a past day on purpose is left there. */
+  var lastToday = today();
+  /* NEVER MID-SENTENCE (review of this diff): a roll while a box has focus or a journal save is pending would move
+     S.priv to the new day under his fingers and send yesterday's last words to today's row. The roll waits for the
+     next tick instead - a minute late is harmless, a lost sentence is not. */
+  function busy(){
+    var a = document.activeElement;
+    if(a && (a.tagName === 'TEXTAREA' || (a.tagName === 'INPUT' && a.type !== 'checkbox'))) return true;
+    try{ if(typeof pvT !== 'undefined' && pvT) return true; }catch(e){}
+    return false;
+  }
+  function roll(){
+    var t = today();
+    if(t === lastToday) return false;
+    if(busy()) return false;
+    var was = lastToday; lastToday = t;
+    if(S && S.date === was && typeof goDay === 'function'){
+      try{ goDay(t); paintAll(); }catch(e){ warn('midnight roll', e); }
+      return true;
+    }
+    return false;
+  }
+  var tick = null;
+  function start(){ if(!tick) tick = setInterval(roll, 60000); roll(); }
+  function stop(){ if(tick){ clearInterval(tick); tick = null; } }
+  document.addEventListener('visibilitychange', function(){ if(document.visibilityState === 'visible') start(); else stop(); });
+  window.addEventListener('focus', roll);
+  if(document.visibilityState === 'visible') start();
+
+  /* ---- S1.4 · THE ENGINE'S NUMBER IS ON EVERY DAY BEFORE ANYTHING PAINTS ------------------------------------------
+     The outermost wrapper, so every layer below reads a `pct` the one engine wrote this instant - the stale 0% of a
+     ticked Sabbath was a reader drawing before saveDay's 450 ms debounce had set it. */
+  /* S1.2: the Sabbath is a PAGE state as well - on it the section headers and their "+ Add" go, so Today reads as
+     one row and one box. An attribute on <html>, so a later re-render of the list cannot bring them back. */
+  function sabFlag(){
+    var on = ht293SabOn() && ht293IsSab(S.date) && !(typeof h30Advanced === 'function' && h30Advanced());
+    if(on) document.documentElement.setAttribute('data-h293sab', '1'); else document.documentElement.removeAttribute('data-h293sab');
+  }
+  var _pa = paintAll;
+  paintAll = function(){
+    try{ ht293Sync(); sabFlag(); }catch(e){ warn('sync', e); }
+    return _pa.apply(null, arguments);
+  };
+  var _pl = paintLog;
+  paintLog = function(){
+    try{ ht293Sync(); sabFlag(); }catch(e){ warn('sync', e); }
+    return _pl.apply(null, arguments);
+  };
+
+  window.__HT293.roll = roll;
+  window.__HT293.mapSec = mapSec;
+  /* READ-ONLY SEAMS for golden_ht37-40 (the __HT23 convention: exported deliberately, used by the goldens only) */
+  window.__HT293.S = function(){ return S; };
+  window.__HT293.dk = dk;
+  window.__HT293.store = function(v){ return HT29SEC.store(v); };
+  window.__HT293.client = function(){ return sb; };
+  window.__HT293.drive = function(){ return HT29DRIVE; };
+  window.__HT293.__setLastToday = function(v){ lastToday = v; };
+  window.__HT293_goDay = function(k){ return goDay(k); };
+  /* the pre-293 due rule, for the golden's percent-change list only (S1.5) */
+  window.__HT293.dueOldFor = function(h, k){ if(isWeekly(h)) return true; var d = dowOf(h); return !d || d.indexOf(dnum(k).getDay()) >= 0; };
+
+  /* ---- S2.7 · THE GROUP TAB --------------------------------------------------------------------------------------
+     Cory 9/28: "a group tab as a third tab ... soon we have a bunch of people invited into the group". A third
+     button in the phone's bottom bar, after Today and Insights. It opens the SAME page state Insights uses
+     (`data-vtab="views"`) with `data-h293tab="group"`, which shows #h293Grp - the group card, moved there by
+     HT-30's build() - and hides the Insights page. Ranking, rewards and punishments are the next group work
+     (NEXT_HT), so there is no placeholder block for them here. */
+  function groupHost(){
+    if(window.innerWidth >= 1024) return null;
+    var n = document.getElementById('h293Grp'); if(n) return n;
+    var grid = document.querySelector('.grid'); if(!grid) return null;
+    n = document.createElement('section');
+    n.id = 'h293Grp'; n.className = 'h30ins h293grp';
+    n.innerHTML = '<div class="sh"><h2>Group</h2><span class="ln"></span><span class="c"></span></div>';
+    grid.appendChild(n);
+    /* THE CARD KEEPS ITS BEHAVIOUR WHERE IT MOVED (golden_ht33 T6f found it): a member's line, Reports, Invite are
+       answered by HT-29's handler, which HT-30 bound on the Insights body - so it is bound here too, and the page adopts
+       the card HT-29 re-renders, exactly as HT-30's build() does on Insights. */
+    n.addEventListener('click', function(e){
+      try{ if(window.__HT29INS && window.__HT29INS.onClick) window.__HT29INS.onClick(e); }catch(err){ warn('group click', err); }
+      setTimeout(function(){ try{ if(window.__HT30INS && window.__HT30INS.build) window.__HT30INS.build(); }catch(err){ warn('group rebuild', err); } }, 0);
+    });
+    return n;
+  }
+  var relaying = false;
+  function tabState(){ return document.documentElement.getAttribute('data-h293tab') || ''; }
+  function markGroup(){
+    var bar = document.getElementById('h29Bar'); if(!bar) return;
+    var views = (document.documentElement.getAttribute('data-vtab') || 'today') !== 'today';
+    var grp = views && tabState() === 'group';
+    var gb = bar.querySelector('[data-t293="group"]'), ib = bar.querySelector('[data-t29="insights"]');
+    if(gb){ gb.classList.toggle('on', grp); gb.setAttribute('aria-current', grp ? 'page' : 'false'); }
+    if(ib && grp){ ib.classList.remove('on'); ib.setAttribute('aria-current', 'false'); }
+  }
+  function groupButton(){
+    var bar = document.getElementById('h29Bar'); if(!bar || bar.querySelector('[data-t293="group"]')) return;
+    var b = document.createElement('button');
+    b.type = 'button'; b.setAttribute('data-t293', 'group'); b.textContent = 'Group';
+    var ins = bar.querySelector('[data-t29="insights"]');
+    if(ins && ins.nextSibling) bar.insertBefore(b, ins.nextSibling); else bar.appendChild(b);
+  }
+  document.addEventListener('click', function(e){
+    var t = e.target.closest && e.target.closest('#h29Bar [data-t293="group"], #h29Bar [data-t29]');
+    if(!t) return;
+    if(t.getAttribute('data-t293') === 'group'){
+      e.preventDefault(); e.stopPropagation();
+      document.documentElement.setAttribute('data-h293tab', 'group');
+      var ins = document.querySelector('#h29Bar [data-t29="insights"]');
+      relaying = true;
+      try{ if(ins) ins.click(); }finally{ relaying = false; }   /* the page HT-30 opens, reached the way a person does */
+      document.documentElement.setAttribute('data-h293tab', 'group');
+      setTimeout(function(){ try{ groupHost(); paintAll(); }catch(err){ warn('group open', err); } markGroup(); window.scrollTo(0, 0); }, 40);
+      setTimeout(markGroup, 200);                            /* after every layer's own late re-mark */
+      return;
+    }
+    if(relaying) return;                                                                              /* our own relay */
+    document.documentElement.setAttribute('data-h293tab', t.getAttribute('data-t29') === 'today' ? '' : 'insights');
+    setTimeout(markGroup, 40);
+  }, true);
+  var _pa2 = paintAll;
+  paintAll = function(){
+    var out = _pa2.apply(null, arguments);
+    try{ groupButton(); markGroup(); }catch(e){ warn('group tab', e); }
+    return out;
+  };
+  window.__HT293.groupHost = groupHost;
+  window.__HT293.markGroup = markGroup;
+})();
+
+/* ---- PASTE 293 S3 · THE JOURNAL: THREE PARTS, ITS OWN LEDGER, GOOGLE DOCS BOTH WAYS -------------------------------
+   Cory 9/28: "journal brain then completed and then prayer should populate the Obsidian, the journal ledger, and the
+   Google Docs in the same format ... a bilateral editable system that syncs up and it should be a one-to-one", and
+   09:31 "google docs first for other users - for Andrew and I it will be obsidian".
+     · THE PARTS are the three columns `day_private` already has - brain_dump · tasks · prayer - so no migration.
+     · THE LEDGER leaves Settings and opens from a `Ledger` tap on the journal's title: newest first, a sticky month
+       header, one row per day (date · the Journal's first line · three marks), a tap opens that day.
+     · GOOGLE DOCS: one Doc per day, `HT Journal YYYY-MM-DD`, in a Drive folder `HT Journal`, body = the three
+       headings. Supabase saves first and the Doc follows. THE DOC CARRIES A SIGNATURE of the text the app last wrote
+       (Drive `appProperties.ht293s`): opening a day reads its Doc, and when the Doc's text no longer matches that
+       signature it was edited outside the app since - so the Doc wins and is saved. Device-independent, and it
+       needs no `updated_at` column (day_private has none). One entry <-> one Doc; the later writer wins.
+     · OBSIDIAN (Cory) is the BEV vault's own two-way copier, `tools/copiers/ht_journal.py` - same three headings
+       (Journal · Completed · Prayer), into the git-IGNORED `events/journal/`, because a journal never enters a repo
+       (CC_STANDING §3). It is built; it is not armed (134 R8) and has no key (BEV/HT_SUPABASE_DB_URL). */
+var HT293_PARTS = [['brain_dump', 'Journal'], ['tasks', 'Completed'], ['prayer', 'Prayer']];
+var HT293DOCS = (function(){
+  var FOLDER = 'HT Journal', DOC = 'application/vnd.google-apps.document';
+  function st(){ try{ return JSON.parse(localStorage.getItem('ht293_docs') || '{}'); }catch(e){ return {}; } }
+  function put(o){ try{ localStorage.setItem('ht293_docs', JSON.stringify(o)); }catch(e){} }
+  function on(){
+    try{ return !!HT29DRIVE.state().mirror && HT29DRIVE.available(); }catch(e){ return false; }
+  }
+  function parts(p){
+    var o = {}; HT293_PARTS.forEach(function(f){ o[f[0]] = String((p && p[f[0]]) || '').replace(/\r\n/g, '\n').trim(); }); return o;
+  }
+  function body(k, p){
+    var f = parts(p);
+    return HT293_PARTS.map(function(x){ return '## ' + x[1] + '\n' + f[x[0]]; }).join('\n\n') + '\n';
+  }
+  /* THE HEADINGS ARE THE ONES WE WRITE - `## Journal`, `## Completed`, `## Prayer`. A line of his own that says
+     "Prayer:" inside the brain dump is his words, never a heading (review of this diff); only a Doc that carries none
+     of our headings at all is read by the looser rule (a heading alone on a line). */
+  function parse(text){
+    var out = { brain_dump:'', tasks:'', prayer:'' }, cur = null, buf = {};
+    var lines = String(text || '').replace(/\r\n/g, '\n').replace(/^﻿/, '').split('\n');
+    var strict = lines.some(function(l){ return /^##\s+(journal|completed|prayer)\s*$/i.test(l); });
+    var rx = strict ? /^##\s+(journal|completed|prayer)\s*$/i : /^\s*#{0,3}\s*(journal|completed|prayer)\s*:?\s*$/i;
+    lines.forEach(function(line){
+      var m = rx.exec(line);
+      if(m){ cur = { journal:'brain_dump', completed:'tasks', prayer:'prayer' }[m[1].toLowerCase()]; buf[cur] = buf[cur] || []; return; }
+      if(cur) buf[cur].push(line);
+    });
+    Object.keys(buf).forEach(function(k){ out[k] = buf[k].join('\n').trim(); });
+    return out;
+  }
+  /* the signature of the Doc's TEXT as we wrote it (whitespace-normalised), so an untouched Doc is recognised before
+     any parsing - parsing is only ever done on a Doc somebody actually edited */
+  function norm(t){ return String(t || '').replace(/\r\n/g, '\n').replace(/^﻿/, '').split('\n')
+                      .map(function(l){ return l.replace(/\s+$/, ''); }).join('\n').replace(/\n{3,}/g, '\n\n').trim(); }
+  function sigText(t){ return sig({ brain_dump:norm(t), tasks:'', prayer:'' }); }
+  function sig(f){
+    var s = JSON.stringify([f.brain_dump || '', f.tasks || '', f.prayer || '']), h = 5381;
+    for(var i = 0; i < s.length; i++) h = ((h * 33) ^ s.charCodeAt(i)) >>> 0;
+    return 'h' + h.toString(36) + '.' + s.length;
+  }
+  function D(){ return HT29DRIVE; }
+  function folder(){
+    var o = st(); if(o.folder) return Promise.resolve(o.folder);
+    var d = D();
+    return d.call('GET', d.API + '?spaces=drive&fields=files(id)&q=' +
+                  d.q("name='" + d.qesc(FOLDER) + "' and mimeType='application/vnd.google-apps.folder' and trashed=false"))
+      .then(function(j){
+        if(j && j.files && j.files[0]) return j.files[0].id;
+        return d.call('POST', d.API + '?fields=id', JSON.stringify({ name:FOLDER, mimeType:'application/vnd.google-apps.folder' }),
+                      { 'Content-Type':'application/json' }).then(function(x){ return x.id; });
+      }).then(function(id){ var s = st(); s.folder = id; put(s); return id; });
+  }
+  function find(fid, k){
+    var d = D();
+    return d.call('GET', d.API + '?spaces=drive&fields=files(id,modifiedTime,appProperties)&q=' +
+                  d.q("name='" + d.qesc('HT Journal ' + k) + "' and '" + d.qesc(fid) + "' in parents and trashed=false"))
+      .then(function(j){ return (j && j.files && j.files[0]) || null; });
+  }
+  function pend(k, add){
+    var s = st(); s.pending = s.pending || {};
+    if(add) s.pending[k] = 1; else delete s.pending[k];
+    put(s);
+  }
+  /* THE APP -> THE DOC. Called after the entry is saved in Supabase, never before: the Doc only ever follows. */
+  function push(k){
+    k = k || S.date;
+    if(!on()) return Promise.resolve(false);
+    if(!D().hasToken()){ pend(k, true); return Promise.resolve(false); }   /* re-prompted at the next tap (stress 4) */
+    var p = (S.privAll || {})[k] || {}, text = body(k, p), s = sigText(text), d = D();
+    return folder().then(function(fid){
+      return find(fid, k).then(function(doc){
+        var meta = { appProperties:{ ht293s:s } }, b = 'h293' + Math.random().toString(36).slice(2);
+        if(!doc){ meta.name = 'HT Journal ' + k; meta.parents = [fid]; meta.mimeType = DOC; }
+        var mp = '--' + b + '\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n' + JSON.stringify(meta) +
+                 '\r\n--' + b + '\r\nContent-Type: text/plain; charset=UTF-8\r\n\r\n' + text + '\r\n--' + b + '--';
+        var url = doc ? (d.UP + '/' + doc.id + '?uploadType=multipart&fields=id,modifiedTime')
+                      : (d.UP + '?uploadType=multipart&fields=id,modifiedTime');
+        return d.call(doc ? 'PATCH' : 'POST', url, mp, { 'Content-Type':'multipart/related; boundary=' + b });
+      });
+    }).then(function(){ pend(k, false); var o = st(); o.last = new Date().toISOString(); put(o); return true; },
+            function(e){ pend(k, true); throw e; });
+  }
+  /* THE DOC -> THE APP, when a day is opened. Only a Doc edited OUTSIDE the app since the app last wrote it wins. */
+  function pull(k){
+    k = k || S.date;
+    if(!on() || !D().hasToken()) return Promise.resolve(false);
+    var d = D();
+    return folder().then(function(fid){ return find(fid, k); }).then(function(doc){
+      if(!doc) return false;
+      return d.callText('GET', d.API + '/' + doc.id + '/export?mimeType=text%2Fplain').then(function(txt){
+        var mine = (doc.appProperties && doc.appProperties.ht293s) || '';
+        if(sigText(txt) === mine) return false;                             /* nobody touched the Doc: never parsed */
+        var f = parse(txt || '');
+        if(sig(f) === sig(parts((S.privAll || {})[k]))) return false;        /* already the same words */
+        /* the Doc wins only onto the entry that is OPEN and not being typed in; otherwise it waits for the next open,
+           and the app never pushes its own copy over the outside edit (review of this diff) */
+        return apply(k, f).then(function(done){ return done ? push(k).then(function(){ return true; }) : false; });
+      });
+    });
+  }
+  function apply(k, f){
+    if(k !== S.date) return Promise.resolve(false);                         /* only the entry that is open */
+    var a = document.activeElement;
+    if(a && (a.tagName === 'TEXTAREA' || a.tagName === 'INPUT')) return Promise.resolve(false);   /* never under his fingers */
+    try{ if(typeof pvT !== 'undefined' && pvT) return Promise.resolve(false); }catch(e){}
+    var p = S.priv || (S.priv = {});
+    HT293_PARTS.forEach(function(x){ p[x[0]] = f[x[0]]; });
+    try{ paintJournalInputs(); if(typeof paintInputs3 === 'function') paintInputs3(); }catch(e){}
+    try{ var bd = document.getElementById('iDump') || document.querySelector('[data-f="brain_dump"]'); if(bd && 'value' in bd) bd.value = f.brain_dump; }catch(e){}
+    return Promise.resolve(savePriv()).then(function(){ toast('journal updated from Google Docs'); return true; });
+  }
+  return { on:on, push:push, pull:pull, parse:parse, body:body, sig:sig, sigText:sigText, parts:parts, FOLDER:FOLDER, state:st };
+})();
+window.__HT293DOCS = HT293DOCS;
+(function(){
+  function warn(m, e){ try{ console.warn('HT-293 ' + m, e); }catch(_){} }
+
+  /* the Doc follows every save of the open entry - Supabase first, the mirror after, debounced */
+  var pushT = null;
+  var _sp = savePriv;
+  savePriv = function(){
+    var k = S.date, out = _sp.apply(null, arguments);
+    if(HT293DOCS.on()){
+      Promise.resolve(out).then(function(){
+        clearTimeout(pushT);
+        pushT = setTimeout(function(){ HT293DOCS.push(k).catch(function(e){ warn('docs push', e); }); }, 1500);
+      });
+    }
+    return out;
+  };
+  /* opening a day reads its Doc (the pull is no-op when nothing changed outside the app) */
+  var lastPulled = null;
+  function pullOpen(){
+    if(!HT293DOCS.on() || !S || !S.date || lastPulled === S.date) return;
+    lastPulled = S.date;
+    HT293DOCS.pull(S.date).catch(function(e){ warn('docs pull', e); });   /* no retry storm: the next open of a day asks again */
+  }
+  var _gd = goDay;
+  goDay = function(k){ var out = _gd.apply(null, arguments); lastPulled = null; setTimeout(pullOpen, 50); return out; };
+  /* stress 4: a token that lapsed mid-save left the day PENDING; the next tap re-asks Google and mirrors again */
+  /* ONE RUN AT A TIME, AND ONE ASK PER SESSION (review of this diff): without the guard two quick taps pushed the same
+     day twice and could make two Docs for it; without the cap a declined sign-in came back on every tap. */
+  var flushing = false, askedThisSession = false;
+  function flushPending(){
+    var ks = Object.keys(HT293DOCS.state().pending || {});
+    flushing = true;
+    return ks.reduce(function(p, k){ return p.then(function(){ return HT293DOCS.push(k).catch(function(){}); }); }, Promise.resolve())
+      .then(function(){ flushing = false; }, function(){ flushing = false; });
+  }
+  document.addEventListener('click', function(){
+    var s = HT293DOCS.state(); if(flushing || !HT293DOCS.on() || !s.pending || !Object.keys(s.pending).length) return;
+    if(HT29DRIVE.hasToken()){ flushPending(); return; }
+    if(askedThisSession) return;
+    askedThisSession = true; flushing = true;
+    HT29DRIVE.signIn().then(function(){ flushing = false; return flushPending(); })
+      .catch(function(e){ flushing = false; warn('docs re-prompt', e); });
+  }, true);
+
+  /* ---- S3.2 · THE LEDGER --------------------------------------------------------------------------------------- */
+  var MO_L = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+  function days(){
+    return Object.keys(S.privAll || {}).filter(function(k){
+      var p = S.privAll[k]; if(!p || k > today()) return false;
+      return HT293_PARTS.some(function(f){ return String(p[f[0]] || '').trim(); });
+    }).sort().reverse();
+  }
+  function firstLine(t){ var s = String(t || '').trim().split(/\n/)[0] || ''; return s.length > 90 ? s.slice(0, 89) + '…' : s; }
+  function rows(){
+    var out = '', cur = null;
+    days().forEach(function(k){
+      var d = dnum(k), mo = MO_L[d.getMonth()] + ' ' + d.getFullYear(), p = S.privAll[k];
+      if(mo !== cur){ if(cur) out += '</div>'; out += '<div class="h293mo"><div class="h293moh">' + esc(mo) + '</div>'; cur = mo; }
+      out += '<button type="button" class="h293ld" data-h293day="' + k + '">' +
+        '<span class="h293dt">' + esc(WD[d.getDay()].slice(0, 3) + ' ' + d.getDate()) + '</span>' +
+        '<span class="h293fl">' + esc(firstLine(p.brain_dump) || firstLine(p.tasks) || firstLine(p.prayer)) + '</span>' +
+        '<span class="h293mk" aria-label="' + HT293_PARTS.map(function(f){ return f[1] + (String(p[f[0]] || '').trim() ? ' written' : ' empty'); }).join(', ') + '">' +
+          HT293_PARTS.map(function(f){ return '<i class="' + (String(p[f[0]] || '').trim() ? 'on' : '') + '" title="' + f[1] + '"></i>'; }).join('') +
+        '</span></button>';
+    });
+    if(cur) out += '</div>';
+    return out || '<div class="empty">Nothing written yet. What you write on Today lands here, one row a day.</div>';
+  }
+  function open(){
+    var n = document.getElementById('h293Led');
+    if(!n){
+      n = document.createElement('div'); n.id = 'h293Led'; n.className = 'h293led';
+      n.setAttribute('role', 'dialog'); n.setAttribute('aria-label', 'Journal ledger');
+      document.body.appendChild(n);
+      n.addEventListener('click', function(e){
+        var b = e.target.closest && e.target.closest('[data-h293day]');
+        if(b){ close(); try{ goDay(b.getAttribute('data-h293day')); paintAll(); }catch(err){ warn('ledger open day', err); }
+               setTimeout(function(){ var j = ledgerTitle(); if(j) j.scrollIntoView({ block:'start' }); }, 60); return; }
+        if(e.target.closest && e.target.closest('[data-h293close]')) close();
+      });
+    }
+    n.innerHTML = '<div class="h293lh"><h2>Ledger</h2><span class="c">' + days().length + ' days</span>' +
+                  '<button type="button" class="tbtn" data-h293close="1" aria-label="close the ledger">Close</button></div>' +
+                  '<div class="h293lb">' + rows() + '</div>';
+    n.hidden = false; document.documentElement.classList.add('h293ledon');
+  }
+  function close(){ var n = document.getElementById('h293Led'); if(n) n.hidden = true; document.documentElement.classList.remove('h293ledon'); }
+  document.addEventListener('keydown', function(e){ if(e.key === 'Escape') close(); });
+  /* THE TAP IS ON THE JOURNAL'S OWN TITLE, phone and desktop - the block whose header reads "Journal" on Today */
+  function ledgerTitle(){
+    var hs = Array.prototype.slice.call(document.querySelectorAll('.colL .blk > .sh h2, #jIn .sh h2, .grid .sh h2'));
+    return hs.filter(function(h){ return /^\s*(\d\s*)?journal\s*$/i.test(h.textContent || '') && !h.closest('#h26Jrn'); })[0] || null;
+  }
+  function tap(){
+    var h = ledgerTitle(); if(!h) return;
+    var sh = h.parentNode; if(!sh || sh.querySelector('.h293lt')) return;
+    var b = document.createElement('button');
+    b.type = 'button'; b.className = 'h293lt tbtn'; b.textContent = 'Ledger';
+    b.setAttribute('aria-label', 'open the journal ledger');
+    b.addEventListener('click', function(e){ e.preventDefault(); e.stopPropagation(); open(); });
+    h.insertAdjacentElement('afterend', b);
+  }
+  var _pa = paintAll;
+  paintAll = function(){ var out = _pa.apply(null, arguments); try{ tap(); pullOpen(); }catch(e){ warn('ledger tap', e); } return out; };
+  window.__HT293.ledger = { open:open, close:close, days:days, title:ledgerTitle };
+})();
 
 })();

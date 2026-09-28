@@ -48,8 +48,10 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 def fixture_dir(estate):
     """The headless fixture. R70.345 (2026-09-10) moved it with the machinery to <BEV>/_machine/ht3;
     the old <BEV>/ht3 is the fallback, so this runs in either layout."""
-    for d in (os.path.join(estate, '_machine', 'ht3'), os.path.join(estate, 'ht3')):
-        if os.path.isdir(d):
+    # PASTE 293: a private fixture when asked (179's HT_FIXTURE_DIR, which ht33-36 already honour), so a wire can
+    # iterate while another run holds the shared ht3
+    for d in (os.environ.get('HT_FIXTURE_DIR'), os.path.join(estate, '_machine', 'ht3'), os.path.join(estate, 'ht3')):
+        if d and os.path.isdir(d):
             return d
     return os.path.join(estate, '_machine', 'ht3')
 

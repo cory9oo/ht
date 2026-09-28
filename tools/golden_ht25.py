@@ -45,8 +45,10 @@ ESTATE = find_estate(REPO)
 def fixture_dir(estate):
     """The headless fixture. R70.345 (2026-09-10) moved it with the machinery to <BEV>/_machine/ht3;
     the old <BEV>/ht3 is the fallback, so this runs in either layout."""
-    for d in (os.path.join(estate, '_machine', 'ht3'), os.path.join(estate, 'ht3')):
-        if os.path.isdir(d):
+    # PASTE 293: a private fixture when asked (179's HT_FIXTURE_DIR, which ht33-36 already honour), so a wire can
+    # iterate while another run holds the shared ht3
+    for d in (os.environ.get('HT_FIXTURE_DIR'), os.path.join(estate, '_machine', 'ht3'), os.path.join(estate, 'ht3')):
+        if d and os.path.isdir(d):
             return d
     return os.path.join(estate, '_machine', 'ht3')
 
@@ -294,8 +296,9 @@ async def s3(pw):
         # AMENDED BY NAME, HT-30 (paste 137 S1.4), 2026-09-20: the last two swap and the fourth
         # is renamed. S3h and S3i assert the same two properties about the same four names.
         # AMENDED BY HT-194 S2 (R67.2, Cory 2026-09-24): Standards now comes BEFORE Weekly routine; names unchanged.
-        SECS29 = ['Morning routine', 'Night routine', 'Standards', 'Weekly routine']
-        chk('S3h · the headers read the four sections and nothing else',
+        # AMENDED BY PASTE 293 (R67.2, Cory 2026-09-28 09:23): Scheduled . Weekly . Standards, and nothing else.
+        SECS29 = ['Scheduled', 'Weekly', 'Standards']
+        chk('S3h · the headers read the three sections and nothing else',
             heads and all(h in SECS29 for h in heads), heads)
         chk('S3i · and they appear in that order',
             [h for h in heads if h in SECS29] == sorted(set(h for h in heads if h in SECS29), key=SECS29.index), heads)

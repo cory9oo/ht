@@ -157,8 +157,9 @@ async def a(pw):
     secs = await pg.evaluate(SECS)
     chk('A1 . with a 3 s session delay hasSection() is FALSE before the session resolves', early is False, early)
     chk('A2 . hasSection() becomes true within 10 s', ok, ok)
-    chk('A3 . h0 follows the server into Morning (heuristic never yields morning)', secs.get('h0') == 'morning', secs.get('h0'))
-    chk('A4 . h1 follows the server into Morning', secs.get('h1') == 'morning', secs.get('h1'))
+    # AMENDED BY PASTE 293 (R67.2, Cory 2026-09-28 09:23): the server's `morning` is DRAWN as Scheduled - these checks still prove the screen follows the server, not the stale device copy (weekly).
+    chk('A3 . h0 follows the server into Morning (heuristic never yields morning)', secs.get('h0') == 'scheduled', secs.get('h0'))
+    chk('A4 . h1 follows the server into Morning', secs.get('h1') == 'scheduled', secs.get('h1'))
     chk('A5 . no page errors', not errs, errs[:2])
     await b.close()
 
@@ -168,7 +169,7 @@ async def a(pw):
     await pg.wait_for_timeout(400)
     secs = await pg.evaluate(SECS)
     chk('A6 . a normal-speed login gives the same: hasSection true, h0/h1 Morning',
-        ok and secs.get('h0') == 'morning' and secs.get('h1') == 'morning', [ok, secs.get('h0'), secs.get('h1')])
+        ok and secs.get('h0') == 'scheduled' and secs.get('h1') == 'scheduled', [ok, secs.get('h0'), secs.get('h1')])
     await b.close()
 
 
@@ -186,7 +187,7 @@ async def bsec(pw):
                  sup: sup, still: localStorage.getItem('ht31_sections') }; }""")
     chk('B1 . hasSection true', ok, ok)
     chk('B2 . the screen follows the SERVER, not the stale device placement: h0 is Morning (not weekly)',
-        secs.get('h0') == 'morning', secs.get('h0'))
+        secs.get('h0') == 'scheduled', secs.get('h0'))
     chk('B3 . the device map is archived to ht186_sections_superseded (id h0, device weekly)',
         any(e.get('id') == 'h0' and e.get('device') == 'weekly' for e in (st['sup'] or [])), st['sup'])
     chk('B4 . ht31_sections is left in place (not deleted), only stepped aside', st['still'] is not None, st['still'])
@@ -199,7 +200,7 @@ async def bsec(pw):
     secs2 = await pg.evaluate(SECS)
     reads = await pg.evaluate("() => window.__ht31reads")
     chk('B6 . a second load reads ht31_sections ZERO times (instrumented getItem)', reads == 0, reads)
-    chk('B7 . the second load still follows the server: h0 Morning', ok2 and secs2.get('h0') == 'morning', [ok2, secs2.get('h0')])
+    chk('B7 . the second load still follows the server: h0 Morning', ok2 and secs2.get('h0') == 'scheduled', [ok2, secs2.get('h0')])
     chk('B8 . no page errors', not errs, errs[:2])
     await b.close()
 

@@ -121,15 +121,18 @@ async def main():
     async with async_playwright() as pw:
         # ------------------------------------------------------------------ T1
         section('T1', 'a planned time on every standard, set from the row')
-        b, pg, errs = await open_page(pw, flags={'__NO_CLOSED_AT': True})
+        # PASTE 293: the fixture's untimed rows are all weekly - one is PLACED in Scheduled so a Scheduled row without a time exists
+        b, pg, errs = await open_page(pw, flags={'__NO_CLOSED_AT': True, '__SECTION': True, '__SECTIONS': {'h10': 'morning'}})
         rows = await pg.evaluate(ROWS)
         secs = sorted(set(r['sec'] for r in rows if r['sec']))
         chk('T1a . the list renders rows in more than one section (%s)' % secs, len(secs) >= 2, secs)
-        miss = [r['id'] for r in rows if not r['pat']]
-        chk('T1b . EVERY row carries a planned-time chip, a time or `+ time` (%d rows)' % len(rows), rows and not miss, miss)
+        # AMENDED BY PASTE 293 (R67.2, Cory 2026-09-28 09:23: "any task that is pulled into weekly or standards doesn't have a time; any task pulled into Scheduled presents the time option")
+        miss = [r['id'] for r in rows if r['sec'] == 'scheduled' and not r['pat']]
+        extra = [r['id'] for r in rows if r['sec'] != 'scheduled' and r['pat']]
+        chk('T1b . EVERY Scheduled row carries its chip, a time or `+ time`, and no other row shows one (%d rows)' % len(rows),
+            rows and not miss and not extra, [miss, extra])
         ghost_secs = sorted(set(r['sec'] for r in rows if r['patTxt'].strip() == '+ time'))
-        chk('T1c . the ghost `+ time` reaches Standards and Weekly, not only Morning and Night',
-            'weekly' in ghost_secs or 'standards' in ghost_secs, ghost_secs)
+        chk('T1c . the ghost `+ time` is on Scheduled rows and nowhere else', ghost_secs == ['scheduled'], ghost_secs)
         tgt = next((r for r in rows if r['patTxt'].strip() == '+ time'), None)
         ok = False
         if tgt:
@@ -225,10 +228,12 @@ async def main():
         # ------------------------------------------------------------------ T6
         section('T6', 'ON TIME % and the median variance, per member, beside the reports')
         b, pg, errs = await open_page(pw, flags={'__NO_CLOSED_AT': True})
-        await pg.evaluate("() => { const t = [...document.querySelectorAll('[data-t29]')].find(x => /insights/i.test(x.textContent)); if (t) t.click(); }")
+        # AMENDED BY PASTE 293 S2.7 (R67.2, Cory 2026-09-28: "a group tab ... that's also where we'll see our rewards"):
+        # the group panel, with its Reports door, lives on the Group tab now - reached by its tap.
+        await pg.evaluate("() => { const t = document.querySelector('#h29Bar [data-t293=group]'); if (t) t.click(); }")
         await pg.wait_for_timeout(900)
         vis = await pg.evaluate("() => [...document.querySelectorAll('[data-h32reports]')].filter(b => b.offsetParent).length")
-        chk('T6e . on the phone the Reports door is VISIBLE on Insights (R70.211)', vis >= 1, vis)
+        chk('T6e . on the phone the Reports door is VISIBLE on the Group tab (R70.211)', vis >= 1, vis)
         opened = await tap(pg, '.h179rep [data-h32reports]')
         await pg.wait_for_timeout(1500)
         tim = await pg.evaluate("() => { const n = document.getElementById('h179tim'); return n ? [...n.querySelectorAll('.r179 .w')].map(x => x.textContent) : null; }")
@@ -239,7 +244,7 @@ async def main():
         chk('T6d . no page error', not errs, errs[:3])
         await b.close()
         b, pg, errs = await open_page(pw, flags={'__NO_CLOSED_AT': True, '__HT29_SQL': True, '__SECTION': True})
-        await pg.evaluate("() => { const t = [...document.querySelectorAll('[data-t29]')].find(x => /insights/i.test(x.textContent)); if (t) t.click(); }")
+        await pg.evaluate("() => { const t = document.querySelector('#h29Bar [data-t293=group]'); if (t) t.click(); }")   # PASTE 293 S2.7: the group lives on the Group tab
         await pg.wait_for_timeout(1200)
         md = await pg.evaluate("""async () => { const r = [...document.querySelectorAll('[data-h29m]')].find(x => x.offsetParent);
              if (!r) return 'no member row'; r.click(); await new Promise(z => setTimeout(z, 1000));
@@ -368,7 +373,7 @@ GROUP_PROBE = """() => {
 async def open_group(pw, w, h):
     b, pg, errs = await open_page(pw, w, h)
     if w < 1024:
-        await pg.evaluate("() => { const x = [...document.querySelectorAll('[data-t29]')].find(x => /insights/i.test(x.textContent)); if (x) x.click(); }")
+        await pg.evaluate("() => { const t = document.querySelector('#h29Bar [data-t293=group]'); if (t) t.click(); }")   # PASTE 293 S2.7: the group lives on the Group tab
         await pg.wait_for_timeout(1200)
     return b, pg, errs
 
@@ -461,8 +466,9 @@ async def t10_to_t14(pw):
         b, pg, errs = await open_page(pw, w, h, flags=SECF)
         sp = await pg.evaluate(SECP)
         keys = sorted(sp.keys())
-        chk('T12a . at %d all four sections are drawn (%s)' % (w, ','.join(keys)),
-            keys == ['morning', 'night', 'standards', 'weekly'], sp)
+        # AMENDED BY PASTE 293 (R67.2, Cory 2026-09-28 09:23: "one category to be called Scheduled and then another one to be weekly and then another one to be standards")
+        chk('T12a . at %d all three sections are drawn (%s)' % (w, ','.join(keys)),
+            keys == ['scheduled', 'standards', 'weekly'], sp)
         # REPOINTED BY HT-194 N2.2 (R67.2, Cory 2026-09-24 11:12): "the sections lose their colours but stay strongly
         # separated". Every row still carries its section (the drag reads it); what separates them is STRUCTURE.
         chk('T12b . at %d every row carries its section, and no row wears a colour rail' % w,

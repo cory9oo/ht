@@ -43,8 +43,10 @@ def find_estate(start):
 
 
 def fixture_dir(estate):
-    for d in (os.path.join(estate, '_machine', 'ht3'), os.path.join(estate, 'ht3')):
-        if os.path.isdir(d):
+    # PASTE 293: a private fixture when asked (179's HT_FIXTURE_DIR, which ht33-36 already honour), so a wire can
+    # iterate while another run holds the shared ht3
+    for d in (os.environ.get('HT_FIXTURE_DIR'), os.path.join(estate, '_machine', 'ht3'), os.path.join(estate, 'ht3')):
+        if d and os.path.isdir(d):
             return d
     return os.path.join(estate, '_machine', 'ht3')
 
@@ -160,7 +162,8 @@ async def sec_s0(pw):
 # =============================================================================================
 # AMENDED BY HT-194 S2 (R67.2, Cory 2026-09-24 09:11): "morning routine, nightly routine, standards and then weekly
 # routine". Names unchanged; Standards moves before Weekly routine. Every check below asks the same question.
-ORDER = ['Morning routine', 'Night routine', 'Standards', 'Weekly routine']
+# AMENDED BY PASTE 293 (R67.2, Cory 2026-09-28 09:23: "one category to be called Scheduled and then another one to be weekly and then another one to be standards") - three, in his order.
+ORDER = ['Scheduled', 'Weekly', 'Standards']
 
 
 async def sec_s1(pw):
@@ -168,8 +171,8 @@ async def sec_s1(pw):
     print("\n--- S1 . four sections, in Cory's 9/20 order ---")
     js = src(os.path.join(REPO, 'app.js'))
     m = re.search(r"var ORDER = \[([^\]]*)\];", js)
-    chk('S1a . HT29SEC declares morning, night, standards, weekly',
-        bool(m) and [x.strip().strip("'") for x in m.group(1).split(',')] == ['morning', 'night', 'standards', 'weekly'],
+    chk('S1a . HT29SEC declares scheduled, weekly, standards (paste 293)',
+        bool(m) and [x.strip().strip("'") for x in m.group(1).split(',')] == ['scheduled', 'weekly', 'standards'],
         m.group(1) if m else None)
     # AMENDED BY HT-194 S2: the markdown shape no longer carries its own literal - it READS HT29SEC.ORDER, which is
     # the strongest form of "the same order" (a second literal is how two lists drift).
@@ -192,7 +195,7 @@ async def sec_s1(pw):
                            return !n || n.classList.contains('grp'); }).map(g => g.textContent.trim())""")
         chk('S1e . %s . no header is drawn over an empty section' % tag, empty == [], empty)
         adds = await pg.eval_on_selector_all('#log .eadd', 'ns => ns.map(n => n.textContent.trim())')
-        chk('S1f . %s . every section carries its own "add" that presets it' % tag, len(adds) == 4, adds)
+        chk('S1f . %s . every section carries its own "add" that presets it' % tag, len(adds) == 3, adds)
         if tag == 'phone':
             # the headers must not cost more than they save (stress 3)
             hh = await pg.evaluate("""() => { const g=[...document.querySelectorAll('#log > .grp')]
@@ -225,7 +228,8 @@ async def sec_s1(pw):
     # assertion keeps its five subjects; only the word the clock used to produce has moved, and `his`
     # still proves a stored section beats everything.
     chk('S1i . an unplaceable row lands in Standards, and 133 still places the rest',
-        placed == {'none': 'standards', 'weekly': 'weekly', 'timed': 'standards', 'sabbath': 'night', 'his': 'weekly'},
+        # AMENDED BY PASTE 293 (R67.2, Cory 2026-09-28 09:23: "one category to be called Scheduled and then another one to be weekly and then another one to be standards"): unplaced, timed and the Sabbath all read as Scheduled.
+        placed == {'none': 'scheduled', 'weekly': 'weekly', 'timed': 'scheduled', 'sabbath': 'scheduled', 'his': 'weekly'},
         placed)
     await b.close()
 
@@ -235,7 +239,7 @@ async def sec_s1(pw):
     flags = dict(SQL); flags.update(PLACED); flags['__BIGSET'] = True; flags['__BLOCKS'] = True
     b, pg, errs = await open_page(pw, 390, 844, flags=flags)
     counts = await pg.evaluate("""() => { const st = window.__HT25S3.state();
-        const f = window.__HT29S2.sectionOf, ORDER = ['morning','night','weekly','standards'];
+        const f = window.__HT29S2.sectionOf, ORDER = ['scheduled','weekly','standards'];   /* PASTE 293 */
         const due = [...document.querySelectorAll('#log .li')].map(r => r.getAttribute('data-h'));
         const placed = {}; ORDER.forEach(k => placed[k] = 0);
         let unplaceable = 0;
@@ -335,7 +339,8 @@ async def sec_s3(pw):
         # MEASURED on main at 295489e: 14px on the phone (golden_ht28 A4 pins it there), 12.5px on
         # the desktop. "Text size unchanged" is the rule - not bigger, not smaller.
         chk('S3b . %s . and the NAME is the same size it was' % tag,
-            rows['font'] == (14 if tag == 'phone' else 12.5), rows)
+            # AMENDED BY PASTE 293 S2.3 (R67.2, Cory 2026-09-28: "minimize the text a little bit on the phone"): 13 on the phone.
+            rows['font'] == (13 if tag == 'phone' else 12.5), rows)
         aff = await pg.evaluate("""() => { const e=document.querySelector('#log .li .edp'),
                                                  g=document.querySelector('#log .li .drg');
             return [e ? +getComputedStyle(e).opacity : null, g ? +getComputedStyle(g).opacity : null]; }""")
@@ -453,9 +458,14 @@ async def sec_s5(pw):
                  dayHidden: (document.getElementById('h30SabDayF')||{}).hidden }; }""")
     chk('S5b . Settings carries Sabbath, with its switch', has['there'] and has['sw'], has)
     chk('S5c . and the one sentence, verbatim',
-        u'No other standards take place on your Sabbath \u2014 only the Sabbath check-off shows that day.' in has['text'],
+        # AMENDED BY PASTE 293 S1.2 (R67.2, Cory 2026-09-28: "by default, all of the other tasks should not appear on the
+        # Sabbath day unless in the settings, we change it per task"): the sentence names the per-task switch.
+        u'On your Sabbath only the Sabbath check-off shows \u2014 and any standard whose own sheet says Show on Sabbath.' in has['text'],
         has['text'][:160])
-    chk('S5d . the day picker only appears once it is switched on', has['dayHidden'] is True, has)
+    # AMENDED BY PASTE 293 S1.2 (Cory: "an option in the settings where you can choose a Sabbath day"): ONE control,
+    # `Sabbath day: None, Sunday ... Saturday` - the switch it replaced is kept hidden (R70.138). OFF is `None`.
+    chk('S5d . one control: Sabbath day, None selected for an account that never chose', has['dayHidden'] is False
+        and (await pg.evaluate("() => (document.getElementById('h30SabDay')||{}).value")) == '', has)
     await no_errors(pg, errs, 'S5 (off)')
     await b.close()
 
@@ -510,7 +520,8 @@ CARDS_HT30 = ['Month . completion', 'Month . rating', 'Completion and rating ove
 # AMENDED BY HT-228 (R67.2, Cory 2026-09-24 23:27 "these percentages ... belong to the top of the insight
 # tab ... too hidden and doesn't trigger enough emotion"): the day's-percent HERO card 'Today' opens the
 # page, above his four; nothing else moves.
-CARDS_HT31 = ['Today', 'The month', 'The year', 'The group, side by side', 'The life']
+# AMENDED BY PASTE 293 S2.7 (R67.2, Cory 2026-09-28: "a group tab as a third tab"): the group moves to its own tab.
+CARDS_HT31 = ['Today', 'The month', 'The year', 'The life']
 CARDS = CARDS_HT31
 
 
@@ -551,17 +562,20 @@ async def sec_s6(pw):
             # It had two - the desktop tab and the phone's More - and this wire closes both, so a check
             # that only asked "is it still in the DOM" would have passed while the feature became
             # unreachable on every width. It is opened the way a person opens it.
-            await pg.evaluate("() => { const b=document.getElementById('bSet'); if(b) b.click(); }")
-            await pg.wait_for_timeout(1400)
-            kept = await pg.evaluate("""() => { const vis=e => !!(e && e.offsetParent);
+            # AMENDED BY PASTE 293 S3.2 (R67.2, Cory 2026-09-28: "instead of it being on a Settings make it ... a little
+            # clickable option on the journal title where it says ledger"): the archive's door is the journal title's
+            # `Ledger` tap now, opened the way a person opens it; the old panel is still in the DOM (R70.138).
+            await pg.evaluate("() => { const t=window.__HT293.ledger.title(); const b=t && t.parentNode.querySelector('.h293lt'); if(b) b.click(); }")
+            await pg.wait_for_timeout(900)
+            kept = await pg.evaluate("""() => { const L=document.getElementById('h293Led');
                 const j=document.getElementById('h26Jrn');
-                return { ledger: vis(j), inSettings: !!(j && j.closest('.ov')),
+                return { ledger: !!(L && !L.hidden && L.getBoundingClientRect().height > 0), inSettings: !!(L && L.querySelectorAll('[data-h293day]').length),
                          find: !!(j && j.querySelector('input,[data-c5find]')),
                          inDom: ['h16Month','h16Year','h16Ins','h26Ins','h26Jrn','vViews']
                                   .filter(i => !!document.getElementById(i)).length,
                          sw: document.documentElement.scrollWidth,
                          cw: document.documentElement.clientWidth }; }""")
-            chk('S6d . desktop . the journal archive is reachable - Settings -> Journal, with its search',
+            chk('S6d . desktop . the journal archive is reachable - the Ledger on the journal title, its rows, and the search kept',
                 kept['ledger'] and kept['inSettings'] and kept['find'], kept)
             chk('S6e . desktop . and nothing that lived on Views was deleted - all six are in the DOM',
                 kept['inDom'] == 6, kept)

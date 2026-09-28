@@ -30,7 +30,8 @@ import argparse, io, os, sys
 HERE = os.path.dirname(os.path.abspath(__file__))
 
 # In order. A new migration goes at the END: they are applied the way they were written.
-ORDER = ['2026-09-15_ht29.sql', '2026-09-20_ht30.sql', '2026-09-22_ht31.sql', '2026-09-23_ht32.sql']
+ORDER = ['2026-09-15_ht29.sql', '2026-09-20_ht30.sql', '2026-09-22_ht31.sql', '2026-09-23_ht32.sql',
+         '2026-09-28_ht293_sections.sql']   # PASTE 293 S1: Scheduled, and Show on Sabbath
 ROLLBACK = ['2026-09-15_ht29_rollback.sql']
 
 # Every table the stack touches. RLS OFF on any of them stops the whole paste.

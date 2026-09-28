@@ -59,8 +59,21 @@ PROBE = r"""(sel) => {
       const el = n.parentElement; const cs = el && getComputedStyle(el);
       if (!cs || cs.visibility === 'hidden' || cs.display === 'none' || +cs.opacity === 0) continue;
       const r = document.createRange(); r.selectNodeContents(n);
-      [...r.getClientRects()].forEach(b => { if (b.width > 0.5 && b.height > 0.5)
-        boxes.push({ id: i, t: n.textContent.trim().slice(0, 24), l: b.left, r: b.right, tp: b.top, b: b.bottom }); });
+      /* PASTE 293: WHAT IS PAINTED, not the whole text run. A one-line name with an ellipsis (Cory 9/28, "rows expand
+         horizontally") lays its full text out past its box and CLIPS it there; the eye sees only the clipped part, so
+         each text box is cut to every ancestor that clips (overflow other than visible) before it is compared. */
+      let cl = -1e9, cr = 1e9, ct = -1e9, cb = 1e9;
+      for (let a = el; a && a !== document.documentElement; a = a.parentElement) {
+        const s = getComputedStyle(a);
+        if (s.overflowX !== 'visible' || s.overflow === 'hidden' || s.overflow === 'clip') {
+          const q = a.getBoundingClientRect(); cl = Math.max(cl, q.left); cr = Math.min(cr, q.right); ct = Math.max(ct, q.top); cb = Math.min(cb, q.bottom);
+        }
+      }
+      [...r.getClientRects()].forEach(b0 => {
+        const b = { left: Math.max(b0.left, cl), right: Math.min(b0.right, cr), top: Math.max(b0.top, ct), bottom: Math.min(b0.bottom, cb) };
+        const bw = b.right - b.left, bh = b.bottom - b.top;
+        if (bw > 0.5 && bh > 0.5)
+          boxes.push({ id: i, t: n.textContent.trim().slice(0, 24), l: b.left, r: b.right, tp: b.top, b: b.bottom }); });
       i++;
     }
   });
@@ -84,7 +97,12 @@ SEL = {
     'settings': '#thPick, #h32mir',
     'inshero': '#h228Hero',    # the phone Insights hero card
     'masthead': '#tStrip',     # the desktop masthead figure (the desktop day's-percent hero)
-    'todaybar': '#tStrip',     # the phone foot-of-Today bar
+    'todaybar': '#tStrip',     # the phone Today bar - PASTE 293: at the TOP of Today now
+    # PASTE 293 S5.1: the surfaces 293 adds or moves
+    'rows': '#log',            # drag · edit · time, one column at the right edge of every row
+    'grouptab': '#h293Grp',    # the phone's third tab, holding the group panel
+    'ledger': '#h293Led',      # the journal's own ledger screen
+    'life': '#vWeeks, #h30Life',   # the life chart to 100 (desktop quadrant / phone Insights card)
 }
 GROUP = SEL['group']
 SETTINGS = SEL['settings']
@@ -93,7 +111,10 @@ SETTINGS = SEL['settings']
 # the full-height LIFE quadrant and ht18's cell floor leaves no room - see the wire's FOR SPEC.)
 PLAN = [('group', 1695), ('group', 1280), ('group', 390), ('group', 360), ('settings', 1695), ('settings', 390),
         ('inshero', 390), ('inshero', 360),
-        ('masthead', 1695), ('masthead', 1280), ('todaybar', 390), ('todaybar', 360)]
+        ('masthead', 1695), ('masthead', 1280), ('todaybar', 390), ('todaybar', 360),
+        ('rows', 390), ('rows', 360), ('grouptab', 390), ('grouptab', 360),
+        ('ledger', 390), ('ledger', 360), ('ledger', 1695), ('ledger', 1280),
+        ('life', 1695), ('life', 1280), ('life', 390), ('life', 360)]
 
 
 async def open_page(pw, url, w, scale):
@@ -113,7 +134,15 @@ async def open_page(pw, url, w, scale):
 
 async def reach(pg, surface, vw):
     # the phone Insights page (group card and the hero card both live there) is reached by a tap
-    if surface in ('group', 'inshero') and vw < 1024:
+    # PASTE 293 S2.7: the phone's group panel is the Group tab's page now - reached by ITS tap
+    if surface in ('group', 'grouptab') and vw < 1024:
+        await pg.evaluate("() => { const x = document.querySelector('#h29Bar [data-t293=\"group\"]'); if (x) x.click(); }")
+        await pg.wait_for_timeout(1200)
+    if surface == 'ledger':
+        await pg.evaluate("() => { const t = window.__HT293 && window.__HT293.ledger && window.__HT293.ledger.title(); "
+                          "const b = t && t.parentNode.querySelector('.h293lt'); if (b) b.click(); }")
+        await pg.wait_for_timeout(700)
+    if surface in ('inshero', 'life') and vw < 1024:
         await pg.evaluate("() => { const x = [...document.querySelectorAll('[data-t29]')].find(x => /insights/i.test(x.textContent)); if (x) x.click(); }")
         await pg.wait_for_timeout(1200)
     if surface == 'settings':

@@ -44,8 +44,10 @@ def find_estate(start):
 
 
 def fixture_dir(estate):
-    for d in (os.path.join(estate, '_machine', 'ht3'), os.path.join(estate, 'ht3')):
-        if os.path.isdir(d):
+    # PASTE 293: a private fixture when asked (179's HT_FIXTURE_DIR, which ht33-36 already honour), so a wire can
+    # iterate while another run holds the shared ht3
+    for d in (os.environ.get('HT_FIXTURE_DIR'), os.path.join(estate, '_machine', 'ht3'), os.path.join(estate, 'ht3')):
+        if d and os.path.isdir(d):
             return d
     return os.path.join(estate, '_machine', 'ht3')
 
@@ -254,7 +256,8 @@ async def sec_s2(pw):
         # routine . Standards, and renames the fourth. The assertion - "they render in the declared
         # order, and only the ones that have rows" - is unchanged.
         # AMENDED BY HT-194 S2 (R67.2, Cory 2026-09-24): Standards before Weekly routine; names unchanged.
-        names == [n for n in ['Morning routine', 'Night routine', 'Standards', 'Weekly routine'] if n in names]
+        # AMENDED BY PASTE 293 (R67.2, Cory 2026-09-28 09:23: "one category to be called Scheduled and then another one to be weekly and then another one to be standards"): three, in that order.
+        names == [n for n in ['Scheduled', 'Weekly', 'Standards'] if n in names]
         and all(h[1] for h in heads) and not [n for n in names if n in ('TIMED', 'ANYTIME', 'WEEKLY')], heads)
     rule = await pg.evaluate("""() => { const S=window.__HT29S2, out={};
       for(const h of (window.__MOCK_DB.habits||[])) out[h.id]=S.sectionOf(h); return out; }""")
@@ -271,7 +274,8 @@ async def sec_s2(pw):
     # what it is. `h0` carries a 05:00 and is now a Standard until Cory moves it, which he can do from
     # the row or the sheet in one tap.
     chk('S2c · the rule: weekly -> weekly, the Sabbath -> night, else standards - and NEVER by the clock',
-        rule.get('h0') == 'standards' and rule.get('h11') == 'weekly' and rule.get('h1') == 'night', rule)
+        # AMENDED BY PASTE 293 (R67.2, Cory 2026-09-28 09:23: "one category to be called Scheduled and then another one to be weekly and then another one to be standards"): an unplaced row and the Sabbath read as Scheduled; weekly stays weekly; still never by the clock.
+        rule.get('h0') == 'scheduled' and rule.get('h11') == 'weekly' and rule.get('h1') == 'scheduled', rule)
     # THE SHEET IS OPENED FIRST. Asked with the sheet shut, `#eSection` is absent because nothing is on
     # screen - the check passed with the column present, and would pass with the field always shown.
     await pg.click('#log .li .edp')
@@ -298,7 +302,8 @@ async def sec_s2(pw):
       for(const c of document.getElementById('log').children){
         if(c.classList.contains('grp')) cur=c.getAttribute('data-sec');
         else if(c.classList.contains('li')) o[c.getAttribute('data-h')]=cur; } return o; }""")
-    chk('S2e · a stored section wins over the rule', place.get('h0') == 'night' and place.get('h11') == 'standards',
+    # AMENDED BY PASTE 293 (R67.2, Cory 2026-09-28 09:23: "one category to be called Scheduled and then another one to be weekly and then another one to be standards"): a stored `night` is drawn under Scheduled; a stored `standards` still wins over the rule.
+    chk('S2e · a stored section wins over the rule', place.get('h0') == 'scheduled' and place.get('h11') == 'standards',
         {k: place.get(k) for k in ('h0', 'h11')})
     await pg.evaluate("() => { window.__UPDATES=[]; const r=document.querySelector('#log .li[data-h=h0] .edp'); r.click(); }")
     await pg.wait_for_timeout(500)
@@ -317,7 +322,8 @@ async def sec_s2(pw):
     # must not write `notes` AT ALL (writing '' or null would have wiped every definition of done -
     # the defect `saveSheet` now guards against by element presence, as it already did for the cue).
     chk('S2f · the sheet has Section (four, the row\'s own selected), and no free text (HT-30 S3.8)',
-        sheet['has'] and sheet['val'] == 'night' and sheet['opts'] == ['morning', 'night', 'standards', 'weekly']
+        # AMENDED BY PASTE 293 (R67.2, Cory 2026-09-28 09:23: "one category to be called Scheduled and then another one to be weekly and then another one to be standards"): the picker offers the three, and a stored night selects Scheduled.
+        sheet['has'] and sheet['val'] == 'scheduled' and sheet['opts'] == ['scheduled', 'weekly', 'standards']
         # the FIELD is what "no free text" means: HT-30 hides the textarea and leaves its row inside
         # "More" (hidden, never deleted), so the LABEL is still in the DOM and `#eNotes` is not.
         and not sheet['notesInput']
@@ -357,7 +363,10 @@ async def sec_s2(pw):
     # carries it" - the logged time is SHOWN with one signed number beside it, which is now the only lateness signal.
     nums = await pg.evaluate("() => [...document.querySelectorAll('#log .li .dat .v194')].map(n => n.textContent)")
     chk('S2j · the logged time is on the row with ONE small number beside it (%s)' % nums,
-        all(d['datShown'] for d in dots if d['cls']) and sorted(nums) == sorted(['+10', '+50', '+110']), (dots[:4], nums))
+        # AMENDED BY PASTE 293 (R67.2, Cory 2026-09-28 09:23: "one category to be called Scheduled and then another one to be weekly and then another one to be standards") and "any task that is pulled into weekly or standards doesn't have a time": S2g above moved
+        # h0 into Standards, so ITS time is hidden (kept in the data); the Scheduled rows still show theirs.
+        all(d['datShown'] for d in dots if d['cls'] and d['id'] != 'h0')
+        and all(not d['datShown'] for d in dots if d['id'] == 'h0') and sorted(nums) == sorted(['+10', '+50', '+110']), (dots[:4], nums))
     await pg.evaluate("() => document.querySelector('#log .li[data-h=h1] .dot29').click()")
     await pg.wait_for_timeout(200)
     said = await pg.evaluate("() => (document.getElementById('toast')||{}).textContent||''")
@@ -368,18 +377,21 @@ async def sec_s2(pw):
     # the add-link may PLACE a standard that is already on the list (no name is ever in this repository)
     # the default fixture's list holds "Prayer" (the BIGSET one does not) - the point is a name already there
     b, pg, errs = await open_page(pw, 390, 844, flags=dict(SQL),
-                                  qs=add_link([{'n': 'Prayer', 's': 'night'}, {'n': 'A brand new one', 's': 'night', 't': '21:45'}]))
+                                  qs=add_link([{'n': 'Prayer', 's': 'standards'}, {'n': 'A brand new one', 's': 'night', 't': '21:45'}]))
     await pg.wait_for_timeout(900)
     card = await pg.evaluate("() => { const n=document.getElementById('h28First'); return n && n.classList.contains('on') ? n.innerText : null; }")
-    chk('S2l · the add-link card offers to place what is already there', card and 'night routine' in card.lower(), (card or '')[:160])
+    # AMENDED BY PASTE 293 (R67.2, Cory 2026-09-28 09:23: "one category to be called Scheduled and then another one to be weekly and then another one to be standards"): a link that says `night` places into Scheduled, and says so.
+    chk('S2l · the add-link card offers to place what is already there', card and 'standards' in card.lower(), (card or '')[:160])   # PASTE 293: Prayer is placed into Standards
     await pg.evaluate("() => { window.__UPDATES=[]; window.__INSERTS=[]; const b=document.getElementById('h28Seed'); b && b.click(); }")
     await pg.wait_for_timeout(900)
     res = await pg.evaluate("() => ({ up:(window.__UPDATES||[]).map(u=>u[1]), ins:(window.__INSERTS||[]).map(i=>i[1]), add:window.__h28Add })")
     ins = res['ins'][0] if res['ins'] else []
     chk('S2m · it adds the missing one with its section and places the one that exists',
         res['add'] and res['add'].get('placed') == 1 and res['add'].get('added') == 1
-        and any(u.get('section') == 'night' for u in res['up'])
-        and any(r.get('section') == 'night' for r in (ins if isinstance(ins, list) else [ins])), res)
+        # AMENDED BY PASTE 293 (R67.2, Cory 2026-09-28 09:23: "one category to be called Scheduled and then another one to be weekly and then another one to be standards"): Scheduled is WRITTEN as `morning` until the migration is proven (the live constraint).
+        # PASTE 293: 'Prayer' is unplaced, which reads as Scheduled now - so the link MOVES it to Standards (a real placement)
+        and any(u.get('section') == 'standards' for u in res['up'])
+        and any(r.get('section') == 'morning' for r in (ins if isinstance(ins, list) else [ins])), res)
     await no_errors(pg, errs, 'S2 (add-link)')
     await b.close()
 
@@ -435,7 +447,8 @@ async def sec_s3(pw):
         # have no stored section, and a clock no longer places one, so the member's day heads the same
         # rows under the section they are actually in. What the line asserts - that a co-member's day
         # comes with ITS SECTIONS and its check marks, and is read-only - is untouched.
-        day['open'] and day['rows'] >= 2 and day['ticks'] == 1 and 'Standards' in day['secs'], {k: day[k] for k in ('rows', 'ticks', 'secs')})
+        # AMENDED BY PASTE 293 (R67.2, Cory 2026-09-28 09:23: "one category to be called Scheduled and then another one to be weekly and then another one to be standards"): the unplaced rows head under Scheduled.
+        day['open'] and day['rows'] >= 2 and day['ticks'] == 1 and 'Scheduled' in day['secs'], {k: day[k] for k in ('rows', 'ticks', 'secs')})
     chk('S3h · the late dot is computed from their own clock (06:40 against 06:00)',
         any('late' in c for c in day['dots']), day['dots'])
     chk('S3i · the rating NUMBER shows', re.search(r'rated \d', day['text']) is not None, day['text'][:120])
@@ -513,8 +526,9 @@ async def sec_s5(pw):
     # middle door is hidden (never deleted - it is still the second child, with `hidden` on it). The
     # property this line asserts - the phone has ONE bottom bar and the old tabs are not a second door
     # - is unchanged, and is now stronger: there are two doors on it, not three.
-    chk('S5a · the phone has one bottom bar: Today · Insights',
-        bar['on'] and bar['shown'] == ['Today', 'Insights'] and bar['old'] == 'none', bar)
+    # AMENDED BY PASTE 293 S2.7 (R67.2, Cory 2026-09-28: "a group tab as a third tab"): still ONE bar, three doors.
+    chk('S5a · the phone has one bottom bar: Today · Insights · Group',
+        bar['on'] and bar['shown'] == ['Today', 'Insights', 'Group'] and bar['old'] == 'none', bar)
     await pg.click('#h29Bar [data-t29=insights]')
     await pg.wait_for_timeout(800)
     # HT-30 moves these three cards onto the one Insights page; they keep their ids, classes and
@@ -529,7 +543,9 @@ async def sec_s5(pw):
     # AMENDED BY NAME, HT-30 (paste 137 S6.14): the same three cards, in the order Cory's one page
     # puts them - the trend, then the group side by side, then what makes a good day. "Exactly three,
     # and these three" is what this line asserts, and it still does.
-    chk('S5b · exactly three on the surface', ins['cards'] == ['trend', 'group', 'rate'], ins['cards'])
+    # AMENDED BY PASTE 293 S2.7: the same three cards exist; the group one now lives on the Group tab's page, so it is
+    # last in document order. "Exactly three, and these three" is what this line asserts, and it still does.
+    chk('S5b · exactly three on the surface', sorted(ins['cards']) == ['group', 'rate', 'trend'], ins['cards'])
     chk('S5c · HT-26\'s five are under More, not gone', ins['fiveUnderMore'] and ins['moreOpen'] is False, ins)
     chk('S5d · no horizontal scroll at 390', ins['wide'] <= ins['vw'] + 1, (ins['wide'], ins['vw']))
     bars7 = await pg.evaluate("() => document.querySelectorAll('.h29c .ch29 rect').length")

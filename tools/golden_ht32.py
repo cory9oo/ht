@@ -46,8 +46,10 @@ ESTATE = find_estate(REPO)
 
 
 def fixture_dir(estate):
-    for d in (os.path.join(estate, '_machine', 'ht3'), os.path.join(estate, 'ht3')):
-        if os.path.isdir(d):
+    # PASTE 293: a private fixture when asked (179's HT_FIXTURE_DIR, which ht33-36 already honour), so a wire can
+    # iterate while another run holds the shared ht3
+    for d in (os.environ.get('HT_FIXTURE_DIR'), os.path.join(estate, '_machine', 'ht3'), os.path.join(estate, 'ht3')):
+        if d and os.path.isdir(d):
             return d
     raise SystemExit('golden_ht32: no fixture under %s - looked for _machine/ht3 and ht3.' % estate)
 
@@ -656,9 +658,11 @@ async def sec_s8(pw):
     # the zone must be a real IANA name the BROWSER resolved, not the word "timezone" in a
     # label - the first spelling of this asserted the label and would have passed on an empty
     # detection, which is the case it exists to catch.
-    chk('S8d . MY WEEK carries the stakes, the hour and the DETECTED zone - nobody picks a timezone '
+    # AMENDED BY PASTE 293 S1.3 (R67.2, Cory 2026-09-28: "take away my day closes at time feature - assume each day
+    # starts the next day at 12 AM"): the hour is GONE from My week; the detected zone stays and says the day rolls at midnight.
+    chk('S8d . MY WEEK carries the stakes and the DETECTED zone, and no close-time hour - nobody picks a timezone '
         'from a list of four hundred',
-        got['hour'] and re.search(r'[A-Za-z]+/[A-Za-z_]+', got['tz'] or ''), got)
+        not got['hour'] and re.search(r'[A-Za-z]+/[A-Za-z_]+', got['tz'] or '') and 'midnight' in (got['tz'] or ''), got)
     chk('S8e . and the member\'s own stakes are in the box, ready to edit from their own phone (N1)',
         'day off' in (got['rw'] or ''), got)
     chk('S8f . zero page errors', not errs, errs[:2])

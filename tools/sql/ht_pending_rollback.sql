@@ -5,6 +5,18 @@
 -- was applied would drop a column another one still depends on. Run the whole file, or lift out the
 -- one block you want - each is complete on its own.
 
+-- ---- undo of 2026-09-28_ht293_sections.sql ----------------------------------------------------------
+begin;
+update public.habits set section = section_before_ht293
+ where section = 'scheduled' and section_before_ht293 in ('morning', 'night');
+update public.habits set section = 'morning' where section = 'scheduled';
+alter table public.habits drop constraint if exists habits_section_ht293;
+alter table public.habits drop constraint if exists habits_section_ht29;
+alter table public.habits add constraint habits_section_ht29
+  check (section is null or section in ('morning', 'night', 'standards', 'weekly'));
+commit;
+-- (show_on_sabbath and section_before_ht293 are KEPT - DEC-037)
+
 -- ---- undo of 2026-09-23_ht32.sql ----------------------------------------------------------
 -- 2026-09-23_ht32.sql carries no UNDO block of its own.
 

@@ -43,8 +43,10 @@ except Exception: pass
 def fixture_dir(estate):
     """The headless fixture. R70.345 (2026-09-10) moved it with the machinery to <BEV>/_machine/ht3;
     the old <BEV>/ht3 is the fallback, so this runs in either layout."""
-    for d in (os.path.join(estate, '_machine', 'ht3'), os.path.join(estate, 'ht3')):
-        if os.path.isdir(d):
+    # PASTE 293: a private fixture when asked (179's HT_FIXTURE_DIR, which ht33-36 already honour), so a wire can
+    # iterate while another run holds the shared ht3
+    for d in (os.environ.get('HT_FIXTURE_DIR'), os.path.join(estate, '_machine', 'ht3'), os.path.join(estate, 'ht3')):
+        if d and os.path.isdir(d):
             return d
     return os.path.join(estate, '_machine', 'ht3')
 
@@ -867,6 +869,10 @@ async def run_s7(pw):
             % (t, m['tapeStats']),
             not m['tapeVisible'] and m['tapeStats'] >= 10 and m['tapeH'] == 0,
             {'visible': m['tapeVisible'], 'stats': m['tapeStats'], 'h': m['tapeH']})
+        # PASTE 293 S2.8 (Cory 2026-09-28 09:31: "Life chart to loosen HT18, grow at 10 rows ... X and Y on desktop and on
+        # phone app are identical"): MEASURED, and the floor did NOT need loosening - the grid already ran 100 rows; what
+        # read as "90" was a clipped 6.5px `100`. At 100 rows the life cell is 4.05px at 1920x855 (6.02 @1920x1080, 4.5
+        # @1600x900) with the `100` drawn full size in a 20px gutter. The floor stays 4 and is never loosened (R67.2).
         chk("C6 · %s · LIFE is ONE graph, no folds, cell %s" % (t, m['cell']),
             m['folds'] == 1 and m['cell'] >= 4, [m['folds'], m['cell']])
         chk("C7 · %s · one page, a bounded 96px of give, no sideways scroll (note 8)" % t,

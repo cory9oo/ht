@@ -52,8 +52,10 @@ CONTAINER = os.path.dirname(ESTATE) if os.path.basename(ESTATE).lower() == '_mac
 
 
 def fixture_dir(estate):
-    for d in (os.path.join(estate, '_machine', 'ht3'), os.path.join(estate, 'ht3')):
-        if os.path.isdir(d):
+    # PASTE 293: a private fixture when asked (179's HT_FIXTURE_DIR, which ht33-36 already honour), so a wire can
+    # iterate while another run holds the shared ht3
+    for d in (os.environ.get('HT_FIXTURE_DIR'), os.path.join(estate, '_machine', 'ht3'), os.path.join(estate, 'ht3')):
+        if d and os.path.isdir(d):
             return d
     raise SystemExit('golden_ht31: no fixture under %s - looked for _machine/ht3 and ht3. Returning a '
                      'path that does not exist only moves the failure somewhere less readable.' % estate)
@@ -206,14 +208,16 @@ async def sec_s1(pw):
     for t in ('05:00', '12:30', '21:30', '23:59', '00:00'):
         b, pg, errs = await open_page(pw, 390, 844, flags={'__ANCHORS': {'h0': {'a': t, 'm': 20}}})
         where = await pg.evaluate(UNDER, 'h0')
-        chk('S1d . no column, planned %s . the row stays in Standards' % t, where == 'Standards', where)
+        # AMENDED BY PASTE 293 (R67.2, Cory 2026-09-28 09:23: "one category to be called Scheduled and then another one to be weekly and then another one to be standards"): an unplaced row is Scheduled without a time - still never moved by its clock.
+        chk('S1d . no column, planned %s . the row stays where the rule puts it: Scheduled, whatever the hour' % t, where == 'Scheduled', where)
         await b.close()
     # with the column, the stored section wins at every hour
     for t in ('05:00', '21:30'):
         b, pg, errs = await open_page(pw, 390, 844, flags=dict(SQL, __SECTIONS={'h0': 'night'},
                                                                __ANCHORS={'h0': {'a': t, 'm': 20}}))
         where = await pg.evaluate(UNDER, 'h0')
-        chk('S1e . placed night, planned %s . it is in Night routine' % t, where == 'Night routine', where)
+        # AMENDED BY PASTE 293 (R67.2, Cory 2026-09-28 09:23: "one category to be called Scheduled and then another one to be weekly and then another one to be standards"): Night routine is one Scheduled.
+        chk('S1e . placed night, planned %s . it is in Scheduled (night reads as Scheduled)' % t, where == 'Scheduled', where)
         await b.close()
 
     # the other half: no renderer re-groups the list behind the sections' back
@@ -238,13 +242,16 @@ async def sec_s1(pw):
     await pg.evaluate("() => window.__HT31SEC.place('h0','night')")
     await pg.evaluate("() => window.__HT29S2 && window.__HT29S2.regroup()")
     await pg.wait_for_timeout(600)
-    chk('S1j . and the row moves there, with no column and no migration',
-        await pg.evaluate(UNDER, 'h0') == 'Night routine', await pg.evaluate(UNDER, 'h0'))
+    # AMENDED BY PASTE 293 (R67.2, Cory 2026-09-28 09:23: "one category to be called Scheduled and then another one to be weekly and then another one to be standards"): a device placement of `night` reads as Scheduled.
+    chk('S1j . and the row moves there, with no column and no migration (night -> Scheduled)',
+        await pg.evaluate(UNDER, 'h0') == 'Scheduled', await pg.evaluate(UNDER, 'h0'))
     moved = await pg.evaluate("""() => { const st=window.__HT25S3.state();
       st.habits[2].section='morning'; st.habits[2].time_anchor='21:45';
       return window.__HT31MOVED.list().map(r => r.id + ':' + r.suggest); }""")
-    chk('S1k . a task stored `morning` with an evening time is listed for one tap, never moved silently',
-        any(x.endswith(':night') for x in moved), moved)
+    # AMENDED BY PASTE 293 (R67.2, Cory 2026-09-28 09:23: "one category to be called Scheduled and then another one to be weekly and then another one to be standards"): morning and night are ONE Scheduled, so a
+    # timed task can no longer sit in the wrong one of them - the review has nothing to list, and it still never moves one.
+    chk('S1k . a task stored `morning` with an evening time is no longer "misplaced" - nothing listed, nothing moved',
+        moved == [] and await pg.evaluate(UNDER, 'h2') == 'Scheduled', [moved, await pg.evaluate(UNDER, 'h2')])
     await b.close()
 
 
@@ -311,21 +318,23 @@ async def sec_s2(pw):
     # places FOUR rows across the four sections and gives NONE of them a time, so there are ghosts to
     # find, ghosts that must NOT be there, and a number on both.
     b, pg, errs = await open_page(pw, 390, 844, flags=dict(SQL, **PLACED))
-    ghosts = await pg.evaluate("""() => { const out={in:[], out:[]};
+    ghosts = await pg.evaluate("""() => { const out={in:[], out:[], wrong:[]};
       for (const r of document.querySelectorAll('#log .li')){
         let p=r.previousElementSibling, h='';
         while(p){ if(p.classList && p.classList.contains('grp')){ h=p.textContent.trim(); break; } p=p.previousElementSibling; }
-        const wants = true;   /* paste 179 S1: the ghost is on EVERY section now, not Morning and Night only */
+        const wants = (h === 'Scheduled');   /* PASTE 293 (Cory 9/28): the time option on Scheduled rows only */
         const has = !!r.querySelector('.ht31ghost');
         if (has) out.in.push(h);
+        if (has && !wants) out.wrong.push(r.getAttribute('data-h'));
         if (wants && !has && !r.querySelector('.pat30')) out.out.push(r.getAttribute('data-h'));
       }
       return out; }""")
     # paste 179 S1 moved the rule this check holds: a row with no time shows `+ time` in all four sections.
-    chk('S2l . every ghost + time sits in one of the four sections, and there IS at least one (%d)' % len(ghosts['in']),
-        len(ghosts['in']) >= 1
-        and all(h in ('Morning routine', 'Night routine', 'Weekly routine', 'Standards') for h in ghosts['in']), ghosts)
-    chk('S2m . and no timeless row in any section was left without one',
+    # AMENDED BY PASTE 293 (R67.2, Cory 2026-09-28 09:23: "one category to be called Scheduled and then another one to be weekly and then another one to be standards"): "any task that is pulled into
+    # Scheduled presents the time option" - the ghost is on Scheduled rows only, and on every timeless one of them.
+    chk('S2l . every ghost + time sits in Scheduled, and there IS at least one (%d)' % len(ghosts['in']),
+        len(ghosts['in']) >= 1 and all(h == 'Scheduled' for h in ghosts['in']) and not ghosts['wrong'], ghosts)
+    chk('S2m . and no timeless Scheduled row was left without one',
         not ghosts['out'], ghosts['out'][:4])
     chk('S2n . zero page errors', not errs, errs[:2])
     await b.close()
@@ -380,7 +389,9 @@ async def sec_s3(pw):
             m['h'] >= floor and 9.0 <= cut <= 15.0, m)
         # the two sizes are HT-28's and HT-30's, measured before this wire and unchanged by it: the
         # height came out of padding and out of the control boxes, never out of the type.
-        want = {390: '14px', 1280: '12.5px'}[w]
+        # AMENDED BY PASTE 293 S2.3 (R67.2, Cory 2026-09-28: "minimize the text a little bit on the phone ... rows
+        # expand horizontally more than vertically"): the phone's row title is one scale step down, 13px, never below.
+        want = {390: '13px', 1280: '12.5px'}[w]
         chk('S3c . %d . the TEXT is still %s and no name is clipped' % (w, want),
             m['font'] == want and not m['clipped'], m)
         # synthetic taps at +-8px of each row's centre land on that row
@@ -422,7 +433,9 @@ async def sec_s3(pw):
 # AMENDED BY HT-228 (R67.2, Cory 2026-09-24 23:27 "these percentages ... belong to the top of the insight
 # tab ... it's too hidden and doesn't trigger enough emotion"): the day's-percent HERO card 'Today' is the
 # first thing under the Insights title, above his four; nothing else moves.
-FOUR = ['Today', 'The month', 'The year', 'The group, side by side', 'The life']
+# AMENDED BY PASTE 293 S2.7 (R67.2, Cory 2026-09-28: "a group tab as a third tab"): the group card MOVES to the Group
+# tab; Insights keeps the hero, the month, the year and the life (golden_ht38 S2 holds the tab).
+FOUR = ['Today', 'The month', 'The year', 'The life']
 
 
 async def sec_s4(pw):
@@ -543,8 +556,9 @@ async def sec_s6(pw):
       return c ? { on:c.classList.contains('on'), lines:c.querySelectorAll('.h28l li').length,
                    ex: !!document.getElementById('h28Ex'),
                    text:(c.innerText||'') } : null; }""")
-    chk('S6f . a new account opens on the card, and it names the four sections',
-        card and card['on'] and 'Morning routine' in card['text'] and 'Standards' in card['text'],
+    # AMENDED BY PASTE 293 (R67.2, Cory 2026-09-28 09:23): the card names the THREE - Scheduled, Weekly, Standards.
+    chk('S6f . a new account opens on the card, and it names the three sections',
+        card and card['on'] and 'Scheduled' in card['text'] and 'Weekly' in card['text'] and 'Standards' in card['text'],
         card and card['text'][:140])
     chk('S6g . the starter list is EXAMPLES - not blank, and not anyone else\'s standards',
         card and card['ex'] and 'Move for 20 minutes' in card['text'] and 'Read 10 pages' in card['text'],

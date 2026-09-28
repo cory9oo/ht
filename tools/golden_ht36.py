@@ -269,7 +269,10 @@ async def sec_s2(pw):
     chk('S2c . phone . the bar percent equals the day\'s completion (the hero\'s)',
         ok and bar['pct'] == (str(bar['nums']['today']) + '%'), ok and [bar['pct'], bar['nums']])
     chk('S2d . phone . the fill is as wide as the percent', ok and bar['fillW'] == (str(bar['nums']['today']) + '%'), ok and bar['fillW'])
-    chk('S2e . phone . its one text link is Insights', ok and bar['go'] and 'INSIGHTS' in bar['go'].upper(), ok and bar['go'])
+    # AMENDED BY PASTE 293 S2.1 (R67.2, Cory 2026-09-28: "you can remove the insights ... verbiage on the today's tab. It is
+    # a duplicate because I can already get to insights by clicking on the tab at the bottom"): the words are GONE; the
+    # bar's tap still opens Insights (the next check).
+    chk('S2e . phone . the bar carries no "Insights" words any more', ok and not bar['go'], ok and bar['go'])
     # the tap opens Insights
     await pg.click('#tStrip')
     await pg.wait_for_timeout(700)

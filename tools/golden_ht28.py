@@ -42,8 +42,10 @@ def find_estate(start):
 
 
 def fixture_dir(estate):
-    for d in (os.path.join(estate, '_machine', 'ht3'), os.path.join(estate, 'ht3')):
-        if os.path.isdir(d):
+    # PASTE 293: a private fixture when asked (179's HT_FIXTURE_DIR, which ht33-36 already honour), so a wire can
+    # iterate while another run holds the shared ht3
+    for d in (os.environ.get('HT_FIXTURE_DIR'), os.path.join(estate, '_machine', 'ht3'), os.path.join(estate, 'ht3')):
+        if d and os.path.isdir(d):
             return d
     return os.path.join(estate, '_machine', 'ht3')
 
@@ -183,7 +185,8 @@ async def sec_a(pw):
     chk("A4 · every row is still a >= 32px tap target and the checkbox target is 44 wide by the row",
         m['rowMin'] >= 32 and m['bxw'][0] == 44 and abs(m['bxw'][1] - m['row0']) <= 2,
         [m['rowMin'], m['row0'], m['bxw']])
-    chk("A4 · standard names are 14px (15px before) and the duplicate time prefix is gone", m['nmFont'] == '14px' and m['tpfx'] == 0, [m['nmFont'], m['tpfx']])
+    # AMENDED BY PASTE 293 S2.3 (R67.2, Cory 2026-09-28: "minimize the text a little bit on the phone"): 14 -> 13px.
+    chk("A4 · standard names are 13px (15px before) and the duplicate time prefix is gone", m['nmFont'] == '13px' and m['tpfx'] == 0, [m['nmFont'], m['tpfx']])
     # AMENDED BY NAME, HT-30 (paste 137 S3.9 + S4.11): 584 -> 523 px. A measurement replaced by a
     # measurement: the rows above it are a quarter thinner, and the why's field AND its label are off
     # the phone (the first cut hid the field and left the word "Why" standing over nothing - the shot
@@ -788,8 +791,10 @@ async def sec_e(pw):
     # renames the fourth. E14 asserts the same property about the same four names.
     # AMENDED BY HT-194 S2 (R67.2, Cory 2026-09-24): Standards before Weekly routine; names unchanged.
     SECS29 = ['Morning routine', 'Night routine', 'Standards', 'Weekly routine']
-    chk("E14 · the sections are Morning routine, Night routine, Standards, Weekly routine",
-        sat['heads'] == [s for s in SECS29 if s in sat['heads']] and sat['heads'], sat['heads'])
+    # AMENDED BY PASTE 293 S1.2 (R67.2, Cory 2026-09-28: "I only want to ever see ... on a Saturday ... Sabbath and it's just
+    # one ... task completion checkbox"): on the Sabbath the section headers go with the rows - Today is one row, one box.
+    chk("E14 · on the Sabbath no section header is drawn - one row, one box (paste 293)",
+        sat['heads'] == [], sat['heads'])
     chk("F16 · Saturday: the Sabbath is one ordinary due item (in the denominator, weight 1)", 'h1' in sat['daily'], sat['daily'])
     await pg.evaluate("() => { window.__WRITES=[]; }")
     await pg.click('#log .li[data-h="h1"]'); await pg.wait_for_timeout(1300)
@@ -913,8 +918,9 @@ async def sec_f(pw):
     def under(n):
         i = order.index(n)
         return next((x for x in reversed(order[:i]) if x.startswith('#')), None)
-    chk("F19 · they render on a weekday: all three in Standards, because a clock places nothing",
-        '#Standards' in order and all(n in order and under(n) == '#Standards' for n in names), order)
+    # AMENDED BY PASTE 293 (R67.2, Cory 2026-09-28 09:23): an unplaced row is Scheduled without a time.
+    chk("F19 · they render on a weekday: all three in Scheduled, because a clock places nothing",
+        '#Scheduled' in order and all(n in order and under(n) == '#Scheduled' for n in names), order)
     after = await pg.evaluate("(n) => JSON.stringify(window.__MOCK_DB.habits.filter(h=>n.indexOf(h.name)<0).map(h=>[h.id,h.name,h.cadence,h.sort_order,h.time_anchor||null]))", names)
     ups = await pg.evaluate("() => (window.__UPDATES||[]).filter(u=>u[0]==='habits').length")
     chk("F19 · every existing standard is untouched", before == after and ups == 0, [ups])
@@ -977,7 +983,8 @@ async def sec_g(pw):
     # is in Weekly routine and the other three are in Standards, which is where he moves them from.
     chk("G21 · one tap starts from four EXAMPLES across Weekly routine and Standards",
         # AMENDED BY HT-194 S2/S3 (R67.2): all four headers render, empty ones included, in Cory's 9/24 order
-        e['rows'] == 4 and e['heads'] == ['Morning routine', 'Night routine', 'Standards', 'Weekly routine'] and not e['card']
+        # AMENDED BY PASTE 293 (R67.2, Cory 2026-09-28 09:23): Scheduled . Weekly . Standards
+        e['rows'] == 4 and e['heads'] == ['Scheduled', 'Weekly', 'Standards'] and not e['card']
         and e['ins'] == [['Move for 20 minutes|daily|07:00', 'Read 10 pages|daily|', 'Lights out|daily|22:30', 'Plan the week|weekly|']], e)
     # edit: rename + Days + delete, all in the app
     rid = await pg.evaluate("() => [...document.querySelectorAll('#log .li')].find(r=>/Read 10 pages/.test(r.textContent)).getAttribute('data-h')")
