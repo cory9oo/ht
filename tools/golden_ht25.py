@@ -297,7 +297,8 @@ async def s3(pw):
         # is renamed. S3h and S3i assert the same two properties about the same four names.
         # AMENDED BY HT-194 S2 (R67.2, Cory 2026-09-24): Standards now comes BEFORE Weekly routine; names unchanged.
         # AMENDED BY PASTE 293 (R67.2, Cory 2026-09-28 09:23): Scheduled . Weekly . Standards, and nothing else.
-        SECS29 = ['Scheduled', 'Weekly', 'Standards']
+        # AMENDED BY PASTE 357 (Cory 2026-09-28 21:10: "Standards above the Weekly, Weekly at the bottom"): Standards moves above Weekly.
+        SECS29 = ['Scheduled', 'Standards', 'Weekly']
         chk('S3h · the headers read the three sections and nothing else',
             heads and all(h in SECS29 for h in heads), heads)
         chk('S3i · and they appear in that order',

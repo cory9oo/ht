@@ -24,7 +24,8 @@ from golden293_lib import Golden, REPO, open_page, src, no_errors, today_key_js 
 
 G = Golden('HT-37 (paste 293 S1 · the day model)')
 chk = G.chk
-THREE = ['Scheduled', 'Weekly', 'Standards']
+# AMENDED BY PASTE 357 (Cory 2026-09-28 21:10: "Standards above the Weekly, Weekly at the bottom"): Standards moves above Weekly.
+THREE = ['Scheduled', 'Standards', 'Weekly']
 
 # A fixture world, laid over the mock's own data inside the page: five habits, a Sabbath on TODAY's weekday.
 WORLD = r"""(opts) => {
@@ -48,9 +49,9 @@ WORLD = r"""(opts) => {
 
 
 async def s1(pw):
-    G.sec('S1', 'Scheduled · Weekly · Standards')
+    G.sec('S1', 'Scheduled · Standards · Weekly')
     js = src(os.path.join(REPO, 'app.js'))
-    chk('S1a . HT29SEC declares the three, in his order', "var ORDER = ['scheduled','weekly','standards'];" in js)
+    chk('S1a . HT29SEC declares the three, in his order', "var ORDER = ['scheduled','standards','weekly'];" in js)
     chk('S1b . and names them exactly as he did',
         "var NAMES = { scheduled:'Scheduled', weekly:'Weekly', standards:'Standards' };" in js)
     chk('S1c . morning · night · anytime read as Scheduled (read-side only)',

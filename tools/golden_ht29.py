@@ -257,7 +257,8 @@ async def sec_s2(pw):
         # order, and only the ones that have rows" - is unchanged.
         # AMENDED BY HT-194 S2 (R67.2, Cory 2026-09-24): Standards before Weekly routine; names unchanged.
         # AMENDED BY PASTE 293 (R67.2, Cory 2026-09-28 09:23: "one category to be called Scheduled and then another one to be weekly and then another one to be standards"): three, in that order.
-        names == [n for n in ['Scheduled', 'Weekly', 'Standards'] if n in names]
+        # AMENDED BY PASTE 357 (Cory 2026-09-28 21:10: "Standards above the Weekly, Weekly at the bottom"): Standards moves above Weekly.
+        names == [n for n in ['Scheduled', 'Standards', 'Weekly'] if n in names]
         and all(h[1] for h in heads) and not [n for n in names if n in ('TIMED', 'ANYTIME', 'WEEKLY')], heads)
     rule = await pg.evaluate("""() => { const S=window.__HT29S2, out={};
       for(const h of (window.__MOCK_DB.habits||[])) out[h.id]=S.sectionOf(h); return out; }""")
@@ -323,7 +324,8 @@ async def sec_s2(pw):
     # the defect `saveSheet` now guards against by element presence, as it already did for the cue).
     chk('S2f · the sheet has Section (four, the row\'s own selected), and no free text (HT-30 S3.8)',
         # AMENDED BY PASTE 293 (R67.2, Cory 2026-09-28 09:23: "one category to be called Scheduled and then another one to be weekly and then another one to be standards"): the picker offers the three, and a stored night selects Scheduled.
-        sheet['has'] and sheet['val'] == 'scheduled' and sheet['opts'] == ['scheduled', 'weekly', 'standards']
+        # AMENDED BY PASTE 357 (Cory 2026-09-28 21:10: "Standards above the Weekly, Weekly at the bottom"): Standards moves above Weekly.
+        sheet['has'] and sheet['val'] == 'scheduled' and sheet['opts'] == ['scheduled', 'standards', 'weekly']
         # the FIELD is what "no free text" means: HT-30 hides the textarea and leaves its row inside
         # "More" (hidden, never deleted), so the LABEL is still in the DOM and `#eNotes` is not.
         and not sheet['notesInput']

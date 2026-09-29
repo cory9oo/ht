@@ -10012,7 +10012,10 @@ var HT29SEC = (function(){
   /* PASTE 293 S1.1 (Cory 2026-09-28 09:23, names confirmed 09:31): "one category to be called Scheduled and then
      another one to be weekly and then another one to be standards". THREE, in that order. Read-side mapping:
      morning · night · anytime · timed · null -> scheduled; the stored value is never rewritten by a read. */
-  var ORDER = ['scheduled','weekly','standards'];
+  /* PASTE 357 S1 (Cory 2026-09-28 21:10, from his phone): "Standards above the Weekly, Weekly at the bottom. Just
+     swap the two sections." Scheduled stays first; Standards moves up, Weekly to the bottom. Display order only —
+     NAMES, sectionOf, store, the daily/weekly reset rules and the journal shape (HT29MD) are all untouched. */
+  var ORDER = ['scheduled','standards','weekly'];
   var NAMES = { scheduled:'Scheduled', weekly:'Weekly', standards:'Standards' };
   var LEGACY = { morning:'scheduled', night:'scheduled', anytime:'scheduled', timed:'scheduled' };
   function sectionOf(h){

@@ -984,7 +984,8 @@ async def sec_g(pw):
     chk("G21 · one tap starts from four EXAMPLES across Weekly routine and Standards",
         # AMENDED BY HT-194 S2/S3 (R67.2): all four headers render, empty ones included, in Cory's 9/24 order
         # AMENDED BY PASTE 293 (R67.2, Cory 2026-09-28 09:23): Scheduled . Weekly . Standards
-        e['rows'] == 4 and e['heads'] == ['Scheduled', 'Weekly', 'Standards'] and not e['card']
+        # AMENDED BY PASTE 357 (Cory 2026-09-28 21:10: "Standards above the Weekly, Weekly at the bottom"): Standards moves above Weekly.
+        e['rows'] == 4 and e['heads'] == ['Scheduled', 'Standards', 'Weekly'] and not e['card']
         and e['ins'] == [['Move for 20 minutes|daily|07:00', 'Read 10 pages|daily|', 'Lights out|daily|22:30', 'Plan the week|weekly|']], e)
     # edit: rename + Days + delete, all in the app
     rid = await pg.evaluate("() => [...document.querySelectorAll('#log .li')].find(r=>/Read 10 pages/.test(r.textContent)).getAttribute('data-h')")

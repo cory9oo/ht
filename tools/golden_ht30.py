@@ -163,7 +163,8 @@ async def sec_s0(pw):
 # AMENDED BY HT-194 S2 (R67.2, Cory 2026-09-24 09:11): "morning routine, nightly routine, standards and then weekly
 # routine". Names unchanged; Standards moves before Weekly routine. Every check below asks the same question.
 # AMENDED BY PASTE 293 (R67.2, Cory 2026-09-28 09:23: "one category to be called Scheduled and then another one to be weekly and then another one to be standards") - three, in his order.
-ORDER = ['Scheduled', 'Weekly', 'Standards']
+# AMENDED BY PASTE 357 (Cory 2026-09-28 21:10: "Standards above the Weekly, Weekly at the bottom"): Standards moves above Weekly.
+ORDER = ['Scheduled', 'Standards', 'Weekly']
 
 
 async def sec_s1(pw):
@@ -171,8 +172,8 @@ async def sec_s1(pw):
     print("\n--- S1 . four sections, in Cory's 9/20 order ---")
     js = src(os.path.join(REPO, 'app.js'))
     m = re.search(r"var ORDER = \[([^\]]*)\];", js)
-    chk('S1a . HT29SEC declares scheduled, weekly, standards (paste 293)',
-        bool(m) and [x.strip().strip("'") for x in m.group(1).split(',')] == ['scheduled', 'weekly', 'standards'],
+    chk('S1a . HT29SEC declares scheduled, standards, weekly (paste 357)',
+        bool(m) and [x.strip().strip("'") for x in m.group(1).split(',')] == ['scheduled', 'standards', 'weekly'],
         m.group(1) if m else None)
     # AMENDED BY HT-194 S2: the markdown shape no longer carries its own literal - it READS HT29SEC.ORDER, which is
     # the strongest form of "the same order" (a second literal is how two lists drift).
@@ -239,7 +240,7 @@ async def sec_s1(pw):
     flags = dict(SQL); flags.update(PLACED); flags['__BIGSET'] = True; flags['__BLOCKS'] = True
     b, pg, errs = await open_page(pw, 390, 844, flags=flags)
     counts = await pg.evaluate("""() => { const st = window.__HT25S3.state();
-        const f = window.__HT29S2.sectionOf, ORDER = ['scheduled','weekly','standards'];   /* PASTE 293 */
+        const f = window.__HT29S2.sectionOf, ORDER = ['scheduled','standards','weekly'];   /* PASTE 357 */
         const due = [...document.querySelectorAll('#log .li')].map(r => r.getAttribute('data-h'));
         const placed = {}; ORDER.forEach(k => placed[k] = 0);
         let unplaceable = 0;

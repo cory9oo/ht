@@ -198,9 +198,10 @@ async def u2(pw):
                                                         '__SECTIONS': {'h0': 'morning', 'h1': 'night', 'h2': 'weekly'}})
     order = await pg.evaluate("() => [...document.querySelectorAll('#log > .grp[data-sec]')].map(x => x.getAttribute('data-sec'))")
     # AMENDED BY PASTE 293 (R67.2, Cory 2026-09-28 09:23: "one category to be called Scheduled and then another one to be weekly and then another one to be standards"): three, in his new order.
-    chk('U2a . Today renders Scheduled . Weekly . Standards', order == ['scheduled', 'weekly', 'standards'], order)
+    # AMENDED BY PASTE 357 (Cory 2026-09-28 21:10: "Standards above the Weekly, Weekly at the bottom"): Standards moves above Weekly.
+    chk('U2a . Today renders Scheduled . Standards . Weekly', order == ['scheduled', 'standards', 'weekly'], order)
     names = await pg.evaluate("() => [...document.querySelectorAll('#log > .grp[data-sec]')].map(x => x.textContent.trim())")
-    chk('U2b . the names are exactly his', names == ['Scheduled', 'Weekly', 'Standards'], names)
+    chk('U2b . the names are exactly his', names == ['Scheduled', 'Standards', 'Weekly'], names)
     md = await pg.evaluate("() => (window.__HT29MD && window.__HT29MD.SECTIONS) ? window.__HT29MD.SECTIONS.map(s => s.key || s[0] || s) : null")
     chk('U2c . the markdown shape reads the same order', md is None or [str(x).lower() for x in md][:4] == ['morning', 'night', 'standards', 'weekly'], md)
     await b.close()
