@@ -50,8 +50,14 @@ async def s1(pw):
         const nm = r.querySelector('.nm'), cs = getComputedStyle(nm), rg = document.createRange(); rg.selectNodeContents(nm);
         const lines = new Set([...rg.getClientRects()].filter(q => q.width > 0).map(q => Math.round(q.top))).size;
         return [parseFloat(cs.fontSize), cs.whiteSpace, lines]; })""")
-    chk('S1e . row titles one step smaller (13 px, never below), one line, an ellipsis',
-        dens and all(d[0] == 13 and d[1] == 'nowrap' and d[2] == 1 for d in dens), dens[:4])
+    # AMENDED BY PASTE 347 S1 (R67.2 - a golden is amended by name, not loosened): Cory, Monday
+    # 2026-09-28 8:02 PM, reversed 293's "one line, an ellipsis" - a clipped title is a task he cannot
+    # read. The 13px scale STAYS; the title now WRAPS (white-space:normal, never nowrap) and lays out on
+    # >=1 line. The three-line visual cap is `-webkit-line-clamp:3`, verified from computed style in
+    # golden_ht42 S1c - it is NOT measurable here, because getClientRects returns every LAYOUT line box
+    # (a long name lays out 6 boxes while the clamp paints only 3), so this holds the wrap, not the cap.
+    chk('S1e . row titles 13 px (never below) and WRAP - never one clipped line (paste 347 S1)',
+        dens and all(d[0] == 13 and d[1] != 'nowrap' and d[2] >= 1 for d in dens), dens[:4])
     col = await pg.evaluate("""() => [...document.querySelectorAll('#log .li')].filter(r => r.offsetParent).map(r => {
         const x = s => { const n = r.querySelector(s); return n ? Math.round(n.getBoundingClientRect().x) : null; };
         const t = r.querySelector('.pat30:not([hidden]), .t293e');

@@ -1912,7 +1912,10 @@ html[data-simple] .h20wkd .p i{ display:inline-block; width:8px; height:8px; mar
 html[data-simple] .li .nm .pat{ display:inline-block; min-width:38px; margin-right:8px;
   font:500 10.5px/1 var(--mono); letter-spacing:.04em; color:var(--muted);
   font-variant-numeric:tabular-nums }
-html[data-simple] .li .nm .dat{ margin-left:8px; font:400 10px/1 var(--mono); font-style:normal;
+/* PASTE 347 N1: `.dat` (the ✓ done-time + its streak) is styled wherever it sits - it used to live inside
+   `.nm`; it is now moved to the row's right-edge column so a wrapping title never pushes it (the #log column
+   rule above sets its margin). */
+html[data-simple] .li .dat{ margin-left:8px; font:400 10px/1 var(--mono); font-style:normal;
   color:var(--green-bright); opacity:.75; font-variant-numeric:tabular-nums }
 html[data-simple] .li.on .nm .pat{ opacity:.55 }
 
@@ -3361,10 +3364,16 @@ html[data-simple] .chart text.xl2-today{ fill:var(--text); font-weight:600 }
   html[data-simple] #log .li.on .nm,
   html[data-simple] #log .li.on a.nm{ color:var(--good) }
 
-  /* S2.3 · wider, not taller: one scale step down (14 -> 13, never below), one line, an ellipsis */
+  /* S2.3 · AMENDED BY PASTE 347 S1 (Cory, Monday 2026-09-28 8:02 PM, from his phone): "The text is cut
+     off for the task completions." 293's "one line, an ellipsis" clipped every Scheduled/Weekly/Standards
+     title - a task he cannot read is a task he cannot do. The row grows instead: the title WRAPS, is never
+     truncated, and is capped at three lines (~90 chars at 390px) so a pathological title cannot swallow the
+     screen. This restores R70.142's S4 rule for the #log rows 293 had out-specified; the 13px scale stays. */
   html[data-simple] #log .li .nm{ font-size:13px; line-height:1.36; flex:1 1 auto; min-width:0;
-    white-space:nowrap; overflow:hidden; text-overflow:ellipsis }
-  html[data-simple] #log .li .nm *{ white-space:nowrap }
+    white-space:normal; overflow:hidden; text-overflow:clip;
+    overflow-wrap:anywhere; word-break:normal;
+    display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical }
+  html[data-simple] #log .li .nm *{ white-space:normal; overflow-wrap:anywhere }
 
   /* S2.4 · DRAG · EDIT · TIME, ONE STRAIGHT COLUMN AT THE RIGHT EDGE. Flex order puts the three last, in that
      order; the time slot is a fixed width on every row, and a row with no chip keeps an empty one (.t293e). */
@@ -3374,9 +3383,14 @@ html[data-simple] .chart text.xl2-today{ fill:var(--text); font-weight:600 }
   html[data-simple] #log .li > .sp16{ order:3; flex:0 0 0; min-width:0 }
   html[data-simple] #log .li > .drg{ order:20; flex:0 0 36px; width:36px }
   html[data-simple] #log .li > .edp{ order:21; flex:0 0 36px; width:36px }
+  /* PASTE 347 N1: the done-mark (with its streak) is order 22, the planned time order 23 (rightmost), so
+     both sit at the right edge and never after the title; the time keeps a fixed 52px slot on every row so
+     the times fall in one straight vertical line, its digits tabular. */
+  html[data-simple] #log .li > .dat{ order:22; flex:0 0 auto; align-self:center; margin:0 6px 0 0;
+    text-align:right; white-space:nowrap; font-variant-numeric:tabular-nums }
   html[data-simple] #log .li > .pat30,
-  html[data-simple] #log .li > .t293e{ order:22; flex:0 0 52px; width:52px; min-width:52px; margin:0;
-    text-align:right; box-sizing:border-box; padding-right:4px }
+  html[data-simple] #log .li > .t293e{ order:23; flex:0 0 52px; width:52px; min-width:52px; margin:0;
+    text-align:right; box-sizing:border-box; padding-right:4px; font-variant-numeric:tabular-nums }
   html[data-simple] #log .li > .t293e{ display:block; align-self:stretch }
 
   /* S2.7 · THE GROUP TAB: its page shows alone; Insights no longer carries the group; three tabs fit at 360 */
@@ -3425,6 +3439,60 @@ html[data-h293sab="1"] #log .eadd{ display:none !important }
 .sh .h293lt{ padding:0 6px; height:14px; line-height:12px; margin:-4px 0 -4px 8px; align-self:center; flex:0 0 auto }
 /* PASTE 293 S1.1 · Scheduled wears the colour the Morning routine wore (--sec-morning, every theme carries it) */
 html[data-simple] #log > [data-sec="scheduled"]{ --sec:var(--sec-morning, var(--accent)) }
+
+/* ============================================================================================
+   PASTE 347 · EVERY TASK READS IN FULL (Cory, Monday 2026-09-28) — the row grows down; the controls
+   column holds still; on the desktop the time joins the phone's right-edge column.
+   ============================================================================================ */
+/* S1 · a wrapped row is as tall as its title needs. The checkbox sits at the TOP, level with the first
+   line, not floating in the middle of a three-line name; the controls (drag · edit · done · time) stay
+   vertically centred so wrapping never moves them sideways. Both breakpoints. */
+html[data-simple] #log .li{ align-items:flex-start }
+html[data-simple] #log .li > .bxw{ align-self:flex-start }
+html[data-simple] #log .li > .drg,
+html[data-simple] #log .li > .edp,
+html[data-simple] #log .li > .dat,
+html[data-simple] #log .li > .pat30,
+html[data-simple] #log .li > .t293e{ align-self:center }
+
+/* N1 · DESKTOP (Cory, 8:04 PM): "I want to see the time option pushed all the way to the right ... on the
+   right side of the sheet." The desktop row becomes the phone row — the same right-edge column layout that
+   293's S2.4 gave the phone, now at >=1024px too: title (wraps, never cut) | ≡ | ✎ | done | time. The time
+   keeps a fixed 52px slot on every row (an empty .t293e on rows that carry none) so the times fall in one
+   straight vertical line down the sheet, tabular; the done-mark rides beside the time, never after the title. */
+@media (min-width:1024px){
+  html[data-simple] #log .li > .bxw{ order:0 }
+  html[data-simple] #log .li > .nm{ order:1 }
+  html[data-simple] #log .li > *{ order:2 }
+  html[data-simple] #log .li > .sp16{ order:3; flex:0 0 0; min-width:0 }
+  html[data-simple] #log .li > .drg{ order:20; flex:0 0 36px; width:36px }
+  html[data-simple] #log .li > .edp{ order:21; flex:0 0 36px; width:36px }
+  html[data-simple] #log .li > .dat{ order:22; flex:0 0 auto; margin:0 6px 0 0;
+    text-align:right; white-space:nowrap; font-variant-numeric:tabular-nums }
+  html[data-simple] #log .li > .pat30,
+  html[data-simple] #log .li > .t293e{ order:23; flex:0 0 52px; width:52px; min-width:52px; margin:0;
+    text-align:right; box-sizing:border-box; padding-right:4px; font-variant-numeric:tabular-nums }
+  html[data-simple] #log .li > .t293e{ display:block }
+}
+
+/* PASTE 347 N1 (fix) · TWO things make the desktop times fall in ONE straight vertical line and the
+   drag/edit line up across done and undone rows (golden_ht42 N1d/N1f):
+   1. THE NAME GROWS. On the phone `#log .li .nm` is `flex:1 1 auto` (S2.3); on the desktop it was
+      content-sized, so a short name left the row left-packed and its time landed mid-row instead of at
+      the right edge. Forcing the grow pushes the whole control block flush to the right on every row. */
+@media (min-width:1024px){
+  html[data-simple] #log .li > .nm{ flex:1 1 auto; min-width:0;
+    white-space:normal; overflow:hidden; text-overflow:clip; overflow-wrap:anywhere; word-break:normal;
+    display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical }
+}
+/* 2. THE DONE-MARK LEAVES THE ROW'S HORIZONTAL FLOW. `.dat` (the `✓ 7:30` and its streak) is a
+   variable-width chip; while it sat in the flex tail a done row pushed drag · edit sideways, so the
+   columns only lined up on undone rows. It is lifted out (absolute, pinned to the right edge, stacked
+   just under the planned time) - Cory's "under or beside the time, never back after the title" - so a
+   done row and an undone row now share the exact same drag · edit · time columns. Both breakpoints; the
+   row is already `position:relative`. Placed last so it wins over 293's S2.4 tail rules on either side. */
+html[data-simple] #log .li > .dat{ position:absolute; right:4px; top:50%; margin:7px 0 0 0;
+  text-align:right; white-space:nowrap; font-variant-numeric:tabular-nums; z-index:1 }
 
 /* ============================================================================================
    PASTE 300 · SUPER HD — how the tracker is DRAWN (nothing that 293 laid out moves; only its look).

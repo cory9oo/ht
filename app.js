@@ -12158,10 +12158,17 @@ function h30Advanced(){
   function chips(){
     var log = h30El('log'); if(!log) return;
     Array.prototype.slice.call(log.querySelectorAll('.li')).forEach(function(r){
-      var pat = r.querySelector('.nm .pat'); if(!pat) return;
-      pat.classList.add('pat30');
       var sp = r.querySelector('.sp16');
-      if(sp) r.insertBefore(pat, sp); else r.appendChild(pat);
+      var pat = r.querySelector('.nm .pat');
+      if(pat){ pat.classList.add('pat30'); if(sp) r.insertBefore(pat, sp); else r.appendChild(pat); }
+      /* PASTE 347 N1 (Cory 2026-09-28 8:04 PM): the done-mark - `✓ 07:30` and the streak number `.v194`
+         it carries - leaves the name too, so a wrapping title never pushes it "back after the title". It
+         keeps its `.dat` class, so `#log .li .dat` and `.li .dat .v194` still find it, and the CSS column
+         rule places it at the row's right edge beside the time. Idempotent: once moved it is no longer a
+         child of `.nm`, so a re-run finds nothing to move. */
+      Array.prototype.slice.call(r.querySelectorAll('.nm .dat')).forEach(function(dat){
+        if(sp) r.insertBefore(dat, sp); else r.appendChild(dat);
+      });
     });
   }
   var _pa = paintAll;
@@ -14813,7 +14820,10 @@ var HT194 = (function(){
       if(missed && !miss){
         miss = document.createElement('i'); miss.className = 'dat d194 v194miss';
         miss.innerHTML = '<span class="v194">—</span>';
-        nm.appendChild(miss);
+        /* PASTE 347 N1: the past-miss `—` marker joins the right-edge column like the done-mark, never
+           trailing the (now wrapping) title. It is a `.dat`, so the #log column rule places it. */
+        var sp194 = r.querySelector('.sp16');
+        if(sp194) r.insertBefore(miss, sp194); else r.appendChild(miss);
       }else if(!missed && miss) miss.parentNode.removeChild(miss);
       r.classList.toggle('v179', !!dat);              /* the old dot beside the name is not a second signal */
     });
