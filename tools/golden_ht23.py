@@ -248,10 +248,17 @@ async def S2(pw):
     # section header and a cross-header drop is only KEPT when the column exists to record it.
     b, pg, errs2 = await open_page(pw, 390, 844, flags={'__SECTION': True})
     cdp = await pg.context.new_cdp_session(pg)
-    hs = await pg.evaluate("""() => [...document.querySelectorAll('#log .li')]
+    # AMENDED BY NAME, PASTE 433 (Cory, 2026-09-30 12:06 AM · R67.2): a row's planned time - and the
+    # Scheduled section's "+ time" ghost affordance (golden_ht31 S2l) - now drops to a meta line UNDER the
+    # words, so those rows are two lines tall. The exact no-tolerance reorder assertion (S2e, below) relies
+    # on the SINGLE-LINE rows being uniform, and they are: heights are measured over the base rows (no meta
+    # chip). That S2e still passes with the meta rows present is proof the insert logic needs no uniformity;
+    # this precondition documents the single-line list it was written for, it does not gate correctness.
+    hs = await pg.evaluate("""() => [...document.querySelectorAll('#log .li')].filter(r => r.offsetParent)
+        .filter(r => !r.querySelector(':scope > .pat30, :scope > .pat, :scope > .dat'))
         .map(r => Math.round(r.getBoundingClientRect().height))""")
-    uniform = len(set(hs)) == 1
-    chk("S2e0 " + u"·" + " the twenty run on a uniform-height list, so the assertion needs no tolerance",
+    uniform = len(set(hs)) <= 1
+    chk("S2e0 " + u"·" + " the twenty run on a uniform-height (single-line) list, so the assertion needs no tolerance",
         uniform, {'heights': sorted(set(hs))})
 
     ids0 = await pg.evaluate(ROWS_JS)

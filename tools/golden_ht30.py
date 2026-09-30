@@ -330,12 +330,20 @@ async def sec_s3(pw):
     for (w, h, tag, before) in ((390, 844, 'phone', BEFORE_PHONE), (1280, 720, 'desktop', BEFORE_DESK)):
         flags = dict(SQL); flags.update(PLACED)
         b, pg, errs = await open_page(pw, w, h, flags=flags)
-        rows = await pg.evaluate("""() => { const r = [...document.querySelectorAll('#log .li')]
-            .map(x => x.getBoundingClientRect().height).filter(x => x > 0);
+        # AMENDED BY NAME, PASTE 433 (Cory, 2026-09-30 12:06 AM · R67.2): on the phone a row with a planned
+        # time now carries a meta line UNDER the words and is legitimately two lines tall. The "quarter
+        # thinner" floor was always about the BASE single-line row, so measure the rows that carry no meta
+        # time (on the desktop the time stays in a right-edge column, so every row is single-line and the
+        # filter falls back to all).
+        rows = await pg.evaluate("""() => {
+            const all = [...document.querySelectorAll('#log .li')].filter(x => x.offsetParent);
+            const base = all.filter(x => !x.querySelector(':scope > .pat30, :scope > .pat, :scope > .dat'));
+            const r = (base.length ? base : all).map(x => x.getBoundingClientRect().height).filter(x => x > 0);
             const nm = document.querySelector('#log .li .nm');
             return { mean: r.length ? Math.round(r.reduce((a,c)=>a+c,0)/r.length*10)/10 : null,
-                     font: nm ? parseFloat(getComputedStyle(nm).fontSize) : null }; }""")
-        chk('S3a . %s . rows are at least a quarter thinner (%s -> %s)' % (tag, before, rows['mean']),
+                     font: nm ? parseFloat(getComputedStyle(nm).fontSize) : null,
+                     nbase: base.length, nall: all.length }; }""")
+        chk('S3a . %s . base (single-line) rows are at least a quarter thinner (%s -> %s) [paste 433]' % (tag, before, rows['mean']),
             rows['mean'] is not None and rows['mean'] <= before * 0.8, rows)
         # MEASURED on main at 295489e: 14px on the phone (golden_ht28 A4 pins it there), 12.5px on
         # the desktop. "Text size unchanged" is the rule - not bigger, not smaller.

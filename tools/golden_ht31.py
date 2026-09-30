@@ -378,9 +378,15 @@ async def sec_s3(pw):
         '--row-h:' in tok and '--row-h-desk:' in tok and '--row-pad:' in tok)
     for w in (390, 1280):
         b, pg, errs = await open_page(pw, w, 900, flags=dict(SQL, **dict(PLACED, **TIMES)))
-        m = await pg.evaluate("""() => { const r=[...document.querySelectorAll('#log .li')];
-          const h=Math.round(r[0].getBoundingClientRect().height*10)/10;
-          const font=getComputedStyle(r[0].querySelector('.nm')).fontSize;
+        # AMENDED BY NAME, PASTE 433 (Cory, 2026-09-30 12:06 AM · R67.2): on the phone a row with a planned
+        # time now drops that time to a meta line UNDER the words, so a timed row is two lines tall. The
+        # thinness floor is about the BASE single-line row, so measure the first row that carries no meta time
+        # (on the desktop every row keeps its time in the right-edge column, so the filter falls back to r[0]).
+        m = await pg.evaluate("""() => { const r=[...document.querySelectorAll('#log .li')].filter(x=>x.offsetParent);
+          const base=r.filter(x => !x.querySelector(':scope > .pat30, :scope > .pat, :scope > .dat'));
+          const r0=(base[0]||r[0]);
+          const h=Math.round(r0.getBoundingClientRect().height*10)/10;
+          const font=getComputedStyle(r0.querySelector('.nm')).fontSize;
           const clipped=r.some(x => { const n=x.querySelector('.nm'); return n && n.scrollHeight > n.clientHeight + 1; });
           return { h:h, font:font, clipped:clipped, n:r.length }; }""")
         was, floor = BEFORE_ROW[w], FLOOR[w]

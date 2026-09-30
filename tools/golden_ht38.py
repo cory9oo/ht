@@ -58,16 +58,23 @@ async def s1(pw):
     # (a long name lays out 6 boxes while the clamp paints only 3), so this holds the wrap, not the cap.
     chk('S1e . row titles 13 px (never below) and WRAP - never one clipped line (paste 347 S1)',
         dens and all(d[0] == 13 and d[1] != 'nowrap' and d[2] >= 1 for d in dens), dens[:4])
+    # AMENDED BY NAME, PASTE 433 (Cory, 2026-09-30 12:06 AM · R67.2): the phone no longer carries a
+    # right-edge TIME column. 293/347's column reserved a fixed 52px slot on every row - empty (.t293e) on
+    # untimed rows, which was the blank space Cory photographed, and it made a timed row's words narrower
+    # than an untimed row's (the zigzag). The planned time now drops to a muted meta line UNDER the words;
+    # on the row's first line only DRAG then EDIT remain, and they hug the right edge at the same x on every
+    # row (no zigzag). golden_ht433_edict measures the full one-width/no-blank/no-zigzag invariant.
     col = await pg.evaluate("""() => [...document.querySelectorAll('#log .li')].filter(r => r.offsetParent).map(r => {
         const x = s => { const n = r.querySelector(s); return n ? Math.round(n.getBoundingClientRect().x) : null; };
-        const t = r.querySelector('.pat30:not([hidden]), .t293e');
-        return [x('.drg'), x('.edp'), t ? Math.round(t.getBoundingClientRect().x) : null, Math.round(r.getBoundingClientRect().right)]; })""")
-    xs = set(tuple(c[:3]) for c in col)
-    ok_order = all(c[0] is not None and c[1] is not None and c[2] is not None and c[0] < c[1] < c[2] for c in col)
-    chk('S1f . drag · edit · time, in that order, at the same x on every row (%d rows)' % len(col),
+        const edp = r.querySelector('.edp');
+        return [x('.drg'), x('.edp'), Math.round(r.getBoundingClientRect().right),
+                edp ? Math.round(edp.getBoundingClientRect().right) : null]; })""")
+    xs = set((c[0], c[1]) for c in col)
+    ok_order = all(c[0] is not None and c[1] is not None and c[0] < c[1] for c in col)
+    chk('S1f . drag then edit at the same x on every row, no zigzag (%d rows) [paste 433]' % len(col),
         len(xs) == 1 and ok_order, sorted(xs)[:4])
-    chk('S1g . and the column sits at the right edge of the row',
-        col and all(c[3] - c[2] <= 60 for c in col), col[:3])
+    chk('S1g . and the edit control hugs the row right edge - no blank gutter [paste 433]',
+        col and all(c[3] is not None and c[2] - c[3] <= 6 for c in col), col[:3])
     await no_errors(G, pg, errs, 'S1 (today)')
     # today's tick, both charts, on the phone - reached by the tab as a person does
     await pg.evaluate("() => document.querySelector('#h29Bar [data-t29=\"insights\"]').click()")
