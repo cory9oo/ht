@@ -3705,8 +3705,8 @@ var HT32_CARDFIT = true;
    query the sheet issues and FAILS if any `habits` statement lacks a user_id filter. */
 (function(){
   var GROUPS = ['Morning','Afternoon','Night','Standards','Weekly','Other'];
-  var LONG_PRESS = 450;     /* B2: the phone gesture, in ms */
-  var DRAG_SLOP  = 6;       /* px of movement that turns a press into a drag, never a tap */
+  /* PASTE 429 S1: LONG_PRESS (the text long-press) and DRAG_SLOP are gone - the handle drags
+     from frame 0 and nothing else drags at all, so neither had a reader left. */
 
   function advanced(){
     try{ if(localStorage.getItem('ht_advanced')==='1') return true; }catch(e){}
@@ -4319,40 +4319,28 @@ var HT32_CARDFIT = true;
     if(e.button!=null && e.button!==0) return;
     if(e.target.closest('.eadd')) return;
     if(e.target.closest('.edp')) return;                      /* the pencil is a click, not a drag */
-    var row=e.target.closest('.li'); if(!row) return;
-    var touch=(e.pointerType==='touch'||e.pointerType==='pen');
-    var handle=e.target.closest('.drg');
-    st={ row:row, hid:row.getAttribute('data-h'), x:e.clientX, y:e.clientY, pid:e.pointerId,
-         touch:touch, armed:!touch, dragging:false, timer:null, fromHandle:!!handle };
-    /* ---- THE FIX, AND IT IS ABOUT WHEN, NOT WHAT (S2.0) --------------------------------
-       The old path armed a touch after 450 ms and only THEN added `.reordering`, whose
-       `touch-action:none` the browser had already stopped listening for: iOS reads
-       `touch-action` when the gesture BEGINS. By then the touch was committed to page
-       scrolling and the moves arrived late or not at all. A mouse never shows you this,
-       which is exactly why it passed on the laptop for four wires.
+    /* ---- PASTE 429 S1 · DRAG ONLY BY THE HANDLE ---------------------------------------
+       The press must be ON the handle (`.drg`), or nothing about a drag is set up: no state,
+       no timer, no `.armed`, no vibrate - on EVERY pointer type, mouse included, one rule for
+       phone and desktop. The words scroll and toggle; they never drag.
+       The old path armed the TEXT - a mouse press at once, a touch after a 450 ms long-press -
+       so a finger that rested on a task and then scrolled was past the timer and the scroll
+       became a reorder ("I scroll and it switches positions"). That whole branch is gone.
        The handle carries `touch-action:none` IN THE STYLESHEET, permanently, so the browser
-       has the answer before the finger lands. A press on it is a drag from frame 0 - no
-       long-press wait on any pointer type - and the row itself stays scrollable, which is
-       the trade-off app.css line 527 was protecting. */
-    if(handle){
-      st.armed=true;
-      beginDrag();
-      lastY=e.clientY;
-      if(!autoRaf) autoRaf=requestAnimationFrame(autoScrollStep);
-      e.preventDefault();
-      return;
-    }
-    if(touch) st.timer=setTimeout(function(){
-      if(!st) return;
-      st.armed=true; st.row.classList.add('armed');
-      try{ if(navigator.vibrate) navigator.vibrate(12); }catch(err){}
-    },LONG_PRESS);
+       has the answer before the finger lands: a press on it is a drag from frame 0, and the
+       row itself stays scrollable (the trade-off app.css line 527 was protecting). */
+    var handle=e.target.closest('.drg'); if(!handle) return;
+    var row=e.target.closest('.li'); if(!row) return;
+    st={ row:row, hid:row.getAttribute('data-h'), x:e.clientX, y:e.clientY, pid:e.pointerId,
+         dragging:false, fromHandle:true };
+    beginDrag();
+    lastY=e.clientY;
+    if(!autoRaf) autoRaf=requestAnimationFrame(autoScrollStep);
+    e.preventDefault();
   }
   function onMove(e){
-    if(!st) return;
-    var d=Math.abs(e.clientY-st.y)+Math.abs(e.clientX-st.x);
-    if(!st.armed){ if(d>10) cancelPress(); return; }           /* a scroll, not a press */
-    if(!st.dragging){ if(d<=DRAG_SLOP) return; beginDrag(); }
+    if(!st || !st.fromHandle) return;   /* belt & braces (S1): only a handle drag ever moves the order */
+    if(!st.dragging) beginDrag();
     e.preventDefault();
     lastY=e.clientY;
     moveDrag(e.clientY);
@@ -4370,16 +4358,11 @@ var HT32_CARDFIT = true;
        the twenty-drag stability check. It stays, with the reason it actually earns rather than
        the one it was first given. `moveDrag`'s own guard makes it free when nothing needs to
        move. */
-    if(st.dragging) moveDrag(lastY);
+    if(st.dragging && st.fromHandle) moveDrag(lastY);
     var s=st; st=null;
     s.row.classList.remove('armed');
-    if(s.dragging){ suppressClick=true; endDrag(s.row); return; }
-    if(s.touch && s.armed){                                    /* long press, no move: the sheet */
-      suppressClick=true;
-      var h=hby(s.hid); if(h) openSheet(h);
-      return;
-    }
-    /* desktop press with no movement: leave it — the app's own click toggles the row */
+    if(s.dragging && s.fromHandle){ suppressClick=true; endDrag(s.row); return; }
+    /* a handle press that never moved: leave the order exactly as it was */
   }
 
   /* ---- HT-23 S2 . THE KEYBOARD FALLBACK -------------------------------------------------
@@ -4451,10 +4434,16 @@ var HT32_CARDFIT = true;
     window.addEventListener('pointermove',onMove,{passive:false});
     window.addEventListener('pointerup',onUp);
     window.addEventListener('pointercancel',function(){
+      /* PASTE 429 S3 · A cancelled drag NEVER commits. No `endDrag`, so nothing is persisted;
+         and paintLog() rebuilds the list from S.habits, so the ORDER on screen returns to what
+         it was before the press - a browser-cancelled drag leaves the order untouched. */
       cancelPress();
+      var was=st;
       if(st&&st.row){ st.row.classList.remove('armed'); st.row.classList.remove('dragging'); }
       var log2=document.getElementById('log'); if(log2) log2.classList.remove('reordering');
+      if(autoRaf){ cancelAnimationFrame(autoRaf); autoRaf=null; }
       st=null;
+      if(was) paintLog();
     });
   }
 

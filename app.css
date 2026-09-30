@@ -554,7 +554,17 @@ html[data-simple] .li .drg:focus-visible{ outline:none; color:var(--green-bright
   border-color:var(--green-bright) }
 html[data-simple] .li .drg:active{ cursor:grabbing }
 html[data-simple] .li.dragging .drg{ cursor:grabbing }
-.li .drg{ touch-action:none; -webkit-user-select:none; user-select:none }
+.li .drg{ position:relative; touch-action:none; -webkit-user-select:none; user-select:none;
+  -webkit-touch-callout:none }
+/* ---- PASTE 429 S2 · A HANDLE A THUMB CAN HIT -------------------------------------------
+   The glyph keeps its dense look and the row keeps its height; a 44x44 transparent overlay
+   centred on the handle gives the thumb its target and carries the same `touch-action:none`,
+   so the WHOLE hit area - not just the glyph - is claimed before the finger lands. The ROW
+   (.li) is never `touch-action:none`, so page scrolling from a row still works (app.css:527's
+   trade-off, above). The overlay overflows the glyph's box, so it never widens the row. */
+.li .drg::before{ content:''; position:absolute; left:50%; top:50%;
+  width:44px; height:44px; min-width:44px; min-height:44px; transform:translate(-50%,-50%);
+  touch-action:none; -webkit-touch-callout:none }
 
 /* the drag. `touch-action:none` only while reordering — otherwise the row would eat page scrolling. */
 .li.armed{background:var(--sel);box-shadow:inset 2px 0 0 var(--accent)}

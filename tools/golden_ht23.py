@@ -192,15 +192,34 @@ async def S2(pw):
         m.get('handleTouchAction') == 'none' and not m.get('logReordering'), m)
     chk("S2c " + u"·" + " and the ROW is not - page scrolling from a row still works (app.css:527's trade-off)",
         m.get('rowTouchAction') not in ('none',), m)
-    # AMENDED BY NAME, HT-30 (paste 137 S3.9): 44 -> 36, with the row. The keyboard path is untouched
-    # and is still what the second half of this line asserts.
-    # AMENDED AGAIN BY NAME, HT-31 (paste 143 S3.12), 2026-09-22: the handle is 36 WIDE and fills its
-    # row's height. The width is the number a thumb needs and it is unchanged; the height stopped being
-    # a fixed square because a fixed-height control is a floor under every row that holds it, and the
-    # row had to get thinner. This row is 48px tall in the BIGSET fixture (a name that wraps), which is
-    # why the height is asserted against the row rather than against a constant.
-    chk("S2d " + u"·" + " the handle is 36 wide, fills its row, and is focusable for the keyboard path",
-        m.get('w') == 36 and abs(m.get('h', 0) - m.get('rowH', -99)) <= 2 and m.get('focusable'), m)
+    # AMENDED BY NAME, PASTE 429 S2 (2026-09-30): "the drag feature is buggy on the iPhone ... only drag
+    # if I click and hold on the 3 lines" (Cory). The handle now carries a 44x44 HIT AREA - the number a
+    # thumb needs - through a transparent `::before` OVERLAY, so the glyph keeps its dense look and the row
+    # keeps its height (a fixed-height control was rejected as a floor under every row, HT-31 above). So the
+    # assertion becomes the HIT AREA, not the glyph box: the overlay measures >= 44x44, and a press ABOVE and
+    # BELOW the glyph - outside the 14px glyph, inside the overlay - still lands on THIS handle, which is what
+    # "a thumb can hit it" actually means. NOT weakened: the glyph is still focusable for the keyboard path,
+    # still labelled, and the row is NOT bloated (the glyph box stays within the row's own height).
+    hit = await pg.evaluate("""() => {
+      const g = document.querySelector('#log .li .drg'); if(!g) return {noHandle:true};
+      const cs = getComputedStyle(g, '::before');
+      const gb = g.getBoundingClientRect();
+      const cx = gb.left + gb.width/2, cy = gb.top + gb.height/2;
+      const onThis = (x,y) => { const el = document.elementFromPoint(x,y);
+        return !!(el && el.closest && el.closest('.drg') === g); };
+      const onAny = (x,y) => { const el = document.elementFromPoint(x,y);
+        return !!(el && el.closest && el.closest('.drg')); };
+      const span = [-20,-14,-7,0,7,14,20].map(dy => onAny(cx, cy+dy));
+      return { ovw: parseFloat(cs.width), ovh: parseFloat(cs.height),
+               glyphH: Math.round(gb.height),
+               center: onThis(cx,cy), spanAllHandle: span.every(Boolean), span,
+               rowH: Math.round(document.querySelector('#log .li').getBoundingClientRect().height),
+               focusable: g.tabIndex === 0, label: g.getAttribute('aria-label') }; }""")
+    chk("S2d " + u"·" + " the handle's HIT AREA is >= 44x44 with no dead spot in the column, the glyph keeps its look, and it stays focusable",
+        hit.get('ovw', 0) >= 44 and hit.get('ovh', 0) >= 44
+        and hit.get('center') and hit.get('spanAllHandle')
+        and hit.get('glyphH', 99) <= hit.get('rowH', 0) + 2
+        and hit.get('focusable') and hit.get('label') == 'reorder this standard', hit)
 
     # ---- 20 CONSECUTIVE TOUCH REORDERS, 0 MISPLACEMENTS ---------------------------------
     # A MISPLACEMENT IS MEASURED BY GEOMETRY, NOT BY A MODEL OF THE ALGORITHM. The first draft of
