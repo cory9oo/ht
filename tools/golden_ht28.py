@@ -868,12 +868,14 @@ async def sec_f(pw):
     chk("F17 · the Insights line reads 'Sabbaths kept \u00b7 N in a row \u00b7 M of the last K'",
         bool(re.match(r'^Sabbaths kept \u00b7 \d+ in a row \u00b7 \d+ of the last \d+$', ln or '')), ln)
     await pg.wait_for_timeout(600)
+    # MIGRATED BY HT-432: the day column is a rect.hitcol now, not a circle.hit (the Sabbath rings,
+    # DEC-172, are drawn against it) - the count of Saturdays reads the same element the rings do.
     rg = await pg.evaluate("""() => { const sh=window.__HT28.sabHistory(); const t=window.__HT24.today();
       const rings=[...document.querySelectorAll('#vMonth .h28ring')];
-      const sats=[...document.querySelectorAll('#vMonth circle.hit[data-vgd]')].map(c=>c.getAttribute('data-vgd'))
+      const sats=[...document.querySelectorAll('#vMonth .hitcol[data-vgd]')].map(c=>c.getAttribute('data-vgd'))
         .filter(k=>new Date(k+'T12:00:00').getDay()===6 && k>=sh.first && k<=t && !(k===t && !sh.kept(k)));
       return { first: sh.first, rings: rings.length, sats: sats.length, kept: rings.filter(r=>r.classList.contains('kept')).length,
-        before: [...document.querySelectorAll('#vMonth circle.hit[data-vgd]')].map(c=>c.getAttribute('data-vgd')).filter(k=>k<sh.first && new Date(k+'T12:00:00').getDay()===6).length }; }""")
+        before: [...document.querySelectorAll('#vMonth .hitcol[data-vgd]')].map(c=>c.getAttribute('data-vgd')).filter(k=>k<sh.first && new Date(k+'T12:00:00').getDay()===6).length }; }""")
     chk("F17 · a ring on every Saturday of the month since the first (filled kept, hollow missed), none before it",
         rg['first'] and rg['rings'] == rg['sats'] and rg['rings'] > 0, rg)
     chk("F · zero page errors", not errs, errs[:2])

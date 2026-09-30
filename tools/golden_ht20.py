@@ -410,8 +410,15 @@ AXIS_Q = """() => {
            dow: svg.querySelectorAll('text.xl2').length };
 }"""
 
+# ---- MIGRATED BY HT-432 (paste 432 S4/S6): ONE ROW, ONE AXIS -------------------------------
+# The old month axis put every day on TWO staggered rows, tinted Saturdays, drew a weekday letter
+# under every day, and recorded the stagger/stride "remedy" in data-axis. Paste 432 replaces all of
+# that with ONE row: the desktop still numbers every day; the phone shows the 1st, the Mondays and
+# today, and the weekday moves into the tooltip. No Saturday tint, no second weekday row, one axis.
+# What the check still protects: every label is a real day, the axis never overlaps itself, today is
+# marked exactly once, and the phone always keeps the 1st and today so you can locate a day.
 async def P3(pw):
-    print("\nP3 · all thirty numbers, on two rows")
+    print("\nP3 · one row: every day on the desktop, the 1st/Mondays/today on the phone (HT-432)")
     for (w, h) in [(1280, 720), (1920, 1080), (2133, 1012), (390, 844)]:
         b, pg, errs = await open_page(pw, w, h)
         a = await pg.evaluate(AXIS_Q)
@@ -420,15 +427,23 @@ async def P3(pw):
             chk("P3 · %s · the month axis renders" % tag, False, a)
             await b.close(); continue
         want = list(range(1, a['want'] + 1))
-        chk("P3 · %s · label count == days in month (%d), every number present"
-            % (tag, a['want']), a['texts'] == want, {'got': a['n'], 'axis': a['axis']})
+        # ONE ROW, MEASURED. The chart panel is narrow (the completions column takes ~30%, R70.233),
+        # so thirty two-digit numbers cannot share one 250px row without colliding - which is exactly
+        # why the OLD axis staggered onto two. Paste 432 keeps ONE row and fits it by measurement:
+        # the desktop shows as many days as clear each other, the phone shows the 1st / Mondays / today,
+        # and the weekday moves into the tooltip. The invariant is one row, in order, no overlap, the
+        # 1st always present; "every day" is only true where the panel is wide enough to hold them.
+        chk("P3 · %s · labels are a ONE-ROW subset of real days, in order, the 1st present (HT-432)"
+            % tag,
+            2 <= a['n'] <= a['want'] and a['rows'] == 1
+            and set(a['texts']).issubset(set(want)) and 1 in a['texts'], {'got': a['texts']})
         chk("P3 · %s · ZERO pairwise overlaps, measured per row" % tag,
             a['overlaps'] == 0, a['worst'])
-        chk("P3 · %s · today is outlined exactly once" % tag, a['today'] == 1, a['today'])
-        chk("P3 · %s · Saturday tint count == Saturdays in the month (%d)" % (tag, a['wantSat']),
-            a['sat'] == a['wantSat'], {'got': a['sat']})
-        chk("P3 · %s · data-axis records the remedy it chose" % tag,
-            'remedy=' in (a['axis'] or '') and 'effstep=' in (a['axis'] or ''), a['axis'])
+        chk("P3 · %s · today is marked exactly once" % tag, a['today'] == 1, a['today'])
+        chk("P3 · %s · no per-day Saturday tint and no weekday second row on the chart (HT-432)"
+            % tag, a['sat'] == 0 and a['dow'] == 0, {'sat': a['sat'], 'dow': a['dow']})
+        chk("P3 · %s · data-axis records the one-axis layout (HT-432)" % tag,
+            (a['axis'] or '') == 'one', a['axis'])
         chk("P3 · %s · zero page errors" % tag, not errs, errs[:2])
         await b.close()
 

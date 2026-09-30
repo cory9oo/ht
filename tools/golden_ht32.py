@@ -370,10 +370,16 @@ async def sec_s9(pw):
         chk('S9c.%dx%d . and every axis label is ON the card - not clipped above its top, which is '
             'where the 100 and the 90 went' % (w, h), not clipped, clipped)
         ylab = [c for c in charts if c['y']]
-        chk('S9d.%dx%d . the phone y axis reads 0 . 25 . 50 . 75 . 100 - five labels, and the 100 '
-            'he named is one of them' % (w, h),
-            all(c['y'] == ['0', '25', '50', '75', '100'] or c['y'] == ['100', '75', '50', '25', '0']
-                for c in ylab) if ylab else True, [c['y'] for c in ylab])
+        # ---- MIGRATED BY HT-432 (paste 432 S1/S2/S6): the phone COMPLETION axis is 0/50/100 now ----
+        # Paste 432: "0/50/100 on the phone, all five on desktop", and a slim RATING strip is added
+        # UNDER the completion plot with its OWN 0/5/10 axis. So a phone card's ayl labels are the
+        # three completion ticks followed by the strip's three. What the check protects is unchanged:
+        # the axis is legible on the phone and the 100 Cory named is present.
+        def _ok(y):
+            return y[:3] in (['0', '50', '100'], ['100', '50', '0']) and '100' in y and '10' in y
+        chk('S9d.%dx%d . the phone COMPLETION axis reads 0/50/100 and the RATING strip its own '
+            '0/5/10, the 100 present (HT-432 S1/S2)' % (w, h),
+            all(_ok(c['y']) for c in ylab) if ylab else True, [c['y'] for c in ylab])
         chk('S9e.%dx%d . the labels were not thinned away to make it fit - every chart still carries '
             'its x labels' % (w, h), all(c['x'] > 0 for c in charts), [c['x'] for c in charts])
         cardmax = await pg.evaluate("() => getComputedStyle(document.documentElement)"
@@ -392,11 +398,17 @@ async def sec_s9(pw):
     # DEDUPE FIRST: a desktop page draws several charts, so the same label value appears many times
     # and `t[1]-t[0]` on the raw sorted list is 0 every time - a number that looks like a measurement
     # and is an artefact of counting the same axis twice.
-    step = await pg.evaluate("() => { const t=[...new Set([...document.querySelectorAll('text.ayl')]"
-                             ".map(n=>+n.textContent.trim()).filter(n=>!isNaN(n)))].sort((a,b)=>a-b);"
-                             " return t.length>1 ? t[1]-t[0] : null; }")
-    chk('S9i.1280x720 . and where a desktop chart is drawn its y axis is still every 10, not the '
-        'phone\'s five', step in (None, 10, 20), step)
+    # ---- MIGRATED BY HT-432 (paste 432 S2/S6): the desktop COMPLETION axis is 0/25/50/75/100 -------
+    # Paste 432 draws the completion axis at 0/25/50/75/100 on the desktop (the phone drops to 0/50/100)
+    # and adds a rating strip at 0/5/10. The old "step is still 10 (denser than the phone)" no longer
+    # describes it - the completion axis is denser than the phone's THREE, but its own step is 25, and
+    # the strip contributes 5 and 10. What the desktop must keep is the FULL completion axis, so the
+    # check asserts 0/25/50/75/100 are all present.
+    vals = await pg.evaluate("() => [...new Set([...document.querySelectorAll('text.ayl')]"
+                             ".map(n=>+n.textContent.trim()).filter(n=>!isNaN(n)))].sort((a,b)=>a-b)")
+    chk('S9i.1280x720 . the desktop completion axis is 0/25/50/75/100 - denser than the phone\'s '
+        'three (HT-432 S2); the rating strip adds 0/5/10',
+        set([0, 25, 50, 75, 100]).issubset(set(vals)), vals)
     chk('S9j.1280x720 . zero page errors', not errs, errs[:2])
     await b.close()
 

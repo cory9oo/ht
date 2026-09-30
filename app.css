@@ -3560,3 +3560,41 @@ body{
 /* 4 · MOTION — one easing, one duration ≤ 200ms, on the things that already animate (the sheet slide
    uses var(--dur)/var(--ease) at its own rule; nothing new moves). */
 
+
+/* ======================= HT-432 · THE CHARTS — QUIET LINES, ONE AXIS (paste 432) =======================
+   Completion is THE chart; rating is a slim companion strip. ONE hue (var(--ht-green), the same in every
+   theme), no right axis, no dashes, no per-value ramp. The loud line is the trailing-mean TREND; the daily
+   line is quiet (35%) with an 8% wash; today is the only blue. LAST in the file on purpose, so these win
+   the source-order tie with every earlier `.chart` rule (paste S2/S6; DEC-062 — this IS the design). */
+.chart{ width:100%; display:block }
+.chart .ax,        html[data-simple] .chart .ax{ stroke:var(--ht-line); stroke-width:1 }
+.chart .ax0,       html[data-simple] .chart .ax0{ stroke:var(--ht-line) }
+.chart .ax-r,      html[data-simple] .chart .ax-r{ stroke:var(--ht-line); stroke-width:1 }
+.chart .ayl,       html[data-simple] .chart .ayl{ font:400 11px/1 var(--mono); fill:var(--ht-dim);
+  font-variant-numeric:tabular-nums }
+.chart .striplab,  html[data-simple] .chart .striplab{ font:400 9px/1 var(--sans); fill:var(--ht-dim);
+  letter-spacing:.08em }
+.chart .wash-c,    html[data-simple] .chart .wash-c{ fill:var(--ht-green); fill-opacity:.08; stroke:none }
+.chart .ln-c,      html[data-simple] .chart .ln-c{ fill:none; stroke:var(--ht-green); stroke-width:1.5;
+  stroke-opacity:.35; stroke-dasharray:none; stroke-linejoin:round; stroke-linecap:round }
+.chart .trend-c,   html[data-simple] .chart .trend-c{ fill:none; stroke:var(--ht-green); stroke-width:2;
+  stroke-dasharray:none; stroke-linejoin:round; stroke-linecap:round }
+.chart .ref30,     html[data-simple] .chart .ref30{ stroke:var(--ht-muted); stroke-width:1; stroke-dasharray:none }
+.chart .reflab,    html[data-simple] .chart .reflab{ font:400 11px/1 var(--mono); fill:var(--ht-dim) }
+.chart .ln-r,      html[data-simple] .chart .ln-r{ fill:none; stroke:var(--ht-muted); stroke-width:1.5;
+  stroke-dasharray:none; stroke-linejoin:round; stroke-linecap:round }
+.chart .dot-c,     html[data-simple] .chart .dot-c{ fill:var(--ht-green); stroke:var(--ht-panel); stroke-width:2 }
+.chart .dot-r,     html[data-simple] .chart .dot-r{ fill:var(--ht-muted); stroke:var(--ht-panel); stroke-width:1 }
+.chart .dot-today, html[data-simple] .chart .dot-today{ fill:var(--ht-today); stroke:var(--ht-panel); stroke-width:2 }
+.chart .halo-today,html[data-simple] .chart .halo-today{ fill:var(--ht-today); opacity:.25; stroke:none }
+.chart .mtick,     html[data-simple] .chart .mtick{ stroke:var(--ht-line); stroke-width:1 }
+.chart .xhair,     html[data-simple] .chart .xhair{ stroke:var(--ht-muted); stroke-width:1; pointer-events:none }
+.chart text.xl,    html[data-simple] .chart text.xl{ font:400 11px/1 var(--mono); fill:var(--ht-dim);
+  letter-spacing:0 }
+.chart text.xl-today, html[data-simple] .chart text.xl-today{ fill:var(--ht-text); font-weight:600 }
+.chart .hitcol,    html[data-simple] .chart .hitcol{ cursor:pointer }
+.chart .hitcol[data-vgd], .chart .hitcol[data-vgy],
+html[data-simple] .chart .hitcol[data-vgd], html[data-simple] .chart .hitcol[data-vgy]{ cursor:pointer }
+/* HT-432: the 5-swatch ramp legend is retired from the two chart navs (paste S2) — hidden, never
+   removed from the DOM (R70.138; golden_ht29 S0a). The year's copy was already hidden pre-432. */
+#vMonthNav .h16leg, #vYearNav .h16leg{ display:none !important }

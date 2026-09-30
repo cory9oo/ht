@@ -453,10 +453,14 @@ async def run_s4(pw):
         # months would need 6.7px type, below the 7px floor Cory called "crunched". The set is
         # complete WHERE IT FITS and legible everywhere: twelve once the panel affords them,
         # never fewer than six, never smaller than 7px. At 1920 it renders all twelve at 9.5px.
-        chk("S4d · %s · YEAR labels are three letters and legible (6..12; twelve where the panel "
-            "affords them)" % t,
+        # ---- MIGRATED BY HT-432 (paste 432 S3/S6): THE YEAR IS WEEKLY MEANS NOW ----------------
+        # The 12-dot year became up to 53 weekly means; its x-axis is MONTH TICKS carrying the month
+        # INITIAL (one letter), one per month at each month's first week. The old assertion pinned the
+        # three-letter month dots that no longer exist. What the check protects is unchanged: the year
+        # names its months, one label per month, every label legible and inside its box.
+        chk("S4d · %s · YEAR x-axis is month initials at the month ticks (HT-432: weekly means)" % t,
             6 <= len(m['yearLabels']) <= 12
-            and all(len(x) == 3 for x in m['yearLabels']), m['yearLabels'])
+            and all(len(x) == 1 and x.isalpha() for x in m['yearLabels']), m['yearLabels'])
         # AMENDED for HT-18c note 4: upright and thinned, so the count is no longer one per day.
         # Every label that DOES render still carries its number and sits fully inside its box.
         chk("S4e · %s · every MONTH label that renders carries its day NUMBER and is fully inside "

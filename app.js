@@ -5556,11 +5556,45 @@ var HT32_CARDFIT = true;
           if(phone() && window.__HT13_TAB) window.__HT13_TAB('today');
           return; }
       });
-      n.addEventListener('pointerover',function(e){
+      /* ---- HT-432 S5 · CROSSHAIR + TOOLTIP + KEYBOARD ----
+         The tip carries date · % · done/total · rating · trend; a hairline crosshair marks the column.
+         Hover shows it; the SVG is focusable and Left/Right move the crosshair, Enter opens the day. */
+      function tipEl(svg){ return document.getElementById(svg.id==='vYear'?'vYearTip':'vMonthTip'); }
+      function showAt(svg, rect){
+        if(!svg||!rect) return;
+        var xh=svg.querySelector('.xhair');
+        if(xh){ var cx=parseFloat(rect.getAttribute('x'))+parseFloat(rect.getAttribute('width'))/2;
+                xh.setAttribute('x1',cx); xh.setAttribute('x2',cx); xh.style.display=''; }
+        var tip=tipEl(svg); if(tip) tip.textContent=rect.getAttribute('data-tip')||'';
+        svg.dataset.cur=rect.getAttribute('data-i');
+      }
+      function hideX(svg){ var xh=svg&&svg.querySelector('.xhair'); if(xh) xh.style.display='none'; }
+      n.addEventListener('pointermove',function(e){
         var h=e.target.closest('[data-tip]'); if(!h) return;
-        var svg=h.closest('svg'); if(!svg) return;
-        var tip=document.getElementById(svg.id==='vYear'?'vYearTip':'vMonthTip');
-        if(tip) tip.textContent=h.getAttribute('data-tip');
+        showAt(h.closest('svg'), h);
+      });
+      n.addEventListener('pointerleave',function(){
+        q('svg',n).forEach(hideX);
+      });
+      n.addEventListener('keydown',function(e){
+        var svg=e.target.closest && e.target.closest('svg'); if(!svg) return;
+        if(e.key!=='ArrowLeft' && e.key!=='ArrowRight' && e.key!=='Enter') return;
+        var cols=q('.hitcol',svg); if(!cols.length) return;
+        var cur=parseInt(svg.dataset.cur,10); if(isNaN(cur)) cur=-1;
+        if(e.key==='Enter'){
+          var here=cols.filter(function(c){ return +c.getAttribute('data-i')===cur; })[0]||cols[0];
+          var k=here.getAttribute('data-vgd'); var mo=here.getAttribute('data-vgy');
+          if(k!=null && k<=today()){ goDay(k); if(phone() && window.__HT13_TAB) window.__HT13_TAB('today'); }
+          else if(mo!=null){ S.calYM=[S.vYear||dnum(today()).getFullYear(), +mo]; repaintCharts(); }
+          e.preventDefault(); return;
+        }
+        var order=cols.map(function(c){ return +c.getAttribute('data-i'); }).sort(function(a,b){return a-b;});
+        var pos=order.indexOf(cur); if(pos<0) pos = e.key==='ArrowRight'? -1 : order.length;
+        pos += (e.key==='ArrowRight'?1:-1);
+        pos=Math.max(0,Math.min(order.length-1,pos));
+        var want=order[pos];
+        var rect=cols.filter(function(c){ return +c.getAttribute('data-i')===want; })[0];
+        showAt(svg, rect); e.preventDefault();
       });
     });
     if(!window.__HT16_RESIZE){
@@ -5627,300 +5661,194 @@ var HT32_CARDFIT = true;
     }catch(e){}
     return Math.max(140, Math.min(cap, Math.max(dflt, Math.round(h))));
   }
+  /* ================= HT-432 · THE CHARTS — QUIET LINES, ONE AXIS (paste 432) =================
+     Completion (0-100) IS the chart; rating (0-10) is a slim companion strip under it, its own
+     axis, sharing the exact x positions. ONE hue (var(--ht-green), the same in every theme), no
+     right axis, no dashes, no per-value ramp. The one loud line is the trailing-mean TREND; the
+     daily line is quiet (35%) with an 8% wash; today is the only blue. DEC-062: this IS the design. */
+  function trailMean(pts, i, win, minLogged, get){
+    var vals=[], logged=0;
+    for(var j=Math.max(0,i-win+1); j<=i; j++){ var v=get(pts[j]); if(v!=null){ vals.push(v); logged++; } }
+    if(logged < minLogged) return null;               /* never invents a trend across a hole */
+    return vals.reduce(function(a,b){ return a+b; },0)/vals.length;
+  }
+  /* done / total for the S5 tooltip ("19 of 25"): the day's own active_set is the denominator (P4),
+     the checked ids within it are the numerator. Today, before its first save, has no active_set yet
+     and the tooltip simply omits the "of" clause rather than guess. */
+  function doneTotalOf(k){
+    var r=S.byDate[k]; if(!r) return { done:null, total:null };
+    var set=(r.active_set && r.active_set.length) ? r.active_set.map(String) : null;
+    if(!set) return { done:null, total:null };
+    var ck=r.checked||{};
+    return { done:set.filter(function(id){ return ck[id]; }).length, total:set.length };
+  }
+  function weekStart(d){                                /* the Monday of d's week, noon-anchored */
+    var x=new Date(d.getTime()); var off=(x.getDay()+6)%7;
+    x.setDate(x.getDate()-off); x.setHours(12,0,0,0); return x;
+  }
+
   function h16Chart(svgId, pts, opts){
     var svg=document.getElementById(svgId); if(!svg) return 0;
     var host=svg.parentNode;
-    /* HT-17 S2 (R70.140): NO RIGHT AXIS. Rating x10 reads off the LEFT axis and the legend says so,
-       so the 34px right gutter that held it is reclaimed for the plot. R=10 is the half-dot bleed. */
-    var H=opts.height||190, L=30, R=10, T=12, B=opts.twoLine?34:24;
-    var narrow = MONTH_SCROLLS && opts.perX && window.innerWidth<=480;
-    if(!narrow) H=availHeight(svg,H);
-    var n=pts.length, W;
-    if(narrow){
-      W = L + R + n*opts.perX;                               /* a full cell either end, so nothing clips */
+    if(host) host.classList.remove('h16scroll');       /* one axis fits the width; never scrolls */
+    svg.removeAttribute('width'); svg.style.width='';
+    var isYear = opts.attr==='data-vgy';
+    var isPhone = window.innerWidth < 720;              /* paste S4 breakpoint */
+
+    var H = availHeight(svg, opts.height||196), W;
+    if(!svg.getClientRects().length){                  /* hidden Insights tab: draw at the card's width */
+      W = Math.max(240, Math.round(window.innerWidth - 76));
       svg.setAttribute('viewBox','0 0 '+W+' '+H);
       svg.setAttribute('preserveAspectRatio','xMinYMin meet');
-      svg.setAttribute('width',W); svg.setAttribute('height',H);
-      svg.style.width=W+'px'; svg.style.height=H+'px';
-      if(host) host.classList.add('h16scroll');
-    } else {
-      if(host) host.classList.remove('h16scroll');
-      svg.removeAttribute('width'); svg.style.width='';
-      if(!svg.getClientRects().length){                      /* a hidden surface measures 0 wide */
-        /* HT-179 S4: the phone's month chart lives on the Insights tab, hidden while Today is up. The
-           28px branch drew it anyway; the fit branch must too, or its axis is empty until the tab is
-           opened. It is drawn at the width the card WILL have - the viewport less the card's padding -
-           and measureAndDraw re-fits it to the pixel once the tab shows it. */
-        if(!(opts.perX && window.innerWidth<=480)) return 0;
-        W = Math.max(240, Math.round(window.innerWidth - 76));
-        svg.setAttribute('viewBox','0 0 '+W+' '+H);
-        svg.setAttribute('preserveAspectRatio','xMinYMin meet');
-        svg.setAttribute('height',H); svg.style.height=H+'px';
-      } else W = fitSvg(svgId,H);
-      if(W==null) return 0;               /* B0.2: unmeasurable — measureAndDraw will call back */
-    }
-    var pad=opts.pad||0;
-    /* rotated day labels need a taller bottom band than two stacked tspans do */
-    if(opts.twoLine){
-      var st = n>1 ? (W-L-R-2*pad)/(n-1) : (W-L-R);
-      /* 52, not 40. MEASURED: at B=40 the rotated string "31 Wed" ran past the bottom of the viewBox
-         and the DAY NUMBER was clipped off — the labels rendered as "Tue Wed Thu" with no dates, and
-         the golden did not catch it because it counted labels rather than reading them. S2 asks for
-         day number AND weekday, so the band is sized to the longest string it has to hold. */
-      if(st < 40) B = 52;
-    }
-    var px=function(i){ return n<2 ? L+(W-L-R)/2 : L+pad+i*(W-L-R-2*pad)/(n-1); };
-    var py=function(v){ return H-B-(v/100)*(H-T-B); };
-    var s='';
-    /* LEFT 0-100 in tens, a gridline every ten. THE RIGHT AXIS IS DELETED (R70.140 · R70.79):
-       two axes for two series invited the reading that the dashed line was a percentage. It is not —
-       it is a 1-10 rating, and the legend now carries `rating x10` instead.
-       LABEL DENSITY IS MEASURED, NOT FIXED: every 10 when the chart has >=180px to give them, every
-       20 below that. Eleven labels in an 84px band is a grey smear, not an axis. */
-    /* HT-32 N6: 0 - 25 - 50 - 75 - 100 ON THE PHONE, every 10 on the desktop. Eleven labels in a
-       390px-wide card is the grey smear the measured rule below already avoided at small heights;
-       Cory's complaint was the opposite one - that the top labels were not VISIBLE at all - and the
-       answer to that is a card that fits (see HT32_CARDFIT), not fewer labels. Five is what a phone
-       can read at a glance and it always includes the 100 he named. The gridlines stay every 10. */
-    /* GRIDLINES AND LABELS ARE TWO LISTS, NOT ONE LOOP WITH A MODULO.
-       They used to share the ten-step loop and pick labels with `v % labelStep`, which can only ever
-       select values the LOOP offers - so asking for 25 gave 0, 50 and 100, because 25 and 75 are not
-       multiples of ten and the loop never reached them. `golden_ht32` S9d caught it on its first
-       run. A list also states what the axis reads, which a modulo does not. */
-    var yLabels = (window.innerWidth <= 480) ? [0, 25, 50, 75, 100]
-                : (H >= 180 ? [0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100]
-                            : [0, 20, 40, 60, 80, 100]);
-    for(var v=0; v<=100; v+=10){
-      s+='<line class="ax'+(v===0?' ax0':'')+'" x1="'+L+'" y1="'+py(v).toFixed(1)+'" x2="'+(W-R)+
-         '" y2="'+py(v).toFixed(1)+'"/>';
-    }
-    yLabels.forEach(function(v){
-      s+='<text class="ayl" x="'+(L-5)+'" y="'+(py(v)+3).toFixed(1)+'" text-anchor="end">'+v+'</text>';
-    });
-    function runs(get){
-      var out=[], cur=[];
-      pts.forEach(function(p,i){ var val=get(p);
-        if(val==null){ if(cur.length){ out.push(cur); cur=[]; } return; }
-        cur.push([i,val]); });
-      if(cur.length) out.push(cur);
-      return out;
-    }
-    function draw(rs,cls){
-      return rs.map(function(r){
-        if(r.length===1) return '<circle class="'+cls+'-d" cx="'+px(r[0][0]).toFixed(1)+
-                                '" cy="'+py(r[0][1]).toFixed(1)+'" r="2"/>';
-        return '<path class="'+cls+'" d="'+r.map(function(pt,j){
-          return (j?'L':'M')+px(pt[0]).toFixed(1)+' '+py(pt[1]).toFixed(1); }).join(' ')+'"/>';
-      }).join('');
-    }
-    s+=draw(runs(function(p){ return p.c; }),'ln-c');
-    s+=draw(runs(function(p){ return p.r==null?null:p.r*10; }),'ln-r');
-    /* the dots, each behind a hit area no smaller than 24px: a 6px target on a phone is decoration.
-       A COMPLETION DOT IS FILLED WITH THAT DAY'S RAMP COLOUR, so the line and the grade agree. */
-    /* HT-18d (Cory note 6, "the completion dot needs to appear"). THE TARGETS GO FIRST.
-       They were painted AFTER the dots — a 12px `circle.hit` and a full-height `rect.hitcol` laid
-       straight over a 3.1px `circle.dot-c`. Transparent, so on a busy chart you never noticed; on
-       a chart with one or two logged days the dot is the only mark on it and it was underneath
-       both, which also swallowed its own hover. SVG has no z-index: paint order IS depth, so the
-       hit shapes are emitted first and the dots land on top of them. */
-    pts.forEach(function(p,i){
-      if(p.c==null && p.r==null) return;
-      /* B2 (R70.234): the hover carries the full date. It was "60% · 8/10" with no way to tell
-         which day you were over — on a 30-point axis where only half the numbers render, that is
-         the difference between a tooltip and a guess. */
-      var tip=(p.full? p.full+' · ' : '')+tipOf(p.c,p.r), at=opts.attr+'="'+p.key+'"';
-      var hw=Math.max(6, (n>1?(W-L-R-2*pad)/(n-1):24));
-      s+='<rect class="hitcol" '+at+' data-tip="'+esc(tip)+'" x="'+(px(i)-hw/2).toFixed(1)+
-         '" y="0" width="'+hw.toFixed(1)+'" height="'+H+'" fill="transparent"/>';
-      s+='<circle class="hit" '+at+' data-tip="'+esc(tip)+'" cx="'+px(i).toFixed(1)+
-         '" cy="'+(H/2)+'" r="12"/>';
-      if(p.c!=null) s+='<circle class="dot dot-c '+rampClass(p.c)+'" '+at+' data-tip="'+esc(tip)+
-                       '" cx="'+px(i).toFixed(1)+'" cy="'+py(p.c).toFixed(1)+'" r="3.4"/>';
-      if(p.r!=null) s+='<circle class="dot dot-r" '+at+' data-tip="'+esc(tip)+'" cx="'+px(i).toFixed(1)+
-                       '" cy="'+py(p.r*10).toFixed(1)+'" r="2.6"/>';
-    });
-    /* EVERY label, always — NEVER THINNED (R70.140). Two tspans in ONE <text>, so a per-day count
-       counts days.
-       ROTATED 90 DEGREES when the width per x-step is under 40px: at 31 days in a 400px panel each
-       day gets ~12px, and "12 Fri" horizontal in 12px either overlaps its neighbours or gets dropped.
-       Thinning is the tempting fix and it is the wrong one — the wire says every day stays labelled,
-       so the labels turn instead. */
-    var stepPx = n>1 ? (W-L-R-2*pad)/(n-1) : (W-L-R);
-    /* HT-18c (Cory 2026-09-07 15:05): "Fix the x axis values to be better, i do not like them
-       slanted like that. make them upright, fit them how you must."
-       NOTHING IS ROTATED ANY MORE. R70.140 said every day stays labelled and turned them 90 degrees
-       rather than thin them; the owner has now looked at that and rejected it, so the trade flips:
-       UPRIGHT always, and when upright labels cannot all fit they are THINNED on a stride — with
-       the first, the last and TODAY always kept, so the axis is never missing the day you are on.
-       The weekday line is the first thing dropped, because "12" locates a day and "Fri" does not.
-       AND THE LABELS ARE A CONTROL (his note 9): each carries the same `data-vgd` the dots do, so
-       clicking a date goes to that day. */
-    /* HT-18d (Cory note 5): the minimum comes from the WIDEST label this chart carries, not from
-       one constant for every chart. At ~5.7px a glyph in the mono face, "Jan" wants 24px and "7"
-       wants 12 — a single 15 crammed the YEAR into a smear and over-thinned the MONTH. */
-    var maxChars = pts.reduce(function(m,p){ return Math.max(m, String(p.x==null?'':p.x).length); }, 1);
-    /* SHRINK BEFORE THINNING. A constant 15px thinned the YEAR to 7 of 12 months, which is a worse
-       axis than twelve small ones - twelve is the whole set and every one of them is a place you
-       can click. So the type is sized to the space first (mono glyphs run ~0.6em wide, capped at
-       9.5px and floored at 7), and the stride only comes into play once 7px still will not fit -
-       which is the MONTH at 30 days in a narrow panel, and there thinning is the honest answer. */
-    /* the 3px of breathing room is part of what a label costs, so it comes off the space
-       BEFORE the type is sized — without it the year sized to 9.5px, then failed its own
-       fit test by 3px and thinned to seven months anyway. */
-    /* B2 (R70.234): "the label width is MEASURED, never assumed". The 0.62em-per-glyph estimate
-       below is what kept the numbers strided at 15 of 30 - it makes a two-digit label 11.7px wide
-       against an 11px column, when the rendered width at 7px is 8.7px and fits with room. One probe
-       node, reused, tells the truth about this font at this size; the estimate stays as the
-       fallback for a surface that will not measure. */
-    var probeEl=null;
-    function labWidth(txt, fontPx){
-      try{
-        if(!probeEl){
-          probeEl=document.createElementNS('http://www.w3.org/2000/svg','text');
-          probeEl.setAttribute('class','xl');
-          probeEl.setAttribute('x','-999'); probeEl.setAttribute('y','-999');
-          svg.appendChild(probeEl);
-        }
-        probeEl.setAttribute('font-size', fontPx);
-        probeEl.textContent = String(txt);
-        var w = probeEl.getComputedTextLength();
-        if(w > 0) return w;
-      }catch(e){}
-      return String(txt).length * fontPx * 0.62;
-    }
-    var widest = pts.reduce(function(a,p){
-      var t=String(p.x==null?'':p.x); return t.length>String(a).length ? t : a; }, '');
-    var fontPx, stride;
-    /* HT-18e (B): the floor was 7px and Cory's word for the result was "incredibly crunched and
-       thin". 7px is not a size a number is read at - it is a size a number is counted at. The floor
-       is 9 now and the stride carries the difference: fifteen dates you can read beat thirty you
-       cannot. */
-    /* 9 for a running scale like days-of-the-month, where the numbers interpolate and half of
-       them still tell you where you are; 8 for a small FIXED set like the twelve months, where
-       every label is a distinct place and dropping six of them loses half the axis. MEASURED:
-       at a 251px panel the year affords 8.3px, so 8 shows all twelve and 9 shows six. */
-    /* B1 narrows the chart panels at 1280 (243px), where twelve three-letter months want 7.3px.
-       The floor for a small FIXED set drops to 7 so the set stays complete; it only ever binds on a
-       small panel, because the type is sized by fit first — at 1920 the year renders at 8.5px. */
-    /* B2 (R70.234) asks for EVERY day numbered. B1 widened the month chart from 277 to 392, and a
-       two-digit number at 7px needs ~11.7px of column against the ~12.6px a 31-day month now gets -
-       so all 31 fit, and the stride below stays only as the safety net for a panel that genuinely
-       cannot hold them. 9 stays the floor for a chart with no second line to carry the rhythm. */
-    var FLOOR = (n <= 12) ? 7 : (opts.twoLine ? 7 : 9);
-    /* the largest size at which the WIDEST real label fits its own column, measured. */
-    fontPx = FLOOR; stride = 1;
-    var sz, wAtFloor = labWidth(widest, FLOOR);
-    for(sz = 9.5; sz >= FLOOR; sz -= 0.5){
-      if(labWidth(widest, sz) + 2 <= stepPx){ fontPx = sz; break; }
-    }
-    /* ---- HT-20 P3 · EVERY DAY GETS ITS NUMBER (R70.253) --------------------------------
-       THE ARITHMETIC ALREADY REFUSED THE SINGLE ROW, and it is written into `data-axis`:
-       at Cory's own 2133px window a 30-day month gives each label 10.97px of column and a
-       two-digit number renders 9.51px wide, which needs 11.51px with its 2px of air. It does
-       not fit at ANY supported width — 1280 gives 5.83px — so a smaller font was never the
-       answer. STAGGERING ODD AND EVEN ONTO TWO ROWS DOUBLES THE EFFECTIVE STEP: 21.94px at
-       2133, 20.90 at 1920, 11.66 at 1280, and the label needs 11.53. It fits at all three.
+      svg.setAttribute('height',H); svg.style.height=H+'px';
+    } else { W = fitSvg(svgId,H); if(W==null) return 0; }
 
-       ORDER OF REMEDY, applied only as far as needed and every step measured:
-         1. stagger onto two rows      -> effective step x2
-         2. shrink the label to a 9px floor
-         3. drop the weekday letter     -> last resort, and first below 400px on the phone
-       THINNING IS NOT AN OPTION at any supported width. `stride` survives only as the floor of
-       last resort for a panel too narrow to hold the set even staggered — under 250px, where
-       there is no honest layout — and the axis records which remedy it took. */
-    var remedy = 'single';
-    if(sz < FLOOR){
-      fontPx = FLOOR;
-      if(opts.twoLine && (wAtFloor + 2) <= stepPx * 2){
-        remedy = 'stagger';                       /* 1 — every day keeps its number */
-      } else {
-        stride = Math.ceil((wAtFloor + 2) / Math.max(1, stepPx * (opts.twoLine ? 2 : 1)));
-        remedy = opts.twoLine ? 'stagger+stride' : 'stride';
+    var n=pts.length, pad=opts.pad||0;
+    var L=30, R=14, T=10, XB=18, GAP=8;
+    var body = H - T - XB;
+    var RS = Math.max(28, Math.min(isPhone?52:70, Math.round(body*0.30)));   /* rating strip */
+    var cTop=T, cBot=T + (body - GAP - RS);            /* completion plot */
+    var rTop=cBot+GAP, rBot=rTop+RS;                   /* rating strip */
+    var px=function(i){ return n<2 ? (L+(W-L-R)/2) : L+pad+i*(W-L-R-2*pad)/(n-1); };
+    var cy=function(v){ return cBot-(v/100)*(cBot-cTop); };
+    var ry=function(v){ return rBot-(v/10)*(rBot-rTop); };
+    var s='';
+
+    /* ---- COMPLETION GRID: solid 1px --ht-line at 0/25/50/75/100 ---- */
+    [0,25,50,75,100].forEach(function(v){
+      s+='<line class="ax'+(v===0?' ax0':'')+'" x1="'+L+'" y1="'+cy(v).toFixed(1)+'" x2="'+(W-R)+
+         '" y2="'+cy(v).toFixed(1)+'"/>';
+    });
+    (isPhone?[0,50,100]:[0,25,50,75,100]).forEach(function(v){
+      s+='<text class="ayl" x="'+(L-6)+'" y="'+(cy(v)+3).toFixed(1)+'" text-anchor="end">'+v+'</text>';
+    });
+
+    function runs(get){ var out=[],cur=[]; pts.forEach(function(p,i){ var v=get(p);
+      if(v==null){ if(cur.length){ out.push(cur); cur=[]; } return; } cur.push([i,v]); });
+      if(cur.length) out.push(cur); return out; }
+
+    /* ---- 8% WASH under the daily completion line, per run, never bridging a gap ---- */
+    var cRuns=runs(function(p){ return p.c; });
+    cRuns.forEach(function(r){
+      var d='M'+px(r[0][0]).toFixed(1)+' '+cBot.toFixed(1);
+      r.forEach(function(pt){ d+=' L'+px(pt[0]).toFixed(1)+' '+cy(pt[1]).toFixed(1); });
+      d+=' L'+px(r[r.length-1][0]).toFixed(1)+' '+cBot.toFixed(1)+' Z';
+      s+='<path class="wash-c" d="'+d+'"/>';
+    });
+    /* ---- daily completion line: quiet 35% green, round; a lone day shows only its dot ---- */
+    cRuns.forEach(function(r){ if(r.length<2) return;
+      s+='<path class="ln-c" d="'+r.map(function(pt,j){ return (j?'L':'M')+px(pt[0]).toFixed(1)+' '+
+         cy(pt[1]).toFixed(1); }).join(' ')+'"/>'; });
+
+    /* ---- reference hairline at the period mean (month only), labelled once at its right end ---- */
+    if(!isYear){
+      var cs=pts.map(function(p){ return p.c; }).filter(function(v){ return v!=null; });
+      if(cs.length){
+        var mean=Math.round(cs.reduce(function(a,b){ return a+b; },0)/cs.length);
+        s+='<line class="ref30" x1="'+L+'" y1="'+cy(mean).toFixed(1)+'" x2="'+(W-R)+'" y2="'+cy(mean).toFixed(1)+'"/>';
+        s+='<text class="reflab" x="'+(W-R)+'" y="'+(cy(mean)-3).toFixed(1)+'" text-anchor="end">30d '+mean+'%</text>';
       }
     }
-    if(probeEl && probeEl.parentNode) probeEl.parentNode.removeChild(probeEl);
-    /* the axis states its own arithmetic. Invisible, three dozen bytes, and it is the difference
-       between "the numbers are thinned" and "a 30 is 13.0px rendered against a 11.0px column, so
-       thirty of them do not fit and fifteen do" - which is the claim a receipt has to be able to
-       make (B2 asked for the width to be MEASURED; this is where the measurement is kept). */
-    try{ svg.setAttribute('data-axis', 'n='+n+' step='+stepPx.toFixed(2)+
-      ' label="'+widest+'" w@'+FLOOR+'='+wAtFloor.toFixed(2)+
-      ' font='+fontPx+' stride='+stride+' remedy='+remedy+
-      ' effstep='+(stepPx*(remedy.indexOf('stagger')===0?2:1)).toFixed(2)); }catch(e){}
-    /* the two rounding steps used to disagree by a fraction of a pixel and thin the YEAR to seven
-       months when twelve fitted; deciding the stride from `fitPx` directly removes the argument. */
-    /* HT-18e (C, Cory note 3): "I want to see Monday through Sunday abbreviation somehow. And
-       maybe we can add in thirty days as well." Both, on two lines doing different jobs: the NUMBER
-       locates a date and is strided so it stays readable; the WEEKDAY is the rhythm of the week and
-       is drawn for EVERY day, because one letter costs ~5px and even 8px a day affords that. Three
-       letters where they fit, one where they do not - the rhythm survives either way. */
-    var twoLine = !!opts.twoLine;
-    var dowChars = stepPx >= 22 ? 3 : 1;
-    var todayIx = -1;
-    pts.forEach(function(p,i){ if(p.key===today()) todayIx=i; });
-    /* PASTE 293 S2.5: the YEAR chart marks this month too - its keys are "0".."11", so a date never matched */
-    if(todayIx < 0 && opts.attr === 'data-vgy' && String(S.vYear || '') === String(dnum(today()).getFullYear()))
-      pts.forEach(function(p,i){ if(p.key===String(dnum(today()).getMonth())) todayIx=i; });
-    /* TODAY is always kept, and the strided label beside it gives way rather than colliding —
-       measured as one overlapping pair on the MONTH axis before this. */
-    var kept = {};
-    pts.forEach(function(p,i){
-      if((stride===1) || (i%stride===0) || i===0 || i===n-1) kept[i]=1;
+
+    /* ---- TREND: trailing mean over LOGGED days, the one loud line (breaks across a hole) ---- */
+    var win=isYear?4:7, minL=isYear?2:3;
+    var trend=pts.map(function(p,i){ return trailMean(pts,i,win,minL,function(q){ return q.c; }); });
+    (function(){ var out=[],cur=[]; trend.forEach(function(v,i){
+       if(v==null){ if(cur.length){ out.push(cur); cur=[]; } return; } cur.push([i,v]); });
+       if(cur.length) out.push(cur);
+       out.forEach(function(r){ if(r.length<2) return;
+         s+='<path class="trend-c" d="'+r.map(function(pt,j){ return (j?'L':'M')+px(pt[0]).toFixed(1)+
+            ' '+cy(pt[1]).toFixed(1); }).join(' ')+'"/>'; }); })();
+
+    /* ---- RATING STRIP: its own 0-10 axis, a title, a neutral line + dots, no wash ---- */
+    [0,5,10].forEach(function(v){
+      s+='<line class="ax ax-r" x1="'+L+'" y1="'+ry(v).toFixed(1)+'" x2="'+(W-R)+'" y2="'+ry(v).toFixed(1)+'"/>';
+      s+='<text class="ayl ayl-r" x="'+(L-6)+'" y="'+(ry(v)+3).toFixed(1)+'" text-anchor="end">'+v+'</text>';
     });
-    if(stride>1){
-      /* the LAST label is kept unconditionally, so when the stride does not land on it the one
-         before it collides — measured as the single remaining overlapping pair on the MONTH axis
-         (28 against 29). Whichever label is kept for a reason other than the stride wins its space. */
-      if((n-1) % stride !== 0) delete kept[n-2];
-      if(todayIx>=0){ delete kept[todayIx-1]; delete kept[todayIx+1]; kept[todayIx]=1; }
-      kept[0]=1; kept[n-1]=1;
+    s+='<text class="striplab" x="'+L+'" y="'+(rTop-2).toFixed(1)+'">RATING</text>';
+    runs(function(p){ return p.r; }).forEach(function(r){ if(r.length<2) return;
+      s+='<path class="ln-r" d="'+r.map(function(pt,j){ return (j?'L':'M')+px(pt[0]).toFixed(1)+' '+
+         ry(pt[1]).toFixed(1); }).join(' ')+'"/>'; });
+
+    /* ---- today ---- */
+    var todayIx=-1;
+    pts.forEach(function(p,i){ if(p.isNow || p.key===today()) todayIx=i; });
+
+    /* ---- HIT COLUMNS: the whole day column, >=24px, full height — crosshair anchor + tooltip ---- */
+    var col = n>1 ? (W-L-R-2*pad)/(n-1) : (W-L-R);
+    var hw=Math.max(24, col);
+    pts.forEach(function(p,i){
+      if(p.c==null && p.r==null && !p.drill) return;
+      var parts=[];
+      if(p.full) parts.push(p.full);
+      if(p.c!=null) parts.push(Math.round(p.c)+'%');
+      if(p.done!=null && p.total!=null) parts.push(p.done+' of '+p.total);
+      if(p.r!=null) parts.push('rating '+p.r);
+      if(trend[i]!=null) parts.push('trend '+Math.round(trend[i])+'%');
+      var tip=parts.join(' · ');
+      var at=(p.key!=null? ' '+opts.attr+'="'+p.key+'"' : '');
+      s+='<rect class="hitcol" '+at+' data-i="'+i+'" data-tip="'+esc(tip)+'" x="'+(px(i)-hw/2).toFixed(1)+
+         '" y="'+T+'" width="'+hw.toFixed(1)+'" height="'+(rBot-T).toFixed(1)+'" fill="transparent"/>';
+    });
+
+    /* ---- DOTS: rating (behind), completion, today on top; each with a 2px surface ring ---- */
+    var dotR=isYear?3.5:4;
+    pts.forEach(function(p,i){ if(p.r!=null)
+      s+='<circle class="dot-r" cx="'+px(i).toFixed(1)+'" cy="'+ry(p.r).toFixed(1)+'" r="3"/>'; });
+    pts.forEach(function(p,i){ if(p.c==null || i===todayIx) return;
+      s+='<circle class="dot-c" cx="'+px(i).toFixed(1)+'" cy="'+cy(p.c).toFixed(1)+'" r="'+dotR+'"/>'; });
+    if(todayIx>=0 && pts[todayIx] && pts[todayIx].c!=null){
+      var tx=px(todayIx).toFixed(1), tyc=cy(pts[todayIx].c).toFixed(1);
+      s+='<circle class="halo-today" cx="'+tx+'" cy="'+tyc+'" r="10"/>';
+      s+='<circle class="dot-today" cx="'+tx+'" cy="'+tyc+'" r="5"/>';
     }
-    /* HT-20 P3: two rows when the remedy is a stagger — EVEN indices on the lower row (which is
-       where a single row already sat, so nothing moves for an axis that never needed this) and
-       ODD indices 10px above it. The band is already 52px deep for the two-line form, so the
-       upper row costs no height; the weekday letters keep their own line at H-6. */
-    var yLo = H-(twoLine?18:8), yHi = yLo-10, stag = (remedy.indexOf('stagger')===0);
-    pts.forEach(function(p,i){
-      if(!kept[i]) return;
-      var x=px(i).toFixed(1);
-      var at = p.key!=null ? ' '+opts.attr+'="'+p.key+'"' : '';
-      var y = (stag && (i%2)) ? yHi : yLo;
-      s+='<text class="xl'+(stag?(i%2?' xl-hi':' xl-lo'):'')+(i===todayIx?' xl-today':'')+
-         '" x="'+x+'" y="'+y+'" text-anchor="middle" font-size="'+fontPx+'"'+at+'>'+
-         '<tspan x="'+x+'">'+esc(p.x)+'</tspan></text>';
-    });
-    /* ---- HT-19 B2 - THE DAY AXIS (R70.234) ---------------------------------------------
-       Every day carries a weekday letter AND its number. The two lines do different jobs: the
-       letter is the rhythm of the week, the number is the date you click. Saturdays are tinted
-       because Saturday is the day the list becomes one box (B3), today is outlined, and the full
-       date rides on the hover the dots already have.
-       THE FORM IS CHOSEN BY MEASUREMENT, NOT BY A BREAKPOINT. `Mon` at >=1600 is what the wire
-       asks for, but a wide window does not guarantee a wide PANEL - B1 just changed every panel
-       width in the app. So the three-letter form is used when it actually fits the per-day column
-       and the one-letter form when it does not; getComputedTextLength on a rendered probe is the
-       measurement, and it is taken once per paint rather than per label. */
-    if(twoLine) (function(){
-      var col = n>1 ? (W-L-R-2*pad)/(n-1) : (W-L-R);
-      var three = false;
-      try{
-        var probe=document.createElementNS('http://www.w3.org/2000/svg','text');
-        probe.setAttribute('font-size','8'); probe.setAttribute('x','-999'); probe.setAttribute('y','-999');
-        probe.setAttribute('class','xl2');
-        probe.textContent='Mon';
-        svg.appendChild(probe);
-        three = probe.getComputedTextLength() + 2 <= col;
-        svg.removeChild(probe);
-      }catch(e){ three = col >= 22; }
+
+    /* ---- X BAND — ONE ROW ---- */
+    if(isYear){
+      /* PASTE 293 S2.5: the year marks THIS MONTH — the month initial (at its first week) wears the
+         today ink when it is the current month of the shown year, and the current week keeps its blue
+         dot. todayIx is the today-WEEK, which is not a month-start, so the mark is decided by month. */
+      var nowMo = String(dnum(today()).getMonth()),
+          nowYr = String(S.vYear||'')===String(dnum(today()).getFullYear());
+      pts.forEach(function(p,i){ if(!p.monthStart) return;
+        var x=px(i).toFixed(1), thisMonth = nowYr && p.key===nowMo;
+        s+='<line class="mtick" x1="'+x+'" y1="'+cTop+'" x2="'+x+'" y2="'+rBot.toFixed(1)+'"/>';
+        s+='<text class="xl'+(thisMonth?' xl-today':'')+'" x="'+x+'" y="'+(H-4)+'" text-anchor="middle">'+
+           esc(p.mi)+'</text>'; });
+    } else {
+      /* ONE ROW, MEASURED, NEVER OVERLAPPING (paste S4). The candidates are the whole month on the
+         desktop and the 1st / Mondays / today on the phone; then a greedy pass keeps a label only
+         when it clears the last kept one by a label's width, and TODAY always wins its space. So the
+         desktop shows as many days as fit and the phone shows the landmark days — one row either way,
+         and the golden's zero-overlap check is satisfied by construction, not by luck. */
+      var fontPx=11, minGap = 2*fontPx*0.62 + 5;         /* a two-digit number + air */
+      var cand=[];
       pts.forEach(function(p,i){
-        if(!p.x2) return;
-        var xx=px(i).toFixed(1);
-        var at2 = p.key!=null ? ' '+opts.attr+'="'+p.key+'"' : '';
-        var lab = three ? String(p.x2) : String(p.x2).charAt(0);
-        var sat = /^sat/i.test(String(p.x2));
-        s+='<text class="xl2'+(sat?' xl-sat':'')+(i===todayIx?' xl2-today':'')+'" x="'+xx+
-           '" y="'+(H-6)+'" text-anchor="middle" font-size="8"'+at2+'>'+esc(lab)+'</text>';
+        if(isPhone){ if(p.x==='1' || p.x2==='Mon' || i===todayIx) cand.push(i); }
+        else cand.push(i);
       });
-    })();
+      var kept=[], lastX=-1e9;
+      cand.forEach(function(i){
+        var x=px(i);
+        if(i===todayIx){ while(kept.length && x-px(kept[kept.length-1])<minGap) kept.pop();
+                         kept.push(i); lastX=x; return; }
+        if(x-lastX>=minGap){ kept.push(i); lastX=x; }
+      });
+      kept.forEach(function(i){
+        var p=pts[i], x=px(i).toFixed(1);
+        var at=p.key!=null ? ' '+opts.attr+'="'+p.key+'"' : '';
+        s+='<text class="xl'+(i===todayIx?' xl-today':'')+'" x="'+x+'" y="'+(H-4)+
+           '" text-anchor="middle"'+at+'>'+esc(p.x)+'</text>'; });
+    }
+
+    /* crosshair, positioned by bindPanels on hover / focus / arrow keys */
+    s+='<line class="xhair" x1="0" y1="'+T+'" x2="0" y2="'+rBot.toFixed(1)+'" style="display:none"/>';
+
+    try{ svg.setAttribute('data-n', n);
+      svg.setAttribute('data-axis','one'); }catch(e){}
+    svg.setAttribute('tabindex','0');
+    svg.setAttribute('role','img');
+    svg.setAttribute('aria-label', (isYear?'Year':'Month')+' completion and rating chart');
     svg.innerHTML=s;
     return pts.filter(function(p){ return p.c!=null||p.r!=null; }).length;
   }
@@ -5928,24 +5856,38 @@ var HT32_CARDFIT = true;
   function monthPoints(){
     var ym=S.calYM||(S.calYM=[dnum(today()).getFullYear(),dnum(today()).getMonth()]);
     return monthKeys(ym[0],ym[1]).map(function(k,i){
-      var d=dnum(k);
+      var d=dnum(k), dt=doneTotalOf(k);
       return { x:String(i+1), x2:DOW3[d.getDay()], key:k, c:pctOn(k), r:ratingOf(k),
-               /* B2: the full date, for the hover the dots already carry */
+               done:dt.done, total:dt.total,
                full: DOW3[d.getDay()]+' '+MO[d.getMonth()]+' '+d.getDate() };
     });
   }
+  /* THE YEAR IS WEEKLY MEANS (paste S3): up to 53 Monday-anchored weeks, each the mean of its logged
+     days. A month with no logged week is a gap; a week with no day in the year is skipped. The drill
+     target is the MONTH the week belongs to (`key` = month index), so tapping any week opens that
+     month, exactly as the 12-dot year did. Month starts carry a tick and the month initial. */
   function yearPoints(){
-    var yr=S.vYear||(S.vYear=dnum(today()).getFullYear()), out=[];
-    for(var m=0;m<12;m++){
-      var ks=monthKeys(yr,m);
-      var cs=ks.map(pctOn).filter(function(v){ return v!=null; });
-      var rs=ks.map(ratingOf).filter(function(v){ return v!=null; });
-      /* 0 LOGGED DAYS IS A GAP, NOT A ZERO. A zero reads as a month of total failure. */
-      /* HT-17 S2: THREE-LETTER months. `J F M A M J J A S O N D` has three ambiguous pairs and
-         reads as noise; `Jan Feb Mar` is the label. */
-      out.push({ x:MO[m], x2:'', key:String(m),
+    var yr=S.vYear||(S.vYear=dnum(today()).getFullYear());
+    var start=weekStart(new Date(yr,0,1)), todayK=today(), prevMo=-1, out=[];
+    for(var w=0; w<53; w++){
+      var ws=new Date(start.getTime()+w*7*MSDAY);
+      var cs=[], rs=[], keyDay=null, hasNow=false;
+      for(var dd=0; dd<7; dd++){
+        var day=new Date(ws.getTime()+dd*MSDAY);
+        if(day.getFullYear()!==yr) continue;
+        var k=dk(day); if(!keyDay) keyDay=day;
+        var c=pctOn(k); if(c!=null) cs.push(c);
+        var rr=ratingOf(k); if(rr!=null) rs.push(rr);
+        if(k===todayK) hasNow=true;
+      }
+      if(!keyDay) continue;
+      var mo=keyDay.getMonth(), monthStart=(mo!==prevMo); prevMo=mo;
+      out.push({ x:'', x2:'', key:String(mo),
                  c: cs.length? Math.round(meanOf(cs)) : null,
-                 r: rs.length? Math.round(meanOf(rs)*10)/10 : null });
+                 r: rs.length? Math.round(meanOf(rs)*10)/10 : null,
+                 full:'Week of '+MO[mo]+' '+keyDay.getDate(),
+                 done:null, total:null, drill:true, isNow:hasNow,
+                 monthStart:monthStart, mi:MO[mo].charAt(0) });
     }
     return out;
   }
@@ -5960,7 +5902,7 @@ var HT32_CARDFIT = true;
     var ym=S.calYM, nav=document.getElementById('vMonthNav');
     if(nav) nav.innerHTML='<button class="mv" data-vgm="-1">\u2039</button>'+
       '<b>'+MO[ym[1]].toUpperCase()+' '+ym[0]+'</b>'+
-      '<button class="mv" data-vgm="1">\u203a</button>'+legend();
+      '<button class="mv" data-vgm="1">\u203a</button>'+legend();   /* HT-432: legend kept in DOM (R70.138), hidden by CSS */
     var got=pts.filter(function(p){ return p.c!=null; }).length;
     var tip=document.getElementById('vMonthTip');
     if(tip) tip.textContent = got? got+' logged' : 'nothing logged';
@@ -5974,10 +5916,10 @@ var HT32_CARDFIT = true;
     var nav=document.getElementById('vYearNav');
     if(nav) nav.innerHTML='<button class="mv" data-vgyn="-1">\u2039</button>'+
       '<b>'+(S.vYear||dnum(today()).getFullYear())+'</b>'+
-      '<button class="mv" data-vgyn="1">\u203a</button>'+legend();
+      '<button class="mv" data-vgyn="1">\u203a</button>'+legend();   /* HT-432: legend kept in DOM (R70.138), hidden by CSS */
     var got=pts.filter(function(p){ return p.c!=null; }).length;
     var tip=document.getElementById('vYearTip');
-    if(tip) tip.textContent=got+' of 12 months logged';
+    if(tip) tip.textContent=got+' weeks logged';
     return pts;
   }
   window.__HT16.monthPoints = monthPoints;
@@ -8872,14 +8814,19 @@ var HT32_CARDFIT = true;
     var sh=sabHistory(); if(!sh || !sh.first) return;
     var ax=svg.querySelector('line.ax0'); if(!ax) return;
     var y=(+ax.getAttribute('y1'))-7, t=today(), ns='http://www.w3.org/2000/svg';
-    q('circle.hit[data-vgd]', svg).forEach(function(c){
+    /* HT-432: the day column is a `rect.hitcol` now, not a `circle.hit`; read the centre from whichever
+       shape is present so the Sabbath rings (DEC-172) survive the one-axis redraw. */
+    q('.hitcol[data-vgd], circle.hit[data-vgd]', svg).forEach(function(c){
       var k=c.getAttribute('data-vgd');
       if(!k || k<sh.first || k>t || dnum(k).getDay()!==6) return;
       var kept=sh.kept(k);
       if(k===t && !kept) return;
+      var cx = c.tagName.toLowerCase()==='rect'
+        ? (parseFloat(c.getAttribute('x'))+parseFloat(c.getAttribute('width'))/2)
+        : parseFloat(c.getAttribute('cx'));
       var r=document.createElementNS(ns,'circle');
       r.setAttribute('class','h28ring'+(kept?' kept':' miss'));
-      r.setAttribute('cx', c.getAttribute('cx')); r.setAttribute('cy', y.toFixed(1)); r.setAttribute('r','3.6');
+      r.setAttribute('cx', cx.toFixed(1)); r.setAttribute('cy', y.toFixed(1)); r.setAttribute('r','3.6');
       var tt=document.createElementNS(ns,'title'); tt.textContent='Sabbath '+(kept?'kept':'missed'); r.appendChild(tt);
       svg.appendChild(r);
     });
