@@ -146,6 +146,22 @@ svg{display:block}
 .li.tint-dusk{background:var(--tint-dusk)}
 .li.tint-dawn:hover,.li.tint-dusk:hover{background:var(--sel)}
 
+/* HT-652 S2 · THE BLANK PAGE — a full-screen writing surface: the field's text and nothing else,
+   one close control and Esc. The day-view box becomes a preview that opens it, so it reads as a tap
+   target. The text area IS the viewport; it never auto-grows (see growTo's h652ta guard). */
+#iWhy,#iTasks,#iPrayer,#iDump{cursor:pointer}
+html.h652lock,html.h652lock body{overflow:hidden}
+.h652page{position:fixed;inset:0;z-index:9000;background:var(--ground);display:flex;flex-direction:column}
+.h652page[hidden]{display:none}
+.h652x{position:absolute;top:max(10px,env(safe-area-inset-top));right:14px;z-index:2;
+  width:34px;height:34px;border:0;border-radius:50%;background:var(--sunk);color:var(--ink2);
+  font-size:22px;line-height:1;cursor:pointer}
+.h652x:hover{color:var(--ink)}
+.h652ta{flex:1 1 auto;width:100%;box-sizing:border-box;border:0;outline:0;resize:none;
+  background:var(--ground);color:var(--ink);font-size:16px;line-height:1.7;
+  padding:calc(env(safe-area-inset-top) + 56px) 20px 24px;overflow-y:auto}
+@media(min-width:1024px){.h652ta{max-width:760px;margin:0 auto;padding-top:72px;padding-bottom:48px}}
+
 /* ---------------- panels ---------------- */
 .pan{border:1px solid var(--rule);background:var(--sheet);padding:12px}
 .pan.flat{border-left:0;border-right:0;background:none;padding:12px 0}

@@ -552,6 +552,9 @@ function growCeil(){
 }
 function growTo(t){
   if(!t) return;
+  /* HT-652 S2: the full-page writing box IS the viewport — it never auto-grows, so the expanding-box
+     glitch Andrew hit on the day view cannot happen on it. Every other textarea grows as before. */
+  if(t.classList && t.classList.contains('h652ta')) return;
   t.style.height = 'auto';
   var want = t.scrollHeight + 2, ceil = growCeil(), h = Math.min(want, ceil);
   t.style.height = h + 'px';
@@ -592,6 +595,104 @@ window.addEventListener('resize', regrowAll);
 
 window.__HT25 = { growTo:growTo, growCeil:growCeil, caretIntoView:caretIntoView,
                   regrowAll:regrowAll };
+
+/* ---- HT-652 S2 · THE BLANK PAGE ----------------------------------------------------------------
+   A tap or click on any journal field opens a FULL-SCREEN writing page: that field's text and
+   nothing else — no header, no tabs, no other field, no chrome but one small close control (and Esc
+   on the laptop). The focus mode of the writers Cory named (iA Writer, Day One): nothing on screen
+   but the page, a blank canvas open to creation.
+
+   ONE SAVE PATH, NEVER TWO. The page writes straight back into the day-view box and fires that box's
+   own `input` event, so the field saves exactly the one way it saved when typed into directly — the
+   autosave debounce (htSaveNow) is untouched. The box on the day view becomes a preview that opens
+   the page: it shows the first lines of the text and a quiet hint when empty.
+
+   The four fields are the day's journal: the rating's why, the brain dump (where its column exists),
+   completed, and the prayer journal. */
+(function(){
+  var FIELDS = ['iWhy', 'iDump', 'iTasks', 'iPrayer'];
+  var HINT = { iWhy:'Why was it that number? Tap to write.',
+               iDump:'Brain dump — tap for a blank page.',
+               iTasks:'What got done today? Tap to write.',
+               iPrayer:'Prayer journal — tap for a blank page.' };
+  var pageEl = null, taEl = null, srcId = null, open = false;
+
+  function build(){
+    if(pageEl) return;
+    pageEl = document.createElement('div');
+    pageEl.id = 'ht652page';
+    pageEl.className = 'h652page';
+    pageEl.setAttribute('hidden', '');
+    pageEl.setAttribute('role', 'dialog');
+    pageEl.setAttribute('aria-modal', 'true');
+    pageEl.innerHTML =
+      '<button type="button" class="h652x" id="h652x" aria-label="Close and return">×</button>' +
+      '<textarea class="h652ta" id="h652ta" aria-label="Writing page"></textarea>';
+    document.body.appendChild(pageEl);
+    taEl = pageEl.querySelector('#h652ta');
+    pageEl.querySelector('#h652x').addEventListener('click', function(e){ e.preventDefault(); close(); });
+    /* mirror every keystroke into the day-view box and fire ITS input — the one save path */
+    taEl.addEventListener('input', function(){
+      var src = document.getElementById(srcId); if(!src) return;
+      src.value = taEl.value;
+      src.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+    taEl.addEventListener('keydown', function(e){ if(e.key === 'Escape'){ e.preventDefault(); close(); } });
+    pageEl.addEventListener('keydown', function(e){ if(e.key === 'Escape'){ e.preventDefault(); close(); } });
+  }
+
+  function openFor(id){
+    var src = document.getElementById(id); if(!src) return;
+    build();
+    srcId = id; open = true;
+    taEl.value = src.value;
+    pageEl.removeAttribute('hidden');
+    document.documentElement.classList.add('h652lock');
+    /* caret at the end of the text; an empty field opens empty */
+    taEl.focus();
+    try{ var n = taEl.value.length; taEl.setSelectionRange(n, n); }catch(e){}
+  }
+
+  function close(){
+    if(!open) return;
+    open = false;
+    var src = document.getElementById(srcId);
+    if(src){ src.value = taEl.value; src.dispatchEvent(new Event('input', { bubbles: true })); }
+    pageEl.setAttribute('hidden', '');
+    document.documentElement.classList.remove('h652lock');
+    srcId = null;
+    /* NO refocus of the box: focusing it would re-open the page at once. The day shows, the box
+       shows the text, and the next tap opens the page again. */
+  }
+
+  /* The box is a preview that opens the page. `focusin` catches a tap, a label click and keyboard
+     tab-in alike; the page then takes focus, so nothing is ever typed into the box itself. */
+  document.addEventListener('focusin', function(e){
+    var t = e.target;
+    if(open || !t || !t.id || FIELDS.indexOf(t.id) < 0) return;
+    openFor(t.id);
+  }, true);
+  /* a plain click when the box already held focus (so focusin did not fire) still opens it */
+  document.addEventListener('click', function(e){
+    var t = e.target;
+    if(open || !t || !t.id || FIELDS.indexOf(t.id) < 0) return;
+    openFor(t.id);
+  }, true);
+
+  /* the quiet hint, set whenever a box is (re)painted empty; the real placeholder on iWhy that
+     HT-21 set is left alone where it already speaks. */
+  function hints(){
+    FIELDS.forEach(function(id){
+      var b = document.getElementById(id);
+      if(b && !b.getAttribute('placeholder')) b.setAttribute('placeholder', HINT[id] || 'Tap to write.');
+    });
+  }
+  document.addEventListener('DOMContentLoaded', hints);
+  if(document.readyState !== 'loading') hints();
+
+  window.__HT652PAGE = { open:openFor, close:close, isOpen:function(){ return open; },
+                         ta:function(){ return taEl; }, src:function(){ return srcId; }, hints:hints };
+})();
 /* DUE TODAY and not weekly. This is what the day's percentage is computed against, and
    `saveDay()` snapshots it into `active_set` on every save - so a day already logged keeps the
    set it was graded on and NO PAST DAY IS EVER REPRICED (P4). That mechanism already shipped;
