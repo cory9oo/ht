@@ -5616,6 +5616,9 @@ var HT32_CARDFIT = true;
   window.__HT16.LIFE_SCALE = LIFE_SCALE;
   window.__HT16.lifeGrade = lifeGrade;
   window.__HT16.lifeScaleFill = lifeScaleFill;
+  window.__HT16.h16Chart = h16Chart;              /* 656 S2: golden_ht651_zero renders a crafted series */
+  window.__HT16.compDraw = compDraw;              /* 656 S2: due-but-unlogged -> 0, nothing-due -> gap */
+  window.__HT16.dueCountOn = dueCountOn;
   window.__HT16.TARGET_AGE = TARGET_AGE;
   window.__HT16.LIFE_TOTAL = LIFE_TOTAL;
 
@@ -5856,6 +5859,29 @@ var HT32_CARDFIT = true;
     var ck=r.checked||{};
     return { done:set.filter(function(id){ return ck[id]; }).length, total:set.length };
   }
+  /* ---- HT-651 S1 (paste 656 S2) · ZERO IS A POINT, A GAP IS A GAP (Cory 2026-10-07, item 4) -------
+     The completion line must run unbroken from the first logged day to today. A day with tasks DUE
+     and nothing checked is a 0 (not a hole — "did nothing"); a day with NOTHING due stays a gap the
+     line bridges with a dash ("nothing was asked"). Never a made-up number — a 0 says did-nothing, a
+     gap says nothing-asked (Stephen Few, *Show Me the Numbers*; Datawrapper, "How to handle missing
+     data in charts"). This changes only what is DRAWN (the point's `cd` field); every COMPUTED figure
+     still reads `c` = pctOn (logged days only), so no average, reference mean, trend or streak moves. */
+  function firstLoggedKey(){
+    var best=null; (S.days||[]).forEach(function(r){ if(r && r.date && (best==null || r.date<best)) best=r.date; });
+    return best;
+  }
+  function dueCountOn(k){
+    var r=S.byDate[k];
+    if(r && r.active_set && r.active_set.length) return r.active_set.length;       /* the day's own P4 denominator */
+    return (S.habits||[]).filter(function(h){ return h.active!==false && dueDay(h,k); }).length;
+  }
+  function compDraw(k){
+    var v=pctOn(k);                                     /* a saved day keeps its real pct, 0% included */
+    if(v!=null) return v;
+    var first=firstLoggedKey();
+    if(!first || k<first || k>today()) return null;     /* outside [first logged .. today]: no point */
+    return dueCountOn(k)>0 ? 0 : null;                  /* due but unlogged -> 0; nothing due -> dashed gap */
+  }
   function weekStart(d){                                /* the Monday of d's week, noon-anchored */
     var x=new Date(d.getTime()); var off=(x.getDay()+6)%7;
     x.setDate(x.getDate()-off); x.setHours(12,0,0,0); return x;
@@ -5900,16 +5926,23 @@ var HT32_CARDFIT = true;
     function runs(get){ var out=[],cur=[]; pts.forEach(function(p,i){ var v=get(p);
       if(v==null){ if(cur.length){ out.push(cur); cur=[]; } return; } cur.push([i,v]); });
       if(cur.length) out.push(cur); return out; }
+    /* HT-651 S1 (656 S2): a dashed path through every non-null point in order, so the line reads
+       UNBROKEN from first to last — the solid runs are drawn on top, leaving a dash only across a gap. */
+    function bridge(get, yf, cls){ var d='', first=true;
+      pts.forEach(function(p,i){ var v=get(p); if(v==null) return;
+        d+=(first?'M':'L')+px(i).toFixed(1)+' '+yf(v).toFixed(1)+' '; first=false; });
+      return first ? '' : '<path class="'+cls+'" d="'+d.trim()+'"/>'; }
 
     /* ---- 8% WASH under the daily completion line, per run, never bridging a gap ---- */
-    var cRuns=runs(function(p){ return p.c; });
+    var cRuns=runs(function(p){ return p.cd; });
     cRuns.forEach(function(r){
       var d='M'+px(r[0][0]).toFixed(1)+' '+cBot.toFixed(1);
       r.forEach(function(pt){ d+=' L'+px(pt[0]).toFixed(1)+' '+cy(pt[1]).toFixed(1); });
       d+=' L'+px(r[r.length-1][0]).toFixed(1)+' '+cBot.toFixed(1)+' Z';
       s+='<path class="wash-c" d="'+d+'"/>';
     });
-    /* ---- daily completion line: quiet 35% green, round; a lone day shows only its dot ---- */
+    /* ---- daily completion line: a dashed bridge across gaps, then the solid 35% green runs on top ---- */
+    s+=bridge(function(p){ return p.cd; }, cy, 'ln-c-gap');
     cRuns.forEach(function(r){ if(r.length<2) return;
       s+='<path class="ln-c" d="'+r.map(function(pt,j){ return (j?'L':'M')+px(pt[0]).toFixed(1)+' '+
          cy(pt[1]).toFixed(1); }).join(' ')+'"/>'; });
@@ -5940,6 +5973,8 @@ var HT32_CARDFIT = true;
       s+='<text class="ayl ayl-r" x="'+(L-6)+'" y="'+(ry(v)+3).toFixed(1)+'" text-anchor="end">'+v+'</text>';
     });
     s+='<text class="striplab" x="'+L+'" y="'+(rTop-2).toFixed(1)+'">RATING</text>';
+    /* the rating line is bridged the SAME way, but an unrated day is NEVER a 0 — it stays a dashed gap */
+    s+=bridge(function(p){ return p.r; }, ry, 'ln-r-gap');
     runs(function(p){ return p.r; }).forEach(function(r){ if(r.length<2) return;
       s+='<path class="ln-r" d="'+r.map(function(pt,j){ return (j?'L':'M')+px(pt[0]).toFixed(1)+' '+
          ry(pt[1]).toFixed(1); }).join(' ')+'"/>'; });
@@ -5952,10 +5987,10 @@ var HT32_CARDFIT = true;
     var col = n>1 ? (W-L-R-2*pad)/(n-1) : (W-L-R);
     var hw=Math.max(24, col);
     pts.forEach(function(p,i){
-      if(p.c==null && p.r==null && !p.drill) return;
+      if(p.cd==null && p.r==null && !p.drill) return;
       var parts=[];
       if(p.full) parts.push(p.full);
-      if(p.c!=null) parts.push(Math.round(p.c)+'%');
+      if(p.cd!=null) parts.push(Math.round(p.cd)+'%');
       if(p.done!=null && p.total!=null) parts.push(p.done+' of '+p.total);
       if(p.r!=null) parts.push('rating '+p.r);
       if(trend[i]!=null) parts.push('trend '+Math.round(trend[i])+'%');
@@ -5969,10 +6004,10 @@ var HT32_CARDFIT = true;
     var dotR=isYear?3.5:4;
     pts.forEach(function(p,i){ if(p.r!=null)
       s+='<circle class="dot-r" cx="'+px(i).toFixed(1)+'" cy="'+ry(p.r).toFixed(1)+'" r="3"/>'; });
-    pts.forEach(function(p,i){ if(p.c==null || i===todayIx) return;
-      s+='<circle class="dot-c" cx="'+px(i).toFixed(1)+'" cy="'+cy(p.c).toFixed(1)+'" r="'+dotR+'"/>'; });
-    if(todayIx>=0 && pts[todayIx] && pts[todayIx].c!=null){
-      var tx=px(todayIx).toFixed(1), tyc=cy(pts[todayIx].c).toFixed(1);
+    pts.forEach(function(p,i){ if(p.cd==null || i===todayIx) return;
+      s+='<circle class="dot-c" cx="'+px(i).toFixed(1)+'" cy="'+cy(p.cd).toFixed(1)+'" r="'+dotR+'"/>'; });
+    if(todayIx>=0 && pts[todayIx] && pts[todayIx].cd!=null){
+      var tx=px(todayIx).toFixed(1), tyc=cy(pts[todayIx].cd).toFixed(1);
       s+='<circle class="halo-today" cx="'+tx+'" cy="'+tyc+'" r="10"/>';
       s+='<circle class="dot-today" cx="'+tx+'" cy="'+tyc+'" r="5"/>';
     }
@@ -6031,7 +6066,7 @@ var HT32_CARDFIT = true;
     var ym=S.calYM||(S.calYM=[dnum(today()).getFullYear(),dnum(today()).getMonth()]);
     return monthKeys(ym[0],ym[1]).map(function(k,i){
       var d=dnum(k), dt=doneTotalOf(k);
-      return { x:String(i+1), x2:DOW3[d.getDay()], key:k, c:pctOn(k), r:ratingOf(k),
+      return { x:String(i+1), x2:DOW3[d.getDay()], key:k, c:pctOn(k), cd:compDraw(k), r:ratingOf(k),
                done:dt.done, total:dt.total,
                full: DOW3[d.getDay()]+' '+MO[d.getMonth()]+' '+d.getDate() };
     });
@@ -6045,12 +6080,13 @@ var HT32_CARDFIT = true;
     var start=weekStart(new Date(yr,0,1)), todayK=today(), prevMo=-1, out=[];
     for(var w=0; w<53; w++){
       var ws=new Date(start.getTime()+w*7*MSDAY);
-      var cs=[], rs=[], keyDay=null, hasNow=false;
+      var cs=[], cds=[], rs=[], keyDay=null, hasNow=false;
       for(var dd=0; dd<7; dd++){
         var day=new Date(ws.getTime()+dd*MSDAY);
         if(day.getFullYear()!==yr) continue;
         var k=dk(day); if(!keyDay) keyDay=day;
         var c=pctOn(k); if(c!=null) cs.push(c);
+        var cdv=compDraw(k); if(cdv!=null) cds.push(cdv);    /* S2: a due-but-unlogged day is a 0 in the drawn week mean */
         var rr=ratingOf(k); if(rr!=null) rs.push(rr);
         if(k===todayK) hasNow=true;
       }
@@ -6058,6 +6094,7 @@ var HT32_CARDFIT = true;
       var mo=keyDay.getMonth(), monthStart=(mo!==prevMo); prevMo=mo;
       out.push({ x:'', x2:'', key:String(mo),
                  c: cs.length? Math.round(meanOf(cs)) : null,
+                 cd: cds.length? Math.round(meanOf(cds)) : null,
                  r: rs.length? Math.round(meanOf(rs)*10)/10 : null,
                  full:'Week of '+MO[mo]+' '+keyDay.getDate(),
                  done:null, total:null, drill:true, isNow:hasNow,

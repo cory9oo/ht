@@ -3,6 +3,7 @@
 # that run anywhere the headless fixture (_machine/ht3) and Playwright are present; the pre-reset
 # goldens that read estate files (tools/copiers/_ht.py and the like) are run per-paste, not here.
 golden_ht651_life.py
+golden_ht651_zero.py
 golden_ht652_tint.py
 golden_ht652_page.py
 golden_ht652_time.py

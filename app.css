@@ -3613,6 +3613,12 @@ body{
 .chart .reflab,    html[data-simple] .chart .reflab{ font:400 11px/1 var(--mono); fill:var(--ht-dim) }
 .chart .ln-r,      html[data-simple] .chart .ln-r{ fill:none; stroke:var(--ht-muted); stroke-width:1.5;
   stroke-dasharray:none; stroke-linejoin:round; stroke-linecap:round }
+/* HT-651 S1 (656 S2): the dashed bridge that joins the line across a nothing-due / unrated gap, so the
+   completion and rating lines read UNBROKEN from the first logged day to today (a dash = nothing asked). */
+.chart .ln-c-gap,  html[data-simple] .chart .ln-c-gap{ fill:none; stroke:var(--ht-green); stroke-width:1.5;
+  stroke-opacity:.35; stroke-dasharray:3 3; stroke-linejoin:round; stroke-linecap:round }
+.chart .ln-r-gap,  html[data-simple] .chart .ln-r-gap{ fill:none; stroke:var(--ht-muted); stroke-width:1.5;
+  stroke-opacity:.9; stroke-dasharray:3 3; stroke-linejoin:round; stroke-linecap:round }
 .chart .dot-c,     html[data-simple] .chart .dot-c{ fill:var(--ht-green); stroke:var(--ht-panel); stroke-width:2 }
 .chart .dot-r,     html[data-simple] .chart .dot-r{ fill:var(--ht-muted); stroke:var(--ht-panel); stroke-width:1 }
 .chart .dot-today, html[data-simple] .chart .dot-today{ fill:var(--ht-today); stroke:var(--ht-panel); stroke-width:2 }
