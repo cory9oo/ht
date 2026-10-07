@@ -168,6 +168,24 @@ function winEndMin(h){
   return (e!=null && e>=a) ? e : a + (planMins(h)||0);
 }
 function winEnd(h){ return fmtClock(winEndMin(h)); }
+/* HT-652 S3: the row's time chip carries the planned WINDOW. A planned time with planned minutes
+   shows start-end (5:00-5:30 AM, end from winEndMin); a planned time alone shows the start; minutes
+   with no time show the length (30m); neither shows nothing. ONE clock renderer (fmtTime, R70 /
+   golden_ht31 S2): the start drops its own AM/PM only when it shares the end's AND is a single-digit
+   hour, so a bare two-digit 24-hour-looking clock is never left on the screen. */
+function winChip(h){
+  var s = winStartMin(h);
+  if(s != null){
+    var startT = fmtTime(winStart(h)), endT = fmtTime(winEnd(h));
+    if((planMins(h) || 0) <= 0) return startT;
+    var ap = /[\s ]*([AP]M)\s*$/;
+    var sap = (startT.match(ap) || [])[1] || '', eap = (endT.match(ap) || [])[1] || '';
+    var startDisp = (sap && sap === eap && parseInt(startT, 10) < 10) ? startT.replace(ap, '') : startT;
+    return startDisp + '–' + endT;
+  }
+  var pm = planMins(h);
+  return pm != null ? (pm + 'm') : '';
+}
 /* A RULE is a standard with no planned time, and it renders NO time column - never an empty
    one. An empty column is a question the row cannot answer, and a column of them reads as a
    fault in the app rather than an absence in the data. */
@@ -878,7 +896,38 @@ function rolling(n,upto){
   if(!a.length) return null;
   return Math.round(a.reduce(function(x,y){return x+y;},0)/a.length);
 }
-function committed(){ return daily().reduce(function(t,h){ return t+(h.minutes||0); },0); }
+/* HT-652 S3: committed() reads planMins() — planned minutes, falling back to `minutes` — so it and
+   the Time committed card draw from the ONE source and can never disagree. For a row that only ever
+   set `minutes` this is identical to before; for one with a slot length it is the planned length. */
+function committed(){ return daily().reduce(function(t,h){ return t+(planMins(h)||0); },0); }
+/* The Morning · Night · Standards split of a day's planned load. Scheduled holds what used to be
+   Morning and Night (paste 293), so the split reads the planned time: before noon Morning, from noon
+   Night (the same rule as the row tint, S1); a scheduled row with no time, and anything the person
+   filed under Standards, is Standards; weekly cadence is its own bucket. */
+function commitBucket(h){
+  if(isWeekly(h)) return 'weekly';
+  var sec = (window.__HT29S2 && window.__HT29S2.sectionOf) ? window.__HT29S2.sectionOf(h) : 'scheduled';
+  if(sec === 'standards' || sec === 'weekly') return sec === 'weekly' ? 'weekly' : 'standards';
+  var m = winStartMin(h);
+  if(m == null) return 'standards';
+  return m < 720 ? 'morning' : 'night';
+}
+/* One day's planned load and what was given against it: planned = sum planMins over the non-weekly
+   tasks due that day (so Today.planned === committed()); given = the same over the ones checked. */
+function planGiven(k){
+  var p = 0, g = 0, bk = { morning:0, night:0, standards:0 };
+  (S.habits || []).forEach(function(h){
+    if(isWeekly(h) || !dueOn(h, k)) return;
+    var pm = planMins(h) || 0; p += pm;
+    var b = commitBucket(h); if(bk[b] != null) bk[b] += pm;
+    if(doneOn(h, k)) g += pm;
+  });
+  return { planned:p, given:g, bk:bk };
+}
+/* HT-652 S3 seam — the golden reads the one source directly, so the card can never quietly diverge
+   from committed() or from the chip. */
+window.__HT652 = { committed:committed, planGiven:planGiven, winChip:winChip, commitBucket:commitBucket,
+                   repaint:function(){ try{ paintAll(); }catch(e){} } };
 function remaining(k){
   var ck=ckOf(k);
   return daily().reduce(function(t,h){ return t+(ck[h.id]?0:(h.minutes||0)); },0);
@@ -1430,7 +1479,10 @@ function paintLog(){
        answer, and a list of them reads as a fault. */
     var pAt = winStart(h);
     var dAt = doneAt(S.date, h.id);
-    var nmIn = (pAt ? '<b class="pat">'+esc(fmtTime(pAt))+'</b>' : '') +
+    /* HT-652 S3: the chip is the planned WINDOW (start–end) when a length is set, the start alone
+       when it is not, the length (30m) when there is a time-less length, nothing when neither. */
+    var chip652 = winChip(h);
+    var nmIn = (chip652 ? '<b class="pat">'+esc(chip652)+'</b>' : '') +
       esc(nameOf(h.name)) +
       (dAt ? '<i class="dat'+lateCls(h,S.date)+'">\u2713 '+esc(fmtTime(dAt))+esc(lateTxt(h,S.date))+'</i>' : '') +
       ((S.hasCue && h.cue)?'<i class="cue">'+esc(h.cue)+'</i>':'');
@@ -13660,7 +13712,7 @@ var HT31_DESK_INSIGHTS = false;
    PASTE 228 (Cory 2026-09-24 23:27): the day's percent is the HERO and opens the page - `h228Hero` goes
    FIRST, above the four, and nothing else moves. */
 /* PASTE 293 S2.7: `h30Group` leaves - it is the Group tab's page now */
-var HT31_INS_ORDER = ['h228Hero', 'h31Month', 'h31Year', 'h30Life'];
+var HT31_INS_ORDER = ['h228Hero', 'h652time', 'h31Month', 'h31Year', 'h30Life'];   /* 652 S3: committed under the hero */
 var HT31_INS_HIDE = ['h30MonthC', 'h30MonthR', 'h30Trend', 'h30Rate'];
 function h31Phone(){ return window.innerWidth < 1024; }
 /* THE FLAG, AND A SEAM TO FLIP IT AT RUNTIME. `HT31_INSIGHTS_EXTRAS = true` brings HT-29's and
@@ -14188,6 +14240,65 @@ var HT32_WEEK = 'sun_fri';                /* Sunday..Friday; Saturday is the Sab
   }, 170); });
   window.__HT228 = { strip: strip, phoneCard: paintCard, card: paintCard,
                      data: data, ink: ink, band: bandOf, id: HERO };
+})();
+
+
+/* ================== HT-652 S3 · THE TIME COMMITTED CARD ==================
+   Cory asked for "an output view of the user's committed time per day / week". It rides the Insights
+   hero — the daily completion percent (HT-228). ON THE PHONE it is the card right under the hero in
+   #h30InsBody, ordered by HT31_INS_ORDER. ON THE LAPTOP, where HT-31 S4.15 removed the Insights page
+   and the day's percent is the masthead figure, the card sits directly under the masthead. ONE
+   SOURCE: planMins() — the same committed() reads — so the card can never disagree with the row. */
+(function(){
+  var ID = 'h652time';
+  function bodyNode(){
+    var t = planGiven(S.date), pw = 0, gw = 0, i;
+    for(i = 0; i < 7; i++){ var x = planGiven(shift(S.date, -i)); pw += x.planned; gw += x.given; }
+    function gap(p, g){ var d = p - g; return d <= 0 ? 'all given' : fmt(d) + ' still to give'; }
+    var pct = Math.round(t.planned / 1440 * 100);
+    var n = document.createElement('div');
+    n.className = 'tc652';
+    n.innerHTML =
+      '<div class="tc652l"><b>Today</b> · ' + fmt(t.planned) + ' planned · ' + fmt(t.given) +
+        ' given · ' + gap(t.planned, t.given) + '</div>' +
+      '<div class="tc652s">Morning ' + fmt(t.bk.morning) + ' · Night ' + fmt(t.bk.night) +
+        ' · Standards ' + fmt(t.bk.standards) + '</div>' +
+      '<div class="tc652l"><b>This week</b> · ' + fmt(pw) + ' planned · ' + fmt(gw) +
+        ' given · ' + gap(pw, gw) + '</div>' +
+      '<div class="tc652f">' + pct + '% of the 24 h in a day</div>';
+    return n;
+  }
+  function cardNode(){
+    if(!(window.__HT30INS && window.__HT30INS.card)) return null;
+    return window.__HT30INS.card(ID, 'Time committed', bodyNode());   /* .h30c/.lab shape, refreshed each call */
+  }
+  function phone(){ return window.innerWidth < 1024; }
+  function place(){
+    var c = cardNode(); if(!c) return;
+    if(phone()){
+      var body = document.getElementById('h30InsBody'); if(!body) return;
+      var hero = document.getElementById('h228Hero');
+      if(hero && hero.parentNode === body){ if(c.previousSibling !== hero) body.insertBefore(c, hero.nextSibling); }
+      else if(c.parentNode !== body){ body.insertBefore(c, body.firstChild); }
+    }else{
+      var mast = document.querySelector('.mast');
+      if(mast && mast.parentNode && (c.parentNode !== mast.parentNode || c.previousSibling !== mast)){
+        mast.parentNode.insertBefore(c, mast.nextSibling);
+      }
+    }
+  }
+  var _pa = paintAll;
+  paintAll = function(){ var out = _pa.apply(null, arguments); try{ place(); }catch(e){} return out; };
+  document.addEventListener('click', function(){ setTimeout(function(){ try{ place(); }catch(e){} }, 70); }, true);
+  if(window.MutationObserver){
+    new MutationObserver(function(){ try{ place(); }catch(e){} })
+      .observe(document.documentElement, { attributes:true, attributeFilter:['data-vtab'] });
+  }
+  var rt = null;
+  window.addEventListener('resize', function(){ clearTimeout(rt); rt = setTimeout(function(){ try{ place(); }catch(e){} }, 180); });
+  if(document.readyState !== 'loading') setTimeout(place, 500);
+  else window.addEventListener('load', function(){ setTimeout(place, 500); });
+  window.__HT652CARD = { place:place, id:ID, body:bodyNode };
 })();
 
 
