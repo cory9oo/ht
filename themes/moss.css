@@ -14,6 +14,8 @@
   --st-secured:#4FC39A; --st-ontrack:#9CC486; --st-atrisk:#D9B874; --st-outofreach:#E27D66;
   --m1:#9CC486; --m2:#D9B874; --m3:#D59A8C; --m4:#B7A6D9;
   --sec-morning:#E6E2D3; --sec-night:#E6E2D3; --sec-weekly:#E6E2D3; --sec-standards:#E6E2D3;
+  /* HT-652 S1: dawn and dusk washes tuned to the moss ground (see graphite.css). */
+  --tint-dawn:rgba(222,170,92,.075); --tint-dusk:rgba(118,130,206,.085);
   --sb-thumb:rgba(174,178,158,.35); --sb-thumb-hover:rgba(174,178,158,1);
   --panel:#0E130E; --panel-2:#131A13; --line:#1F281F; --dim:#707A6A; --accent-red:#E27D66;
   color-scheme:dark;

@@ -139,6 +139,12 @@ svg{display:block}
 .li .ad{font:400 9.5px/1 var(--mono);flex:0 0 auto;min-width:30px;text-align:right}
 .li.nx{box-shadow:inset 2px 0 0 var(--accent)}
 .li.nx .nm{color:var(--ink)}
+/* HT-652 S1 · DAWN AND DUSK — a morning row wears a warm dawn wash, a night row a deep dusk wash,
+   one token per theme laid at low opacity over the row ground (themes/*.css). Standards and Weekly
+   carry none. Hover still answers, so the wash never swallows the row's own feedback. */
+.li.tint-dawn{background:var(--tint-dawn)}
+.li.tint-dusk{background:var(--tint-dusk)}
+.li.tint-dawn:hover,.li.tint-dusk:hover{background:var(--sel)}
 
 /* ---------------- panels ---------------- */
 .pan{border:1px solid var(--rule);background:var(--sheet);padding:12px}

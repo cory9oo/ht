@@ -10016,6 +10016,9 @@ var HT29SEC = (function(){
     return window.__ADVANCED===true || /[?&]advanced=1/.test(location.search);
   }
   function byId(){ var m = {}; (S.habits||[]).forEach(function(h){ m[h.id] = h; }); return m; }
+  /* HT-652 S1: dawn before noon, dusk from noon on; no planned time, no tint. ONE definition, read by
+     the row tint here and by the Time committed card's Morning/Night split (S3), so the two agree. */
+  function tintTOD(h){ var m = h ? winStartMin(h) : null; return m == null ? null : (m < 720 ? 'dawn' : 'dusk'); }
   function mkAdd(sec){
     var b = document.createElement('button');
     b.className = 'eadd'; b.type = 'button';
@@ -10053,7 +10056,15 @@ var HT29SEC = (function(){
       var hd = document.createElement('div'); hd.className = 'grp'; hd.setAttribute('data-sec', s);
       hd.textContent = HT29SEC.NAMES[s];
       frag.appendChild(hd);
-      B[s].forEach(function(x){ frag.appendChild(x.r); });
+      B[s].forEach(function(x){
+        /* HT-652 S1: a planned time of day colours the row. Scheduled holds what used to be Morning and
+           Night (paste 293 merged them), so the morning/night split is read from the planned time, never
+           from a section that no longer exists: before noon -> dawn, from noon on -> dusk. A row dragged
+           or re-timed is re-tinted the next repaint, which is this one. Standards and Weekly carry none. */
+        x.r.classList.remove('tint-dawn', 'tint-dusk');
+        if(s === 'scheduled'){ var t = tintTOD(x.h); if(t) x.r.classList.add('tint-' + t); }
+        frag.appendChild(x.r);
+      });
       frag.appendChild(mkAdd(s));
     });
     other.forEach(function(o){ frag.appendChild(o); });
@@ -10108,7 +10119,7 @@ var HT29SEC = (function(){
 
   /* called by HT-28's regroup28 from every path that repaints the list, so it runs last */
   window.__HT29S2 = { regroup:regroup29, sectionOf:HT29SEC.sectionOf, dotOf:HT29SEC.dotOf,
-                      names:HT29SEC.NAMES, hasSection:function(){ return !!S.hasSection; } };
+                      names:HT29SEC.NAMES, tintTOD:tintTOD, hasSection:function(){ return !!S.hasSection; } };
 })();
 
 /* ---- HT-29 S3 · THE GROUP, REAL AND BOTH WAYS ----------------------------------------------------------------

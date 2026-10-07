@@ -14,6 +14,8 @@
   --st-secured:#5CC08C; --st-ontrack:#E07A8C; --st-atrisk:#E0A15E; --st-outofreach:#E8894F;
   --m1:#E07A8C; --m2:#D9B26A; --m3:#8FC0A6; --m4:#C79BD6;
   --sec-morning:#EADCDE; --sec-night:#EADCDE; --sec-weekly:#EADCDE; --sec-standards:#EADCDE;
+  /* HT-652 S1: dawn and dusk washes tuned to the crimson ground (see graphite.css). */
+  --tint-dawn:rgba(232,154,86,.075); --tint-dusk:rgba(140,120,206,.085);
   --sb-thumb:rgba(184,161,165,.35); --sb-thumb-hover:rgba(184,161,165,1);
   --panel:#140E10; --panel-2:#1A1315; --line:#2B1F22; --dim:#7D6A6E; --accent-red:#E8894F;
   color-scheme:dark;

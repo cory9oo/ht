@@ -26,6 +26,9 @@
   --m1:#8FB8D9; --m2:#C9A6F5; --m3:#E9C46E; --m4:#7FD6C6;
   /* 194 N2.2: sections carry NO colour — every --sec-* is the body text, told apart by structure. */
   --sec-morning:#E6EAF0; --sec-night:#E6EAF0; --sec-weekly:#E6EAF0; --sec-standards:#E6EAF0;
+  /* HT-652 S1: a morning row wears dawn, a night row wears dusk — ONE low-opacity wash each,
+     laid over the row ground so the scheme keeps its character. Warm sunrise, cool nightfall. */
+  --tint-dawn:rgba(227,164,92,.075); --tint-dusk:rgba(122,134,214,.085);
   --sb-thumb:rgba(154,163,175,.35); --sb-thumb-hover:rgba(154,163,175,1);
   /* the four names the simple view's own rules still read by their old spelling */
   --panel:#111317; --panel-2:#171A1F; --line:#23272E; --dim:#626B77; --accent-red:#E06A5E;
