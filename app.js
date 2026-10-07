@@ -5433,6 +5433,24 @@ var HT32_CARDFIT = true;
      `--gN` token IS a ramp token. HT-15's golden reads that attribute, and it still reads true. */
   function rampFill(p){ var i=rampIx(p); return i==null?'var(--surface)':('var(--g'+(i+1)+')'); }
   function rampVar(p){ var i=rampIx(p); return i==null?'var(--surface)':('var(--ramp-'+i+')'); }
+
+  /* ---- HT-651 S3 · FIVE FIXED COLOURS FOR A WEEK OF LIFE (Cory 2026-10-07, item 6) ----------
+     A week of the Life chart wears ONE OF FIVE FIXED STEPS by its grade, using the cutoffs the app
+     already carries (GRADE: A 90+, B 80, C 70, D 60, F below; A+ folds into A). Steps, not a ramp —
+     Lisa Charlotte Muth (Datawrapper, "When to use classed and when to use unclassed color scales"):
+     classes when a reader must read a value, and Cory's words were "the coloring of the weeks seems
+     unclear". These five live HERE, in one constant, and NEVER in a theme token, so no colour scheme
+     can change them — which is the whole of item 6 ("when the color themes change, the coloring
+     meshes with the week scores"). A 5-class *sequential* violet family (ColorBrewer — Cynthia Brewer,
+     colorbrewer2.org), lightness carrying the order so it reads in greyscale; a red-to-green scale is
+     refused (colour-blind readers), and violet sits >= 60 deg off every offered accent (crimson ~350,
+     moss ~110, graphite ~202). SUPERSEDES DEC-059 FOR THE LIFE CHART ONLY: the percentage density ramp
+     stays everywhere else; the weeks-of-life grid now reads by grade. Proven for every theme by
+     tools/life_scale_check.py (>= 3:1 on the ground, >= 60 deg off the accent, >= 15 L* between steps). */
+  var LIFE_SCALE = { A:'#FFFFFF', B:'#DFCBFF', C:'#B79FE7', D:'#8E78BF', F:'#675491' };
+  function lifeGrade(p){ if(p==null) return null; if(p>=90) return 'A'; if(p>=80) return 'B'; if(p>=70) return 'C'; if(p>=60) return 'D'; return 'F'; }
+  /* null is UNLOGGED → no colour (the caller draws the faint outline), never a grade colour. */
+  function lifeScaleFill(p){ var g=lifeGrade(p); return g==null?'var(--surface)':LIFE_SCALE[g]; }
   function legend(){
     return '<span class="h16leg">'+[0,1,2,3,4].map(function(i){
       return '<i class="rampbg-'+i+'"></i>'; }).join('')+'</span>';
@@ -5442,6 +5460,9 @@ var HT32_CARDFIT = true;
   window.__HT16.rampIx = rampIx;
   window.__HT16.rampClass = rampClass;
   window.__HT16.rampFill = rampFill;
+  window.__HT16.LIFE_SCALE = LIFE_SCALE;
+  window.__HT16.lifeGrade = lifeGrade;
+  window.__HT16.lifeScaleFill = lifeScaleFill;
   window.__HT16.TARGET_AGE = TARGET_AGE;
   window.__HT16.LIFE_TOTAL = LIFE_TOTAL;
 
@@ -7768,7 +7789,7 @@ var HT32_CARDFIT = true;
       var tip='week '+wi+' · '+weekRange18(wi,b)+' · '+
               (pct==null?'—':Math.round(pct)+'%');
       s+='<rect class="lw" x="'+(foldX(fi2)+LEFT+wk*PW)+'" y="'+(TOP+ry2*PH)+'" width="'+cellW+
-         '" height="'+cellH+'" fill="'+window.__HT16.rampFill(pct)+'" data-wk="'+wi+
+         '" height="'+cellH+'" fill="'+window.__HT16.lifeScaleFill(pct)+'" data-grade="'+(window.__HT16.lifeGrade(pct)||'')+'" data-wk="'+wi+
          '" data-tip="'+esc(tip)+'"><title>'+esc(tip)+'</title></rect>';
     });
 
@@ -14634,7 +14655,8 @@ var HT185LIFE = (function(){
     var d = (k instanceof Date) ? k : new Date(k + 'T12:00:00');
     return Math.floor((d - b) / 6048e5);
   }
-  function fill(p){ return (window.__HT16 && window.__HT16.rampFill) ? window.__HT16.rampFill(p) : 'var(--accent)'; }
+  /* HT-651 S3: the weeks-of-life grid reads by GRADE (five fixed colours), not the density ramp. */
+  function fill(p){ return (window.__HT16 && window.__HT16.lifeScaleFill) ? window.__HT16.lifeScaleFill(p) : 'var(--accent)'; }
   function render(host){
     var b = birthD(); if(!b || !phone()) return false;
     var W = Math.floor(host.clientWidth || host.getBoundingClientRect().width || 0);
@@ -14675,7 +14697,7 @@ var HT185LIFE = (function(){
     Object.keys(by).forEach(function(k){
       var wi = +k, yr = Math.floor(wi / WEEKS), wk = wi % WEEKS; if(yr >= Y) return;
       var a = by[k], m = a.reduce(function(x, v){ return x + v; }, 0) / a.length;
-      s += '<rect class="h185wk" data-wk="' + wi + '" x="' + (AX + wk * P) + '" y="' + (AXT + yr * P) + '" width="' + cell +
+      s += '<rect class="h185wk" data-wk="' + wi + '" data-grade="' + ((window.__HT16 && window.__HT16.lifeGrade(m)) || '') + '" x="' + (AX + wk * P) + '" y="' + (AXT + yr * P) + '" width="' + cell +
            '" height="' + cell + '" fill="' + fill(m) + '"><title>week ' + wi + ' · ' + Math.round(m) + '%</title></rect>';
     });
     /* the x axis: weeks - PASTE 293 S2.8: the desktop's own ticks, 0 10 20 30 40 and 52, so the axes are identical */
