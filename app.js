@@ -245,6 +245,10 @@ var HT194_GRID = true;            /* 194 S5: the group card is a fixed-column gr
    git, never deleted - DEC-037 / R70.138). A saved retired name RESOLVES to the NEAREST of the three and
    is never written back: classic -> graphite, gilt -> crimson, orchid/neon -> moss, anything else ->
    graphite (the default). Mapping logged once on load (see applyTheme's caller). See THEME_RETIRED. */
+/* HT-651 S2 (paste 656 S3) · EVERY LINE IS NAMED (Cory 2026-10-07, item 5). The ONE ADDRESS for the
+   name of every charted line, so a legend says the same words on every chart. ×10 names the HT-17
+   convention: the rating reads off the left axis as rating×10. */
+var LINE_LABELS = { c:'Completion %', r:'Day rating ×10', t:'On-time %' };
 var THEMES = ['crimson','moss','graphite'];   /* offered, in picker order */
 var THEME_ALL = THEMES.slice();
 var THEME_RETIRED = { classic:'graphite', gilt:'crimson', orchid:'moss', neon:'moss',
@@ -5608,6 +5612,22 @@ var HT32_CARDFIT = true;
     return '<span class="h16leg">'+[0,1,2,3,4].map(function(i){
       return '<i class="rampbg-'+i+'"></i>'; }).join('')+'</span>';
   }
+  /* HT-651 S2 (656 S3): the ONE builder for a line-chart legend — a swatch in the line's own stroke
+     (solid for completion, dashed for the rating) and its name from LINE_LABELS, so every chart names
+     its lines in the same words. It wraps to two rows on the phone and never scrolls sideways (CSS). */
+  function chartLegend(keys){
+    return '<div class="chleg">'+keys.map(function(k){
+      return '<span class="chleg-i"><i class="chsw chsw-'+k+'"></i>'+esc(LINE_LABELS[k]||k)+'</span>';
+    }).join('')+'</div>';
+  }
+  function putLegend(svgId, keys){
+    var svg=document.getElementById(svgId); if(!svg) return;
+    var host=svg.closest('.pan')||svg.parentNode; if(!host||!host.parentNode) return;
+    var id=svgId+'Leg', leg=document.getElementById(id);
+    if(!leg){ leg=document.createElement('div'); leg.id=id; host.parentNode.insertBefore(leg, host.nextSibling); }
+    leg.className='chleg-host';
+    leg.innerHTML=chartLegend(keys);
+  }
 
   window.__HT16 = window.__HT16 || {};
   window.__HT16.rampIx = rampIx;
@@ -6110,6 +6130,7 @@ var HT32_CARDFIT = true;
       h16Chart('vMonth', monthPoints(),
                { attr:'data-vgd', height:196, twoLine:true, pad:4, perX:PHONE_DAY_PX }); });
     h16Chart('vMonth', pts, { attr:'data-vgd', height:196, twoLine:true, pad:4, perX:PHONE_DAY_PX });
+    putLegend('vMonth', ['c','r']);                 /* 656 S3: name the two lines under the month chart */
     var ym=S.calYM, nav=document.getElementById('vMonthNav');
     if(nav) nav.innerHTML='<button class="mv" data-vgm="-1">\u2039</button>'+
       '<b>'+MO[ym[1]].toUpperCase()+' '+ym[0]+'</b>'+
@@ -6124,6 +6145,7 @@ var HT32_CARDFIT = true;
     measureAndDraw('vYear', function(){
       h16Chart('vYear', yearPoints(), { attr:'data-vgy', height:196, twoLine:false, pad:2 }); });
     h16Chart('vYear', pts, { attr:'data-vgy', height:196, twoLine:false, pad:2 });
+    putLegend('vYear', ['c','r']);                  /* 656 S3: name the two lines under the year chart */
     var nav=document.getElementById('vYearNav');
     if(nav) nav.innerHTML='<button class="mv" data-vgyn="-1">\u2039</button>'+
       '<b>'+(S.vYear||dnum(today()).getFullYear())+'</b>'+
@@ -11364,7 +11386,7 @@ var HT29INS = (function(){
       '<div class="vline">Average <b>' + t.avg + '%</b>' + (t.rateAvg != null ? ' · rating <b>' + t.rateAvg + '</b>' : '') +
         (t.onTimeAvg != null ? ' · on time <b>' + t.onTimeAvg + '%</b>' : '') + '</div>' +
       chart(t, memberLines(range)) +
-      '<div class="h29leg"><span><i class="r"></i>rating</span><span><i class="t"></i>on time</span>' +
+      '<div class="h29leg"><span><i class="r"></i>' + esc(LINE_LABELS.r) + '</span><span><i class="t"></i>' + esc(LINE_LABELS.t) + '</span>' +
         (others.length ? others.map(function(r, j){
           return '<button type="button" class="h29mb' + (shown[r.id] ? ' on' : '') + '" data-i29m="' + esc(r.id) + '" aria-pressed="' + (shown[r.id] ? 'true' : 'false') + '">' +
                  '<i class="m' + (j % 4) + '"></i>' + esc(r.n) + '</button>'; }).join('') : '') + '</div>');

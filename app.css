@@ -3634,3 +3634,15 @@ html[data-simple] .chart .hitcol[data-vgd], html[data-simple] .chart .hitcol[dat
 /* HT-432: the 5-swatch ramp legend is retired from the two chart navs (paste S2) — hidden, never
    removed from the DOM (R70.138; golden_ht29 S0a). The year's copy was already hidden pre-432. */
 #vMonthNav .h16leg, #vYearNav .h16leg{ display:none !important }
+/* HT-651 S2 (656 S3): the named legend under a line chart. One swatch in the line's own stroke
+   (solid = completion, dashed = rating) + its name from LINE_LABELS. Wraps to two rows on the phone,
+   centred, and never scrolls sideways (flex-wrap + max-width, no min-width). */
+.chleg-host{ width:100%; max-width:100% }
+.chleg{ display:flex; flex-wrap:wrap; gap:4px 14px; align-items:center; justify-content:center;
+  font:400 11px/1.4 var(--mono); color:var(--ht-dim); margin:6px auto 2px; max-width:100%; padding:0 4px }
+.chleg-i{ display:inline-flex; align-items:center; white-space:nowrap }
+.chleg .chsw{ display:inline-block; width:16px; height:0; border-top:2px solid var(--ht-green);
+  vertical-align:middle; margin-right:5px }
+.chleg .chsw-c{ border-top:2px solid var(--ht-green) }
+.chleg .chsw-r{ border-top:2px dashed var(--ht-muted) }
+.chleg .chsw-t{ border-top:2px solid var(--st-late) }
