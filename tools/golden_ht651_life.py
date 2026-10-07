@@ -106,6 +106,23 @@ async def run(pw, w, h, label):
     chk("%s · every painted life week uses a LIFE_SCALE hex (%d weeks), none a theme --g token"
         % (label, len(painted)), allgrade and notoken, [c['f'] for c in cells[:6]])
 
+    # HT-656 S4: the legend beside the life chart, the no-data swatch, the now swatch, both widths
+    leg = await pg.evaluate(
+        "() => { const l=document.querySelector('.lifeleg'); if(!l) return null;"
+        "  return { text:(l.textContent||'').trim(), sw:l.querySelectorAll('.lifeleg-sw').length,"
+        "    nd:!!l.querySelector('.lifeleg-nodata'), now:!!l.querySelector('.lifeleg-now'),"
+        "    overflow:l.scrollWidth-l.clientWidth }; }")
+    legok = (bool(leg) and leg['sw'] == 7 and leg['nd'] and leg['now']
+             and 'A 90+' in leg['text'] and 'F <60' in leg['text']
+             and 'no data' in leg['text'] and 'now' in leg['text'])
+    chk("%s · the life chart carries a legend: five grades (A 90+ .. F <60) + no data + now" % label, legok, leg)
+    chk("%s · the life legend overflows nowhere sideways (wraps instead)" % label,
+        bool(leg) and leg['overflow'] <= 1, leg and leg.get('overflow'))
+
+    cwsel = 'rect.cw' if w >= 1024 else 'rect.h185today'
+    cwn = await pg.evaluate("(sel) => document.querySelectorAll(sel).length", cwsel)
+    chk("%s · the current week is outlined (%s)" % (label, cwsel), cwn >= 1, cwn)
+
     chk("%s · zero page errors" % label, not errs, errs)
     await b.close()
 

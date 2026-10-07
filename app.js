@@ -5608,6 +5608,17 @@ var HT32_CARDFIT = true;
   function lifeGrade(p){ if(p==null) return null; if(p>=90) return 'A'; if(p>=80) return 'B'; if(p>=70) return 'C'; if(p>=60) return 'D'; return 'F'; }
   /* null is UNLOGGED → no colour (the caller draws the faint outline), never a grade colour. */
   function lifeScaleFill(p){ var g=lifeGrade(p); return g==null?'var(--surface)':LIFE_SCALE[g]; }
+  /* HT-651 S3 (paste 656 S4): the ONE legend beside the life chart — the five grade swatches with the
+     letter and its score range (from LIFE_SCALE, never a theme token), then `no data` (empty, faint
+     outline) and `now` (outlined like the current week). Used by both widths; wraps on the phone. */
+  var LIFE_RANGE = { A:'90+', B:'80', C:'70', D:'60', F:'<60' };
+  function lifeLegend(){
+    var items=['A','B','C','D','F'].map(function(g){
+      return '<span class="lifeleg-i"><i class="lifeleg-sw" style="background:'+LIFE_SCALE[g]+'"></i>'+g+' '+LIFE_RANGE[g]+'</span>'; });
+    items.push('<span class="lifeleg-i"><i class="lifeleg-sw lifeleg-nodata"></i>no data</span>');
+    items.push('<span class="lifeleg-i"><i class="lifeleg-sw lifeleg-now"></i>now</span>');
+    return '<div class="lifeleg">'+items.join('')+'</div>';
+  }
   function legend(){
     return '<span class="h16leg">'+[0,1,2,3,4].map(function(i){
       return '<i class="rampbg-'+i+'"></i>'; }).join('')+'</span>';
@@ -5636,6 +5647,7 @@ var HT32_CARDFIT = true;
   window.__HT16.LIFE_SCALE = LIFE_SCALE;
   window.__HT16.lifeGrade = lifeGrade;
   window.__HT16.lifeScaleFill = lifeScaleFill;
+  window.__HT16.lifeLegend = lifeLegend;          /* 656 S4: the one legend beside the life chart */
   window.__HT16.h16Chart = h16Chart;              /* 656 S2: golden_ht651_zero renders a crafted series */
   window.__HT16.compDraw = compDraw;              /* 656 S2: due-but-unlogged -> 0, nothing-due -> gap */
   window.__HT16.dueCountOn = dueCountOn;
@@ -8028,7 +8040,8 @@ var HT32_CARDFIT = true;
        546x1016 (MEASURED). Bare `.wkscroll` is `overflow-x:auto` and nothing else. */
     host.innerHTML='<div class="wkscroll'+(desktop()?' h18fit':'')+'">'+
       '<svg class="wkg h18life" viewBox="0 0 '+W+' '+H+'" width="'+dW+'" height="'+dH+
-      '" preserveAspectRatio="xMinYMin meet">'+pat+bg+s+ov+cur+'</svg></div>';
+      '" preserveAspectRatio="xMinYMin meet">'+pat+bg+s+ov+cur+'</svg></div>'+
+      (window.__HT16 && window.__HT16.lifeLegend ? window.__HT16.lifeLegend() : '');   /* 656 S4 */
     host.setAttribute('data-h18','1');      /* the stamp watchLife() looks for */
     host.setAttribute('data-lived', lived);
     host.setAttribute('data-cols', WEEKS);
@@ -14993,7 +15006,8 @@ var HT185LIFE = (function(){
     var tw = AX + gridW;
     host.innerHTML = '<svg class="h185life" viewBox="0 0 ' + tw + ' ' + H + '" width="' + tw + '" height="' + H +
       '" data-cols="' + WEEKS + '" data-rows="' + Y + '" data-cell="' + cell + '" data-tick="' + tickW +
-      '" role="img" aria-label="your life in weeks: ' + WEEKS + ' across, one row per year, age down the left">' + s + '</svg>';
+      '" role="img" aria-label="your life in weeks: ' + WEEKS + ' across, one row per year, age down the left">' + s + '</svg>' +
+      (window.__HT16 && window.__HT16.lifeLegend ? window.__HT16.lifeLegend() : '');   /* 656 S4 */
     host.setAttribute('data-h185', String(W));
     return true;
   }

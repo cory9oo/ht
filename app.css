@@ -3646,3 +3646,12 @@ html[data-simple] .chart .hitcol[data-vgd], html[data-simple] .chart .hitcol[dat
 .chleg .chsw-c{ border-top:2px solid var(--ht-green) }
 .chleg .chsw-r{ border-top:2px dashed var(--ht-muted) }
 .chleg .chsw-t{ border-top:2px solid var(--st-late) }
+/* HT-651 S3 (656 S4): the legend beside the life chart — five grade swatches (letter + range), then
+   `no data` (empty, faint outline) and `now` (outlined like the current week). Wraps, no sideways scroll. */
+.lifeleg{ display:flex; flex-wrap:wrap; gap:4px 12px; align-items:center; justify-content:center;
+  font:400 11px/1.4 var(--mono); color:var(--ht-dim); margin:8px auto 2px; max-width:100%; padding:0 4px }
+.lifeleg-i{ display:inline-flex; align-items:center; white-space:nowrap }
+.lifeleg .lifeleg-sw{ display:inline-block; width:12px; height:12px; margin-right:5px; border-radius:2px;
+  box-sizing:border-box; vertical-align:middle }
+.lifeleg .lifeleg-nodata{ background:var(--surface); border:1px solid var(--ht-line) }
+.lifeleg .lifeleg-now{ background:transparent; border:1.5px solid var(--outline-today) }
