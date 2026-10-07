@@ -139,36 +139,6 @@ svg{display:block}
 .li .ad{font:400 9.5px/1 var(--mono);flex:0 0 auto;min-width:30px;text-align:right}
 .li.nx{box-shadow:inset 2px 0 0 var(--accent)}
 .li.nx .nm{color:var(--ink)}
-/* HT-652 S1 · DAWN AND DUSK — a morning row wears a warm dawn wash, a night row a deep dusk wash,
-   one token per theme laid at low opacity over the row ground (themes/*.css). Standards and Weekly
-   carry none. Hover still answers, so the wash never swallows the row's own feedback. */
-.li.tint-dawn{background:var(--tint-dawn)}
-.li.tint-dusk{background:var(--tint-dusk)}
-.li.tint-dawn:hover,.li.tint-dusk:hover{background:var(--sel)}
-
-/* HT-652 S2 · THE BLANK PAGE — a full-screen writing surface: the field's text and nothing else,
-   one close control and Esc. The day-view box becomes a preview that opens it, so it reads as a tap
-   target. The text area IS the viewport; it never auto-grows (see growTo's h652ta guard). */
-#iWhy,#iTasks,#iPrayer,#iDump{cursor:pointer}
-html.h652lock,html.h652lock body{overflow:hidden}
-.h652page{position:fixed;inset:0;z-index:9000;background:var(--ground);display:flex;flex-direction:column}
-.h652page[hidden]{display:none}
-.h652x{position:absolute;top:max(10px,env(safe-area-inset-top));right:14px;z-index:2;
-  width:34px;height:34px;border:0;border-radius:50%;background:var(--sunk);color:var(--ink2);
-  font-size:22px;line-height:1;cursor:pointer}
-.h652x:hover{color:var(--ink)}
-.h652ta{flex:1 1 auto;width:100%;box-sizing:border-box;border:0;outline:0;resize:none;
-  background:var(--ground);color:var(--ink);font-size:16px;line-height:1.7;
-  padding:calc(env(safe-area-inset-top) + 56px) 20px 24px;overflow-y:auto}
-@media(min-width:1024px){.h652ta{max-width:760px;margin:0 auto;padding-top:72px;padding-bottom:48px}}
-
-/* HT-652 S3 · the Time committed card body (rides HT-30's .h30c/.lab card shell). */
-.tc652{font-size:12.5px;line-height:1.5}
-.tc652l{color:var(--ink)}
-.tc652s{color:var(--ink2);font-size:11.5px;margin:2px 0}
-.tc652f{color:var(--ink3);font-size:11px;margin-top:3px}
-/* on the laptop the card sits directly under the masthead (HT-31 removed the Insights page there) */
-@media(min-width:1024px){header.mast + #h652time{margin:10px 16px 0}}
 
 /* ---------------- panels ---------------- */
 .pan{border:1px solid var(--rule);background:var(--sheet);padding:12px}
@@ -3590,68 +3560,3 @@ body{
 /* 4 · MOTION — one easing, one duration ≤ 200ms, on the things that already animate (the sheet slide
    uses var(--dur)/var(--ease) at its own rule; nothing new moves). */
 
-
-/* ======================= HT-432 · THE CHARTS — QUIET LINES, ONE AXIS (paste 432) =======================
-   Completion is THE chart; rating is a slim companion strip. ONE hue (var(--ht-green), the same in every
-   theme), no right axis, no dashes, no per-value ramp. The loud line is the trailing-mean TREND; the daily
-   line is quiet (35%) with an 8% wash; today is the only blue. LAST in the file on purpose, so these win
-   the source-order tie with every earlier `.chart` rule (paste S2/S6; DEC-062 — this IS the design). */
-.chart{ width:100%; display:block }
-.chart .ax,        html[data-simple] .chart .ax{ stroke:var(--ht-line); stroke-width:1 }
-.chart .ax0,       html[data-simple] .chart .ax0{ stroke:var(--ht-line) }
-.chart .ax-r,      html[data-simple] .chart .ax-r{ stroke:var(--ht-line); stroke-width:1 }
-.chart .ayl,       html[data-simple] .chart .ayl{ font:400 11px/1 var(--mono); fill:var(--ht-dim);
-  font-variant-numeric:tabular-nums }
-.chart .striplab,  html[data-simple] .chart .striplab{ font:400 9px/1 var(--sans); fill:var(--ht-dim);
-  letter-spacing:.08em }
-.chart .wash-c,    html[data-simple] .chart .wash-c{ fill:var(--ht-green); fill-opacity:.08; stroke:none }
-.chart .ln-c,      html[data-simple] .chart .ln-c{ fill:none; stroke:var(--ht-green); stroke-width:1.5;
-  stroke-opacity:.35; stroke-dasharray:none; stroke-linejoin:round; stroke-linecap:round }
-.chart .trend-c,   html[data-simple] .chart .trend-c{ fill:none; stroke:var(--ht-green); stroke-width:2;
-  stroke-dasharray:none; stroke-linejoin:round; stroke-linecap:round }
-.chart .ref30,     html[data-simple] .chart .ref30{ stroke:var(--ht-muted); stroke-width:1; stroke-dasharray:none }
-.chart .reflab,    html[data-simple] .chart .reflab{ font:400 11px/1 var(--mono); fill:var(--ht-dim) }
-.chart .ln-r,      html[data-simple] .chart .ln-r{ fill:none; stroke:var(--ht-muted); stroke-width:1.5;
-  stroke-dasharray:none; stroke-linejoin:round; stroke-linecap:round }
-/* HT-651 S1 (656 S2): the dashed bridge that joins the line across a nothing-due / unrated gap, so the
-   completion and rating lines read UNBROKEN from the first logged day to today (a dash = nothing asked). */
-.chart .ln-c-gap,  html[data-simple] .chart .ln-c-gap{ fill:none; stroke:var(--ht-green); stroke-width:1.5;
-  stroke-opacity:.35; stroke-dasharray:3 3; stroke-linejoin:round; stroke-linecap:round }
-.chart .ln-r-gap,  html[data-simple] .chart .ln-r-gap{ fill:none; stroke:var(--ht-muted); stroke-width:1.5;
-  stroke-opacity:.9; stroke-dasharray:3 3; stroke-linejoin:round; stroke-linecap:round }
-.chart .dot-c,     html[data-simple] .chart .dot-c{ fill:var(--ht-green); stroke:var(--ht-panel); stroke-width:2 }
-.chart .dot-r,     html[data-simple] .chart .dot-r{ fill:var(--ht-muted); stroke:var(--ht-panel); stroke-width:1 }
-.chart .dot-today, html[data-simple] .chart .dot-today{ fill:var(--ht-today); stroke:var(--ht-panel); stroke-width:2 }
-.chart .halo-today,html[data-simple] .chart .halo-today{ fill:var(--ht-today); opacity:.25; stroke:none }
-.chart .mtick,     html[data-simple] .chart .mtick{ stroke:var(--ht-line); stroke-width:1 }
-.chart .xhair,     html[data-simple] .chart .xhair{ stroke:var(--ht-muted); stroke-width:1; pointer-events:none }
-.chart text.xl,    html[data-simple] .chart text.xl{ font:400 11px/1 var(--mono); fill:var(--ht-dim);
-  letter-spacing:0 }
-.chart text.xl-today, html[data-simple] .chart text.xl-today{ fill:var(--ht-text); font-weight:600 }
-.chart .hitcol,    html[data-simple] .chart .hitcol{ cursor:pointer }
-.chart .hitcol[data-vgd], .chart .hitcol[data-vgy],
-html[data-simple] .chart .hitcol[data-vgd], html[data-simple] .chart .hitcol[data-vgy]{ cursor:pointer }
-/* HT-432: the 5-swatch ramp legend is retired from the two chart navs (paste S2) — hidden, never
-   removed from the DOM (R70.138; golden_ht29 S0a). The year's copy was already hidden pre-432. */
-#vMonthNav .h16leg, #vYearNav .h16leg{ display:none !important }
-/* HT-651 S2 (656 S3): the named legend under a line chart. One swatch in the line's own stroke
-   (solid = completion, dashed = rating) + its name from LINE_LABELS. Wraps to two rows on the phone,
-   centred, and never scrolls sideways (flex-wrap + max-width, no min-width). */
-.chleg-host{ width:100%; max-width:100% }
-.chleg{ display:flex; flex-wrap:wrap; gap:4px 14px; align-items:center; justify-content:center;
-  font:400 11px/1.4 var(--mono); color:var(--ht-dim); margin:6px auto 2px; max-width:100%; padding:0 4px }
-.chleg-i{ display:inline-flex; align-items:center; white-space:nowrap }
-.chleg .chsw{ display:inline-block; width:16px; height:0; border-top:2px solid var(--ht-green);
-  vertical-align:middle; margin-right:5px }
-.chleg .chsw-c{ border-top:2px solid var(--ht-green) }
-.chleg .chsw-r{ border-top:2px dashed var(--ht-muted) }
-.chleg .chsw-t{ border-top:2px solid var(--st-late) }
-/* HT-651 S3 (656 S4): the legend beside the life chart — five grade swatches (letter + range), then
-   `no data` (empty, faint outline) and `now` (outlined like the current week). Wraps, no sideways scroll. */
-.lifeleg{ display:flex; flex-wrap:wrap; gap:4px 12px; align-items:center; justify-content:center;
-  font:400 11px/1.4 var(--mono); color:var(--ht-dim); margin:8px auto 2px; max-width:100%; padding:0 4px }
-.lifeleg-i{ display:inline-flex; align-items:center; white-space:nowrap }
-.lifeleg .lifeleg-sw{ display:inline-block; width:12px; height:12px; margin-right:5px; border-radius:2px;
-  box-sizing:border-box; vertical-align:middle }
-.lifeleg .lifeleg-nodata{ background:var(--surface); border:1px solid var(--ht-line) }
-.lifeleg .lifeleg-now{ background:transparent; border:1.5px solid var(--outline-today) }

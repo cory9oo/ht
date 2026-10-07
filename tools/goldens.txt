@@ -1,10 +1,23 @@
 # HT golden suite — the list run_goldens.py runs, one golden per line (# comments, blank lines ignored).
-# Every later HT paste appends its golden here. These are the estate-independent, fixture-only goldens
-# that run anywhere the headless fixture (_machine/ht3) and Playwright are present; the pre-reset
-# goldens that read estate files (tools/copiers/_ht.py and the like) are run per-paste, not here.
-golden_ht651_life.py
-golden_ht651_zero.py
-golden_ht651_legend.py
-golden_ht652_tint.py
-golden_ht652_page.py
-golden_ht652_time.py
+# These are the estate-independent, fixture-only goldens that run anywhere the headless fixture
+# (_machine/ht3) and Playwright are present; the pre-reset goldens that read estate files
+# (tools/copiers/_ht.py, _reconcile/ht_batch5/privacy_check.py and the like) are run per-paste, not here.
+#
+# paste 659 (revert to this morning's app, ht-v56 restoring the v52 files): this manifest lists only the
+# goldens that are GREEN on the restored morning app. The 432/651/652 goldens leave because they test
+# features this revert removes; the estate-reading and stale-theme goldens (ht26, ht29, ht31, ht33, ht34,
+# ht39) are not estate-independent / were already red at v52 in this clone, so they are not in the
+# fixture-only suite. Every golden FILE stays on disk (DEC-037 archive, never delete). Every later HT
+# paste re-appends its golden here.
+golden_ht23.py
+golden_ht25.py
+golden_ht30.py
+golden_ht35.py
+golden_ht36.py
+golden_ht37.py
+golden_ht38.py
+golden_ht40.py
+golden_ht41.py
+golden_ht42.py
+golden_ht429.py
+golden_ht433_edict.py
