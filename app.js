@@ -5806,7 +5806,9 @@ var HT32_CARDFIT = true;
          '" cy="'+(H/2)+'" r="12"/>';
       if(p.c!=null) s+='<circle class="dot dot-c '+rampClass(p.c)+'" '+at+' data-tip="'+esc(tip)+
                        '" cx="'+px(i).toFixed(1)+'" cy="'+py(p.c).toFixed(1)+'" r="3.4"/>';
-      if(p.r!=null) s+='<circle class="dot dot-r" '+at+' data-tip="'+esc(tip)+'" cx="'+px(i).toFixed(1)+
+      /* PASTE 682: a 0 on the rating/grade line reads as the F colour (--g0 via .dot-r-f); a real
+         rating is 1-10, so r===0 is only ever an empty-day zero. */
+      if(p.r!=null) s+='<circle class="dot dot-r'+(p.r===0?' dot-r-f':'')+'" '+at+' data-tip="'+esc(tip)+'" cx="'+px(i).toFixed(1)+
                        '" cy="'+py(p.r*10).toFixed(1)+'" r="2.6"/>';
     });
     /* EVERY label, always — NEVER THINNED (R70.140). Two tspans in ONE <text>, so a per-day count
@@ -5995,27 +5997,55 @@ var HT32_CARDFIT = true;
     return pts.filter(function(p){ return p.c!=null||p.r!=null; }).length;
   }
 
+  /* PASTE 682: the first day HT holds ANY record — the start of the tracked span. From it through
+     today a chart position is a point (0 when the day held nothing); before it a position is blank,
+     because nothing was tracked then. The min over the day rows and the private rows, never past today. */
+  function firstKey(){
+    var tdy=today(), best=null;
+    function see(k){ if(k && k<=tdy && (best==null || k<best)) best=k; }
+    (S.days||[]).forEach(function(r){ if(r) see(r.date); });
+    Object.keys(S.privAll||{}).forEach(see);
+    return best;
+  }
   function monthPoints(){
     var ym=S.calYM||(S.calYM=[dnum(today()).getFullYear(),dnum(today()).getMonth()]);
+    var tdy=today(), first=firstKey();
     return monthKeys(ym[0],ym[1]).map(function(k,i){
-      var d=dnum(k);
-      return { x:String(i+1), x2:DOW3[d.getDay()], key:k, c:pctOn(k), r:ratingOf(k),
-               /* B2: the full date, for the hover the dots already carry */
-               full: DOW3[d.getDay()]+' '+MO[d.getMonth()]+' '+d.getDate() };
+      var d=dnum(k), cRaw=pctOn(k), rRaw=ratingOf(k);
+      var o={ x:String(i+1), x2:DOW3[d.getDay()], key:k,
+              /* `logged`/`rated` are the ACTUALLY-recorded flags, so the "N logged" tip still counts
+                 real days and never the drawn 0s (PASTE 682). */
+              logged:(cRaw!=null), rated:(rRaw!=null),
+              /* B2: the full date, for the hover the dots already carry */
+              full: DOW3[d.getDay()]+' '+MO[d.getMonth()]+' '+d.getDate() };
+      /* PASTE 682: a zero is a point, never a gap. Inside [first, today] every day plots — its value,
+         or 0 when it held nothing (the line runs through it). Before the first record and after today
+         stay blank; today plots only once it has any state. */
+      var inSpan = first!=null && k>=first && (k<tdy || (k===tdy && (cRaw!=null||rRaw!=null)));
+      if(inSpan){ o.c = cRaw!=null?cRaw:0; o.r = rRaw!=null?rRaw:0; }
+      else { o.c = null; o.r = null; }
+      return o;
     });
   }
   function yearPoints(){
     var yr=S.vYear||(S.vYear=dnum(today()).getFullYear()), out=[];
+    var tdy=today(), first=firstKey();
+    var firstMo = first? first.slice(0,7) : null, todyMo = tdy.slice(0,7);
     for(var m=0;m<12;m++){
       var ks=monthKeys(yr,m);
       var cs=ks.map(pctOn).filter(function(v){ return v!=null; });
       var rs=ks.map(ratingOf).filter(function(v){ return v!=null; });
-      /* 0 LOGGED DAYS IS A GAP, NOT A ZERO. A zero reads as a month of total failure. */
       /* HT-17 S2: THREE-LETTER months. `J F M A M J J A S O N D` has three ambiguous pairs and
          reads as noise; `Jan Feb Mar` is the label. */
+      /* PASTE 682: a month inside the tracked span [first-month, this-month] is a point — its logged
+         mean, or 0 when the month held nothing (was a gap before). Months before the first record and
+         months still ahead stay blank. */
+      var moKey = yr+'-'+String(m+1).padStart(2,'0');
+      var inSpan = firstMo!=null && moKey>=firstMo && moKey<=todyMo;
       out.push({ x:MO[m], x2:'', key:String(m),
-                 c: cs.length? Math.round(meanOf(cs)) : null,
-                 r: rs.length? Math.round(meanOf(rs)*10)/10 : null });
+                 logged:(cs.length>0), rated:(rs.length>0),
+                 c: inSpan ? (cs.length? Math.round(meanOf(cs)) : 0) : null,
+                 r: inSpan ? (rs.length? Math.round(meanOf(rs)*10)/10 : 0) : null });
     }
     return out;
   }
@@ -6031,7 +6061,8 @@ var HT32_CARDFIT = true;
     if(nav) nav.innerHTML='<button class="mv" data-vgm="-1">\u2039</button>'+
       '<b>'+MO[ym[1]].toUpperCase()+' '+ym[0]+'</b>'+
       '<button class="mv" data-vgm="1">\u203a</button>'+legend();
-    var got=pts.filter(function(p){ return p.c!=null; }).length;
+    /* PASTE 682: count ACTUALLY-logged days (p.logged), never the drawn 0s. */
+    var got=pts.filter(function(p){ return p.logged; }).length;
     var tip=document.getElementById('vMonthTip');
     if(tip) tip.textContent = got? got+' logged' : 'nothing logged';
     return pts;
@@ -6045,13 +6076,15 @@ var HT32_CARDFIT = true;
     if(nav) nav.innerHTML='<button class="mv" data-vgyn="-1">\u2039</button>'+
       '<b>'+(S.vYear||dnum(today()).getFullYear())+'</b>'+
       '<button class="mv" data-vgyn="1">\u203a</button>'+legend();
-    var got=pts.filter(function(p){ return p.c!=null; }).length;
+    /* PASTE 682: count months with a real logged day (p.logged), never the drawn 0s. */
+    var got=pts.filter(function(p){ return p.logged; }).length;
     var tip=document.getElementById('vYearTip');
     if(tip) tip.textContent=got+' of 12 months logged';
     return pts;
   }
   window.__HT16.monthPoints = monthPoints;
   window.__HT16.yearPoints  = yearPoints;
+  window.__HT16.h16Chart    = h16Chart;   /* PASTE 682: the one line renderer, exposed for the golden */
   window.__HT16.tipOf       = tipOf;
 
   /* ---- S4 · LIFE IN WEEKS (R70.95 · R70.96) ---------------------------------------------
@@ -12099,7 +12132,7 @@ var HT29_UPDATE_BANNER = true;
 /* The one place this build says what it is. `sw.js`'s cache name must equal it, and `golden_ht30` S0 reads
    both files and fails when they drift - a version on the screen that is not the version in the cache is
    worse than no version at all, because it is the thing you check when you are already unsure. */
-var HT30_VERSION = 'ht-v58';
+var HT30_VERSION = 'ht-v59';
 
 function warn30(what, e){ try{ console.warn('HT-30: ' + what, e); }catch(_){} }
 function h30El(id){ return document.getElementById(id); }

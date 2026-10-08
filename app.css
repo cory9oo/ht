@@ -697,6 +697,8 @@ html[data-simple] #vViews > .vabout{ display:none !important }
 .chart .xl{ font:400 9px/1 var(--mono); fill:var(--ink3) }
 .chart .dot-c{ fill:var(--accent) }
 .chart .dot-r{ fill:var(--ink3) }
+/* PASTE 682: a 0 on the rating/grade line reads as the F grade colour (after .dot-r so it wins) */
+.chart .dot-r-f{ fill:var(--g0) }
 /* every dot is clickable, and the target is 24px even though the dot is 5 — a 4px target on a phone
    is decoration, not a control */
 .chart .hit{ fill:transparent; cursor:pointer }
@@ -751,6 +753,7 @@ html[data-simple] .chart .ln-r{ stroke:var(--line-rating);     stroke-width:1.3;
 html[data-simple] .chart .ln-c-d{ fill:var(--line-completion) }
 html[data-simple] .chart .ln-r-d{ fill:var(--line-rating) }
 html[data-simple] .chart .dot-r{ fill:var(--line-rating) }
+html[data-simple] .chart .dot-r-f{ fill:var(--g0) }   /* PASTE 682: the rating line's 0 reads as F */
 html[data-simple] .chart .dot-c{ fill:currentColor }          /* the ramp class on the dot supplies it */
 
 /* one 5-swatch legend per view, and no sentence explaining it (R-NOFLUFF) */
