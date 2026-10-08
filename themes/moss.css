@@ -9,7 +9,9 @@
   --ink:#E6E2D3;    --ink2:#AEB29E;  --ink3:#707A6A;
   --accent:#6CAC5D; --accent-ink:#0A0F09; --accent-wash:#18241A;
   --bad:#E27D66;    --good:#4FC39A;
-  --g0:#3A1E17; --g1:#6A3526; --g2:#2A3328; --g3:#48543F; --g4:#2A7A5E; --g5:#4FC39A;
+  /* PASTE 678 — the clearly-stepped high-contrast grade scale, the same five in every theme
+     (moss's old low grades sat at 1.30-2.46:1 on dark). All >= 4.6:1 vs ground, adjacent dE >= 13. */
+  --g0:#CF5247; --g1:#DB7F3D; --g2:#D7B24A; --g3:#9DC24F; --g4:#54BA8A; --g5:#80D4AD;
   --st-todo:#E6E2D3; --st-done:#4FC39A; --st-late:#D9B874; --st-skip:#AEB29E; --st-notdue:#AEB29E;
   --st-secured:#4FC39A; --st-ontrack:#9CC486; --st-atrisk:#D9B874; --st-outofreach:#E27D66;
   --m1:#9CC486; --m2:#D9B874; --m3:#D59A8C; --m4:#B7A6D9;

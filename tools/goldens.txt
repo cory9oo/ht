@@ -22,3 +22,4 @@ golden_ht42.py
 golden_ht429.py
 golden_ht433_edict.py
 golden_ht677_focus.py
+golden_ht678_life.py

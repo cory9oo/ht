@@ -102,6 +102,20 @@ function grade(p){ if(p==null) return ['—',null];
   for(var i=0;i<GRADE.length;i++) if(p>=GRADE[i][0]) return [GRADE[i][1],GRADE[i][2]];
   return ['F',0]; }
 function gcol(p){ var g=grade(p); return g[1]==null?'var(--rule2)':'var(--g'+g[1]+')'; }
+/* PASTE 678 — ONE quiet legend under the life grid, used by both renderers (desktop paintLife18 and
+   phone HT185LIFE): the five grades A B C D F in the re-tuned --g scale (A=--g4 best .. F=--g0 worst),
+   then the three non-grade states — lived (--life-lived), ahead (--life-ahead) and the now ring. It
+   wraps instead of scrolling (app.css .lifeleg). Decorative, so aria-hidden: the SVG already labels. */
+function lifeLegend(){
+  var g=[['A','--g4'],['B','--g3'],['C','--g2'],['D','--g1'],['F','--g0']];
+  var sw=g.map(function(x){ return '<span class="lifeleg-i"><i class="lifeleg-sw" style="background:var('+
+    x[1]+')"></i>'+x[0]+'</span>'; }).join('');
+  function sep(){ return '<span class="lifeleg-sep">·</span>'; }
+  return '<div class="lifeleg" aria-hidden="true">'+sw+sep()+
+    '<span class="lifeleg-i"><i class="lifeleg-sw lifeleg-lived"></i>lived</span>'+sep()+
+    '<span class="lifeleg-i"><i class="lifeleg-sw lifeleg-ahead"></i>ahead</span>'+sep()+
+    '<span class="lifeleg-i"><i class="lifeleg-sw lifeleg-now"></i>now</span></div>';
+}
 /* fills read as density, linear in the percentage, so 45 and 65 are not the same colour */
 function dens(p){
   if(p==null) return 'var(--sunk)';
@@ -7783,7 +7797,10 @@ var HT32_CARDFIT = true;
        straight off the height and the folds are gone. The COLUMN's width follows from the cell —
        and the height does not depend on the width, so writing --h19life here cannot start a
        feedback loop; the track settles on the first paint. */
-    var availH=Math.max(80, Math.round(box.height));
+    /* PASTE 678: reserve a line under the grid for the legend (the box is overflow:hidden, so the
+       grid must leave it room); the host is set flex-direction:column in app.css so it sits below. */
+    var LEGEND_H=22;
+    var availH=Math.max(80, Math.round(box.height)-LEGEND_H);
     var availW=Math.max(120, Math.round(box.width));
     /* THE COLUMN'S WIDTH IS STILL DERIVED FROM THE HEIGHT, and it has to stay that way. It is the
        track width Cory approved ("besides that, it looks really good"), and it is also what keeps
@@ -7820,37 +7837,32 @@ var HT32_CARDFIT = true;
     var foldW=LEFT+WEEKS*PW-GAP;
     function foldX(i){ return i*(foldW+FOLDGAP); }
 
-    /* one background rect per FOLD and one <pattern> per fold for the cell edges: ~5,200 cells and
-       NOT 5,200 nodes, the technique HT-13 paid for when its first life grid rendered solid */
-    var bg='', pat='<defs>', ov='';
-    for(var i=0;i<f;i++){
-      var rowsIn=Math.min(rows, YEARS-i*rows);
-      var bx=foldX(i)+LEFT, bw=WEEKS*PW-GAP, bh=rowsIn*PH-GAP;
-      /* --surface-2, not --surface: the panel behind it IS --surface, so the unlived weeks were
-         invisible and the grid had no body. This is the one line that makes it read as a grid. */
-      /* 194 N2.5: `.h194un` - app.css softens the unlived weeks to the faint tone; the gaps stay --bg, fainter still */
-      bg+='<rect class="h194un" x="'+bx+'" y="'+TOP+'" width="'+bw+'" height="'+bh+'" fill="var(--surface-2)"/>';
-      pat+='<pattern id="wkcell18_'+i+'" x="'+bx+'" y="'+TOP+'" width="'+PW+'" height="'+PH+
-           '" patternUnits="userSpaceOnUse">'+
-           '<rect x="'+cellW+'" y="0" width="'+GAP+'" height="'+PH+'" fill="var(--bg)"/>'+
-           '<rect x="0" y="'+cellH+'" width="'+PW+'" height="'+GAP+'" fill="var(--bg)"/></pattern>';
-      ov+='<rect x="'+bx+'" y="'+TOP+'" width="'+bw+'" height="'+bh+
-          '" fill="url(#wkcell18_'+i+')" pointer-events="none"/>';
-    }
-    pat+='</defs>';
-
+    /* PASTE 678 — CELLS, NOT BARS. Every week is its own square with a 1px gap (the pitch minus the
+       cell, left empty so the card shows through — no line is drawn, the brief forbids them). Four
+       states: future (faint --life-ahead), rated (the grade colour via rampFill), lived-no-rating
+       (calm --life-lived), and the current-week ring drawn last. ~5,200 squares, built as one string
+       and painted on a debounced watcher — within budget for a chart this is painted rarely. */
     var s='', lived=0;
-    /* ONE RECT PER YEAR ROW for the lived run - the runs are HORIZONTAL again.
-       Age labels every ten years DOWN THE LEFT of their own fold, never along the top. */
     for(var y=0;y<YEARS;y++){
       var fi=Math.floor(y/rows), ry=y%rows;
       var x0=foldX(fi)+LEFT, yy=TOP+ry*PH;
-      var st=y*WEEKS, en=st+WEEKS-1, livedTo=Math.min(en, nowWeek);
-      if(livedTo>=st){
-        var count=livedTo-st+1;
-        lived+=count;
-        s+='<rect class="lv" x="'+x0+'" y="'+yy+'" width="'+(count*PW-GAP)+'" height="'+cellH+
-           '" fill="var(--grey)" opacity=".6"/>';
+      for(var wk=0;wk<WEEKS;wk++){
+        var wi=y*WEEKS+wk, cx=x0+wk*PW;
+        if(wi>nowWeek){
+          s+='<rect class="lf" x="'+cx+'" y="'+yy+'" width="'+cellW+'" height="'+cellH+
+             '" fill="var(--life-ahead)"/>';
+        } else if(by[wi]!==undefined){
+          var pct=mean18(by[wi]), g=grade(pct);
+          var tip='week '+wi+' · '+weekRange18(wi,b)+' · '+(pct==null?'—':Math.round(pct)+'%');
+          lived++;
+          s+='<rect class="lw" x="'+cx+'" y="'+yy+'" width="'+cellW+'" height="'+cellH+
+             '" fill="'+window.__HT16.rampFill(pct)+'" data-wk="'+wi+'" data-grade="'+(g&&g[0]||'')+
+             '" data-tip="'+esc(tip)+'"><title>'+esc(tip)+'</title></rect>';
+        } else {
+          lived++;
+          s+='<rect class="lv" x="'+cx+'" y="'+yy+'" width="'+cellW+'" height="'+cellH+
+             '" fill="var(--life-lived)"/>';
+        }
       }
       if(y%10===0)
         s+='<text class="wl" x="'+(x0-4)+'" y="'+(yy+cellH)+'" text-anchor="end">'+y+'</text>';
@@ -7873,28 +7885,14 @@ var HT32_CARDFIT = true;
     /* anchored END: centred on the grid's right edge it hung past the svg and rendered as "5" */
     s+='<text class="wl wlx" x="'+(LEFT+WEEKS*PW-GAP)+'" y="'+(TOP-3)+'" text-anchor="end">'+
        WEEKS+'</text>';
-    /* the logged weeks, each its own cell on the ramp, each carrying its own tooltip */
-    Object.keys(by).forEach(function(k){
-      var wi=+k, yr=Math.floor(wi/WEEKS), wk=wi%WEEKS;
-      if(yr>=YEARS) return;
-      var fi2=Math.floor(yr/rows), ry2=yr%rows;
-      var pct=mean18(by[wi]);
-      var tip='week '+wi+' · '+weekRange18(wi,b)+' · '+
-              (pct==null?'—':Math.round(pct)+'%');
-      s+='<rect class="lw" x="'+(foldX(fi2)+LEFT+wk*PW)+'" y="'+(TOP+ry2*PH)+'" width="'+cellW+
-         '" height="'+cellH+'" fill="'+window.__HT16.rampFill(pct)+'" data-wk="'+wi+
-         '" data-tip="'+esc(tip)+'"><title>'+esc(tip)+'</title></rect>';
-    });
+    /* PASTE 678: the rated weeks are already drawn as cells in the grid loop above; no second pass. */
 
     var cur='';
     var cy=Math.floor(nowWeek/WEEKS), cwk=nowWeek%WEEKS;
     if(cy<YEARS){
       var cfi=Math.floor(cy/rows), cry=cy%rows, cx=foldX(cfi)+LEFT, cyy=TOP+cry*PH;
-      /* the current-age row gets a SUBTLE RULE across it, not a label: his age is DATA, derived
-         from the birthdate, and it is never typed anywhere (R70.95) */
-      cur+='<rect class="cage" data-row="'+cy+'" x="'+cx+'" y="'+cyy+'" width="'+(WEEKS*PW-GAP)+
-           '" height="'+cellH+'" fill="none" stroke="var(--outline-today)" stroke-width="1"'+
-           ' opacity=".35"/>';
+      /* PASTE 678: the current week keeps its bright accent RING (the brief names it). The old
+         full-row --outline-today rule (`.cage`, a 1px line) is dropped — squares only. */
       cur+='<rect class="cw" x="'+(cx+cwk*PW-0.5)+'" y="'+(cyy-0.5)+'" width="'+(cellW+1)+
            '" height="'+(cellH+1)+'" fill="none" stroke="var(--outline-today)"'+
            ' stroke-width="1.5"/>';
@@ -7909,7 +7907,7 @@ var HT32_CARDFIT = true;
        546x1016 (MEASURED). Bare `.wkscroll` is `overflow-x:auto` and nothing else. */
     host.innerHTML='<div class="wkscroll'+(desktop()?' h18fit':'')+'">'+
       '<svg class="wkg h18life" viewBox="0 0 '+W+' '+H+'" width="'+dW+'" height="'+dH+
-      '" preserveAspectRatio="xMinYMin meet">'+pat+bg+s+ov+cur+'</svg></div>';
+      '" preserveAspectRatio="xMinYMin meet">'+s+cur+'</svg></div>'+lifeLegend();
     host.setAttribute('data-h18','1');      /* the stamp watchLife() looks for */
     host.setAttribute('data-lived', lived);
     host.setAttribute('data-cols', WEEKS);
@@ -12101,7 +12099,7 @@ var HT29_UPDATE_BANNER = true;
 /* The one place this build says what it is. `sw.js`'s cache name must equal it, and `golden_ht30` S0 reads
    both files and fails when they drift - a version on the screen that is not the version in the cache is
    worse than no version at all, because it is the thing you check when you are already unsure. */
-var HT30_VERSION = 'ht-v57';
+var HT30_VERSION = 'ht-v58';
 
 function warn30(what, e){ try{ console.warn('HT-30: ' + what, e); }catch(_){} }
 function h30El(id){ return document.getElementById(id); }
@@ -14757,36 +14755,39 @@ var HT185LIFE = (function(){
     var FOOT = 12;                                        /* room for the `100` under the last row */
     var gridW = WEEKS * P - gap, H = AXT + Y * P - gap + FOOT;
     var nowW = weekIdx(new Date(), b);
-    /* N2.5: no solid ground under the grid - the gaps are the card itself, fainter than any fill */
-    var s = '';
-    for(var y = 0; y < Y; y++){
-      var st = y * WEEKS, livedTo = Math.min(st + WEEKS - 1, nowW);
-      /* N2.5: the unlived weeks of this row, in the faint tone (app.css .h194un), never the heavy slate */
-      var unFrom = Math.max(st, nowW + 1);
-      if(unFrom <= st + WEEKS - 1)
-        s += '<rect class="h194un" x="' + (AX + (unFrom - st) * P) + '" y="' + (AXT + y * P) + '" width="' +
-             ((st + WEEKS - unFrom) * P - gap) + '" height="' + cell + '" fill="var(--sunk)"/>';
-      if(livedTo >= st)
-        s += '<rect class="h185lived" x="' + AX + '" y="' + (AXT + y * P) + '" width="' + ((livedTo - st + 1) * P - gap) +
-             '" height="' + cell + '" fill="var(--rule2)"/>';
-      if(y % 10 === 0)
-        s += '<text class="h185y" x="' + (AX - 4) + '" y="' + (AXT + y * P + cell) + '" text-anchor="end">' + y + '</text>';
-    }
-    /* 194 N2.5: the label at the FOOT of the axis - the age the grid runs to, visible at 390 and 360 */
-    s += '<text class="h185y h194foot" x="' + (AX - 4) + '" y="' + (AXT + Y * P - gap + FOOT - 2) + '" text-anchor="end">' + Y + '</text>';
-    /* logged weeks on the ramp */
+    /* PASTE 678 — CELLS, NOT BARS (phone). Compute the logged weeks first, then draw every week as
+       its own square at the computed cell/gap: future is the faint --life-ahead, a rated week its
+       grade colour (fill()), a lived-but-unrated week the calm --life-lived; the current week keeps
+       its accent ring below. The old faint run (.h194un) and lived run (.h185lived) are gone. */
     var by = {};
     dates().forEach(function(k){
       var r = S.byDate[k]; if(!r || r.pct == null || !loggedOn(k)) return;
       var wi = weekIdx(k, b); if(wi == null || wi < 0) return;
       (by[wi] = by[wi] || []).push(+r.pct);
     });
-    Object.keys(by).forEach(function(k){
-      var wi = +k, yr = Math.floor(wi / WEEKS), wk = wi % WEEKS; if(yr >= Y) return;
-      var a = by[k], m = a.reduce(function(x, v){ return x + v; }, 0) / a.length;
-      s += '<rect class="h185wk" data-wk="' + wi + '" x="' + (AX + wk * P) + '" y="' + (AXT + yr * P) + '" width="' + cell +
-           '" height="' + cell + '" fill="' + fill(m) + '"><title>week ' + wi + ' · ' + Math.round(m) + '%</title></rect>';
-    });
+    var s = '';
+    for(var y = 0; y < Y; y++){
+      var yy = AXT + y * P;
+      for(var wk = 0; wk < WEEKS; wk++){
+        var wi = y * WEEKS + wk, cx = AX + wk * P;
+        if(wi > nowW){
+          s += '<rect class="h185ahead" x="' + cx + '" y="' + yy + '" width="' + cell +
+               '" height="' + cell + '" fill="var(--life-ahead)"/>';
+        } else if(by[wi] !== undefined){
+          var a = by[wi], m = a.reduce(function(x, v){ return x + v; }, 0) / a.length, g = grade(m);
+          s += '<rect class="h185wk" data-wk="' + wi + '" data-grade="' + (g && g[0] || '') + '" x="' + cx +
+               '" y="' + yy + '" width="' + cell + '" height="' + cell + '" fill="' + fill(m) +
+               '"><title>week ' + wi + ' · ' + Math.round(m) + '%</title></rect>';
+        } else {
+          s += '<rect class="h185lv" x="' + cx + '" y="' + yy + '" width="' + cell +
+               '" height="' + cell + '" fill="var(--life-lived)"/>';
+        }
+      }
+      if(y % 10 === 0)
+        s += '<text class="h185y" x="' + (AX - 4) + '" y="' + (yy + cell) + '" text-anchor="end">' + y + '</text>';
+    }
+    /* 194 N2.5: the label at the FOOT of the axis - the age the grid runs to, visible at 390 and 360 */
+    s += '<text class="h185y h194foot" x="' + (AX - 4) + '" y="' + (AXT + Y * P - gap + FOOT - 2) + '" text-anchor="end">' + Y + '</text>';
     /* the x axis: weeks - PASTE 293 S2.8: the desktop's own ticks, 0 10 20 30 40 and 52, so the axes are identical */
     HT293_LIFE_WEEK_TICKS.forEach(function(x){ if(x >= WEEKS) return;
       s += '<text class="h185x" x="' + (AX + x * P) + '" y="' + (AXT - 3) + '" text-anchor="start">' + x + '</text>'; });
@@ -14798,7 +14799,7 @@ var HT185LIFE = (function(){
     var tw = AX + gridW;
     host.innerHTML = '<svg class="h185life" viewBox="0 0 ' + tw + ' ' + H + '" width="' + tw + '" height="' + H +
       '" data-cols="' + WEEKS + '" data-rows="' + Y + '" data-cell="' + cell + '" data-tick="' + tickW +
-      '" role="img" aria-label="your life in weeks: ' + WEEKS + ' across, one row per year, age down the left">' + s + '</svg>';
+      '" role="img" aria-label="your life in weeks: ' + WEEKS + ' across, one row per year, age down the left">' + s + '</svg>' + lifeLegend();
     host.setAttribute('data-h185', String(W));
     return true;
   }

@@ -20,7 +20,11 @@
   --ink:#E6EAF0;    --ink2:#9AA3AF;  --ink3:#626B77;
   --accent:#A6C2D2; --accent-ink:#0B0C0E; --accent-wash:#17242B;
   --bad:#E06A5E;    --good:#7FC0A0;
-  --g0:#5E2F2B; --g1:#8A4139; --g2:#B4604F; --g3:#C4954F; --g4:#5A9E7B; --g5:#7FC0A0;
+  /* PASTE 678 — the five grade colours, re-tuned to a clearly-stepped high-contrast scale.
+     The old scale sank the low grades into the dark (F 1.79:1, D 2.70:1); these all clear 4.6:1
+     against the ground, adjacent CIELAB dE >= 13, red->amber->green. The SAME five in every theme
+     (grades mean the same everywhere), so Month, Year and Life read alike. */
+  --g0:#CF5247; --g1:#DB7F3D; --g2:#D7B24A; --g3:#9DC24F; --g4:#54BA8A; --g5:#80D4AD;
   --st-todo:#E6EAF0; --st-done:#7FC0A0; --st-late:#C9A063; --st-skip:#9AA3AF; --st-notdue:#7F8792;
   --st-secured:#7FC0A0; --st-ontrack:#8FB8D9; --st-atrisk:#C9A063; --st-outofreach:#E06A5E;
   --m1:#8FB8D9; --m2:#C9A6F5; --m3:#E9C46E; --m4:#7FD6C6;

@@ -3235,6 +3235,20 @@ svg.h185life{ display:block; max-width:100%; height:auto; overflow:visible }
 svg.h185life text{ font:500 8.5px/1 var(--mono); fill:var(--ink3) }
 @media (max-width:1023px){ #vLife[data-h185], #vWeeks[data-h185]{ overflow:hidden; min-width:0 } }
 
+/* ---- PASTE 678 · the life chart's one quiet legend, under the grid, phone as on desktop ----
+   A B C D F (the re-tuned --g grades) · lived (--life-lived) · ahead (--life-ahead) · now (the ring).
+   It wraps; it never scrolls sideways. Swatches are squares, like the cells they name. */
+.lifeleg{ display:flex; flex-wrap:wrap; align-items:center; gap:4px 9px; padding:7px 2px 2px;
+  font:400 10.5px/1.25 var(--sans); color:var(--ink2); min-width:0 }
+.lifeleg-i{ display:inline-flex; align-items:center; gap:4px; white-space:nowrap }
+.lifeleg-sep{ color:var(--ink3) }
+.lifeleg-sw{ display:inline-block; width:9px; height:9px; border-radius:2px; box-sizing:border-box; flex:0 0 auto }
+.lifeleg-lived{ background:var(--life-lived) }
+.lifeleg-ahead{ background:var(--life-ahead) }
+.lifeleg-now{ background:transparent; border:1.5px solid var(--outline-today) }
+/* desktop: the life column is a flex box the grid fills — stack the legend under the chart */
+@media (min-width:1024px){ html[data-simple] #h16Ins #vWeeks{ flex-direction:column } }
+
 /* ==== PASTE 194 · ROW, SECTIONS, SHEET, GROUP, LIFE, SCHEMES ===========================================================
    One block, last in the file, so it wins every tie on order and nothing above it has to be edited. Colours are
    tokens only (lint_tokens): the hexes live in themes/*.css. */

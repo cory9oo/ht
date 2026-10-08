@@ -135,6 +135,15 @@
   /* HT-22 S2: today stops being drawn in text-white. It is the one "active"
      mark the wire gives a colour to, and it is that colour at 60%. */
   --outline-today:var(--ht-today-60);
+
+  /* PASTE 678 — THE LIFE GRID'S TWO NON-GRADE STATES, derived from the active theme's own
+     --ink/--sheet so they adapt per skin (the grade colours are the theme --g scale, re-tuned
+     in themes/*.css). --life-lived is the calm lived-but-unrated fill: ink 42% over sheet puts
+     it at L*≈44-46 and ≥3.2:1 against ground/sheet/sunk on all three themes — clearly lighter
+     than the panel, calmer than any grade, never the panel grey. --life-ahead is the faint
+     future fill: ink 7% (under eight percent), a square never a line. */
+  --life-lived:color-mix(in srgb, var(--ink) 42%, var(--sheet));
+  --life-ahead:color-mix(in srgb, var(--ink) 7%, var(--sheet));
 }
 
 /* ==========================================================================

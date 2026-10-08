@@ -9,7 +9,9 @@
   --ink:#EADCDE;    --ink2:#B8A1A5;  --ink3:#7D6A6E;
   --accent:#AE2443; --accent-ink:#FBEFF1; --accent-wash:#2A1116;
   --bad:#E8894F;    --good:#5CC08C;
-  --g0:#3A1A14; --g1:#6B3222; --g2:#3A2A2D; --g3:#5A4448; --g4:#2E7A55; --g5:#5CC08C;
+  /* PASTE 678 — the clearly-stepped high-contrast grade scale, the same five in every theme
+     (crimson's old low grades sat at 1.26-2.22:1 on dark). All >= 4.6:1 vs ground, adjacent dE >= 13. */
+  --g0:#CF5247; --g1:#DB7F3D; --g2:#D7B24A; --g3:#9DC24F; --g4:#54BA8A; --g5:#80D4AD;
   --st-todo:#EADCDE; --st-done:#5CC08C; --st-late:#E0A15E; --st-skip:#B8A1A5; --st-notdue:#B8A1A5;
   --st-secured:#5CC08C; --st-ontrack:#E07A8C; --st-atrisk:#E0A15E; --st-outofreach:#E8894F;
   --m1:#E07A8C; --m2:#D9B26A; --m3:#8FC0A6; --m4:#C79BD6;
