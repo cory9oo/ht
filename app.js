@@ -2673,7 +2673,7 @@ function wire(){
       if(e.key==='Escape') e.target.blur();
       return;
     }
-    if(e.key==='Escape'){ closeOv(); return; }
+    if(e.key==='Escape'){ if(window.__HTF && window.__HTF.on()){ window.__HTF.leave(); return; } closeOv(); return; }
     if(e.key==='/'){ e.preventDefault(); el('find').focus(); return; }
     if(e.key==='['){ el('rail').querySelector('[data-d="'+shift(S.date,-1)+'"]')?.click(); return; }
     if(e.key===']'){ var n=shift(S.date,1); if(n<=today()) el('rail').querySelector('[data-d="'+n+'"]')?.click(); return; }
@@ -2700,6 +2700,62 @@ function wire(){
     Array.prototype.forEach.call(el('jump').children,function(c){
       c.classList.toggle('on', c.getAttribute('data-j')===cur); });
   },{passive:true});
+
+  /* PASTE 677 — FOCUS VIEW. A tap on any panel's title bar turns that one panel into a full-screen
+     canvas: the panel alone, edge to edge, the page behind hidden, generous padding, small type
+     (the look is in app.css; this is the behaviour). Every `.blk > .sh` inside `.grid` toggles it —
+     universal, so a panel the brief did not name by title, and a panel added later, are focusable
+     with no new code. It remembers nothing: pure in-memory, opens closed on every load. */
+  (function focusView(){
+    var cur = null;          // the .blk now in focus, or null
+    var pushed = false;      // did we add a history entry for this focus?
+
+    function dispatchResize(){
+      // The one event the app already listens for — regrowAll + the chart repaints above re-fit
+      // the SVGs and the completion list to the new canvas size (no new draw path).
+      try{ window.dispatchEvent(new Event('resize')); }catch(e){}
+    }
+    function closeMark(){
+      var x = document.createElement('button');
+      x.id = 'htfX'; x.className = 'htfx'; x.type = 'button';
+      x.setAttribute('aria-label', 'Close focus'); x.textContent = '×';
+      x.addEventListener('click', function(ev){ ev.stopPropagation(); leave(false); });
+      document.body.appendChild(x);
+    }
+    function enter(blk){
+      if(!blk || cur) return;
+      cur = blk;
+      document.body.classList.add('htf-on');
+      blk.classList.add('htf-focus');
+      closeMark();
+      try{ history.pushState({htf:1}, ''); pushed = true; }catch(e){ pushed = false; }
+      // let the fixed full-screen layout settle, then size the charts to it
+      requestAnimationFrame(function(){ requestAnimationFrame(dispatchResize); });
+    }
+    function leave(fromPop){
+      if(!cur) return;
+      cur.classList.remove('htf-focus'); cur = null;
+      document.body.classList.remove('htf-on');
+      var x = el('htfX'); if(x && x.parentNode) x.parentNode.removeChild(x);
+      if(pushed && !fromPop){ pushed = false; try{ history.back(); }catch(e){} }
+      else { pushed = false; }
+      requestAnimationFrame(dispatchResize);
+    }
+
+    document.addEventListener('click', function(e){
+      var sh = e.target.closest('.sh'); if(!sh) return;
+      var blk = sh.closest('.blk'); if(!blk || !blk.closest('.grid')) return;
+      // a real control in the title bar (the month's ‹ ›, the year's prev/next, Circle's "manage")
+      // does its own job and never toggles focus
+      if(e.target.closest('button,a,input,textarea,select')) return;
+      if(blk.classList.contains('htf-focus')) leave(false); else enter(blk);
+    });
+    window.addEventListener('popstate', function(){ if(cur) leave(true); });
+
+    window.__HTF = { on:function(){ return !!cur; },
+                     panel:function(){ return cur ? (cur.querySelector('.sh h2') || {}).textContent || '' : ''; },
+                     enter:enter, leave:leave };
+  })();
 }
 
 
@@ -12045,7 +12101,7 @@ var HT29_UPDATE_BANNER = true;
 /* The one place this build says what it is. `sw.js`'s cache name must equal it, and `golden_ht30` S0 reads
    both files and fails when they drift - a version on the screen that is not the version in the cache is
    worse than no version at all, because it is the thing you check when you are already unsure. */
-var HT30_VERSION = 'ht-v56';
+var HT30_VERSION = 'ht-v57';
 
 function warn30(what, e){ try{ console.warn('HT-30: ' + what, e); }catch(_){} }
 function h30El(id){ return document.getElementById(id); }

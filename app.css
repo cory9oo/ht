@@ -3560,3 +3560,35 @@ body{
 /* 4 · MOTION — one easing, one duration ≤ 200ms, on the things that already animate (the sheet slide
    uses var(--dur)/var(--ease) at its own rule; nothing new moves). */
 
+/* PASTE 677 — FOCUS VIEW. A tap on a panel's title bar (app.js) adds `htf-on` to <body> and
+   `htf-focus` to that one `.blk`. The panel then fills the viewport edge to edge — the one panel
+   alone, the page behind hidden, generous padding, scrollable, no borders/boxes crowding it — one
+   huge open canvas. It reads the THEME's own tokens, so it is correct in graphite/crimson/moss.
+   It NEVER enlarges type: the base stays the app's own small scale (body is already 13px). */
+body.htf-on{ overflow:hidden; }                 /* only the focused panel scrolls */
+body.htf-on .mast,
+body.htf-on .jump,
+body.htf-on .band,
+body.htf-on .blk:not(.htf-focus){ display:none !important; }   /* the one panel alone */
+body.htf-on .htf-focus{
+  position:fixed; inset:0; z-index:400; margin:0;
+  overflow:auto; -webkit-overflow-scrolling:touch;
+  background:var(--ground); color:var(--ink);
+  padding:40px clamp(20px, 6vw, 72px);          /* generous padding; edge to edge */
+  box-sizing:border-box;
+  font-size:13px;                                /* desktop: the app's small scale, never bigger */
+}
+@media (max-width:760px){ body.htf-on .htf-focus{ font-size:14px; } }  /* phone */
+body.htf-on .htf-focus .pan{                     /* nothing crowding it — drop the box */
+  border:0; background:transparent; padding:0;
+}
+body.htf-on .htf-focus .sh{ padding-top:0; }     /* the title sits quiet at the top */
+/* the small close mark, top right, above the panel and outside .app so the view never hides it */
+.htfx{
+  position:fixed; top:14px; right:14px; z-index:401;
+  width:34px; height:34px; line-height:30px; text-align:center;
+  font:400 22px/30px var(--sans); color:var(--ink3);
+  background:transparent; border:0; cursor:pointer; padding:0;
+}
+.htfx:hover{ color:var(--ink); }
+
