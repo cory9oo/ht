@@ -2716,18 +2716,25 @@ function wire(){
   },{passive:true});
 
   /* PASTE 683 — BOX TO CANVAS. 677 (below) made a panel's TITLE BAR open the focus view; Cory meant
-     the BOXES. A tap or click inside the Journal box (#iDump) or the Completed box (#iTasks) promotes
-     THAT SAME textarea to a full-screen writing canvas (the look is in app.css; this is the
-     behaviour). The node is NEVER moved — opening only adds classes — so the caret stays where it was
-     tapped, the phone keyboard stays up, and every keystroke saves through the box's OWN input/blur
-     path into the same S.priv field it writes today. Nothing is copied and nothing is moved, so
-     leaving can lose nothing.
+     the BOXES. A tap or click inside any writing box on the Journal card promotes THAT SAME textarea
+     to a full-screen writing canvas (the look is in app.css; this is the behaviour). The node is NEVER
+     moved — opening only adds classes — so the caret stays where it was tapped, the phone keyboard
+     stays up, and every keystroke saves through the box's OWN input/blur path into the same S.priv
+     field it writes today. Nothing is copied and nothing is moved, so leaving can lose nothing.
+     PASTE 685 — the boxes are matched as a CLASS, never by a fixed id list. 683 named two ids
+     (#iDump, #iTasks) and so missed the third box, Prayer. The open gate now fires for EVERY textarea
+     inside the Journal card (`.jcard`) — Journal, Completed, Prayer, and any box added to that card
+     later — so a new writing box can never be missed again. The ONE exception is the Rate-the-day
+     "why" (#iWhy): whyBack() moves it INTO this card (into #h18Btm on the desktop, under the strip on
+     the phone), so it is NOT in a separate .blk at run time — it is excluded by its own stable id, the
+     single non-writing box on the card, so the Rate-the-day row never enters the canvas.
      This IIFE is deliberately placed BEFORE focusView() so its `popstate` listener registers FIRST:
      when the canvas is involved it stops the event so 677's own popstate never also leaves the focus
      view — so inside 677 one back press closes only the canvas, a second leaves 677. When the canvas
      is not involved it returns without stopping, and 677 behaves exactly as it always has. */
   (function boxCanvas(){
-    var BOX = { iDump:'brain_dump', iTasks:'tasks' };   // only the two boxes Cory named
+    var CARD = '.jcard';     // the Journal card; a textarea inside it is a writing box (685: match by class, not id)
+    var FIELD = { iDump:'brain_dump', iTasks:'tasks', iPrayer:'prayer' };  // id -> S.priv key, for __HTJ.field() only; never gates opening
     var cur = null;          // the textarea now in canvas, or null
     var pushed = false;      // did we add a history entry for this canvas?
     var selfBack = false;    // true while OUR history.back() is in flight (so 677 is not disturbed)
@@ -2762,8 +2769,13 @@ function wire(){
     // raised the keyboard, and the `j` shortcut's programmatic focus on #iTasks is not hijacked.
     document.addEventListener('click', function(e){
       if(cur) return;
-      var ta = e.target.closest && e.target.closest('#iDump,#iTasks');
-      if(!ta || !BOX[ta.id]) return;
+      var ta = e.target.closest && e.target.closest('textarea');
+      // 685: ANY textarea on the Journal card opens the canvas, matched as a CLASS — so a new writing
+      // box can never be missed — EXCEPT the one non-writing box, the Rate-the-day "why" (#iWhy).
+      // whyBack() moves #iWhy INTO this card (into #h18Btm on the desktop, under the strip on the
+      // phone), so it IS inside `.jcard`; it is excluded by its own stable id, never opening as a
+      // canvas (the LAW: the Rate-the-day row stays on the card but never enters the canvas).
+      if(!ta || !ta.closest(CARD) || ta.id === 'iWhy') return;
       enter(ta);
     });
     // LEAVE by Esc: the app's own keydown early-returns for a focused textarea (it only blurs), so a
@@ -2780,7 +2792,7 @@ function wire(){
 
     window.__HTJ = { on:function(){ return !!cur; },
                      el:function(){ return cur; },
-                     field:function(){ return cur ? BOX[cur.id] : ''; },
+                     field:function(){ return cur ? (FIELD[cur.id] || '') : ''; },
                      enter:enter, leave:leave };
   })();
 
@@ -12213,7 +12225,7 @@ var HT29_UPDATE_BANNER = true;
 /* The one place this build says what it is. `sw.js`'s cache name must equal it, and `golden_ht30` S0 reads
    both files and fails when they drift - a version on the screen that is not the version in the cache is
    worse than no version at all, because it is the thing you check when you are already unsure. */
-var HT30_VERSION = 'ht-v61';
+var HT30_VERSION = 'ht-v62';
 
 function warn30(what, e){ try{ console.warn('HT-30: ' + what, e); }catch(_){} }
 function h30El(id){ return document.getElementById(id); }

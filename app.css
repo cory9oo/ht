@@ -3613,8 +3613,9 @@ body.htf-on .htf-focus .sh{ padding-top:0; }     /* the title sits quiet at the 
 .htfx:hover{ color:var(--ink); }
 
 /* PASTE 683 — BOX TO CANVAS. 677 made a panel's TITLE BAR open the focus view; Cory meant the BOXES.
-   A tap inside the Journal box (#iDump) or the Completed box (#iTasks) adds `htj-on` to <body> and
-   `htj-box` to THAT SAME textarea (app.js — the node is never moved, so caret/keyboard/save are the
+   A tap inside any writing box on the Journal card (685: every textarea on `.jcard` — Journal,
+   Completed, Prayer, and any box added later — matched as a class, never by id) adds `htj-on` to
+   <body> and `htj-box` to THAT SAME textarea (app.js — the node is never moved, so caret/keyboard/save are the
    ones already there). The textarea then fills the viewport edge to edge with a calm margin — one
    huge open canvas for writing — at the focus view's own small, quiet type. It reads the THEME's
    tokens, so it is correct in graphite/crimson/moss, and it sits ABOVE 677's focus layer (400/401)

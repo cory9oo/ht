@@ -193,7 +193,13 @@ try{
         </div>
 
         <!-- ---- 3. JOURNAL ---- -->
-        <div class="blk">
+        <!-- PASTE 685: `jcard` is the one hook the box-to-canvas needs. Every textarea inside this
+             card (Journal, Completed, Prayer, and any box added later) opens the full-screen canvas,
+             matched as a CLASS, never by a fixed id list - so a new writing box can never be missed.
+             NOTE: whyBack() (app.js) moves the Rate-the-day "why" (#iWhy) INTO this card at run time
+             (into #h18Btm on the desktop, under the strip on the phone), so it IS inside .jcard; the
+             open gate excludes it by its own id so the Rate-the-day row never opens the canvas. -->
+        <div class="blk jcard">
           <div class="sh"><h2><i class="n">3</i>Journal</h2><span class="ln"></span><span class="c" id="jrnC">saves as you type</span></div>
           <div id="mcii" style="display:none"></div>
           <div class="pan">
