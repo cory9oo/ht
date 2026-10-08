@@ -213,6 +213,32 @@ svg{display:block}
   font:400 12.5px/1.3 var(--sans);color:var(--ink)
 }
 .fld textarea{resize:vertical;min-height:60px}
+
+/* ---- PASTE 695 — ONE JOURNAL TYPE SIZE, EVERYWHERE; A TAP NEVER ZOOMS OR PANS ----
+   LAW 1: every writing box on the Journal card (Journal #iDump, Completed #iTasks, Prayer #iPrayer,
+   any box added later — all `.jcard textarea`) and the Rate-the-day why box (#iWhy, which lives in
+   its own .blk and whyBack() moves into the card at run time — so it is named by id) show ONE type
+   size and ONE line-height — the canvas's small quiet type of 677/683 — in the card AND when the
+   same box opens as the canvas (S3), on desktop and phone, for every user. The size lives in ONE
+   place: --htype on :root (13px; 14px under the 760px break), read by this rule AND by
+   textarea.htj-box, so there is exactly one number to change and no box can drift; never a per-user
+   setting, never a stored preference, never inherited from a parent block's larger scale.
+   LAW 2: the guards that make a sideways drift impossible even at scale 1 sit here and on the canvas
+   — touch-action:pan-y, overflow-x:hidden with overflow-wrap:anywhere, overscroll-behavior-x:none,
+   -webkit-text-size-adjust:100%; a vertical drag still scrolls the text.
+   WHY !important: a prior phone rule at ≤640px — `html textarea{ font-size:16px !important }` (the old
+   anti-zoom hack: lift every field to 16px so iOS never zooms) — is SUPERSEDED for the writing boxes by
+   this wire's maximum-scale=1 (S4). That hack carries !important, so the one small size can only win
+   with !important, and LAW 1's "no box can drift" demands it win everywhere. The guards carry
+   !important for the same reason: nothing per-box may defeat them. Other fields (selects, time inputs)
+   keep the 16px rule untouched — this wire is scoped to the writing boxes alone. */
+:root{ --htype:13px; --htype-lh:1.65 }
+@media (max-width:760px){ :root{ --htype:14px } }   /* phone — the same 760px flip the canvas used to carry alone */
+.jcard textarea, #iWhy{
+  font-size:var(--htype) !important; line-height:var(--htype-lh) !important;
+  touch-action:pan-y !important; overflow-x:hidden !important; overflow-wrap:anywhere !important;
+  overscroll-behavior-x:none !important; -webkit-text-size-adjust:100%; text-size-adjust:100%;
+}
 .btn{
   display:inline-flex;align-items:center;justify-content:center;gap:6px;
   padding:9px 14px;border:1px solid var(--ink);color:var(--ink);
@@ -3636,11 +3662,12 @@ textarea.htj-box{
   background:var(--ground); color:var(--ink);
   border:0; outline:none; resize:none;
   overflow:auto; -webkit-overflow-scrolling:touch;
-  font-size:13px !important;                                /* the focus view's size, never bigger */
-  line-height:1.65;
+  font-size:var(--htype) !important;                        /* PASTE 695: the ONE size (:root --htype), identical to the box */
+  line-height:var(--htype-lh) !important;                   /* PASTE 695: the ONE line-height, identical to the box */
+  touch-action:pan-y !important; overflow-x:hidden !important; overflow-wrap:anywhere !important; overscroll-behavior-x:none !important;  /* PASTE 695 LAW 2: no sideways drift; a vertical drag still scrolls */
   -webkit-text-size-adjust:100%; text-size-adjust:100%;     /* no phone text-inflation past the small scale */
 }
-@media (max-width:760px){ textarea.htj-box{ font-size:14px !important; } }  /* phone, as 677 */
+/* PASTE 695: the 760px font override is GONE — --htype already flips at 760px, so one rule carries both widths. */
 /* the small close mark, top right, above the canvas — the same quiet mark 677 uses */
 .htjx{
   position:fixed; top:14px; right:14px; z-index:501;
