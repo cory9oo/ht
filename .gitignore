@@ -7,3 +7,8 @@
 # `git add -A` swept exactly this kind of sidecar into a commit once (master-brain A-3 defect W1).
 __pycache__/
 *.pyc
+
+# HT-705: the golden runner's machine state — the measured HT browser weight (tools/state/ht_weight.json).
+# Machine state like auto/state/memory.jsonl: never committed, so it never dirties the tree and never
+# walls ht_push or the next job.
+tools/state/
