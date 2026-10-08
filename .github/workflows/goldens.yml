@@ -1,0 +1,102 @@
+# HT golden suite — the full suite runs on GitHub's machines, not the laptop (paste 707).
+#
+# Zero laptop memory, zero Claude credits: an Ubuntu runner with Python, Node, Playwright's
+# Chromium and the one postgres image golden_ht40 needs runs tools/run_goldens.py IN FULL on
+# every push to main and once nightly at a quiet hour. The suite's only run-time input a bare
+# checkout lacks is mock.js (the Supabase test double / fixture seam, ~34 KB). It carries Cory's
+# real habit names, so it NEVER enters this public repo (rule 6 / R47.3): it is injected at run
+# time from a repo Actions secret into the ephemeral runner alone. Every other fixture file is
+# filled from the checkout by tools/sync_fixture.py. No secret value is ever written into a file
+# under .github — only the ${{ secrets.* }} reference is.
+name: HT golden suite
+
+on:
+  push:
+    branches: [main]
+  schedule:
+    # one nightly run at a quiet hour: 08:00 UTC ≈ 3 AM Central
+    - cron: '0 8 * * *'
+  workflow_dispatch: {}
+
+# A newer push on the same ref cancels an older in-flight run.
+concurrency:
+  group: goldens-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  goldens:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install Python deps (Playwright + psycopg for golden_ht40 S2)
+        run: pip install playwright "psycopg[binary]"
+
+      - name: Install Playwright Chromium
+        run: playwright install --with-deps chromium
+
+      - name: Pull Postgres image (golden_ht40 S2 runs on a real Postgres via Docker)
+        run: docker pull postgres:17-alpine
+
+      - name: Seed the fixture seam from the Actions secret
+        env:
+          HT_FIXTURE_MOCK_JS_B64: ${{ secrets.HT_FIXTURE_MOCK_JS_B64 }}
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/ht3"
+          if [ -z "${HT_FIXTURE_MOCK_JS_B64:-}" ]; then
+            echo "::error::secret HT_FIXTURE_MOCK_JS_B64 is empty or unset — add it once in Settings → Secrets and variables → Actions (see SPEC/FOR_OPUS_ht_actions_secrets.md)."
+            exit 1
+          fi
+          printf '%s' "$HT_FIXTURE_MOCK_JS_B64" | base64 -d > "$RUNNER_TEMP/ht3/mock.js"
+          bytes=$(wc -c < "$RUNNER_TEMP/ht3/mock.js")
+          if [ "$bytes" -lt 1000 ]; then
+            echo "::error::decoded mock.js is only $bytes bytes — the secret HT_FIXTURE_MOCK_JS_B64 looks wrong (expected ~34 KB)."
+            exit 1
+          fi
+          echo "seeded $bytes bytes of the mock.js seam into $RUNNER_TEMP/ht3"
+
+      - name: Run the golden suite in full
+        env:
+          # run_goldens.py and sync_fixture.py both honour HT_FIXTURE_DIR, so the runner never
+          # walks up for an estate (there is none here) and the seam seeded above is kept.
+          HT_FIXTURE_DIR: ${{ runner.temp }}/ht3
+        run: |
+          set -o pipefail
+          start=$(date +%s)
+          python tools/run_goldens.py 2>&1 | tee goldens_run.log
+          rc=${PIPESTATUS[0]}
+          end=$(date +%s)
+          mins=$(awk "BEGIN { printf \"%.1f\", ($end - $start) / 60 }")
+          echo "run minutes: $mins"
+          {
+            echo "## HT golden suite"
+            echo "run minutes: $mins"
+            echo ""
+            echo "GitHub Actions free allowance: on a **public** repository Actions minutes are unmetered — no minute cap while the repo is public, so the headroom is effectively unlimited."
+          } >> "$GITHUB_STEP_SUMMARY"
+          exit "$rc"
+
+      - name: Upload failure artifacts (only when a test fails)
+        if: ${{ failure() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: goldens-failure
+          path: |
+            goldens_run.log
+            tools/**/test-results/**
+            tools/**/*.png
+            tools/**/*.zip
+          if-no-files-found: ignore
+          retention-days: 14
