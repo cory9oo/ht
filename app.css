@@ -3609,3 +3609,40 @@ body.htf-on .htf-focus .sh{ padding-top:0; }     /* the title sits quiet at the 
 }
 .htfx:hover{ color:var(--ink); }
 
+/* PASTE 683 — BOX TO CANVAS. 677 made a panel's TITLE BAR open the focus view; Cory meant the BOXES.
+   A tap inside the Journal box (#iDump) or the Completed box (#iTasks) adds `htj-on` to <body> and
+   `htj-box` to THAT SAME textarea (app.js — the node is never moved, so caret/keyboard/save are the
+   ones already there). The textarea then fills the viewport edge to edge with a calm margin — one
+   huge open canvas for writing — at the focus view's own small, quiet type. It reads the THEME's
+   tokens, so it is correct in graphite/crimson/moss, and it sits ABOVE 677's focus layer (400/401)
+   so it works the same inside 677's focus view.
+   The geometry carries !important for ONE measured reason: HT-10's grow() writes an INLINE height on
+   #iDump/#iTasks on every keystroke, and an inline height beats a plain stylesheet rule — so the
+   canvas would collapse to the scrollHeight mid-type. !important keeps it full while grow() runs. */
+body.htj-on{ overflow:hidden; }                  /* only the canvas scrolls */
+body.htj-on .mast,
+body.htj-on .jump,
+body.htj-on .band{ display:none !important; }    /* nothing peeks past the canvas */
+textarea.htj-box{
+  position:fixed !important; inset:0 !important; z-index:500 !important; margin:0 !important;
+  width:100% !important; height:100% !important;            /* beats grow()'s inline height */
+  min-height:0 !important; max-height:none !important;      /* and the phone's ~40vh grow CAP (else it fills only part of the screen) */
+  box-sizing:border-box !important;
+  padding:40px clamp(20px, 6vw, 72px) !important;           /* a calm margin; edge to edge */
+  background:var(--ground); color:var(--ink);
+  border:0; outline:none; resize:none;
+  overflow:auto; -webkit-overflow-scrolling:touch;
+  font-size:13px !important;                                /* the focus view's size, never bigger */
+  line-height:1.65;
+  -webkit-text-size-adjust:100%; text-size-adjust:100%;     /* no phone text-inflation past the small scale */
+}
+@media (max-width:760px){ textarea.htj-box{ font-size:14px !important; } }  /* phone, as 677 */
+/* the small close mark, top right, above the canvas — the same quiet mark 677 uses */
+.htjx{
+  position:fixed; top:14px; right:14px; z-index:501;
+  width:34px; height:34px; line-height:30px; text-align:center;
+  font:400 22px/30px var(--sans); color:var(--ink3);
+  background:transparent; border:0; cursor:pointer; padding:0;
+}
+.htjx:hover{ color:var(--ink); }
+

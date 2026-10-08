@@ -2715,6 +2715,75 @@ function wire(){
       c.classList.toggle('on', c.getAttribute('data-j')===cur); });
   },{passive:true});
 
+  /* PASTE 683 — BOX TO CANVAS. 677 (below) made a panel's TITLE BAR open the focus view; Cory meant
+     the BOXES. A tap or click inside the Journal box (#iDump) or the Completed box (#iTasks) promotes
+     THAT SAME textarea to a full-screen writing canvas (the look is in app.css; this is the
+     behaviour). The node is NEVER moved — opening only adds classes — so the caret stays where it was
+     tapped, the phone keyboard stays up, and every keystroke saves through the box's OWN input/blur
+     path into the same S.priv field it writes today. Nothing is copied and nothing is moved, so
+     leaving can lose nothing.
+     This IIFE is deliberately placed BEFORE focusView() so its `popstate` listener registers FIRST:
+     when the canvas is involved it stops the event so 677's own popstate never also leaves the focus
+     view — so inside 677 one back press closes only the canvas, a second leaves 677. When the canvas
+     is not involved it returns without stopping, and 677 behaves exactly as it always has. */
+  (function boxCanvas(){
+    var BOX = { iDump:'brain_dump', iTasks:'tasks' };   // only the two boxes Cory named
+    var cur = null;          // the textarea now in canvas, or null
+    var pushed = false;      // did we add a history entry for this canvas?
+    var selfBack = false;    // true while OUR history.back() is in flight (so 677 is not disturbed)
+
+    function closeMark(){
+      var x = document.createElement('button');
+      x.id = 'htjX'; x.className = 'htjx'; x.type = 'button';
+      x.setAttribute('aria-label', 'Close'); x.textContent = '×';
+      x.addEventListener('click', function(ev){ ev.stopPropagation(); leave(false); });
+      document.body.appendChild(x);
+    }
+    function enter(ta){
+      if(!ta || cur) return;
+      cur = ta;
+      document.body.classList.add('htj-on');
+      ta.classList.add('htj-box');
+      closeMark();
+      try{ history.pushState({htj:1}, ''); pushed = true; }catch(e){ pushed = false; }
+      // the node was not touched, so it keeps focus, caret and the phone keyboard it already had
+    }
+    function leave(fromPop){
+      if(!cur) return;
+      cur.classList.remove('htj-box'); cur = null;
+      document.body.classList.remove('htj-on');
+      var x = el('htjX'); if(x && x.parentNode) x.parentNode.removeChild(x);
+      if(pushed && !fromPop){ pushed = false; selfBack = true; try{ history.back(); }catch(e){ selfBack = false; } }
+      else { pushed = false; }
+      // the text is the textarea's own value — untouched here, so nothing is lost on the way out
+    }
+
+    // OPEN on a real gesture (click, not focusin): the native tap has already placed the caret and
+    // raised the keyboard, and the `j` shortcut's programmatic focus on #iTasks is not hijacked.
+    document.addEventListener('click', function(e){
+      if(cur) return;
+      var ta = e.target.closest && e.target.closest('#iDump,#iTasks');
+      if(!ta || !BOX[ta.id]) return;
+      enter(ta);
+    });
+    // LEAVE by Esc: the app's own keydown early-returns for a focused textarea (it only blurs), so a
+    // capture-phase handler closes the canvas when it is open and stops there. 677's Escape branch is
+    // never reached while a textarea is focused, so it is untouched.
+    document.addEventListener('keydown', function(e){
+      if(cur && e.key === 'Escape'){ e.stopImmediatePropagation(); e.preventDefault(); leave(false); }
+    }, true);
+    // LEAVE by the phone back gesture — and keep 677 out of it (see the note above).
+    window.addEventListener('popstate', function(e){
+      if(cur){ leave(true); e.stopImmediatePropagation(); return; }
+      if(selfBack){ selfBack = false; e.stopImmediatePropagation(); }
+    });
+
+    window.__HTJ = { on:function(){ return !!cur; },
+                     el:function(){ return cur; },
+                     field:function(){ return cur ? BOX[cur.id] : ''; },
+                     enter:enter, leave:leave };
+  })();
+
   /* PASTE 677 — FOCUS VIEW. A tap on any panel's title bar turns that one panel into a full-screen
      canvas: the panel alone, edge to edge, the page behind hidden, generous padding, small type
      (the look is in app.css; this is the behaviour). Every `.blk > .sh` inside `.grid` toggles it —
@@ -12132,7 +12201,7 @@ var HT29_UPDATE_BANNER = true;
 /* The one place this build says what it is. `sw.js`'s cache name must equal it, and `golden_ht30` S0 reads
    both files and fails when they drift - a version on the screen that is not the version in the cache is
    worse than no version at all, because it is the thing you check when you are already unsure. */
-var HT30_VERSION = 'ht-v59';
+var HT30_VERSION = 'ht-v60';
 
 function warn30(what, e){ try{ console.warn('HT-30: ' + what, e); }catch(_){} }
 function h30El(id){ return document.getElementById(id); }
