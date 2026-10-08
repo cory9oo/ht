@@ -9,7 +9,7 @@ the new build — cannot pass. Kept and re-based by every later HT paste.
 """
 import os, sys, json
 
-BASE = 'ht-v59'      # paste 683's starting version (main had ht-v59); the bump must take it past this
+BASE = 'ht-v60'      # paste 684's starting version (main had ht-v60); the bump must take it past this
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 try: sys.stdout.reconfigure(encoding='utf-8', errors='replace')
 except Exception: pass

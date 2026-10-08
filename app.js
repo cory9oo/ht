@@ -7833,7 +7833,11 @@ var HT32_CARDFIT = true;
   /* PASTE 293 S2.8 (Cory 9/28: "show age 100 at the bottom of the Y axis ... it only shows up to 90"): the grid always
      had 100 rows, but its `100` was a 6.5px label on the last row's edge, clipped 2px by the quadrant. The gutter
      widens to 20 (the phone's), and `100` is drawn at the size of every other age on the grid's bottom edge (a reserved foot cost 0.1px of cell and broke ht18's floor - measured, so FOOT is 0). */
-  var YEARS=HT293_LIFE_ROWS, WEEKS=52, GAP=1, MINCELL=3, LEFT=20, TOP=12, FOLDGAP=14, FOOT=0;
+  /* PASTE 684 (Cory 2026-10-07 #2): TOP widens 12->26 for one quiet line of headroom above the week
+     numbers, where the axis descriptors go. Only paintLife18 and the never-called foldPlan read TOP;
+     the grid still fills its box (cellH is solved against availH-TOP), so the foot `100` stays on the
+     box's bottom edge at availH and the grid loses ~0.14px of cell - the look is unchanged. */
+  var YEARS=HT293_LIFE_ROWS, WEEKS=52, GAP=1, MINCELL=3, LEFT=20, TOP=26, FOLDGAP=14, FOOT=0;
 
   function foldPlan(availW, availH){
     var plans=[1,2,3].map(function(f){
@@ -7987,6 +7991,14 @@ var HT32_CARDFIT = true;
     /* anchored END: centred on the grid's right edge it hung past the svg and rendered as "5" */
     s+='<text class="wl wlx" x="'+(LEFT+WEEKS*PW-GAP)+'" y="'+(TOP-3)+'" text-anchor="end">'+
        WEEKS+'</text>';
+    /* PASTE 684 (Cory 2026-10-07 #2): one quiet descriptor per axis so a stranger reads the grid.
+       They carry `.wl` (the tick numbers' own muted colour, size and weight) and only add a marker
+       class (no colour); drawn on the headroom line above the week numbers (y=TOP-17), clear of the
+       squares (which start at y=TOP) and of the legend (below the grid). `week of the year` names the
+       top axis, centred over it; `age` names the left axis, at its top end in the corner. */
+    s+='<text class="wl h684ax h684wk" x="'+(LEFT+(WEEKS*PW-GAP)/2)+'" y="'+(TOP-17)+
+       '" text-anchor="middle">week of the year</text>';
+    s+='<text class="wl h684ax h684age" x="1" y="'+(TOP-17)+'" text-anchor="start">age</text>';
     /* PASTE 678: the rated weeks are already drawn as cells in the grid loop above; no second pass. */
 
     var cur='';
@@ -12201,7 +12213,7 @@ var HT29_UPDATE_BANNER = true;
 /* The one place this build says what it is. `sw.js`'s cache name must equal it, and `golden_ht30` S0 reads
    both files and fails when they drift - a version on the screen that is not the version in the cache is
    worse than no version at all, because it is the thing you check when you are already unsure. */
-var HT30_VERSION = 'ht-v60';
+var HT30_VERSION = 'ht-v61';
 
 function warn30(what, e){ try{ console.warn('HT-30: ' + what, e); }catch(_){} }
 function h30El(id){ return document.getElementById(id); }
@@ -14831,7 +14843,10 @@ window.__HT185SYNC = HT185SYNC;
    on Views, #vWeeks on Insights), re-asserted by an observer after any other renderer writes the host - the
    attribute stamp `data-h185` is what makes the observer a no-op on its own write. */
 var HT185LIFE = (function(){
-  var HOSTS = ['vLife', 'vWeeks'], AX = 20, AXT = 13, GAP = 1, WEEKS = 52, MIN = 5;
+  /* PASTE 684 (Cory 2026-10-07 #2): AXT widens 13->26 for one quiet line of headroom above the week
+     numbers, where the axis descriptors go. The cell is (W-AX)/WEEKS and does not depend on AXT, so
+     the phone grid is pixel-for-pixel unchanged; only the header gains a line. */
+  var HOSTS = ['vLife', 'vWeeks'], AX = 20, AXT = 26, GAP = 1, WEEKS = 52, MIN = 5;
   function phone(){ return window.innerWidth < 1024; }
   function birthD(){ var b = S.priv0 && S.priv0.birth_date; return b ? new Date(b + 'T12:00:00') : null; }
   /* PASTE 293 S2.8 (Cory 9/28 09:31): "make sure X and Y on desktop and on phone app are identical" - the phone ran
@@ -14894,6 +14909,12 @@ var HT185LIFE = (function(){
     HT293_LIFE_WEEK_TICKS.forEach(function(x){ if(x >= WEEKS) return;
       s += '<text class="h185x" x="' + (AX + x * P) + '" y="' + (AXT - 3) + '" text-anchor="start">' + x + '</text>'; });
     s += '<text class="h185x" x="' + (AX + gridW) + '" y="' + (AXT - 3) + '" text-anchor="end">' + WEEKS + '</text>';
+    /* PASTE 684 (Cory 2026-10-07 #2): one quiet descriptor per axis, phone as on desktop. Plain text
+       under svg.h185life inherits the tick colour/size/weight from the `svg.h185life text` rule; it
+       gets ONLY a marker class (never h185x/h185y, which the axis goldens read). Drawn on the headroom
+       line above the week numbers (y=AXT-17), clear of the squares and the legend. */
+    s += '<text class="h684ax h684wk" x="' + (AX + gridW / 2) + '" y="' + (AXT - 17) + '" text-anchor="middle">week of the year</text>';
+    s += '<text class="h684ax h684age" x="1" y="' + (AXT - 17) + '" text-anchor="start">age</text>';
     /* today */
     var cy = Math.floor(nowW / WEEKS), cw = nowW % WEEKS;
     if(cy < Y) s += '<rect class="h185today" x="' + (AX + cw * P - 1) + '" y="' + (AXT + cy * P - 1) + '" width="' + (cell + 2) +
