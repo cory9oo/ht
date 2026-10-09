@@ -198,6 +198,10 @@ def s3():
 
 def s4():
     G.sec('S4', 'the live policy table')
+    if sys.platform != 'win32':
+        G.info('S4: cmdkey is Windows-only; credential check skipped on %s' % sys.platform)
+        chk('S4a . on a non-Windows runner the credential check is skipped (cmdkey unavailable)', True)
+        return
     have = subprocess.run(['cmdkey', '/list:BEV/HT_SUPABASE_DB_URL'], capture_output=True, text=True).stdout
     if 'Target:' in have:
         G.info('BEV/HT_SUPABASE_DB_URL present - run tools/sql/2026-09-28_ht293_rls_audit.sql by the migration route')
