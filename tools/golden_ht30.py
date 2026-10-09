@@ -530,7 +530,7 @@ CARDS_HT30 = ['Month . completion', 'Month . rating', 'Completion and rating ove
 # tab ... too hidden and doesn't trigger enough emotion"): the day's-percent HERO card 'Today' opens the
 # page, above his four; nothing else moves.
 # AMENDED BY PASTE 293 S2.7 (R67.2, Cory 2026-09-28: "a group tab as a third tab"): the group moves to its own tab.
-CARDS_HT31 = ['Today', 'The month', 'The year', 'The life']
+CARDS_HT31 = ['Today', 'The Month', 'The Year', 'The life']
 CARDS = CARDS_HT31
 
 

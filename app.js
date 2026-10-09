@@ -13431,8 +13431,7 @@ var HT31_SECTIONS_LOCAL = true;
   }
   function retire(){
     if(retired()){ map = {}; return; }
-    var m = {};
-    try{ m = JSON.parse(localStorage.getItem(KEY) || '{}') || {}; }catch(e){ m = {}; }
+    var m = load();
     Object.keys(m).forEach(function(id){
       var h = (S.habits || []).filter(function(x){ return String(x.id) === String(id); })[0];
       ht186Superseded(id, m[id], (h && h.section) || '');   /* archive the old map, once, with the time */
