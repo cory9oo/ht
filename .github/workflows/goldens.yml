@@ -67,6 +67,9 @@ jobs:
           fi
           echo "seeded $bytes bytes of the mock.js seam into $RUNNER_TEMP/ht3"
 
+      - name: Stub the estate root (goldens walk up for _reconcile; none on a bare checkout)
+        run: mkdir -p "$(dirname "$GITHUB_WORKSPACE")/_reconcile"
+
       - name: Run the golden suite in full
         env:
           # run_goldens.py and sync_fixture.py both honour HT_FIXTURE_DIR, so the runner never
