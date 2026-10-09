@@ -2796,6 +2796,54 @@ function wire(){
                      enter:enter, leave:leave };
   })();
 
+  /* PASTE 704 — THE TOP IS WHERE A NEW ENTRY BEGINS. Cory writes newest-first ("I type bottom up not
+     top down"), so a writing box opens showing its TOP — the free space 704 added in app.css plus the
+     newest words — never its bottom, and the caret is NEVER forced to the end; a tap in that top free
+     space homes the caret to position 0 so the new words sit above the old ones. Behaviour only: no node
+     is moved (the box and its canvas are the SAME element, 685), no save path and no type size is
+     touched — the keystroke in the top line is the ordinary one HT-29 S1 already saves to S.priv and
+     695 already sizes, so (3) and (4) hold by construction and the free space is CSS padding, never a
+     stored blank line. Placed AFTER boxCanvas so window.__HTJ already exists. */
+  (function topSpace(){
+    var CARD = '.jcard';
+    // the SAME class scope 685 uses: a textarea inside the Journal card whose id is not the one
+    // non-writing box (#iWhy). A box added to the card later is covered with no edit.
+    function writingBox(ta){
+      return !!(ta && ta.tagName && String(ta.tagName).toLowerCase() === 'textarea'
+                && ta.closest && ta.closest(CARD) && ta.id !== 'iWhy');
+    }
+    // ONE delegated click in the CAPTURE phase, so it reads state BEFORE boxCanvas's bubble handler
+    // opens the canvas. It records where the tap landed and whether the canvas was already open, then
+    // in a rAF (after any open settles) measures the LIVE box — the full-screen canvas when this tap
+    // opened it, the same node promoted — and decides.
+    document.addEventListener('click', function(e){
+      var ta = e.target && e.target.closest && e.target.closest('textarea');
+      if(!writingBox(ta)) return;
+      var clientY = e.clientY;
+      var wasOpen = !!(window.__HTJ && window.__HTJ.on());
+      requestAnimationFrame(function(){
+        var rect = ta.getBoundingClientRect();
+        var pad = parseFloat(getComputedStyle(ta).paddingTop) || 0;
+        var inTop = ta.scrollTop <= 1 && (clientY - rect.top) <= pad + 2;
+        var openedNow = !wasOpen && !!(window.__HTJ && window.__HTJ.on());
+        if(openedNow){ ta.scrollTop = 0; }                         // open shows the TOP, not the bottom
+        if(inTop){ try{ ta.setSelectionRange(0, 0); }catch(err){}  // the caret lands at the very start
+                   ta.scrollTop = 0; }                             // the new words sit above the old
+      });
+    }, true);
+    // the PROGRAMMATIC open (677's nested case, the `j` shortcut) also shows the top, never the bottom.
+    if(window.__HTJ && typeof window.__HTJ.enter === 'function'){
+      var _enter = window.__HTJ.enter;
+      window.__HTJ.enter = function(ta){
+        var r = _enter.call(window.__HTJ, ta);
+        var open = (window.__HTJ.el && window.__HTJ.el()) || ta;
+        if(open){ open.scrollTop = 0; }
+        return r;
+      };
+    }
+    window.__HT704 = { writingBox: writingBox };                   // exported for the golden
+  })();
+
   /* PASTE 677 — FOCUS VIEW. A tap on any panel's title bar turns that one panel into a full-screen
      canvas: the panel alone, edge to edge, the page behind hidden, generous padding, small type
      (the look is in app.css; this is the behaviour). Every `.blk > .sh` inside `.grid` toggles it —

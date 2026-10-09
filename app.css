@@ -3708,3 +3708,26 @@ textarea.htj-box{
 }
 .htjx:hover{ color:var(--ink); }
 
+/* ---- PASTE 704 — FREE SPACE AT THE TOP OF EVERY WRITING BOX ----
+   Cory writes newest-first ("I type bottom up not top down"), so every multi-line writing box on the
+   Journal card keeps a clear top area — about three lines of its own type — above the first line, to
+   tap and begin a new entry ABOVE the old one. The space is `padding-top` (longhand, so each box keeps
+   the side/bottom padding its existing rules set), never characters in the value — so a saved box still
+   begins at the first typed character and nothing blank is ever stored, synced or re-read (LAW (4)).
+   With `*{box-sizing:border-box}` (line 1) the box height already contains the padding, so growTo()/fit()
+   size correctly and the space is present even when the box is full and scrolling (STRESS 1).
+     CARD — the tall brain dump (#iDump, both sizes) and, on the PHONE, Completed/Prayer too (they are
+       ordinary `.jcard textarea` there — HT-18's #h18Btm reflow is desktop-only). (1,1,1) beats
+       `.fld textarea`'s shorthand `padding:7px 8px` (0,1,1), and being longhand it moves only the top.
+     CANVAS — 685's full-screen canvas for EVERY writing box. `!important` matches the canvas rule's own
+       geometry (it beats grow()'s inline height and the existing `padding:40px …!important`, being the
+       later !important of equal specificity), overriding only the TOP and leaving the calm side margin.
+     DESKTOP #h18Btm — Completed/Prayer rest as the compact ~34–46px previews there; three lines cannot
+       fit without deforming HT-18's tuned quadrant, so they keep a small top padding in the card
+       (higher specificity (1,1,2) wins for those two on the desktop) and carry their top space in the
+       canvas they open on a tap (the !important rule above still gives it). It does not touch the phone
+       (no #h18Btm there) or #iDump. */
+html[data-simple] #iDump, html[data-simple] #iTasks, html[data-simple] #iPrayer{ padding-top: calc(3 * 1.5em); }
+textarea.htj-box{ padding-top: calc(3 * 1.5em) !important; }
+@media(min-width:1024px){ html[data-simple] #h18Btm textarea{ padding-top:7px; } }
+
