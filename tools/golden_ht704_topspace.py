@@ -110,7 +110,17 @@ async def type_at_caret(pg, fid, ch):
     await pg.wait_for_timeout(120)
 
 async def saved_field(pg, key):
-    return await pg.evaluate("(k)=>{ return S && S.priv ? S.priv[k] : null; }", key)
+    # app.js is ONE SEALED CLOSURE (its own receipt-148 lesson): S is NOT a global, so a test reads
+    # what the app PERSISTED, never its in-memory state. HT-32's flush drains the debounced save, and
+    # the mock records every day_private upsert to window.__WRITES (the seam golden_ht28 reads). The
+    # latest write carrying this column is the value that landed on the server.
+    await pg.evaluate("()=>{ return (window.__HT32SAVE && window.__HT32SAVE.flush)"
+                      " ? window.__HT32SAVE.flush() : null; }")
+    await pg.wait_for_timeout(200)
+    return await pg.evaluate(
+        "(k)=>{ var w=(window.__WRITES||[]).filter(function(x){ return x.table==='day_private'"
+        " && x.payload && Object.prototype.hasOwnProperty.call(x.payload,k) && x.payload[k]!=null; });"
+        " return w.length ? w[w.length-1].payload[k] : null; }", key)
 
 async def box_value(pg, fid):
     return await pg.evaluate("(id)=>{ var e=document.getElementById(id); return e?e.value:null; }", fid)
@@ -164,13 +174,15 @@ async def run(pw, w, h, label, desktop):
             % (label, tid, cv2['ss'], cv2['se'], cv2['st']),
             cv2['ss'] == 0 and cv2['se'] == 0 and cv2['st'] == 0, cv2)
 
-        # type at the caret through the OWN input path; the save begins at the first typed character
+        # type at the caret through the OWN input path; the save begins at the first typed character.
+        # clear the write log first so the only day_private write read back is the one this type causes.
+        await pg.evaluate("()=>{ window.__WRITES=[]; }")
         await type_at_caret(pg, tid, 'Z')
         saved = await saved_field(pg, key)
         boxval = await box_value(pg, tid)
         no_blank = isinstance(boxval, str) and len(boxval) > 0 and boxval[0] != '\n' \
             and not boxval.startswith('\n') and boxval.split('\n')[0].strip() != ''
-        chk("%s · #%s typing at the top saves through S.priv.%s, equal to the box" % (label, tid, key),
+        chk("%s · #%s typing at the top saves to day_private.%s, equal to the box" % (label, tid, key),
             saved is not None and saved == boxval, {'saved_head': (saved or '')[:24], 'box_head': (boxval or '')[:24]})
         chk("%s · #%s the save begins with the typed character, NO leading blank line" % (label, tid),
             isinstance(boxval, str) and boxval[:1] == 'Z' and no_blank, (boxval or '')[:24])
