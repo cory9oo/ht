@@ -27,3 +27,4 @@ golden_ht682_zero.py
 golden_ht683_canvas.py
 golden_ht684_axis.py
 golden_ht695_boxes.py
+golden_ht712_root.py

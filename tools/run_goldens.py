@@ -70,11 +70,14 @@ def fixture():
     return os.path.join(MACHINE, 'ht3')
 
 
-def ensure_fixture(fx):
+def ensure_fixture(fx, seed_machine=None):
     import shutil
     if os.path.exists(os.path.join(fx, 'mock.js')):
         return True
-    seed = os.path.join(MACHINE, 'ht-carried', 'ht3')
+    # HT-712: the seed (ht-carried/ht3, the mock.js seam) is resolved from the LIVE runner's own location
+    # (MACHINE), never from a --root worktree's parent, so seeding a per-root fixture works no matter where
+    # the worktree sits.
+    seed = os.path.join(seed_machine or MACHINE, 'ht-carried', 'ht3')
     if os.path.isdir(seed) and os.path.exists(os.path.join(seed, 'mock.js')):
         print('seeding fixture %s from %s' % (fx, seed))
         shutil.copytree(seed, fx, dirs_exist_ok=True)
@@ -82,8 +85,8 @@ def ensure_fixture(fx):
     return False
 
 
-def manifest():
-    path = os.path.join(HERE, 'goldens.txt')
+def manifest(here=None):
+    path = os.path.join(here or HERE, 'goldens.txt')
     out = []
     with open(path, encoding='utf-8') as f:
         for line in f:
@@ -334,9 +337,9 @@ class BrowserMeter(object):
 # =================================================================================================
 # the suite
 # =================================================================================================
-def _sync_fixture(fx):
+def _sync_fixture(fx, here=None):
     env = dict(os.environ, HT_FIXTURE_DIR=fx)
-    sync = subprocess.run([sys.executable, os.path.join(HERE, 'sync_fixture.py')], env=env,
+    sync = subprocess.run([sys.executable, os.path.join(here or HERE, 'sync_fixture.py')], env=env,
                           capture_output=True, text=True)
     if sync.returncode != 0:
         print('run_goldens: sync_fixture failed\n' + sync.stdout + sync.stderr)
@@ -374,15 +377,21 @@ def _write_weight(meter, secs):
               % (WEIGHT_PATH, type(e).__name__))
 
 
-def run_suite(goldens, measure=True):
+def run_suite(goldens, measure=True, here=None, runner=None, fixture_dir=None, seed_machine=None):
     """Run `goldens` (each through the diet runner), metering the browser. -> exit code.
     rc 0 only when every golden is green AND (when measured) the peak is under the cap AND this run
-    left no browser of its own behind."""
-    fx = fixture()
-    if not ensure_fixture(fx):
+    left no browser of its own behind.
+
+    HT-712: `here`/`runner`/`fixture_dir`/`seed_machine` isolate a run to one checkout (--root). With
+    all four None the run is byte-for-byte today's: the live tools dir, the live diet runner, the shared
+    ht3 fixture, and ht-carried/ht3 as the seed."""
+    here = here or HERE
+    runner = runner or RUNNER
+    fx = fixture_dir or fixture()
+    if not ensure_fixture(fx, seed_machine):
         print('run_goldens: no fixture with a mock.js seam at %s and none to seed from' % fx)
         return 1
-    if not _sync_fixture(fx):
+    if not _sync_fixture(fx, here):
         return 1
     if not goldens:
         print('run_goldens: nothing to run')
@@ -396,12 +405,12 @@ def run_suite(goldens, measure=True):
     results = []
     try:
         for g in goldens:
-            gp = os.path.join(HERE, g)
+            gp = os.path.join(here, g)
             if not os.path.exists(gp):
                 print('  MISS %s (not found)' % g)
                 results.append((g, False))
                 continue
-            r = subprocess.run([sys.executable, RUNNER, gp], env=env, capture_output=True, text=True)
+            r = subprocess.run([sys.executable, runner, gp], env=env, capture_output=True, text=True)
             tail = (r.stdout.strip().splitlines() or [''])[-1]
             print('  %-4s %-26s %s' % ('PASS' if r.returncode == 0 else 'FAIL', g, tail))
             if r.returncode != 0:
@@ -549,20 +558,43 @@ def main():
                          'fails safe to the whole suite for a core-app or unmappable change')
     ap.add_argument('--weight', action='store_true',
                     help='print the HT job weight (builder + measured browser) and exit 0 iff peak <= 0.4 GB')
+    # HT-712: run the suite against ONE checkout alone, so two jobs run their suites at once without
+    # seeing each other. With neither --root nor --only the run is byte-for-byte today's.
+    ap.add_argument('--root', default=None, metavar='DIR',
+                    help='HT-712: run against the checkout at DIR - its own tools/goldens, its own diet '
+                         'runner, and a per-root fixture (<machine>/.ht_fixtures/<name>, OUTSIDE every git '
+                         'repo so it never dirties the live checkout or a worktree) - NEVER the live '
+                         'checkout or the shared ht3. HT_FIXTURE_DIR, if set, still wins.')
+    ap.add_argument('--only', default=None, metavar='NAME[,NAME...]',
+                    help='HT-712: run just these goldens (resolved in <root-or-live>/tools), not the whole '
+                         'manifest - the slim suite a per-job or a parallel check uses.')
     a = ap.parse_args()
 
     if a.weight:
         return cmd_weight()
 
-    goldens = manifest()
-    if a.changed is not None:
-        paths = changed_paths(a.changed)
-        if paths is None:
-            print('run_goldens --changed: git diff failed → whole suite (fail-safe)')
-        else:
-            goldens, reason = select_from_changed(paths, goldens)
-            print('--changed %s: %s' % (a.changed, reason))
-    return run_suite(goldens, measure=True)
+    # HT-712: --root resolves the runner, the goldens and the fixture to one checkout. The seed source
+    # (ht-carried/ht3) stays the LIVE runner's MACHINE, so seeding works wherever the worktree sits.
+    here, runner, fx, seed_machine = HERE, RUNNER, None, MACHINE
+    if a.root:
+        root = os.path.abspath(a.root)
+        here = os.path.join(root, 'tools')
+        runner = os.path.join(here, '_golden_runner.py')
+        fx = os.environ.get('HT_FIXTURE_DIR') or os.path.join(MACHINE, '.ht_fixtures', os.path.basename(root))
+
+    if a.only:
+        goldens = [n if n.endswith('.py') else n + '.py'
+                   for n in (s.strip() for s in a.only.split(',')) if n]
+    else:
+        goldens = manifest(here)
+        if a.changed is not None:
+            paths = changed_paths(a.changed)
+            if paths is None:
+                print('run_goldens --changed: git diff failed → whole suite (fail-safe)')
+            else:
+                goldens, reason = select_from_changed(paths, goldens)
+                print('--changed %s: %s' % (a.changed, reason))
+    return run_suite(goldens, measure=True, here=here, runner=runner, fixture_dir=fx, seed_machine=seed_machine)
 
 
 if __name__ == '__main__':
