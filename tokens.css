@@ -128,10 +128,11 @@
   --ramp-3:var(--ht-ramp-3);
   --ramp-4:var(--ht-ramp-4);
 
-  /* the two chart lines: completion is the headline series and reads as ink,
-     rating carries the one positive hue. Unchanged from HT-16 by intent. */
-  --line-completion:var(--text);
-  --line-rating:var(--ht-green);
+  /* the two chart lines (PASTE 731): completion is the headline series and reads as a calm GREEN,
+     drawn dashed; the rating carries the warm AMBER and is drawn solid — so a first-time reader tells
+     them apart by both hue and dash. No blue (Cory dislikes it). These were the other way round. */
+  --line-completion:var(--ht-green);
+  --line-rating:var(--ht-amber);
   /* HT-22 S2: today stops being drawn in text-white. It is the one "active"
      mark the wire gives a colour to, and it is that colour at 60%. */
   --outline-today:var(--ht-today-60);

@@ -5405,12 +5405,16 @@ var HT32_CARDFIT = true;
       var wrap=document.createElement('div');
       wrap.id='vGraphs';
       wrap.innerHTML=
-        '<div class="sh"><h2>The month</h2><span class="ln"></span>'+
+        '<div class="sh"><h2>The Month</h2><span class="ln"></span>'+
           '<span class="c" id="vMonthTip"></span></div>'+
+        /* PASTE 731: one plain subtitle so the chart reads at a glance. It travels with the
+           panel (squareLayout moves it); on the phone it sits under HT-31's card title. */
+        '<div class="h16sub" id="vMonthSub">How much of each day’s habits you completed, and how you rated the day.</div>'+
         '<div class="gnav" id="vMonthNav"></div>'+
         '<div class="pan flat"><svg id="vMonth" class="chart"></svg></div>'+
-        '<div class="sh"><h2>The year</h2><span class="ln"></span>'+
+        '<div class="sh"><h2>The Year</h2><span class="ln"></span>'+
           '<span class="c" id="vYearTip"></span></div>'+
+        '<div class="h16sub" id="vYearSub">Each month’s average completion and rating, across the year.</div>'+
         '<div class="gnav" id="vYearNav"></div>'+
         '<div class="pan flat"><svg id="vYear" class="chart"></svg></div>';
       views.insertBefore(wrap, views.firstChild);       /* the graphs lead the Views surface */
@@ -5584,9 +5588,27 @@ var HT32_CARDFIT = true;
      `--gN` token IS a ramp token. HT-15's golden reads that attribute, and it still reads true. */
   function rampFill(p){ var i=rampIx(p); return i==null?'var(--surface)':('var(--g'+(i+1)+')'); }
   function rampVar(p){ var i=rampIx(p); return i==null?'var(--surface)':('var(--ramp-'+i+')'); }
+  /* PASTE 731: the colour strip becomes a LABELLED scale. The five swatches are the ramp, and the
+     numbers beneath are the ramp's OWN band edges (rampIx: 25/50/75/90) — the dots are coloured by
+     exactly these bands, so a strip labelled 0-20/20-40 would mislabel every dot it legends. The
+     caption and title say what the colour means. */
   function legend(){
-    return '<span class="h16leg">'+[0,1,2,3,4].map(function(i){
+    var sw='<span class="h16leg">'+[0,1,2,3,4].map(function(i){
       return '<i class="rampbg-'+i+'"></i>'; }).join('')+'</span>';
+    var ticks='<span class="h16legsc">'+[0,25,50,75,90,100].map(function(n){
+      return '<u>'+n+'</u>'; }).join('')+'</span>';
+    return '<span class="h16legwrap" title="dot colour = that day’s completion grade">'+
+      '<span class="h16legcap">completed %</span>'+sw+ticks+'</span>';
+  }
+  /* PASTE 731: name both lines above the plot, in plain words, so a first-time reader knows which is
+     which. The exact strings here are the gate's two greps. On the Year each point is a monthly
+     average, so the labels gain " · avg". */
+  function lineLegend(isYear){
+    var avg=isYear?' · avg':'';
+    return '<span class="h16lines">'+
+      '<span class="h16line"><i class="ll-c"></i>Completed (%)'+avg+'</span>'+
+      '<span class="h16line"><i class="ll-r"></i>Day rating (1-10, shown x10)'+avg+'</span>'+
+      '</span>';
   }
 
   window.__HT16 = window.__HT16 || {};
@@ -5617,8 +5639,10 @@ var HT32_CARDFIT = true;
     if(!document.getElementById('h16Month')){
       var pm=panel('h16Month');
       var nav=document.getElementById('vMonthNav');
-      var head=nav && nav.previousElementSibling;             /* the .sh carrying #vMonthTip */
+      var sub=document.getElementById('vMonthSub');           /* PASTE 731: the subtitle travels too */
+      var head=sub ? sub.previousElementSibling : (nav && nav.previousElementSibling);  /* the .sh carrying #vMonthTip */
       if(head) pm.appendChild(head);
+      if(sub) pm.appendChild(sub);
       if(nav) pm.appendChild(nav);
       pm.appendChild(vMonth.closest('.pan') || vMonth);
       grid.appendChild(pm);
@@ -5626,8 +5650,10 @@ var HT32_CARDFIT = true;
     if(!document.getElementById('h16Year')){
       var py=panel('h16Year');
       var ynav=document.getElementById('vYearNav');
-      var yhead=ynav && ynav.previousElementSibling;
+      var ysub=document.getElementById('vYearSub');            /* PASTE 731 */
+      var yhead=ysub ? ysub.previousElementSibling : (ynav && ynav.previousElementSibling);
       if(yhead) py.appendChild(yhead);
+      if(ysub) py.appendChild(ysub);
       if(ynav) py.appendChild(ynav);
       py.appendChild(vYear.closest('.pan') || vYear);
       grid.appendChild(py);
@@ -5783,7 +5809,7 @@ var HT32_CARDFIT = true;
     var host=svg.parentNode;
     /* HT-17 S2 (R70.140): NO RIGHT AXIS. Rating x10 reads off the LEFT axis and the legend says so,
        so the 34px right gutter that held it is reclaimed for the plot. R=10 is the half-dot bleed. */
-    var H=opts.height||190, L=30, R=10, T=12, B=opts.twoLine?34:24;
+    var H=opts.height||190, L=opts.xTitle?40:30, R=10, T=12, B=opts.twoLine?34:24;
     var narrow = MONTH_SCROLLS && opts.perX && window.innerWidth<=480;
     if(!narrow) H=availHeight(svg,H);
     var n=pts.length, W;
@@ -5820,6 +5846,8 @@ var HT32_CARDFIT = true;
          day number AND weekday, so the band is sized to the longest string it has to hold. */
       if(st < 40) B = 52;
     }
+    /* PASTE 731: a labelled x-axis needs its own band at the foot; grow B and shift the tick rows up. */
+    var xtPad = opts.xTitle ? 14 : 0; B += xtPad;
     var px=function(i){ return n<2 ? L+(W-L-R)/2 : L+pad+i*(W-L-R-2*pad)/(n-1); };
     var py=function(v){ return H-B-(v/100)*(H-T-B); };
     var s='';
@@ -5838,16 +5866,23 @@ var HT32_CARDFIT = true;
        select values the LOOP offers - so asking for 25 gave 0, 50 and 100, because 25 and 75 are not
        multiples of ten and the loop never reached them. `golden_ht32` S9d caught it on its first
        run. A list also states what the axis reads, which a modulo does not. */
-    var yLabels = (window.innerWidth <= 480) ? [0, 25, 50, 75, 100]
-                : (H >= 180 ? [0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100]
-                            : [0, 20, 40, 60, 80, 100]);
-    for(var v=0; v<=100; v+=10){
+    /* PASTE 731: gridlines and their numbers ONLY at 0 · 25 · 50 · 75 · 100 (hairline and faint in
+       simple mode); the zero line keeps its own slightly stronger class. One list, both charts, both
+       widths — the five Cory named, replacing the old every-ten loop. No golden counts these lines. */
+    var yLabels = [0, 25, 50, 75, 100];
+    yLabels.forEach(function(v){
       s+='<line class="ax'+(v===0?' ax0':'')+'" x1="'+L+'" y1="'+py(v).toFixed(1)+'" x2="'+(W-R)+
          '" y2="'+py(v).toFixed(1)+'"/>';
-    }
+    });
     yLabels.forEach(function(v){
       s+='<text class="ayl" x="'+(L-5)+'" y="'+(py(v)+3).toFixed(1)+'" text-anchor="end">'+v+'</text>';
     });
+    /* PASTE 731: the one y-axis title, rotated in the left gutter. Both series read off it — the 1-10
+       rating is drawn ×10 — which is exactly what the legend says. */
+    if(opts.xTitle){
+      var ymid=(T+(H-B))/2;
+      s+='<text class="aytitle" x="10" y="'+ymid.toFixed(1)+'" text-anchor="middle" transform="rotate(-90 10 '+ymid.toFixed(1)+')">Completed % / Rating x10</text>';
+    }
     function runs(get){
       var out=[], cur=[];
       pts.forEach(function(p,i){ var val=get(p);
@@ -5874,23 +5909,32 @@ var HT32_CARDFIT = true;
        a chart with one or two logged days the dot is the only mark on it and it was underneath
        both, which also swallowed its own hover. SVG has no z-index: paint order IS depth, so the
        hit shapes are emitted first and the dots land on top of them. */
+    /* PASTE 731: find today BEFORE the dots, so today's dot can be drawn a touch larger. The YEAR
+       chart marks this month too (its keys are "0".."11", so a date key never matches) — PASTE 293. */
+    var todayIx = -1;
+    pts.forEach(function(p,i){ if(p.key===today()) todayIx=i; });
+    if(todayIx < 0 && opts.attr === 'data-vgy' && String(S.vYear || '') === String(dnum(today()).getFullYear()))
+      pts.forEach(function(p,i){ if(p.key===String(dnum(today()).getMonth())) todayIx=i; });
     pts.forEach(function(p,i){
       if(p.c==null && p.r==null) return;
-      /* B2 (R70.234): the hover carries the full date. It was "60% · 8/10" with no way to tell
-         which day you were over — on a 30-point axis where only half the numbers render, that is
-         the difference between a tooltip and a guess. */
-      var tip=(p.full? p.full+' · ' : '')+tipOf(p.c,p.r), at=opts.attr+'="'+p.key+'"';
+      /* B2 (R70.234): the hover carries the full date. PASTE 731: the readout is plain words now —
+         "Oct 8 — completed 72% — rated 6/10" — built on the point; the old "date · N% · N/10" stays
+         as the fallback for any caller that has no readout. */
+      var tip=p.readout || ((p.full? p.full+' · ' : '')+tipOf(p.c,p.r)), at=opts.attr+'="'+p.key+'"';
+      var isT=(i===todayIx);
       var hw=Math.max(6, (n>1?(W-L-R-2*pad)/(n-1):24));
       s+='<rect class="hitcol" '+at+' data-tip="'+esc(tip)+'" x="'+(px(i)-hw/2).toFixed(1)+
          '" y="0" width="'+hw.toFixed(1)+'" height="'+H+'" fill="transparent"/>';
       s+='<circle class="hit" '+at+' data-tip="'+esc(tip)+'" cx="'+px(i).toFixed(1)+
          '" cy="'+(H/2)+'" r="12"/>';
-      if(p.c!=null) s+='<circle class="dot dot-c '+rampClass(p.c)+'" '+at+' data-tip="'+esc(tip)+
-                       '" cx="'+px(i).toFixed(1)+'" cy="'+py(p.c).toFixed(1)+'" r="3.4"/>';
+      /* PASTE 731: dots ~6px with a 1px dark ring (the ring is CSS stroke:var(--ground)); today a
+         touch larger via .dot-today. The completion dot keeps its grade (ramp) fill. */
+      if(p.c!=null) s+='<circle class="dot dot-c '+rampClass(p.c)+(isT?' dot-today':'')+'" '+at+' data-tip="'+esc(tip)+
+                       '" cx="'+px(i).toFixed(1)+'" cy="'+py(p.c).toFixed(1)+'" r="'+(isT?4.4:3.2)+'"/>';
       /* PASTE 682: a 0 on the rating/grade line reads as the F colour (--g0 via .dot-r-f); a real
          rating is 1-10, so r===0 is only ever an empty-day zero. */
-      if(p.r!=null) s+='<circle class="dot dot-r'+(p.r===0?' dot-r-f':'')+'" '+at+' data-tip="'+esc(tip)+'" cx="'+px(i).toFixed(1)+
-                       '" cy="'+py(p.r*10).toFixed(1)+'" r="2.6"/>';
+      if(p.r!=null) s+='<circle class="dot dot-r'+(p.r===0?' dot-r-f':'')+(isT?' dot-today':'')+'" '+at+' data-tip="'+esc(tip)+'" cx="'+px(i).toFixed(1)+
+                       '" cy="'+py(p.r*10).toFixed(1)+'" r="'+(isT?3.8:2.8)+'"/>';
     });
     /* EVERY label, always — NEVER THINNED (R70.140). Two tspans in ONE <text>, so a per-day count
        counts days.
@@ -5991,6 +6035,10 @@ var HT32_CARDFIT = true;
         remedy = opts.twoLine ? 'stagger+stride' : 'stride';
       }
     }
+    /* PASTE 731 (Cory 2026-10-08): on the PHONE the Month's day NUMBERS thin to every other day —
+       one calm single row, not a staggered two — while the weekday letters below stay every day. The
+       first, the last and TODAY are always kept (the stride>1 block below). Desktop is untouched. */
+    if(opts.twoLine && window.innerWidth <= 480){ stride = Math.max(stride, 2); remedy = 'stride'; }
     if(probeEl && probeEl.parentNode) probeEl.parentNode.removeChild(probeEl);
     /* the axis states its own arithmetic. Invisible, three dozen bytes, and it is the difference
        between "the numbers are thinned" and "a 30 is 13.0px rendered against a 11.0px column, so
@@ -6009,11 +6057,7 @@ var HT32_CARDFIT = true;
        letters where they fit, one where they do not - the rhythm survives either way. */
     var twoLine = !!opts.twoLine;
     var dowChars = stepPx >= 22 ? 3 : 1;
-    var todayIx = -1;
-    pts.forEach(function(p,i){ if(p.key===today()) todayIx=i; });
-    /* PASTE 293 S2.5: the YEAR chart marks this month too - its keys are "0".."11", so a date never matched */
-    if(todayIx < 0 && opts.attr === 'data-vgy' && String(S.vYear || '') === String(dnum(today()).getFullYear()))
-      pts.forEach(function(p,i){ if(p.key===String(dnum(today()).getMonth())) todayIx=i; });
+    /* PASTE 731: todayIx is computed once, above the dots (it marks this month on the YEAR chart too). */
     /* TODAY is always kept, and the strided label beside it gives way rather than colliding —
        measured as one overlapping pair on the MONTH axis before this. */
     var kept = {};
@@ -6032,7 +6076,7 @@ var HT32_CARDFIT = true;
        where a single row already sat, so nothing moves for an axis that never needed this) and
        ODD indices 10px above it. The band is already 52px deep for the two-line form, so the
        upper row costs no height; the weekday letters keep their own line at H-6. */
-    var yLo = H-(twoLine?18:8), yHi = yLo-10, stag = (remedy.indexOf('stagger')===0);
+    var yLo = H-(twoLine?18:8)-xtPad, yHi = yLo-10, stag = (remedy.indexOf('stagger')===0);  /* PASTE 731: xtPad lifts the rows for the x-title */
     pts.forEach(function(p,i){
       if(!kept[i]) return;
       var x=px(i).toFixed(1);
@@ -6071,9 +6115,13 @@ var HT32_CARDFIT = true;
         var lab = three ? String(p.x2) : String(p.x2).charAt(0);
         var sat = /^sat/i.test(String(p.x2));
         s+='<text class="xl2'+(sat?' xl-sat':'')+(i===todayIx?' xl2-today':'')+'" x="'+xx+
-           '" y="'+(H-6)+'" text-anchor="middle" font-size="8"'+at2+'>'+esc(lab)+'</text>';
+           '" y="'+(H-6-xtPad)+'" text-anchor="middle" font-size="8"'+at2+'>'+esc(lab)+'</text>';
       });
     })();
+    /* PASTE 731: the x-axis title, centred in the band xtPad reserved at the foot. */
+    if(opts.xTitle){
+      s+='<text class="axtitle" x="'+((L+(W-R))/2).toFixed(1)+'" y="'+(H-3)+'" text-anchor="middle">'+esc(opts.xTitle)+'</text>';
+    }
     svg.innerHTML=s;
     return pts.filter(function(p){ return p.c!=null||p.r!=null; }).length;
   }
@@ -6088,6 +6136,14 @@ var HT32_CARDFIT = true;
     Object.keys(S.privAll||{}).forEach(see);
     return best;
   }
+  /* PASTE 731: the tap/hover readout in plain words — "Oct 8 — completed 72% — rated 6/10". It reads
+     the ACTUALLY-recorded values (null, not the drawn 0), so an empty day reads "Oct 8 — no entry". */
+  function readoutOf(label, c, r){
+    var parts=[];
+    if(c!=null) parts.push('completed '+Math.round(c)+'%');
+    if(r!=null) parts.push('rated '+r+'/10');
+    return label+' — '+(parts.length? parts.join(' — ') : 'no entry');
+  }
   function monthPoints(){
     var ym=S.calYM||(S.calYM=[dnum(today()).getFullYear(),dnum(today()).getMonth()]);
     var tdy=today(), first=firstKey();
@@ -6098,7 +6154,9 @@ var HT32_CARDFIT = true;
                  real days and never the drawn 0s (PASTE 682). */
               logged:(cRaw!=null), rated:(rRaw!=null),
               /* B2: the full date, for the hover the dots already carry */
-              full: DOW3[d.getDay()]+' '+MO[d.getMonth()]+' '+d.getDate() };
+              full: DOW3[d.getDay()]+' '+MO[d.getMonth()]+' '+d.getDate(),
+              /* PASTE 731: the plain-words readout */
+              readout: readoutOf(MO[d.getMonth()]+' '+d.getDate(), cRaw, rRaw) };
       /* PASTE 682: a zero is a point, never a gap. Inside [first, today] every day plots — its value,
          or 0 when it held nothing (the line runs through it). Before the first record and after today
          stay blank; today plots only once it has any state. */
@@ -6123,25 +6181,33 @@ var HT32_CARDFIT = true;
          months still ahead stay blank. */
       var moKey = yr+'-'+String(m+1).padStart(2,'0');
       var inSpan = firstMo!=null && moKey>=firstMo && moKey<=todyMo;
+      var cMean = cs.length? Math.round(meanOf(cs)) : null;
+      var rMean = rs.length? Math.round(meanOf(rs)*10)/10 : null;
       out.push({ x:MO[m], x2:'', key:String(m),
                  logged:(cs.length>0), rated:(rs.length>0),
-                 c: inSpan ? (cs.length? Math.round(meanOf(cs)) : 0) : null,
-                 r: inSpan ? (rs.length? Math.round(meanOf(rs)*10)/10 : 0) : null });
+                 /* PASTE 731: the readout names the month and its averages (or "no entry") */
+                 readout: readoutOf(MO[m]+' '+yr, cMean, rMean),
+                 c: inSpan ? (cs.length? cMean : 0) : null,
+                 r: inSpan ? (rs.length? rMean : 0) : null });
     }
     return out;
   }
 
   function paintMonth16(){
     var pts=monthPoints();
+    var ym=S.calYM||[dnum(today()).getFullYear(),dnum(today()).getMonth()];
+    var xT='Day of '+MO[ym[1]];                               /* PASTE 731: the x-axis title */
     /* B0.2: draw now if the panel is already measurable, and again after layout / fonts / resize */
     measureAndDraw('vMonth', function(){
+      var ym2=S.calYM||[dnum(today()).getFullYear(),dnum(today()).getMonth()];
       h16Chart('vMonth', monthPoints(),
-               { attr:'data-vgd', height:196, twoLine:true, pad:4, perX:PHONE_DAY_PX }); });
-    h16Chart('vMonth', pts, { attr:'data-vgd', height:196, twoLine:true, pad:4, perX:PHONE_DAY_PX });
-    var ym=S.calYM, nav=document.getElementById('vMonthNav');
+               { attr:'data-vgd', height:196, twoLine:true, pad:4, perX:PHONE_DAY_PX,
+                 xTitle:'Day of '+MO[ym2[1]] }); });
+    h16Chart('vMonth', pts, { attr:'data-vgd', height:196, twoLine:true, pad:4, perX:PHONE_DAY_PX, xTitle:xT });
+    var nav=document.getElementById('vMonthNav');
     if(nav) nav.innerHTML='<button class="mv" data-vgm="-1">\u2039</button>'+
       '<b>'+MO[ym[1]].toUpperCase()+' '+ym[0]+'</b>'+
-      '<button class="mv" data-vgm="1">\u203a</button>'+legend();
+      '<button class="mv" data-vgm="1">\u203a</button>'+lineLegend(false)+legend();
     /* PASTE 682: count ACTUALLY-logged days (p.logged), never the drawn 0s. */
     var got=pts.filter(function(p){ return p.logged; }).length;
     var tip=document.getElementById('vMonthTip');
@@ -6151,12 +6217,12 @@ var HT32_CARDFIT = true;
   function paintYear16(){
     var pts=yearPoints();
     measureAndDraw('vYear', function(){
-      h16Chart('vYear', yearPoints(), { attr:'data-vgy', height:196, twoLine:false, pad:2 }); });
-    h16Chart('vYear', pts, { attr:'data-vgy', height:196, twoLine:false, pad:2 });
+      h16Chart('vYear', yearPoints(), { attr:'data-vgy', height:196, twoLine:false, pad:2, xTitle:'Month' }); });
+    h16Chart('vYear', pts, { attr:'data-vgy', height:196, twoLine:false, pad:2, xTitle:'Month' });
     var nav=document.getElementById('vYearNav');
     if(nav) nav.innerHTML='<button class="mv" data-vgyn="-1">\u2039</button>'+
       '<b>'+(S.vYear||dnum(today()).getFullYear())+'</b>'+
-      '<button class="mv" data-vgyn="1">\u203a</button>'+legend();
+      '<button class="mv" data-vgyn="1">\u203a</button>'+lineLegend(true)+legend();
     /* PASTE 682: count months with a real logged day (p.logged), never the drawn 0s. */
     var got=pts.filter(function(p){ return p.logged; }).length;
     var tip=document.getElementById('vYearTip');
@@ -13786,8 +13852,8 @@ function h31Extras(){ return HT31_INSIGHTS_EXTRAS || window.__HT31_EXTRAS === tr
     var hero = (window.__HT228 && window.__HT228.phoneCard) ? window.__HT228.phoneCard() : null;
     if(hero && hero.parentNode !== body) body.appendChild(hero);
     /* the desktop's two line charts, brought over whole */
-    var m = cardFor('h31Month', 'The month', h31El('h16Month'));
-    var y = cardFor('h31Year', 'The year', h31El('h16Year'));
+    var m = cardFor('h31Month', 'The Month', h31El('h16Month'));
+    var y = cardFor('h31Year', 'The Year', h31El('h16Year'));
     if(m && m.parentNode !== body) body.appendChild(m);
     if(y && y.parentNode !== body) body.appendChild(y);
     /* the four, in his order; everything else off */

@@ -770,22 +770,53 @@ html[data-simple][data-vtab="views"] .vWeeksSec{ display:block }
 .rampbg-4{ background:var(--ramp-4) }
 .rampbg-none{ background:var(--surface) }
 
-/* THE TWO LINES, SWAPPED (R70.93). The build shipped completion in the accent red and rating in
-   grey, which read the headline series as an alarm and the honest one as noise. Completion is the
-   text colour and solid; rating is green-bright and dashed; a completion DOT carries that day's
-   ramp colour, so the line and the grade agree. */
-html[data-simple] .chart .ln-c{ stroke:var(--line-completion); stroke-width:1.6; stroke-dasharray:none }
-html[data-simple] .chart .ln-r{ stroke:var(--line-rating);     stroke-width:1.3; stroke-dasharray:4 3 }
+/* THE TWO LINES (R70.93, retuned by PASTE 731). The build once shipped completion red and rating
+   grey; HT-16 made completion the ink (solid) and rating green (dashed). PASTE 731 names the lines in
+   a legend and makes them read apart at a glance: COMPLETION is a calm green, DASHED, 2px; RATING is
+   a warm amber, SOLID, 2px — so `--line-completion` is the green and `--line-rating` the amber (they
+   were the other way round). Rounded caps and joins give the gentle look the brief asks for WITHOUT a
+   bezier (golden_ht682 R2 fixes the completion path at three straight vertices). A completion DOT
+   carries that day's ramp (grade) colour; every dot gets a 1px dark ring so it sits ON the line. */
+html[data-simple] .chart .ln-c{ stroke:var(--line-completion); stroke-width:2; stroke-dasharray:5 3; stroke-linecap:round; stroke-linejoin:round }
+html[data-simple] .chart .ln-r{ stroke:var(--line-rating);     stroke-width:2; stroke-dasharray:none; stroke-linecap:round; stroke-linejoin:round }
 html[data-simple] .chart .ln-c-d{ fill:var(--line-completion) }
 html[data-simple] .chart .ln-r-d{ fill:var(--line-rating) }
-html[data-simple] .chart .dot-r{ fill:var(--line-rating) }
+html[data-simple] .chart .dot-r{ fill:var(--line-rating); stroke:var(--ground); stroke-width:1 }
 html[data-simple] .chart .dot-r-f{ fill:var(--g0) }   /* PASTE 682: the rating line's 0 reads as F */
-html[data-simple] .chart .dot-c{ fill:currentColor }          /* the ramp class on the dot supplies it */
+html[data-simple] .chart .dot-c{ fill:currentColor; stroke:var(--ground); stroke-width:1 }   /* the ramp class supplies the fill; PASTE 731 ring */
+html[data-simple] .chart .dot-today{ stroke:var(--ground); stroke-width:1.2 }                /* PASTE 731: today a touch larger (radius in JS) */
+/* PASTE 731: gridlines hairline and faint; the zero line a touch stronger. */
+html[data-simple] .chart .ax{ opacity:.5 }
+html[data-simple] .chart .ax0{ opacity:.85 }
 
-/* one 5-swatch legend per view, and no sentence explaining it (R-NOFLUFF) */
-.h16leg{ display:flex; align-items:center; gap:0; margin-left:auto }
+/* the colour strip, now a LABELLED scale (PASTE 731) */
+.h16leg{ display:flex; align-items:center; gap:0 }
 .h16leg i{ display:block; width:14px; height:8px }
 html[data-simple] .gnav .lg{ display:none }                    /* the old two-word legend, superseded */
+
+/* ---- PASTE 731 · the Insights charts read at a glance ----------------------------------------
+   A quiet subtitle, a legend that names both lines, and a labelled colour scale. All in the app's
+   small mono on the dark ground; calm, few words, no blue. */
+html[data-simple] .h16sub{ font:400 11px/1.3 var(--sans); color:var(--ink2); padding:2px 0 6px }
+/* the line legend: a dashed-green chip for completion, a solid-amber chip for rating */
+html[data-simple] .h16lines{ display:flex; flex-wrap:wrap; align-items:center; gap:4px 14px;
+  font:400 10px/1.2 var(--mono); color:var(--ink2); width:100%; padding:2px 0 }
+html[data-simple] .h16line{ display:inline-flex; align-items:center; gap:5px; white-space:nowrap }
+html[data-simple] .h16line i{ display:inline-block; width:16px; height:0; flex:0 0 auto }
+html[data-simple] .h16line i.ll-c{ border-top:2px dashed var(--line-completion) }
+html[data-simple] .h16line i.ll-r{ border-top:2px solid var(--line-rating) }
+/* the labelled colour scale: a caption, the five ramp swatches, the band-edge numbers under them */
+html[data-simple] .h16legwrap{ display:flex; align-items:center; gap:6px; margin-left:auto }
+html[data-simple] .h16legcap{ font:400 9px/1 var(--mono); color:var(--ink3); white-space:nowrap }
+html[data-simple] .h16legsc{ display:flex; align-items:center; gap:0;
+  font:400 8px/1 var(--mono); color:var(--ink3) }
+html[data-simple] .h16legsc u{ display:inline-block; width:14px; text-align:center; text-decoration:none;
+  margin-left:-7px }
+html[data-simple] .h16legsc u:first-child{ margin-left:0; text-align:left; width:7px }
+html[data-simple] .h16legsc u:last-child{ text-align:right }
+/* the two axis titles */
+html[data-simple] .chart text.aytitle{ font:400 8px/1 var(--mono); fill:var(--ink3); letter-spacing:.02em }
+html[data-simple] .chart text.axtitle{ font:400 9px/1 var(--mono); fill:var(--ink3); letter-spacing:.02em }
 
 
 /* ======================= HT-16 · S2 · LAYOUT (R70.98 · R70.99 · R70.100) =======================
