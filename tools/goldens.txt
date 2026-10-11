@@ -29,3 +29,7 @@ golden_ht684_axis.py
 golden_ht695_boxes.py
 golden_ht712_root.py
 golden_ht704_topspace.py
+# paste 816 — the three fixes Cory asked for from his phone (name wrap · intentional drag · bar charts)
+golden_ht816_name.py
+golden_ht816_hold.py
+golden_ht816_charts.py

@@ -119,6 +119,14 @@ async def mouse_hold(pg, x0, y0, x1, y1, steps=10, hold_ms=0):
 
 ROWS_JS = """() => [...document.querySelectorAll('#log .li')].map(r => r.getAttribute('data-h'))"""
 
+# 816: the handle now sits at the far right, where the first row's handle - which starts near the foot
+# of the screen - can fall under the fixed bottom tabs. Scroll the first row up before pressing it.
+SCROLL_FIRST = """() => { const r=document.querySelector('#log .li'); if(!r) return;
+  const y=r.getBoundingClientRect().top; window.scrollBy(0, y-250); }"""
+
+# 816: the still-hold (ms) that ARMS a handle drag - every handle drag below waits past it before moving.
+HOLD = 430
+
 # coordinates of a control inside the row at list-index i. sel: '.nm' (the words) or '.drg' (the handle)
 PT_JS = """(a) => { const rows=[...document.querySelectorAll('#log .li')]; const row=rows[a.i]; if(!row) return null;
   const n = row.querySelector(a.sel); if(!n) return null; const r = n.getBoundingClientRect();
@@ -166,16 +174,17 @@ async def B(pw):
     for kind in ('touch', 'mouse'):
         b, pg, errs = await open_page(pw)
         cdp = await pg.context.new_cdp_session(pg)
+        await pg.evaluate(SCROLL_FIRST); await pg.wait_for_timeout(120)   # 816: press lands on the handle
         before = await pg.evaluate(ROWS_JS)
         w0 = await pg.evaluate(WRITES_JS)
         a = await pg.evaluate(PT_JS, {'i': 0, 'sel': '.drg'})
         t = await pg.evaluate(PT_JS, {'i': 3, 'sel': '.nm'})
         endy = t['y'] + t['h'] * 0.25                       # a quarter-row past the target midpoint, clear of ambiguity
         if kind == 'touch':
-            await touch_hold(pg, cdp, a['x'], a['y'], a['x'], endy, steps=14)
+            await touch_hold(pg, cdp, a['x'], a['y'], a['x'], endy, steps=14, hold_ms=HOLD)
             await touch_release(pg, cdp)
         else:
-            await mouse_hold(pg, a['x'], a['y'], a['x'], endy, steps=14)
+            await mouse_hold(pg, a['x'], a['y'], a['x'], endy, steps=14, hold_ms=HOLD)
             await pg.mouse.up()
         await pg.wait_for_timeout(300)
         after = await pg.evaluate(ROWS_JS)
@@ -191,6 +200,7 @@ async def B(pw):
 async def C(pw):
     print("\nC " + u"·" + " the handle's HIT AREA measures >= 44x44 on the phone layout")
     b, pg, errs = await open_page(pw)
+    await pg.evaluate(SCROLL_FIRST); await pg.wait_for_timeout(120)   # 816: hit-test clear of the bottom tabs
     hit = await pg.evaluate("""() => {
       const g = document.querySelector('#log .li .drg'); if(!g) return {noHandle:true};
       const cs = getComputedStyle(g, '::before');
@@ -212,8 +222,11 @@ async def C(pw):
         hit.get('center') and hit.get('spanAllHandle'), hit)
     chk("C3 " + u"·" + " the glyph did not bloat the row (its box stays within the row height)",
         hit.get('glyphH', 99) <= hit.get('rowH', 0) + 2, hit)
-    chk("C4 " + u"·" + " the handle is touch-action:none but the ROW is not (page scroll from a row still works)",
-        hit.get('handleTouchAction') == 'none' and hit.get('rowTouchAction') != 'none', hit)
+    # AMENDED BY NAME, PASTE 816 (R67.2): touch-action is pan-y now, not none - the browser owns the
+    # scroll until a 350ms still hold arms the drag (that is the fix for Cory's accidental moves). The
+    # ROW is still not none, so page scroll from a row still works.
+    chk("C4 " + u"·" + " the handle is touch-action:pan-y (816) but the ROW is not (page scroll from a row still works)",
+        hit.get('handleTouchAction') == 'pan-y' and hit.get('rowTouchAction') != 'none', hit)
     await b.close()
 
 
@@ -221,12 +234,13 @@ async def D(pw):
     print("\nD " + u"·" + " a pointercancel mid-drag NEVER commits - the order stays as it was")
     b, pg, errs = await open_page(pw)
     cdp = await pg.context.new_cdp_session(pg)
+    await pg.evaluate(SCROLL_FIRST); await pg.wait_for_timeout(120)   # 816
     before = await pg.evaluate(ROWS_JS)
     w0 = await pg.evaluate(WRITES_JS)
     a = await pg.evaluate(PT_JS, {'i': 0, 'sel': '.drg'})
     t = await pg.evaluate(PT_JS, {'i': 3, 'sel': '.nm'})
-    # begin a real handle drag, move it, then let the browser CANCEL the gesture mid-drag
-    await touch_hold(pg, cdp, a['x'], a['y'], a['x'], t['y'], steps=12)
+    # begin a real handle drag (818: hold to arm first), move it, then let the browser CANCEL it mid-drag
+    await touch_hold(pg, cdp, a['x'], a['y'], a['x'], t['y'], steps=12, hold_ms=HOLD)
     await touch_cancel(pg, cdp)
     await pg.wait_for_timeout(300)
     after = await pg.evaluate(ROWS_JS)
@@ -292,13 +306,14 @@ async def S(pw):
     fail = None
     for d in range(50):
         before = await pg.evaluate(ROWS_JS)
+        await pg.evaluate(SCROLL_FIRST); await pg.wait_for_timeout(60)   # 816: press lands on the handle, clear of the foot
         k = 1 + (d % (n - 1)) if n > 1 else 0
         a = await pg.evaluate(PT_JS, {'i': 0, 'sel': '.drg'})
         t = await pg.evaluate(PT_JS, {'i': k, 'sel': '.nm'})
         if not a or not t:
             fail = {'d': d, 'why': 'no box'}; ids_ok = False; break
         endy = min(max(t['y'] + t['h'] * 0.25, EDGE + 8), vh - EDGE - 8)   # clear of the auto-scroll band
-        await touch_hold(pg, cdp, a['x'], a['y'], a['x'], endy, steps=12)
+        await touch_hold(pg, cdp, a['x'], a['y'], a['x'], endy, steps=12, hold_ms=HOLD)   # 816: hold to arm
         await touch_release(pg, cdp)
         await pg.wait_for_timeout(120)
         after = await pg.evaluate(ROWS_JS)

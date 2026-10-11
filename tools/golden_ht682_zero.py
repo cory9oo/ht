@@ -1,30 +1,31 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""PASTE 682 GOLDEN — ON THE MONTH AND YEAR CHARTS A ZERO IS A POINT, NEVER A GAP. Run at 1280 and 390.
+"""PASTE 682 GOLDEN — AMENDED BY NAME, PASTE 816 (R67.2): the month/year charts are BARS now, and the
+zero rule is a STUB, not a dot. Run at 1280 and 390.
 
-From the first day HT holds any record through today, every x position plots a point for BOTH series;
-a day or month that held nothing plots at 0 on the baseline (the rating line's 0 in the F colour), and
-the line runs through it. Only positions ahead of today, and positions before the first record, stay
-blank. Two halves, each at both widths:
+816 (Cory 2026-10-11): the fat red zero dot and the x10 rating line are gone. Completion is bars banded
+against the 80% need; the rating is an amber dot/line strip beneath. The zero rule becomes:
+  - an unlogged PAST day is a DIM baseline stub (it still counts as 0 in the average, so it stays visible);
+  - a LOGGED 0% is a solid RED stub;
+  - a FUTURE day (out of span) is NOTHING;
+  - a rating a day never had is a GAP on panel B — a rating is never 0.
 
   DATA — the real point builders `window.__HT16.monthPoints` / `yearPoints`, driven by the fixture's
          `__GAP=40` (nothing logged in the last 40 days, so the current month and its sibling months are
-         empty-but-in-span). Expectations are computed from the PAGE'S OWN `today()`, so the golden is
-         deterministic on any calendar day:
-    D1  every in-span day of the current month plots 0 on BOTH series (c===0, r===0);
+         empty-but-in-span). Expectations are computed from the PAGE'S OWN `today()`:
+    D1  every in-span day of the current month has completion c===0 (unlogged counts as 0) AND the
+        rating rv===null (an unrated day is a GAP, never a 0);
     D2  every day after today is blank (c===null) — a future day shows no point;
-    D3  the first-record boundary holds: on the YEAR chart, a month before the first record is blank
-        and a month still ahead is blank, while every in-span month is a point (an empty one at 0 —
-        the Sept-style gap that used to be null now reads 0);
-    D4  at least one in-span month plots as exactly 0 (the zero is real, not just non-null).
+    D3  the year: a month is blank (c===null) iff out of span (before first / ahead), else a point;
+    D4  at least one in-span month has c===0 (the empty-but-in-span month, a dim stub, not a gap).
 
-  RENDER — a crafted series through `window.__HT16.h16Chart`, independent of the clock:
-    R1  a 0 on the completion series and a 0 on the rating series draw a dot ON THE BASELINE (cy=py(0));
-    R2  the completion line is a SINGLE path that passes THROUGH the zero (3 vertices, no gap element,
-        no dashed bridge — job 656's bridge is gone and must not return);
-    R3  a leading null (before the first record) and a trailing null (future) draw NO dot;
-    R4  the rating line's 0 reads as the F colour — its dot's computed fill resolves to `--g0`;
-    R5  zero page errors at this width.
+  RENDER — a crafted series through `window.__HT16.barLineChart`, independent of the clock:
+    R1  two logged positive days draw two BARS, and there is NO completion line at all;
+    R2  an unlogged in-span day draws a DIM stub (.bl-stub) and a logged 0% a RED stub (.bl-stub-zero);
+    R3  a rating dot only on rated days, and NO line across the gap between two non-adjacent rated days;
+    R4  there is NO right axis (.ax2);
+    R5  the dashed need line (.bl-need) is drawn;
+    R6  zero page errors.
 
 R134 R1: prints its assertion count; a section that asserts nothing is a FAIL.
 """
@@ -61,21 +62,6 @@ def chk(name, ok, got=""):
     print("  %-6s %s%s" % ("PASS" if ok else "FAIL", name, "" if ok else ("   -> " + str(got)[:220])))
 
 
-def _rgb(s):
-    """Any computed colour / hex -> (r,g,b), or None."""
-    s = (s or '').strip()
-    m = re.match(r'rgba?\(\s*([\d.]+)[,\s]+([\d.]+)[,\s]+([\d.]+)', s)
-    if m:
-        return tuple(int(round(float(m.group(i)))) for i in (1, 2, 3))
-    m = re.match(r'#([0-9A-Fa-f]{6})$', s)
-    if m:
-        h = m.group(1); return tuple(int(h[i:i+2], 16) for i in (0, 2, 4))
-    m = re.match(r'#([0-9A-Fa-f]{3})$', s)
-    if m:
-        h = m.group(1); return tuple(int(h[i]*2, 16) for i in range(3))
-    return None
-
-
 async def open_page(pw, w, h):
     b = await pw.chromium.launch()
     ctx = await b.new_context(viewport={'width': w, 'height': h},
@@ -95,20 +81,21 @@ DATA = """() => {
   const H = window.__HT16;
   if(!H || !H.monthPoints || !H.yearPoints) return { err:'no __HT16 point builders' };
   const today = H.state().today;
-  const mp = H.monthPoints().map(p => ({ x:p.x, c:p.c, r:p.r }));
-  const yp = H.yearPoints().map(p => ({ x:p.x, c:p.c, r:p.r }));
+  const mp = H.monthPoints().map(p => ({ x:p.x, c:p.c, rv:p.rv, logged:p.logged }));
+  const yp = H.yearPoints().map(p => ({ x:p.x, c:p.c, rv:p.rv, logged:p.logged }));
   return { today, year:(new Date()).getFullYear(), month:(new Date()).getMonth(),
-           dom:(new Date()).getDate(), domCount:new Date((new Date()).getFullYear(),
-           (new Date()).getMonth()+1, 0).getDate(), mp, yp };
+           dom:(new Date()).getDate(), mp, yp };
 }"""
 
-# a crafted series: before-first (null), logged, an empty-day ZERO, logged, future (null)
+# a crafted series for barLineChart: leading null, logged positive, unlogged in-span (dim stub),
+# logged 0 (red stub), logged positive, trailing null (future). rv is the real rating, null = a gap.
 SERIES = """[
-  {x:'1',x2:'Mon',key:'z-1',c:null,r:null, full:'before first record'},
-  {x:'2',x2:'Tue',key:'z-2',c:100, r:8,    full:'logged'},
-  {x:'3',x2:'Wed',key:'z-3',c:0,   r:0,    full:'empty day, drawn 0'},
-  {x:'4',x2:'Thu',key:'z-4',c:80,  r:6,    full:'logged'},
-  {x:'5',x2:'Fri',key:'z-5',c:null,r:null, full:'future'}
+  {x:'1',x2:'Mon',key:'z-1',c:null, rv:null, logged:false, full:'before first record'},
+  {x:'2',x2:'Tue',key:'z-2',c:100,  rv:8,    logged:true,  full:'logged'},
+  {x:'3',x2:'Wed',key:'z-3',c:0,    rv:null, logged:false, full:'unlogged in-span, dim stub'},
+  {x:'4',x2:'Thu',key:'z-4',c:0,    rv:null, logged:true,  full:'logged 0 percent, red stub'},
+  {x:'5',x2:'Fri',key:'z-5',c:80,   rv:6,    logged:true,  full:'logged'},
+  {x:'6',x2:'Sat',key:'z-6',c:null, rv:null, logged:false, full:'future'}
 ]"""
 
 RENDER = """() => {
@@ -116,21 +103,17 @@ RENDER = """() => {
   const H = window.__HT16;
   let host = document.getElementById('ztHost');
   if(!host){ host = document.createElement('div'); host.id='ztHost'; host.className='chart';
-    host.style.width='600px'; host.innerHTML='<svg id="ztSvg"></svg>'; document.body.appendChild(host); }
-  H.h16Chart('ztSvg', series, { attr:'data-vgd', height:196 });
+    host.style.width='600px'; host.innerHTML='<svg id="ztSvg" class="chart"></svg>'; document.body.appendChild(host); }
+  H.barLineChart('ztSvg', series, { attr:'data-vgd' });
   const svg = document.getElementById('ztSvg');
-  const cy = sel => Array.prototype.slice.call(svg.querySelectorAll(sel))
-                      .map(e => +(+e.getAttribute('cy')).toFixed(1));
-  const paths = Array.prototype.slice.call(svg.querySelectorAll('path.ln-c'));
-  const rf = svg.querySelector('circle.dot-r-f');
+  const n = s => svg.querySelectorAll(s).length;
+  const dim = Array.prototype.slice.call(svg.querySelectorAll('.bl-stub'))
+                   .filter(e => !e.classList.contains('bl-stub-zero')).length;
   return {
-    dotC: cy('circle.dot-c'), dotR: cy('circle.dot-r'),
-    nPathC: paths.length,
-    dPathC: paths.length ? paths[0].getAttribute('d') : '',
-    hasGap: !!svg.querySelector('.ln-c-gap'),
-    rfCy: rf ? +(+rf.getAttribute('cy')).toFixed(1) : null,
-    rfFill: rf ? getComputedStyle(rf).fill : null,
-    g0: getComputedStyle(document.documentElement).getPropertyValue('--g0').trim()
+    bars: n('.bl-bar'), dimStubs: dim, redStubs: n('.bl-stub-zero'),
+    rdots: n('.bl-rdot'), rlines: n('.bl-rline'),
+    complLines: n('path.ln-c') + n('.bl-cline'),
+    rightAxis: n('.ax2'), needLine: n('.bl-need')
   };
 }"""
 
@@ -145,69 +128,44 @@ async def run(pw, w, h, label):
         await b.close(); return
     chk("%s · __HT16 point builders present" % label, True)
 
-    today = d['today']
-    tdate = datetime.date(*(int(x) for x in today.split('-')))
-    # D1/D2 — the current month: in-span (<= today) is 0 on both series; after today is blank
-    mp = d['mp']; dom = d['dom']; dcount = d['domCount']
-    m_inspan_ok = all((p['c'] == 0 and p['r'] == 0) for i, p in enumerate(mp) if (i + 1) <= dom)
-    m_future_ok = all((p['c'] is None and p['r'] is None) for i, p in enumerate(mp) if (i + 1) > dom)
-    chk("%s · D1 every in-span day of the month plots 0 on both series" % label, m_inspan_ok,
-        [(p['x'], p['c'], p['r']) for p in mp[:dom]])
-    chk("%s · D2 every day after today is blank (a future day shows no point)" % label, m_future_ok,
-        [(p['x'], p['c'], p['r']) for p in mp[dom:]])
-    chk("%s · D1b at least one in-span day is a drawn 0 (c===0, r===0)" % label,
-        any(p['c'] == 0 and p['r'] == 0 for p in mp[:dom]), dom)
+    mp = d['mp']; dom = d['dom']
+    # D1 — in-span days of the current month: completion 0, rating a GAP (rv null)
+    m_c0 = all(p['c'] == 0 for i, p in enumerate(mp) if (i + 1) <= dom)
+    m_rvnull = all(p['rv'] is None for i, p in enumerate(mp) if (i + 1) <= dom)
+    chk("%s · D1 every in-span day has completion 0 (unlogged counts as 0)" % label, m_c0,
+        [(p['x'], p['c']) for p in mp[:dom]])
+    chk("%s · D1b and the rating is a GAP on those days (rv===null), never a 0" % label, m_rvnull,
+        [(p['x'], p['rv']) for p in mp[:dom]])
+    # D2 — future days blank
+    m_future = all(p['c'] is None for i, p in enumerate(mp) if (i + 1) > dom)
+    chk("%s · D2 every day after today is blank (c===null)" % label, m_future,
+        [(p['x'], p['c']) for p in mp[dom:]])
 
-    # D3 — the year: blank iff out of span; a point (an empty one at 0) iff in span
+    # D3/D4 — the year: blank iff out of span; at least one in-span month is a 0
+    tdate = datetime.date(*(int(x) for x in d['today'].split('-')))
     first_mo = (tdate - datetime.timedelta(days=73)).strftime('%Y-%m')
-    tody_mo = today[:7]
+    tody_mo = d['today'][:7]
     yp = d['yp']
     def in_span(m):
-        mk = '%04d-%02d' % (d['year'], m + 1)
-        return first_mo <= mk <= tody_mo
-    y_vec_ok = all((yp[m]['c'] is None) == (not in_span(m)) for m in range(12))
-    chk("%s · D3 year: a month is blank iff out of span (before first / ahead), else a point" % label,
-        y_vec_ok, {'first_mo': first_mo, 'tody_mo': tody_mo,
-                   'yp': [(p['x'], p['c']) for p in yp]})
-    # D4 — at least one in-span month plots as exactly 0 (the gap that was null now reads 0)
-    zero_months = [yp[m]['c'] for m in range(12) if in_span(m) and yp[m]['c'] == 0]
-    chk("%s · D4 at least one in-span month plots as a real 0" % label, len(zero_months) >= 1,
-        [(p['x'], p['c']) for p in yp])
+        return first_mo <= ('%04d-%02d' % (d['year'], m + 1)) <= tody_mo
+    y_ok = all((yp[m]['c'] is None) == (not in_span(m)) for m in range(12))
+    chk("%s · D3 year: a month is blank iff out of span, else a point" % label, y_ok,
+        {'first_mo': first_mo, 'tody_mo': tody_mo, 'yp': [(p['x'], p['c']) for p in yp]})
+    zero_months = [m for m in range(12) if in_span(m) and yp[m]['c'] == 0]
+    chk("%s · D4 at least one in-span month plots as a real 0 (a dim stub, not a gap)" % label,
+        len(zero_months) >= 1, [(p['x'], p['c']) for p in yp])
 
     # ---------------------------------------------------------------- RENDER (crafted series)
     r = await pg.evaluate(RENDER)
-    dotc, dotr = r['dotC'], r['dotR']
-    chk("%s · R0 three completion dots and three rating dots (the 2 nulls draw none)" % label,
-        len(dotc) == 3 and len(dotr) == 3, {'dotC': dotc, 'dotR': dotr})
-
-    if dotc and dotr:
-        base_c = max(dotc)                                   # the 0-day sits on the baseline (largest cy)
-        base_r = max(dotr)
-        logged_c = [v for v in dotc if abs(v - base_c) > 0.5]
-        # R1 — the zero is on the baseline, and the two series' zeros share it
-        chk("%s · R1 the completion 0 and the rating 0 sit on one baseline (py(0))" % label,
-            abs(base_c - base_r) <= 0.5 and len(logged_c) == 2 and all(v < base_c for v in logged_c),
-            {'dotC': dotc, 'dotR': dotr})
-    else:
-        chk("%s · R1 baseline measurable" % label, False, r)
-
-    # R2 — a single completion path with 3 vertices (M + 2 L), running THROUGH the zero; no gap/bridge
-    d_path = r['dPathC'] or ''
-    verts = len(re.findall(r'[ML]', d_path))
-    chk("%s · R2 one completion path of 3 vertices passes through the zero (no gap, no bridge)" % label,
-        r['nPathC'] == 1 and verts == 3 and not r['hasGap'], r)
-
-    # R4 — the rating 0 dot reads as the F colour (--g0)
-    rf = _rgb(r['rfFill']); g0 = _rgb(r['g0'])
-    chk("%s · R4 the rating line's 0 is drawn in the F colour (--g0)" % label,
-        rf is not None and g0 is not None and rf == g0, {'rfFill': r['rfFill'], 'g0': r['g0']})
-    # R4b — the F-coloured dot is the one on the baseline (it is the zero, not a logged rating)
-    chk("%s · R4b the F-coloured dot is the baseline (0) dot" % label,
-        r['rfCy'] is not None and dotr and abs(r['rfCy'] - max(dotr)) <= 0.5,
-        {'rfCy': r['rfCy'], 'dotR': dotr})
-
-    # R5 — no page errors
-    chk("%s · R5 zero page errors" % label, not errs, errs)
+    chk("%s · R1 two bars (the logged positive days) and NO completion line" % label,
+        r['bars'] == 2 and r['complLines'] == 0, r)
+    chk("%s · R2 an unlogged in-span day is a DIM stub, a logged 0 is a RED stub" % label,
+        r['dimStubs'] == 1 and r['redStubs'] == 1, r)
+    chk("%s · R3 a rating dot only on rated days, no line across the gap between them" % label,
+        r['rdots'] == 2 and r['rlines'] == 0, r)
+    chk("%s · R4 there is NO right axis" % label, r['rightAxis'] == 0, r)
+    chk("%s · R5 the dashed need line is drawn" % label, r['needLine'] == 1, r)
+    chk("%s · R6 zero page errors" % label, not errs, errs)
     await b.close()
 
 

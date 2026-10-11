@@ -94,8 +94,15 @@ async def touch_hold(pg, cdp, x0, y0, x1, y1, steps=14):
     """Press and move, and STOP with the finger still down - so the page can be measured at the
     instant of release rather than from geometry captured before the drag, which shifts under the
     finger as the dragged row is re-inserted. Measuring before the drag is what made the first two
-    versions of this test wrong about correct code."""
+    versions of this test wrong about correct code.
+
+    AMENDED BY NAME, PASTE 816 (Cory 2026-10-11, R67.2): a press on the handle no longer drags from
+    frame 0 - it ARMS a drag only after a 350 ms STILL hold (that is the fix for "I accidentally move
+    a task"). So every touch reorder now holds still past the arm window before it moves. This is not
+    a loosening: the drag still has to land exactly where the finger lets go; it just has to be
+    INTENDED first. The no-hold case (a scroll, never a reorder) is proven in golden_ht816_hold."""
     await cdp.send('Input.dispatchTouchEvent', {'type': 'touchStart', 'touchPoints': _pt(x0, y0)})
+    await pg.wait_for_timeout(430)                     # 816: hold still to ARM (> 350 ms, movement 0)
     for i in range(1, steps + 1):
         x = x0 + (x1 - x0) * i / steps
         y = y0 + (y1 - y0) * i / steps
@@ -188,8 +195,11 @@ async def S2(pw):
                focusable: g.tabIndex === 0, label: g.getAttribute('aria-label') }; }""")
     chk("S2a " + u"·" + " every row carries a drag handle",
         not m.get('noHandle') and m.get('handles') == m.get('rows') and m.get('rows') > 0, m)
-    chk("S2b " + u"·" + " the handle is touch-action:none AT REST - before any gesture, which is the whole fix",
-        m.get('handleTouchAction') == 'none' and not m.get('logReordering'), m)
+    # AMENDED BY NAME, PASTE 816 (R67.2): touch-action is pan-y now, not none. PASTE 429's `none` made a
+    # press a drag from frame 0 - the cause of Cory's accidental moves. pan-y lets the browser own the
+    # scroll until a 350 ms still hold arms the drag; after arming a non-passive touchmove preventDefaults.
+    chk("S2b " + u"·" + " the handle is touch-action:pan-y AT REST (816) - the scroll is the browser's until a hold arms the drag",
+        m.get('handleTouchAction') == 'pan-y' and not m.get('logReordering'), m)
     chk("S2c " + u"·" + " and the ROW is not - page scrolling from a row still works (app.css:527's trade-off)",
         m.get('rowTouchAction') not in ('none',), m)
     # AMENDED BY NAME, PASTE 429 S2 (2026-09-30): "the drag feature is buggy on the iPhone ... only drag
@@ -200,6 +210,11 @@ async def S2(pw):
     # BELOW the glyph - outside the 14px glyph, inside the overlay - still lands on THIS handle, which is what
     # "a thumb can hit it" actually means. NOT weakened: the glyph is still focusable for the keyboard path,
     # still labelled, and the row is NOT bloated (the glyph box stays within the row's own height).
+    # 816: bring the first row clear of the bottom tab bar before hit-testing (the handle now sits at
+    # the far right where the pencil used to, so the first row's handle - which starts near the foot of
+    # a tall list - can fall under the fixed bottom tabs; this is positioning, not the assertion).
+    await pg.evaluate(TOP_JS)
+    await pg.wait_for_timeout(120)
     hit = await pg.evaluate("""() => {
       const g = document.querySelector('#log .li .drg'); if(!g) return {noHandle:true};
       const cs = getComputedStyle(g, '::before');
