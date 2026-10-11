@@ -64,17 +64,23 @@ async def s1(pw):
     # than an untimed row's (the zigzag). The planned time now drops to a muted meta line UNDER the words;
     # on the row's first line only DRAG then EDIT remain, and they hug the right edge at the same x on every
     # row (no zigzag). golden_ht433_edict measures the full one-width/no-blank/no-zigzag invariant.
+    # AMENDED BY NAME, PASTE 816 S2 (Cory, Sunday 2026-10-11 1:34 PM · R67.2, not loosened): the drag
+    # handle now sits at the FAR RIGHT, PAST THE PENCIL ("a smaller handle at the far right past the
+    # pencil, so a scroll can never move a task by accident"). So the HANDLE, not the pencil, is the
+    # rightmost control and the one that hugs the edge. The invariant that matters is unchanged - each
+    # control at ONE x on every row (no zigzag), and no blank gutter at the right edge - only its layout
+    # order flipped. golden_ht816_hold proves drg.x > edp.x; golden_ht433_edict holds the full
+    # order-agnostic one-width/no-blank/no-zigzag edict that stays green on this layout.
     col = await pg.evaluate("""() => [...document.querySelectorAll('#log .li')].filter(r => r.offsetParent).map(r => {
         const x = s => { const n = r.querySelector(s); return n ? Math.round(n.getBoundingClientRect().x) : null; };
-        const edp = r.querySelector('.edp');
-        return [x('.drg'), x('.edp'), Math.round(r.getBoundingClientRect().right),
-                edp ? Math.round(edp.getBoundingClientRect().right) : null]; })""")
+        const rt = s => { const n = r.querySelector(s); return n ? Math.round(n.getBoundingClientRect().right) : null; };
+        return [x('.drg'), x('.edp'), Math.round(r.getBoundingClientRect().right), rt('.drg'), rt('.edp')]; })""")
     xs = set((c[0], c[1]) for c in col)
-    ok_order = all(c[0] is not None and c[1] is not None and c[0] < c[1] for c in col)
-    chk('S1f . drag then edit at the same x on every row, no zigzag (%d rows) [paste 433]' % len(col),
+    ok_order = all(c[0] is not None and c[1] is not None and c[0] > c[1] for c in col)   # handle right of the pencil (816)
+    chk('S1f . drag and edit each at one x on every row, handle right of the pencil, no zigzag (%d rows) [paste 433/816]' % len(col),
         len(xs) == 1 and ok_order, sorted(xs)[:4])
-    chk('S1g . and the edit control hugs the row right edge - no blank gutter [paste 433]',
-        col and all(c[3] is not None and c[2] - c[3] <= 6 for c in col), col[:3])
+    chk('S1g . and the rightmost control (the handle) hugs the row right edge - no blank gutter [paste 433/816]',
+        col and all(c[3] is not None and c[4] is not None and c[2] - max(c[3], c[4]) <= 6 for c in col), col[:3])
     await no_errors(G, pg, errs, 'S1 (today)')
     # today's tick, both charts, on the phone - reached by the tab as a person does
     await pg.evaluate("() => document.querySelector('#h29Bar [data-t29=\"insights\"]').click()")

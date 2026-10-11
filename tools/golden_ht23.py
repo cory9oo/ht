@@ -305,6 +305,17 @@ async def S2(pw):
         # It gets its own check (S2p) rather than being folded into index arithmetic that does not
         # model headers. The default fixture's first group holds four rows.
         k = 1 + (n % 3)
+        # DRAG A MID-LIST ROW, NEVER THE FIRST — AMENDED BY NAME, PASTE 816/817 (R67.2, NOT loosened).
+        # Paste 816 made the handle `touch-action:pan-y`, so a finger held INSIDE the 64px auto-scroll
+        # band lets the list scroll (autoScrollStep, app.js:4521) — the intended behaviour. The FIRST row
+        # sits in the top band and cannot be scrolled below it (the list is already at its top), so
+        # dragging row 0 tripped the top band under CI load and reddened S2e1 at one row in twenty
+        # (`scrolled`, scrollY falling). A centred source clears BOTH bands on every reorder with a full
+        # row of slack; the assertion is unchanged (the order moved, during==dropped==after, never
+        # scrolled). S2p still proves a header crossing separately; this loop asserts stability, not an
+        # exact index, so a mid-list drag that happens to cross a header is still a valid reorder.
+        src = max(1, len(before) // 2)
+        tgt = min(len(before) - 1, src + k)
         # A QUARTER-ROW PAST THE TARGET'S MIDPOINT, NOT 2px FROM ITS EDGE. The insert rule is
         # midpoint-based, so a release that lands ON a midpoint has two defensible answers one row
         # apart, and which one you get depends on whether you measure with the row lifted or
@@ -312,13 +323,14 @@ async def S2(pw):
         # their own boundary. Away from the boundary the answer is observer-independent, and the
         # assertion below is exact with no tolerance.
         a = t = None
-        for _ in range(3):                           # recentre until press AND release are clear of the band
-            a = await pg.evaluate(BOX_JS, {'i': 0, 'handle': True})
-            t = await pg.evaluate(BOX_JS, {'i': k, 'handle': False})
+        for _ in range(5):                           # recentre until press AND release clear the band by a full row
+            a = await pg.evaluate(BOX_JS, {'i': src, 'handle': True})
+            t = await pg.evaluate(BOX_JS, {'i': tgt, 'handle': False})
             if not a or not t:
                 break
             endy = t['y'] + t['h'] * 0.25
-            if EDGE < a['y'] < vh - EDGE and EDGE < endy < vh - EDGE:
+            margin = EDGE + (a['h'] or 44)           # a full row of slack beyond the 64px band, for CI-load jitter
+            if margin < a['y'] < vh - margin and margin < endy < vh - margin:
                 break
             await pg.evaluate("(d) => window.scrollBy(0, d)", (a['y'] + endy) / 2 - vh / 2)
             await settled(pg, "() => window.scrollY")
@@ -327,7 +339,7 @@ async def S2(pw):
         endy = t['y'] + t['h'] * 0.25
         if not (EDGE < a['y'] < vh - EDGE and EDGE < endy < vh - EDGE):
             inband.append({'n': n, 'press': round(a['y']), 'release': round(endy), 'vh': vh})
-        dragged = before[0]
+        dragged = before[src]
         sy0 = await pg.evaluate("() => window.scrollY")
 
         # ---- "0 MISPLACEMENTS", DEFINED AS SOMETHING THAT IS ACTUALLY TRUE ------------------
