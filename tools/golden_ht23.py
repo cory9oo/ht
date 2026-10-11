@@ -102,7 +102,7 @@ async def touch_hold(pg, cdp, x0, y0, x1, y1, steps=14):
     a loosening: the drag still has to land exactly where the finger lets go; it just has to be
     INTENDED first. The no-hold case (a scroll, never a reorder) is proven in golden_ht816_hold."""
     await cdp.send('Input.dispatchTouchEvent', {'type': 'touchStart', 'touchPoints': _pt(x0, y0)})
-    await pg.wait_for_timeout(430)                     # 816: hold still to ARM (> 350 ms, movement 0)
+    await pg.wait_for_timeout(650)                     # 816: hold still to ARM (HOLD_MS 350 + a wide margin so the arm timer fires before the first move even on a loaded runner; movement 0)
     for i in range(1, steps + 1):
         x = x0 + (x1 - x0) * i / steps
         y = y0 + (y1 - y0) * i / steps

@@ -125,7 +125,8 @@ SCROLL_FIRST = """() => { const r=document.querySelector('#log .li'); if(!r) ret
   const y=r.getBoundingClientRect().top; window.scrollBy(0, y-250); }"""
 
 # 816: the still-hold (ms) that ARMS a handle drag - every handle drag below waits past it before moving.
-HOLD = 430
+# HOLD_MS is 350; the margin here is wide so the arm timer fires before the first move even on a loaded runner.
+HOLD = 650
 
 # coordinates of a control inside the row at list-index i. sel: '.nm' (the words) or '.drg' (the handle)
 PT_JS = """(a) => { const rows=[...document.querySelectorAll('#log .li')]; const row=rows[a.i]; if(!row) return null;
