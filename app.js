@@ -4566,7 +4566,7 @@ var HT32_CARDFIT = true;
     });
     window.addEventListener('pointermove',function(e){
       if(g.touch || !pending()) return;
-      if(g.armed) e.preventDefault();
+      if(g.armed && e.cancelable) e.preventDefault();           /* 817: only when still cancelable - never fight a scroll already in progress */
       move(e.clientX, e.clientY);
     },{passive:false});
     window.addEventListener('pointerup',function(e){ if(g.touch||!pending()) return; end(); });
@@ -4584,7 +4584,12 @@ var HT32_CARDFIT = true;
       if(!pending()) return;
       var p=null,i; for(i=0;i<e.changedTouches.length;i++){ if(e.changedTouches[i].identifier===g.tid){ p=e.changedTouches[i]; break; } }
       if(!p) p=e.touches&&e.touches[0]; if(!p) return;
-      if(g.armed) e.preventDefault();                           /* after arming the app owns the finger */
+      /* 817: preventDefault ONLY while the move is still cancelable. Calling it once a pan-y scroll is
+         already in progress is ignored by the browser (it logs "Ignored attempt to cancel a touchmove
+         event with cancelable=false") and does not stop the scroll - the console noise golden_ht429 S6
+         caught and the lost reorder golden_ht23 S2e1 caught. Guarding here claims the gesture on the
+         first armed move while it CAN be claimed, and stays silent when the browser already owns it. */
+      if(g.armed && e.cancelable) e.preventDefault();           /* after arming the app owns the finger */
       move(p.clientX, p.clientY);
     },{passive:false});
     root.addEventListener('touchend',function(e){ if(!pending()) return; end(); },{passive:true});

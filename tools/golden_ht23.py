@@ -103,6 +103,14 @@ async def touch_hold(pg, cdp, x0, y0, x1, y1, steps=14):
     INTENDED first. The no-hold case (a scroll, never a reorder) is proven in golden_ht816_hold."""
     await cdp.send('Input.dispatchTouchEvent', {'type': 'touchStart', 'touchPoints': _pt(x0, y0)})
     await pg.wait_for_timeout(650)                     # 816: hold still to ARM (HOLD_MS 350 + a wide margin so the arm timer fires before the first move even on a loaded runner; movement 0)
+    # 817: CLAIM the gesture with a tiny first move once ARMED, so the app's non-passive touchmove
+    # preventDefault()s it WHILE IT IS STILL CANCELABLE - before the compositor can start a pan-y scroll
+    # on a big first step and make every later move non-cancelable (the "scrolling in progress" race that
+    # reddened S2e1 and ht429 S6). One 1px nudge, armed, is a drag move (past HOLD_SLOP is irrelevant now).
+    claim_dx = 1 if x1 >= x0 else -1
+    claim_dy = 1 if y1 >= y0 else -1
+    await cdp.send('Input.dispatchTouchEvent', {'type': 'touchMove', 'touchPoints': _pt(x0 + claim_dx, y0 + claim_dy)})
+    await pg.wait_for_timeout(16)
     for i in range(1, steps + 1):
         x = x0 + (x1 - x0) * i / steps
         y = y0 + (y1 - y0) * i / steps
