@@ -1,0 +1,86 @@
+# HT day export — writes one JSON file per day to the `export` branch (job 852).
+#
+# Runs nightly at 08:30 UTC (≈ 3:30 AM CDT, after midnight) and on workflow_dispatch.
+# Reads Cory's day data from Supabase using HT_EXPORT_DB_URL (repo secret).
+# Writes to the public `export` branch; no journal text is exported (R47.3).
+#
+# If HT_EXPORT_DB_URL is unset the step prints the one-click fix and exits 1.
+name: HT day export
+
+on:
+  schedule:
+    - cron: '30 8 * * *'
+  workflow_dispatch: {}
+
+concurrency:
+  group: ht-day-export
+  cancel-in-progress: true
+
+jobs:
+  export:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout main (for export_day.py)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install psycopg
+        run: pip install "psycopg[binary]"
+
+      - name: Gate — check secret
+        env:
+          HT_EXPORT_DB_URL: ${{ secrets.HT_EXPORT_DB_URL }}
+        run: |
+          set -euo pipefail
+          if [ -z "${HT_EXPORT_DB_URL:-}" ]; then
+            echo "::error::HT_EXPORT_DB_URL secret is unset."
+            echo "::error::One click to fix: Settings → Secrets and variables → Actions → New repository secret → Name: HT_EXPORT_DB_URL, Value: the postgres connection string for a read-only role on Cory's Supabase instance."
+            exit 1
+          fi
+
+      - name: Export day files
+        env:
+          HT_EXPORT_DB_URL: ${{ secrets.HT_EXPORT_DB_URL }}
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/ht-export
+          python tools/export_day.py --out-dir /tmp/ht-export
+
+      - name: Commit day files to export branch
+        run: |
+          set -euo pipefail
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git config user.name "github-actions[bot]"
+
+          # Create or check out the export branch
+          if git ls-remote --exit-code --heads origin export > /dev/null 2>&1; then
+            git checkout -B export origin/export
+          else
+            git checkout --orphan export
+            git rm -rf . --quiet 2>/dev/null || true
+          fi
+
+          mkdir -p days
+          # Copy new day files (cp -n: skip existing, never overwrite)
+          find /tmp/ht-export -maxdepth 1 -name '????-??-??.json' | while read f; do
+            cp -n "$f" days/ 2>/dev/null || true
+          done
+
+          git add days/
+          if git diff --cached --quiet; then
+            echo "No new day files to commit."
+          else
+            count=$(git diff --cached --name-only | wc -l)
+            git commit -m "export: add $count day file(s) $(date -u +%Y-%m-%d)"
+            git push origin export
+            echo "pushed $count new day file(s) to export branch"
+          fi
