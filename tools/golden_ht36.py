@@ -10,7 +10,7 @@ tab ... clearly show ... the daily percent and make it color coded. Same request
 hidden and doesn't trigger enough emotion."
 
   S1  THE SCOREBOARD CARD (PASTE 820) - the day's percent as ONE big numeral in its band ink, first
-      under Insights on the phone and in the charts quadrant on the desktop; THREE EQUAL tiles
+      under Insights on the phone and (PASTE 822) the first card of the middle column on the desktop; THREE EQUAL tiles
       (7 days · 30 days · streak) and one `need 80%` caption; the numeral clears 4.5:1 on its card in
       every scheme (the ratio table for the receipt).
   S2  THE BAR AND MAST ARE RETIRED (PASTE 820) - the Today-tab foot bar and the masthead figure are
@@ -214,19 +214,20 @@ async def sec_s1(pw):
         place['firstId'] == 'h228Hero' and place['heroVis'], place)
     await b.close()
 
-    # ---- the desktop scoreboard is the SAME card, in the charts quadrant (#h18Charts) ---------
-    # PASTE 820: ONE renderer, both widths. On the desktop the card is the first thing in the charts
-    # quadrant (the month/year line charts sit in the row beneath it); the life quadrant is untouched.
+    # ---- the desktop scoreboard is the SAME card, now FIRST in the middle column (#h19Right) ----
+    # PASTE 820: ONE renderer, both widths. AMENDED BY NAME (PASTE 822, R67.2): on the desktop the card
+    # is no longer inside the charts quadrant - it is the FIRST card of the middle column #h19Right (the
+    # hero), above the journal and the two charts, so the ring renders full and nothing is clipped.
     b, pg, errs = await open_page(pw, 1695, 900)
-    dk = await pg.evaluate("""() => { const tr=document.getElementById('h18Charts');
+    dk = await pg.evaluate("""() => { const r19=document.getElementById('h19Right');
         const card=document.getElementById('h228Hero');
         const pct=card?card.querySelector('.sh-ring-pct'):null;
         const tiles=card?card.querySelectorAll('.sh-tile').length:0;
-        return { inCharts: !!(tr && card && tr.contains(card) && card.offsetParent),
+        return { firstInRight: !!(r19 && card && r19.firstElementChild===card && card.offsetParent),
                  hasPct: !!(pct && pct.offsetParent), tiles:tiles }; }""")
     ok = dk is not None
-    chk('S1i . desktop . the scoreboard renders in the charts quadrant, the same card markup',
-        ok and dk['inCharts'] and dk['hasPct'] and dk['tiles'] == 3, dk)
+    chk('S1i . desktop . the scoreboard is the FIRST card of the middle column (#h19Right), same markup',
+        ok and dk['firstInRight'] and dk['hasPct'] and dk['tiles'] == 3, dk)
     await b.close()
 
     # ---- contrast: numeral vs its card, every scheme, all five band inks (the table for the receipt) ---
@@ -272,9 +273,9 @@ async def sec_s2(pw):
     b, pg, errs = await open_page(pw, 1695, 900)
     m = await pg.evaluate("""() => ({ strip: !!document.getElementById('tStrip'),
         mast: !!document.querySelector('.hero-mast'),
-        card: !!(document.getElementById('h18Charts') && document.querySelector('#h18Charts #h228Hero')) })""")
+        card: !!(document.getElementById('h19Right') && document.querySelector('#h19Right > #h228Hero')) })""")
     chk('S2e . desktop . the masthead figure (#tStrip / .hero-mast) is gone', not m['strip'] and not m['mast'], m)
-    chk('S2f . desktop . the one scoreboard is in the charts quadrant instead', m['card'], m)
+    chk('S2f . desktop . the one scoreboard is the first card of the middle column instead (PASTE 822)', m['card'], m)
     chk('S2g . desktop . zero page errors', not errs, errs[:2])
     await b.close()
 

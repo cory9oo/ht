@@ -16,9 +16,13 @@ Proven at the seam where each guarantee could break:
     selectionEnd === 0) with scrollTop === 0; and typing there, through the box's OWN input path, saves
     into S.priv so the stored field equals the box, begins with the typed character and has NO leading
     blank line (the space is padding, never a newline in the value).
-  CARD: on the phone each of the three card boxes carries the top space; on the desktop #iDump's card
-    box carries it (Completed/Prayer rest as the compact #h18Btm previews on the desktop and carry their
-    top space in the canvas they open on a tap — proven above, uniform on both sizes).
+  CARD (AMENDED BY NAME, PASTE 822, R67.2 / DEC-037 — the file stays, the assertion is re-pointed):
+    the three journal boxes are ONE-LINE ENTRY POINTS now, on BOTH sizes — a tap opens the canvas, the
+    row never grows, so the top space moved OFF the card row and lives only in the canvas (above). This
+    section now asserts the NEW shape: each card box is a compact row at most 56px tall with NO top
+    padding (padding-top ~ 0), its type still at most 15px (695 untouched). The real top-space
+    guarantee — a clear top area to begin a new entry above the old one — is the CANVAS section, which
+    is unchanged and still proves padding-top >= two lines on every box that opens.
 
 To make each guarantee honest the box is put in its HOSTILE state before opening: scrolled to the
 bottom with the caret at 0, then opened by a SYNTHETIC click (which moves neither scroll nor caret) —
@@ -131,14 +135,17 @@ WRITING = ('iDump', 'iTasks', 'iPrayer')
 async def run(pw, w, h, label, desktop):
     b, pg, errs = await open_page(pw, w, h)
 
-    # ---- CARD: the card boxes that carry the top space on this size ----
-    card_ids = ('iDump',) if desktop else WRITING
-    for tid in card_ids:
+    # ---- CARD (PASTE 822): the three boxes are compact one-line rows now — a row at most 56px, NO
+    #      top padding, type still <= 15px. The top space moved to the canvas (asserted below). ----
+    for tid in WRITING:
         m = await pg.evaluate(CARD_MEASURE, tid)
-        ok = m is not None and m['padTop'] >= 2 * m['lhpx'] - 0.5
-        chk("%s · card #%s keeps a top space >= two lines (%s px >= 2 x %s)"
-            % (label, tid, None if not m else round(m['padTop'], 1), None if not m else round(m['lhpx'], 1)),
-            ok, m)
+        fldh = await pg.evaluate("(id)=>{ var e=document.getElementById(id); var f=e&&e.closest('.fld');"
+                                 " return f?Math.round(f.getBoundingClientRect().height):null; }", tid)
+        ok = (m is not None and m['padTop'] <= 1.0 and m['fs'] <= 15
+              and fldh is not None and 0 < fldh <= 56)
+        chk("%s · card #%s is a compact one-line row (fld %s px <= 56, top padding %s ~ 0, type %s <= 15)"
+            % (label, tid, fldh, None if not m else round(m['padTop'], 1), None if not m else m['fs']),
+            ok, {'m': m, 'fld': fldh})
 
     # ---- CANVAS: the uniform writing surface, for every box, on both sizes ----
     for tid in WRITING:

@@ -2787,6 +2787,14 @@ function wire(){
     document.addEventListener('click', function(e){
       if(cur) return;
       var ta = e.target.closest && e.target.closest('textarea');
+      // PASTE 822: the journal boxes are ONE-LINE rows now, so a tap can land on the row (the label
+      // caption or the padding) and not the textarea body. Re-point the gate at the ROW: a click
+      // inside a `.jcard .fld` that holds a writing textarea opens THAT textarea's canvas. The
+      // textarea-target path above still works unchanged.
+      if(!ta){
+        var fld = e.target.closest && e.target.closest(CARD + ' .fld');
+        if(fld){ var t = fld.querySelector('textarea'); if(t && t.id !== 'iWhy') ta = t; }
+      }
       // 685: ANY textarea on the Journal card opens the canvas, matched as a CLASS — so a new writing
       // box can never be missed — EXCEPT the one non-writing box, the Rate-the-day "why" (#iWhy).
       // whyBack() moves #iWhy INTO this card (into #h18Btm on the desktop, under the strip on the
@@ -6135,12 +6143,19 @@ var HT32_CARDFIT = true;
   /* PASTE 821 S5: the need line is gold when the trailing 7-day completion is at or above NEED - one
      fact, read once, passed to both cards so they agree. The 80 is the one home (global NEED). */
   function needGoldNow(){ var w=(typeof ht293Avg==='function')?ht293Avg(7):null; return w!=null && w>=NEED; }
+  /* PASTE 822 S3: on the desktop the month and year charts fill the taller space the compact journal
+     frees - at least 220px, fitSvg/availHeight measuring the real panel. On the phone the heights are
+     exactly as 819 set them (~200/180); the floor and the measure apply to the desktop alone. */
+  function chH(svgId, base){
+    if(window.innerWidth < 1024) return base;
+    return Math.max(220, Math.min(280, availHeight(document.getElementById(svgId), 220)));
+  }
   function paintMonth16(){
     var pts=monthPoints(), ng=needGoldNow();
     var ym=S.calYM||[dnum(today()).getFullYear(),dnum(today()).getMonth()];
     /* B0.2: draw now if the panel is already measurable, and again after layout / fonts / resize */
-    measureAndDraw('vMonth', function(){ barLineChart('vMonth', monthPoints(), { attr:'data-vgd', height:200, needGold:needGoldNow() }); });
-    barLineChart('vMonth', pts, { attr:'data-vgd', height:200, needGold:ng });    /* S5: ~200px tall on the phone */
+    measureAndDraw('vMonth', function(){ barLineChart('vMonth', monthPoints(), { attr:'data-vgd', height:chH('vMonth',200), needGold:needGoldNow() }); });
+    barLineChart('vMonth', pts, { attr:'data-vgd', height:chH('vMonth',200), needGold:ng });    /* S5: ~200px phone; >=220 desktop (822) */
     var nav=document.getElementById('vMonthNav');
     if(nav) nav.innerHTML='<button class="mv" data-vgm="-1">\u2039</button>'+
       '<b>'+MO[ym[1]].toUpperCase()+' '+ym[0]+'</b>'+
@@ -6152,8 +6167,8 @@ var HT32_CARDFIT = true;
   }
   function paintYear16(){
     var pts=yearPoints(), ng=needGoldNow();
-    measureAndDraw('vYear', function(){ barLineChart('vYear', yearPoints(), { attr:'data-vgy', height:180, needGold:needGoldNow() }); });
-    barLineChart('vYear', pts, { attr:'data-vgy', height:180, needGold:ng });     /* S5: ~180px tall on the phone */
+    measureAndDraw('vYear', function(){ barLineChart('vYear', yearPoints(), { attr:'data-vgy', height:chH('vYear',180), needGold:needGoldNow() }); });
+    barLineChart('vYear', pts, { attr:'data-vgy', height:chH('vYear',180), needGold:ng });     /* S5: ~180px phone; >=220 desktop (822) */
     var nav=document.getElementById('vYearNav');
     if(nav) nav.innerHTML='<button class="mv" data-vgyn="-1">\u2039</button>'+
       '<b>'+(S.vYear||dnum(today()).getFullYear())+'</b>'+
@@ -14407,6 +14422,11 @@ var HT32_WEEK = 'sun_fri';                /* Sunday..Friday; Saturday is the Sab
   function placeDesktop(){
     if(window.innerWidth < 1024) return;
     var card = paintCard(); if(!card) return;
+    /* PASTE 822: the TODAY ring card is the FIRST child of the middle column #h19Right (the hero,
+       above the journal and the two charts) - SPEC's call, reversible in one word. Until #h19Right
+       exists (rightBlock runs in the same quad pass) it falls back to the head of the charts quadrant. */
+    var r = document.getElementById('h19Right');
+    if(r){ if(card.parentNode !== r || r.firstChild !== card) r.insertBefore(card, r.firstChild); return; }
     var tr = document.getElementById('h18Charts');
     if(tr && card.parentNode !== tr) tr.insertBefore(card, tr.firstChild);
   }
@@ -14426,6 +14446,27 @@ var HT32_WEEK = 'sun_fri';                /* Sunday..Friday; Saturday is the Sab
                      /* PASTE 821: the pure renderer and derivations, exposed for golden_ht821_ring */
                      scoreHtml: scoreHtml, records: records, weekData: weekData,
                      canBurst: canBurst, markBurst: markBurst, ringC: RING_C, wkC: WK_C };
+})();
+
+/* ================== PASTE 822 · THE ONE-LINE ROWS SAY 'tap to write' ==================
+   The three journal boxes are one-line entry points now (app.css PASTE 822). An EMPTY row shows the
+   placeholder `tap to write`; a row with saved text shows its first line in the muted ink. HT-30 S4.10
+   took the brain dump's placeholder off (an empty box with a quiet border); Cory's 822 word restores a
+   placeholder for the COMPACT row shape (and HT-10 clears Prayer's each structural pass, so it is set
+   on every repaint, after all other layers, which is why this wraps paintAll last). */
+(function pt822(){
+  function setPh(){
+    ['iDump','iTasks','iPrayer'].forEach(function(id){
+      var n = document.getElementById(id);
+      if(n && n.getAttribute('placeholder') !== 'tap to write') n.setAttribute('placeholder', 'tap to write');
+    });
+  }
+  if(typeof paintAll === 'function'){
+    var _pa = paintAll;
+    paintAll = function(){ var out = _pa.apply(null, arguments); try{ setPh(); }catch(e){} return out; };
+  }
+  document.addEventListener('DOMContentLoaded', setPh);
+  setTimeout(setPh, 60);
 })();
 
 

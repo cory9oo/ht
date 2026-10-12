@@ -11,7 +11,9 @@
       that takes a clock time OUT of a name, and every case it must NOT touch
   S3  the sheet: five fields on the surface, the rest one tap down, the free text gone and never written;
       rows a quarter thinner on both widths with the text the same size; the affordances at rest
-  S4  the Journal, by that name, with no placeholder text anywhere; the why off the phone and on the desktop
+  S4  the Journal, by that name; its box is a one-line entry point with the 'tap to write' placeholder
+      (PASTE 822 amend — HT-30 S4.10's bare open box became a compact row on both widths); the why off
+      the phone and on the desktop
   S5  a Sabbath any account can keep, on the day it chooses, off by default, DEC-172's weights untouched
   S6  ONE Insights page behind ONE tab on both widths, six cards, and no entry list of any kind on it
   S7  start a group or join one; a pasted LINK is a code; a signed-in person joins with no sign-up
@@ -425,8 +427,12 @@ async def sec_s4(pw):
             const l=t && t.closest('.fld'), s=l && l.querySelector('.lab');
             return [id, s ? s.textContent.trim() : null, t ? (t.getAttribute('placeholder')||'') : null]; })""")
         chk('S4a . %s . the box is called Journal' % tag, labs[0][1] == 'Journal', labs)
-        chk('S4b . %s . no box carries placeholder text' % tag,
-            all(not p for _, _, p in labs), labs)
+        # AMENDED BY NAME (PASTE 822, R67.2): the three boxes are ONE-LINE entry points now, and Cory's
+        # 822 word gives the empty row a placeholder - exactly 'tap to write'. HT-30 S4.10's "no
+        # placeholder" held for the OLD quiet open box; the compact row restores the hint. No other box
+        # (the why, a name field) carries one - this asserts the three writing boxes carry 'tap to write'.
+        chk('S4b . %s . each journal box carries the one-line entry placeholder "tap to write"' % tag,
+            all(p == 'tap to write' for _, _, p in labs), labs)
         body = await pg.evaluate("() => document.body.innerText")
         chk('S4c . %s . the words "brain dump" appear nowhere on the screen' % tag,
             'brain dump' not in body.lower(), [l for l in body.split('\\n') if 'brain' in l.lower()][:2])

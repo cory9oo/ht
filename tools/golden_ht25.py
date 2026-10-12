@@ -16,6 +16,12 @@ check types or pastes a genuinely long entry and then asks the two questions a p
 **can I see the caret, and can I reach the bottom** - through `scrollHeight` / `clientHeight` /
 `scrollTop`, which are the same numbers the browser scrolls by.
 
+PASTE 822 AMEND (R67.2): the journal box became a ONE-LINE entry point - a tap opens the full canvas,
+which is the scrolling writing surface. So S2c and S2g no longer ask the BOX to scroll (overflow
+hidden on the row is correct now); they open the SAME element as the canvas and prove the CANVAS
+scrolls to the bottom - the long entry is still reachable, never clipped away, just on the surface
+you write on. The caret/ceiling checks on the box (S2b/S2d/S2e/S2f) are unchanged.
+
 SRC is this file's own repo (`tools/..`), so a run from a worktree tests THAT worktree - the
 HT-23 S5c lesson, and the reason `sync_fixture.py` resolves paths the same way.
 """
@@ -115,8 +121,22 @@ async def s2(pw):
 
             chk('S2b/%s · a 200-line entry overflows its box (so the box must scroll)' % tag,
                 got['reachable'] > 0, got)
-            chk('S2c/%s · and the box scrolls rather than clipping (overflow-y != hidden)' % tag,
-                got['oy'] != 'hidden', got)
+            # AMENDED BY NAME (PASTE 822, R67.2): the journal box is a ONE-LINE entry point now - a tap
+            # opens the full canvas, which is the scrolling writing surface. So the box itself is bounded
+            # (overflow hidden is correct); the "a long entry is reachable, never clipped away" guarantee
+            # moves to the CANVAS. Open the SAME element as the canvas and prove it scrolls to the bottom.
+            cv = await pg.evaluate("""() => {
+              const t = document.getElementById('iDump');
+              if(window.__HTJ && window.__HTJ.enter) window.__HTJ.enter(t);
+              const cs = getComputedStyle(t);
+              t.scrollTop = t.scrollHeight; const end = t.scrollTop;
+              const r = { oy: cs.overflowY, end, max: t.scrollHeight - t.clientHeight,
+                          clientH: t.clientHeight, winH: window.innerHeight };
+              if(window.__HTJ && window.__HTJ.leave) window.__HTJ.leave(false);
+              return r;
+            }""")
+            chk('S2c/%s · the box is a one-line entry point; the CANVAS it opens scrolls, never clips (overflow-y != hidden, bottom reachable)' % tag,
+                cv['oy'] != 'hidden' and cv['end'] >= cv['max'] - 2 and cv['clientH'] <= cv['winH'], cv)
             # THE ONE CORY ACTUALLY HIT: the box grew taller than the screen, so neither the box
             # nor the page could reach the bottom of what he had typed.
             chk('S2d/%s · the box never grows taller than the viewport' % tag,
@@ -136,18 +156,25 @@ async def s2(pw):
                 bottom['end'] >= bottom['max'] - 2 and bottom['top'] == 0, bottom)
 
             # PASTE, not type - the second half of the acceptance, and a different code path.
+            # PASTE 822: the paste lands in the box (bounded one-line row), then the canvas it opens is
+            # what holds and scrolls the 5k entry - the SAME element, promoted.
             pasted = await pg.evaluate("""(txt) => {
               const t = document.getElementById('iPrayer');
               if(!t) return {no:1};
               t.focus(); t.value = txt.repeat(2);
               t.setSelectionRange(0, 0);
               t.dispatchEvent(new Event('input', {bubbles:true}));
-              return { clientH:t.clientHeight, winH:window.innerHeight,
-                       oy:getComputedStyle(t).overflowY };
+              if(window.__HTJ && window.__HTJ.enter) window.__HTJ.enter(t);
+              t.scrollTop = t.scrollHeight; const end = t.scrollTop;
+              const r = { clientH:t.clientHeight, winH:window.innerHeight,
+                          oy:getComputedStyle(t).overflowY, end, max:t.scrollHeight - t.clientHeight };
+              if(window.__HTJ && window.__HTJ.leave) window.__HTJ.leave(false);
+              return r;
             }""", LONG)
             if not pasted.get('no'):
-                chk('S2g/%s · a pasted 5k-char entry is bounded and scrollable' % tag,
-                    pasted['clientH'] <= pasted['winH'] and pasted['oy'] != 'hidden', pasted)
+                chk('S2g/%s · a pasted 5k-char entry is bounded and the canvas it opens is scrollable' % tag,
+                    pasted['clientH'] <= pasted['winH'] and pasted['oy'] != 'hidden'
+                    and pasted['end'] >= pasted['max'] - 2, pasted)
 
             chk('S2h/%s · no console error while doing any of it' % tag, not errs, errs[:2])
         finally:

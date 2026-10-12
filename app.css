@@ -1862,25 +1862,36 @@ html[data-simple] .li .bx, html[data-simple] .li .edp{ align-self:center }
     column-gap:var(--h18gut); row-gap:var(--h18gut);
   }
   html[data-simple] .grid > #h18Comp { grid-area:comp }
-  html[data-simple] .grid > #h19Right{ grid-area:right; display:grid;
-    grid-template-columns:minmax(0,1fr);
-    grid-template-rows:minmax(0,58fr) minmax(0,42fr);
-    gap:var(--h18gut); min-width:0; min-height:0 }
+  /* PASTE 822 — the middle column is ORDERED hero · journal · charts, every row sized to its own
+     CONTENT (never a fixed track for a card — that was the 88px clip Cory photographed), and the
+     column SCROLLS when its content exceeds the viewport rather than clipping it. At 1695x900 it all
+     fits with room to spare; the scroll is the safety a shorter viewport needs (S1). */
+  /* a FLEX COLUMN, not a grid: grid auto-tracks shrink a card under a definite column height (the
+     hero was compressed to 180px of its 306), which is the clip restated. A flex column whose children
+     never shrink keeps each card at its own content height and SCROLLS the column when the sum exceeds
+     the viewport - a normal vertical scroll, not a cut. */
+  html[data-simple] .grid > #h19Right{ grid-area:right; display:flex; flex-direction:column;
+    gap:var(--h18gut); min-width:0; min-height:0; overflow-y:auto; overflow-x:hidden }
   html[data-simple] .grid > #h16Ins  { grid-area:life }
-  /* the journal and the charts are the two halves of the right block */
-  /* HT-18 named these two into `.grid`'s own areas (`jrnl`, `charts`). Inside #h19Right those
-     names do not exist, so each spawned an implicit area and the journal took the full width with
-     the charts stacked beneath it at 99px tall. MEASURED before this line: journal 1180x267,
-     charts 554x99. The placement is released; the two-column template does the work. */
+  /* the hero (the ring card) is placed FIRST in the middle column by placeDesktop() (app.js HT-228),
+     then the journal, then the two charts - each at its own content height, none shrinking. */
+  html[data-simple] #h19Right > #h228Hero,
   html[data-simple] #h19Right > .colL,
-  html[data-simple] #h19Right > #h18Charts{ grid-area:auto; min-width:0; min-height:0 }
-  /* the two charts share the lower half of the right block, side by side */
+  html[data-simple] #h19Right > #h18Charts{ flex:0 0 auto; min-width:0 }
+  /* THE TODAY CARD (the hero) — a full card at the top of the middle column, rendering the SAME
+     .stat-hero the phone draws (the 104px compact-horizontal overrides at #h18Charts > #h228Hero no
+     longer match, because the hero is no longer a child of #h18Charts). No fixed or max height, and
+     no overflow:hidden that cuts it (S1). */
+  html[data-simple] #h19Right > #h228Hero{
+    border:1px solid var(--rule); border-radius:10px; background:var(--surface);
+    padding:10px 14px 12px; overflow:visible; max-height:none }
+  html[data-simple] #h19Right > #h228Hero > .lab{ display:block; font:500 9px/1 var(--mono);
+    letter-spacing:.14em; text-transform:uppercase; color:var(--ink3); padding-bottom:6px }
+  /* the two charts share the LAST row of the middle block, side by side, each at least 220px tall
+     (S3); the renderer measures the real panel via availHeight (app.js). */
   html[data-simple] #h19Right > #h18Charts{ display:grid; grid-template-columns:1fr 1fr;
-    grid-template-rows:minmax(0,1fr); column-gap:var(--h18gut); row-gap:0 }
-  /* PASTE 820 — the one scoreboard card is a fixed header row (88px) atop the charts quadrant in the
-     #h19Right desktop regime too; the two line charts sit in the row beneath it (grid-row:2). This
-     override matches 1864's specificity and follows it, so the card never collapses onto the charts. */
-  html[data-simple] #h19Right > #h18Charts{ grid-template-rows:88px minmax(0,1fr); row-gap:6px }
+    grid-template-rows:auto; column-gap:var(--h18gut); row-gap:0; min-height:248px }
+  html[data-simple] #h19Right > #h18Charts > .h16p{ min-height:248px }
 
   /* ONE task column now: the completions column is 30% wide and two sub-columns of ~230px cannot
      hold a standard's name. The list keeps its inner scroll (R70.186) and the receipt states
@@ -3809,4 +3820,57 @@ textarea.htj-box{
 html[data-simple] #iDump, html[data-simple] #iTasks, html[data-simple] #iPrayer{ padding-top: calc(3 * 1.5em); }
 textarea.htj-box{ padding-top: calc(3 * 1.5em) !important; }
 @media(min-width:1024px){ html[data-simple] #h18Btm textarea{ padding-top:7px; } }
+
+/* ============================ PASTE 822 · ONE-LINE JOURNAL ROWS (every width) ================
+   Cory 2026-10-12: "shrink all of the journal boxes significantly ... let the other features fill
+   in their spaces." The three writing boxes (Journal #iDump, Completed #iTasks, Prayer #iPrayer)
+   become equal ONE-LINE entry points: the .fld is a row, the label a caption at its left, the
+   textarea one muted line showing the first line of any saved text (or the 'tap to write'
+   placeholder when empty). A tap still opens the full canvas (683/685) and the row never grows,
+   because typing happens only in the canvas. The canvas (textarea.htj-box, line ~3766) is UNTOUCHED:
+   these rules exclude .htj-box, so the moment a box is promoted they stop matching and the
+   full-screen geometry wins. The height carries !important for the SAME measured reason the canvas
+   does — HT-10's grow() writes an inline height and an inline height beats a plain stylesheet rule.
+   The 704 card top-space is retired on the compact row (padding:0 !important); the canvas keeps it. */
+.jcard .fld:has(#iDump),
+.jcard .fld:has(#iTasks),
+.jcard .fld:has(#iPrayer){
+  display:flex; align-items:center; gap:10px;
+  padding:0; min-height:44px; max-height:56px; border-bottom:1px solid var(--rule); overflow:hidden;
+}
+.jcard .fld:has(#iDump) > .lab,
+.jcard .fld:has(#iTasks) > .lab,
+.jcard .fld:has(#iPrayer) > .lab{
+  flex:0 0 auto; margin:0; min-width:66px;
+  font:500 9px/1.2 var(--mono); letter-spacing:.12em; text-transform:uppercase; color:var(--ink3);
+}
+.jcard .fld:has(#iDump) textarea:not(.htj-box),
+.jcard .fld:has(#iTasks) textarea:not(.htj-box),
+.jcard .fld:has(#iPrayer) textarea:not(.htj-box){
+  flex:1 1 auto; width:auto; min-width:0;
+  height:40px !important; min-height:0 !important; max-height:40px !important;
+  padding:0 !important;
+  resize:none; border:0; background:transparent; color:var(--muted);
+  overflow:hidden; cursor:pointer;
+}
+.jcard .fld:has(#iDump) textarea::placeholder,
+.jcard .fld:has(#iTasks) textarea::placeholder,
+.jcard .fld:has(#iPrayer) textarea::placeholder{ color:var(--ink3); opacity:1 }
+
+/* DESKTOP — the journal card sizes to its content (picker + three rows) instead of filling the
+   quadrant: HT-18's "#iDump is the tall flex box / Completed + Prayer side by side in #h18Btm"
+   treatment (the S2 block at ~line 1320) is RETIRED here (R70.79), now the three rows are equal,
+   full width, and the middle column scrolls when it must (PASTE 822 S1/S3). */
+@media(min-width:1024px){
+  html[data-simple] .grid > .colL{ overflow:visible }
+  html[data-simple] #jIn{ flex:0 0 auto; overflow:visible }
+  html[data-simple] #jIn > .blk:has(#iDump){ flex:0 0 auto; max-height:none; overflow:visible }
+  html[data-simple] #jIn > .blk:has(#iDump) > .pan{ overflow:visible }
+  html[data-simple] #jIn .fld:has(#iDump){ flex:0 0 auto }
+  html[data-simple] #iDump{ flex:0 0 auto }
+  html[data-simple] #h18Btm{ display:flex; flex-direction:column; gap:0; align-items:stretch }
+  html[data-simple] #h18Btm .fld{ border-bottom:1px solid var(--rule); padding:0 }
+  html[data-simple] #h18Btm textarea:not(.htj-box){ height:40px !important; min-height:0 !important }
+  html[data-simple] #h18Btm textarea:focus{ height:40px }
+}
 
