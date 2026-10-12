@@ -113,6 +113,7 @@ RENDER = """() => {
   return {
     bars: n('.bl-bar'),
     cdots: n('circle.bl-cdot'), hollow: n('circle.bl-cdot.bl-hollow'),
+    stars: n('.bl-star'),                 /* PASTE 821: a 100% day is a gold star, not an ordinary dot */
     cline: n('path.bl-cline'),
     rdots: n('circle.bl-rdot'), rlines: n('path.bl-rline'),
     rightAxis: n('.ax2'), needLine: n('.bl-need')
@@ -159,10 +160,12 @@ async def run(pw, w, h, label):
 
     # ---------------------------------------------------------------- RENDER (crafted series)
     r = await pg.evaluate(RENDER)
-    chk("%s · R1 the logged days draw completion points and a line, and NO bars" % label,
-        r['bars'] == 0 and r['cdots'] == 3 and r['cline'] >= 1, r)
+    # PASTE 821 amended by name (R67.2): three logged days still get exactly three completion marks, but
+    # the 100% day (z-2) is now a GOLD STAR, not an ordinary dot - so two ordinary .bl-cdot + one .bl-star.
+    chk("%s · R1 the logged days draw completion marks and a line, and NO bars" % label,
+        r['bars'] == 0 and (r['cdots'] + r['stars']) == 3 and r['stars'] == 1 and r['cline'] >= 1, r)
     chk("%s · R2 an unlogged in-span day is a GAP (no point), a logged 0 is one HOLLOW point at 0" % label,
-        r['hollow'] == 1 and r['cdots'] == 3, r)
+        r['hollow'] == 1 and (r['cdots'] + r['stars']) == 3, r)
     chk("%s · R3 a rating dot only on rated days, no line across the gap between them" % label,
         r['rdots'] == 2 and r['rlines'] == 0, r)
     chk("%s · R4 there is NO right axis" % label, r['rightAxis'] == 0, r)

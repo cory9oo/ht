@@ -167,7 +167,7 @@ async def sec_s1(pw):
     for pct, band, tok in CASES:
         await force(pg, pct)
         r = await pg.evaluate("""(a) => { %s
-            const el=document.querySelector('#h228Hero .sh-pct'); if(!el) return null;
+            const el=document.querySelector('#h228Hero .sh-ring-pct'); if(!el) return null;
             const cs=getComputedStyle(el);
             return { color:cs.color, fs:parseFloat(cs.fontSize), bg:bgOf(el),
                      band:(window.__HT16&&window.__HT16.rampIx)?window.__HT16.rampIx(a.pct):null,
@@ -179,7 +179,9 @@ async def sec_s1(pw):
         chk('S1b.%d%% . and is inked %s, the band\'s text-safe shade (not a grade letter colour)' % (pct, tok),
             ok and rgb(r['color']) is not None and rgb(r['color']) == rgb(r['tok']),
             ok and [r['color'], r['tok']])
-        chk('S1c.%d%% . the numeral is >=64px at 390 wide' % pct, ok and r['fs'] >= 64, ok and r['fs'])
+        # PASTE 821 amended by name (R67.2): the big numeral now sits in the CENTRE OF THE RING, so it is
+        # 40px (the ring is ~140px); still the large hero figure, no longer the flat 64px.
+        chk('S1c.%d%% . the numeral is >=36px, centred in the ring, at 390 wide' % pct, ok and r['fs'] >= 36, ok and r['fs'])
     chk('S1d . zero page errors building the phone scoreboard', not errs, errs[:2])
     await b.close()
 
@@ -218,7 +220,7 @@ async def sec_s1(pw):
     b, pg, errs = await open_page(pw, 1695, 900)
     dk = await pg.evaluate("""() => { const tr=document.getElementById('h18Charts');
         const card=document.getElementById('h228Hero');
-        const pct=card?card.querySelector('.sh-pct'):null;
+        const pct=card?card.querySelector('.sh-ring-pct'):null;
         const tiles=card?card.querySelectorAll('.sh-tile').length:0;
         return { inCharts: !!(tr && card && tr.contains(card) && card.offsetParent),
                  hasPct: !!(pct && pct.offsetParent), tiles:tiles }; }""")
@@ -235,7 +237,7 @@ async def sec_s1(pw):
         row = []
         for pct, band, tok in CASES:
             await force(pg, pct)
-            r = await pg.evaluate("""() => { %s const el=document.querySelector('#h228Hero .sh-pct');
+            r = await pg.evaluate("""() => { %s const el=document.querySelector('#h228Hero .sh-ring-pct');
                 if(!el) return null; const cs=getComputedStyle(el); return { color:cs.color, bg:bgOf(el) }; }""" % BG)
             cr = ratio(rgb(r['color']), rgb(r['bg'])) if r and rgb(r['color']) and rgb(r['bg']) else 0
             row.append((tok, round(cr, 2)))
@@ -256,7 +258,7 @@ async def sec_s2(pw):
     t = await pg.evaluate("""() => { const col=document.querySelector('.colL');
         return { strip: !!document.getElementById('tStrip'),
                  bar: !!document.querySelector('.hero-bar, .hero-mast'),
-                 colPct: !!(col && col.querySelector('.sh-pct')),
+                 colPct: !!(col && col.querySelector('.sh-pct, .sh-ring, .sh-ring-pct')),
                  log: !!document.getElementById('log'), dump: !!document.getElementById('iDump') }; }""")
     chk('S2a . phone . the day-percent foot bar (#tStrip / .hero-bar) is gone from Today',
         not t['strip'] and not t['bar'], t)
