@@ -19,8 +19,8 @@ rgb() the maths can weigh — this golden never reads a raw attribute string.
       so nothing is silently weakened: future is checked to be faint and distinct, not to clear 3:1.
   S5  CELLS, NOT BARS: a cell's drawn width is strictly less than the column pitch — a real gap, not a
       one-pixel line (the brief: squares only).
-  S6  the one-line legend under the grid carries the five grades + lived + ahead + now, and it wraps
-      (it never scrolls sideways).
+  S6  the one-line legend under the grid carries the five bands by PERCENT (80+ · 60+ · 40+ · 20+ · <20,
+      PASTE 820 — no A..F letters) + lived + ahead + now, and it wraps (it never scrolls sideways).
   S7  zero page errors at either width.
 
 R134 R1: prints its assertion count; a section that asserts nothing is a FAIL.
@@ -234,12 +234,14 @@ async def run(pw, w, h, label):
     chk("%s · cells have a gap: width < pitch (gap=%s)" % (label, None if gap is None else round(gap, 2)),
         gap is not None and gap > 0.4, {'pitch': d['pitch'], 'cellW': d['cellW']})
 
-    # S6 — the legend, under the grid, wraps
+    # S6 — the legend, under the grid, wraps. PASTE 820: the five bands are labelled by PERCENT now
+    # (80+ · 60+ · 40+ · 20+ · <20), no A..F letters anywhere — one scale, every ranking a percent.
     leg = d['leg']
     legok = (bool(leg) and leg['sw'] >= 8 and leg['lived'] and leg['ahead'] and leg['now']
-             and 'A' in leg['text'] and 'F' in leg['text']
+             and '80+' in leg['text'] and '<20' in leg['text']
+             and not any(c in leg['text'] for c in 'ABCDF')
              and 'lived' in leg['text'] and 'ahead' in leg['text'] and 'now' in leg['text'])
-    chk("%s · a legend carries A B C D F · lived · ahead · now" % label, legok, leg)
+    chk("%s · a legend carries 80+ 60+ 40+ 20+ <20 · lived · ahead · now (no letters)" % label, legok, leg)
     chk("%s · the legend wraps, never scrolls sideways" % label,
         bool(leg) and leg['overflow'] <= 1, leg and leg.get('overflow'))
 

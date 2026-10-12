@@ -31,7 +31,10 @@ async def s1(pw):
     G.sec('S1', "the phone's Today")
     b, pg, errs = await open_page(pw, 390, 844, flags=LINKS)
     first = await pg.evaluate("() => { const c = document.querySelector('.colL'); return c && c.firstElementChild && c.firstElementChild.id; }")
-    chk('S1a . the day-percent bar is the first thing in Today', first == 'tStrip', first)
+    strip = await pg.evaluate("() => !!document.getElementById('tStrip')")
+    # PASTE 820: the day-percent bar LEFT Today (the ranking has one home, the Insights scoreboard).
+    # Today opens on an input now, never the #tStrip bar.
+    chk('S1a . the day-percent bar LEFT Today: no #tStrip, Today opens on an input', first != 'tStrip' and not strip, [first, strip])
     txt = await pg.evaluate("() => (document.querySelector('.colL')||{}).innerText || ''")
     chk('S1b . no "Insights ›" anywhere in Today (the tab is the way in)', 'Insights ›' not in txt and 'INSIGHTS ›' not in txt, txt[:120])
     js = src(os.path.join(REPO, 'app.js'))

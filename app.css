@@ -1270,7 +1270,22 @@ html[data-simple] .li .bx, html[data-simple] .li .edp{ align-self:center }
   /* HT-17 placed these two by id on a 12-column grid. Inside #h18Charts that would create implicit
      columns 3..8 and push YEAR off the quadrant, so the placement is released here. */
   html[data-simple] #h18Charts > #h16Month,
-  html[data-simple] #h18Charts > #h16Year{ grid-column:auto; grid-row:auto }
+  html[data-simple] #h18Charts > #h16Year{ grid-column:auto; grid-row:2 }
+  /* PASTE 820 — the one scoreboard card is the desktop's ranking home: a full-width header across the top
+     of the charts quadrant (row 1), the two line charts in the row beneath it (row 2). The SAME node and
+     markup the phone Insights draws; compact and horizontal here so the charts keep their room. */
+  html[data-simple] #h18Charts{ grid-template-rows:66px minmax(0,1fr) }
+  html[data-simple] #h18Charts > #h228Hero{ grid-column:1 / -1; grid-row:1; margin:0 0 6px; overflow:hidden;
+    border:1px solid var(--rule); border-radius:10px; background:var(--surface); padding:6px 12px }
+  html[data-simple] #h18Charts > #h228Hero > .lab{ display:block; font:500 9px/1 var(--mono);
+    letter-spacing:.14em; text-transform:uppercase; color:var(--ink3); padding-bottom:5px }
+  html[data-simple] #h18Charts > #h228Hero .stat-hero{ flex-direction:row; align-items:baseline;
+    gap:18px; flex-wrap:wrap }
+  html[data-simple] #h18Charts > #h228Hero .sh-pct{ font-size:30px }
+  html[data-simple] #h18Charts > #h228Hero .sh-tiles{ margin-top:0; gap:16px;
+    grid-template-columns:repeat(3,auto) }
+  html[data-simple] #h18Charts > #h228Hero .sh-v{ font-size:15px }
+  html[data-simple] #h18Charts > #h228Hero .sh-cap{ margin-top:0; align-self:center }
 }
 /* S1c · THE FRAME GOES TO 1680 AT >=1600 (D-HT-18-2). At 1920 a 1440 frame leaves 240px of margin
    per side, which makes "outer gutter >= 48 at 1920" vacuous and costs every quadrant 120px of
@@ -1848,6 +1863,10 @@ html[data-simple] .li .bx, html[data-simple] .li .edp{ align-self:center }
   /* the two charts share the lower half of the right block, side by side */
   html[data-simple] #h19Right > #h18Charts{ display:grid; grid-template-columns:1fr 1fr;
     grid-template-rows:minmax(0,1fr); column-gap:var(--h18gut); row-gap:0 }
+  /* PASTE 820 — the one scoreboard card is a fixed header row (88px) atop the charts quadrant in the
+     #h19Right desktop regime too; the two line charts sit in the row beneath it (grid-row:2). This
+     override matches 1864's specificity and follows it, so the card never collapses onto the charts. */
+  html[data-simple] #h19Right > #h18Charts{ grid-template-rows:88px minmax(0,1fr); row-gap:6px }
 
   /* ONE task column now: the completions column is 30% wide and two sub-columns of ~230px cannot
      hold a standard's name. The list keeps its inner scroll (R70.186) and the receipt states
@@ -2264,38 +2283,23 @@ textarea{ -webkit-overflow-scrolling:touch }
 #sSlpBlk[hidden]{ display:none !important }
 
 /* ======================= HT-26 S2 · C5 the TODAY strip + INSIGHTS five · C3a the journal ======================= */
-/* HT-228 (PASTE 228): the old three-number strip class is gone; #tStrip is now the HERO renderer's bar/mast.
-   THE CARD - first under Insights on the phone, first in the desktop right block. The numeral is the
-   emotion: >=64px on the phone, >=72px from 1024 up (below). Its colour is set inline (the band ink). */
+/* HT-228 (PASTE 228 → 820): THE ONE SCOREBOARD CARD — first under Insights on the phone, first in the
+   desktop charts quadrant. The numeral is the emotion: >=64px on the phone, 30px horizontal on the
+   desktop (below). Its colour is set inline (the band ink). */
 .stat-hero{ display:flex; flex-direction:column; gap:6px; min-width:0 }
 .stat-hero .sh-pct{ font:600 64px/1 var(--mono); letter-spacing:-.03em }
-.stat-hero .sh-sub{ display:flex; flex-wrap:wrap; align-items:baseline; gap:4px 8px;
-  font:500 12px/1 var(--mono); color:var(--ink2) }
-.hero-m{ white-space:nowrap }
-.hk{ font:500 9px/1 var(--mono); letter-spacing:.12em; text-transform:uppercase; color:var(--ink3) }
-.hero-m .num{ font-weight:600 }
-.hero-dot{ font-style:normal; color:var(--ink3); margin:0 1px }
-.hero-best{ font:600 11px/1 var(--mono); letter-spacing:.06em; text-transform:uppercase }
-.hero-best.h32secured{ color:var(--st-secured) } .hero-best.h32ontrack{ color:var(--st-ontrack) }
-.hero-best.h32atrisk{ color:var(--st-atrisk) }  .hero-best.h32out{ color:var(--st-outofreach) }
-
-/* THE BAR - the foot of Today on the phone. A slim full-width bar, the fill as wide as the day's percent
-   in the day's band ink, the percent at the right, Insights the only text link. */
-.hero-bar{ display:flex; align-items:center; gap:8px; width:100%; margin:2px 0 8px; padding:8px 2px;
-  background:none; border:0; border-top:1px solid var(--rule); color:var(--ink); font:inherit;
-  text-align:left; cursor:pointer }
-.hero-bar .hero-track{ flex:1; min-width:0; height:8px; background:var(--sunk); border:1px solid var(--rule); overflow:hidden }
-.hero-bar .hero-fill{ display:block; height:100% }
-.hero-bar .hero-num{ font:600 15px/1 var(--mono); letter-spacing:-.01em }
-.hero-bar .go{ font:500 10px/1 var(--mono); letter-spacing:.08em; text-transform:uppercase; color:var(--accent) }
-
-/* THE MAST - restyled at 1024 (below); on the phone #tStrip is the bar, so this base only guards a
-   hero-mast that somehow renders narrow. */
-.hero-mast{ display:flex; align-items:baseline; gap:10px; width:100%; margin:2px 0 8px; padding:8px 2px;
-  background:none; border:0; border-top:1px solid var(--rule); color:var(--ink); font:inherit;
-  text-align:left; cursor:pointer }
-.hero-mast .hero-num{ font:700 28px/1 var(--mono); letter-spacing:-.02em }
-.hero-mast .hero-mrow{ display:flex; flex-wrap:wrap; align-items:baseline; gap:4px 8px }
+/* PASTE 820 — the one scoreboard body: big percent, three EQUAL tiles (7 days · 30 days · streak), one
+   caption. Equal widths and gaps (R70.306); each figure in its band ink, streak the neutral ink with `d`. */
+.stat-hero .sh-tiles{ display:grid; grid-template-columns:repeat(3,1fr); gap:8px; margin-top:4px }
+.stat-hero .sh-tile{ display:flex; flex-direction:column; gap:3px; min-width:0 }
+.stat-hero .sh-k{ font:500 9px/1 var(--mono); letter-spacing:.12em; text-transform:uppercase; color:var(--ink3) }
+.stat-hero .sh-v{ font:600 18px/1 var(--mono); letter-spacing:-.01em }
+.stat-hero .sh-cap{ margin-top:6px; font:500 10px/1 var(--mono); letter-spacing:.08em;
+  text-transform:uppercase; color:var(--ink3) }
+/* PASTE 820 — RETIRED (CONSOLIDATE): the Today-tab `.hero-bar` and the desktop `.hero-mast` figure,
+   with their `.hero-track`/`.hero-fill`/`.hero-mrow`/`.hero-num`/`.hero-m`/`.hk`/`.hero-dot`/`.hero-best`
+   word-label parts and the `.sh-sub` sub-line, are gone — the one scoreboard above replaces them at
+   every width. No JS renders these classes any more (one renderer per kind). */
 .c5rows{ display:grid; gap:2px; margin-top:6px }
 .c5r{ display:flex; align-items:baseline; gap:8px; padding:3px 0; border-bottom:1px solid var(--rule) }
 .c5r .n{ flex:1; min-width:0; font-size:12px; line-height:1.3; color:var(--ink) }
@@ -2323,19 +2327,9 @@ html[data-simple][data-vtab="views"] #h26Ins, html[data-simple][data-vtab="views
 /* the desktop's quadrants are full and measured (golden_ht18): there the two panels live in the
    app's overlay, opened from the masthead strip, and never take a row of the grid */
 #ov #h26Ins, #ov #h26Jrn{ display:block !important; margin-bottom:14px }
-@media(min-width:1024px){
-  /* THE MAST FIGURE: >=28px, band-inked, the largest text in .mast (the wordmark is 13px, a tape figure
-     16px), on the row's baseline with line-height:1 so it does not grow the masthead row (golden_ht18,
-     stress 3). It sits just after the date, left of the version stamp. */
-  .mast .hero-mast{ display:inline-flex; align-items:baseline; width:auto; margin:0 0 0 14px; padding:0;
-    border:0; gap:0 10px; line-height:1; white-space:nowrap }
-  .mast .hero-mast .hero-num{ font:700 28px/1 var(--mono); letter-spacing:-.02em }
-  .mast .hero-mast .hero-mrow{ gap:0 8px; flex-wrap:nowrap }
-  .mast .hero-mast .sh-sub, .mast .hero-mast .hero-m .num{ font-size:11px }
-  /* THE DESKTOP HERO IS THE MASTHEAD FIGURE ABOVE. The day's-percent CARD (72px numeral) is NOT placed
-     in #h16Ins: that panel is the full-height LIFE quadrant (golden_ht18), whose grid already sits at
-     the ht18 cell floor, so a card there would drop it below floor - and ht18 is never loosened. */
-}
+/* PASTE 820 — RETIRED (CONSOLIDATE): the desktop `.mast .hero-mast` figure left the masthead. The day's
+   ranking has ONE home at every width — the scoreboard card, placed at the head of the charts quadrant
+   on the desktop (#h18Charts, see S1b above) and first under Insights on the phone. */
 /* MORE holds HT-13's own #vInsights node (moved, never copied); inside an OPENED More it may show */
 html[data-simple] #c5More[open] #vInsights, html[data-simple] #c5More[open] #vDow{ display:block !important }
 
@@ -3472,9 +3466,8 @@ html[data-simple] .chart text.xl2-today{ fill:var(--text); font-weight:600 }
    vertical scroller, which these two stop. Nothing is clipped: golden_ht20 P10a's rule (fit, never hide) holds. */
 
 @media (max-width:1023px){
-  /* S2.1 · the bar opens Today, full width, and no longer says "Insights" */
-  html[data-simple] .colL > #tStrip.hero-bar{ width:100%; margin:0 0 10px }
-  html[data-simple] #tStrip .go{ display:none }
+  /* S2.1 · PASTE 820: the #tStrip day-percent bar left Today (the ranking's one home is the scoreboard),
+     so its Today-column rules are retired with it. */
 
   /* S2.2 · EVERY ROW IS RED UNTIL IT IS DONE, THEN GREEN. The white rows were a linked name: `a.nm` took --ink at
      (0,3,2) and out-ranked the done colour. One rule per state, above every earlier one. */
@@ -3662,11 +3655,11 @@ body{
 .esheet .ebody{ box-shadow:var(--elev-3) }
 
 /* 3 · TABULAR NUMERALS everywhere a number sits — the body sets it (app.css:6), but a `font:` SHORTHAND
-   resets font-variant-numeric to `normal`, and the hero number (`.hero-mast/.hero-bar .hero-num`) carries
-   one — so its digits were proportional. Re-declared here at matching-or-higher specificity, LAST in the
-   cascade, for the three the brief names: the hero number, the bar, and the ledger. golden_ht41 T5 holds it. */
-.mast .hero-mast .hero-num, .hero-mast .hero-num, .hero-bar .hero-num,
-.stat-hero .sh-pct, .hero-bar, .hero-m, .hero-num,
+   resets font-variant-numeric to `normal`, so the scoreboard figures carry one — else their digits read
+   proportional. Re-declared here at matching-or-higher specificity, LAST in the cascade, for the number
+   surfaces that ship: the scoreboard big % and tiles, and the ledger. golden_ht41 T5 holds it.
+   (PASTE 820: the `.hero-mast/.hero-bar .hero-num` selectors are gone with the retired bar/mast.) */
+.stat-hero .sh-pct, .stat-hero .sh-v,
 .h16sc, .h16sc td, .h16sc td.num, #log .li{
   font-variant-numeric:tabular-nums;
 }

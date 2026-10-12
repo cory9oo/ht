@@ -115,18 +115,31 @@
   --text:var(--ht-text);
   --muted:var(--ht-muted);
   --grey:var(--ht-dim);
-  --red:var(--ht-ramp-0);
+  --red:var(--g0);
   --red-bright:var(--ht-red);
   --green:var(--ht-green);
   --green-bright:var(--ht-green);
   --amber:var(--ht-amber);
   --today:var(--ht-today);
 
-  --ramp-0:var(--ht-ramp-0);
-  --ramp-1:var(--ht-ramp-1);
-  --ramp-2:var(--ht-ramp-2);
-  --ramp-3:var(--ht-ramp-3);
-  --ramp-4:var(--ht-ramp-4);
+  /* PASTE 820 — ONE SCALE. The ramp is the five colours Cory likes (the A..F swatches --g0 red → --g4
+     teal-green), so `.ramp-N` / `rampVar` carry the same band table as `rampFill` and the life grid.
+     `--ht-ramp-0..4` stay declared but unused by rankings now (DEC-037, archive-never-delete). */
+  --ramp-0:var(--g0);
+  --ramp-1:var(--g1);
+  --ramp-2:var(--g2);
+  --ramp-3:var(--g3);
+  --ramp-4:var(--g4);
+
+  /* PASTE 820 — the figure TEXT inks, one per band. The band SWATCH is the pure --g hex; a FIGURE
+     (the big Today percent, a scoreboard tile) is TEXT, and --g0 (red) reads ~4.3:1 on the card panel
+     (--surface #10131A) — under 4.5:1 — so band 0's ink is its nearest passing shade. Bands 1..4 clear
+     4.5:1 as text and use their own swatch hex. `contrast_ht32.py` proves all five. */
+  --gink0:#E26A60;
+  --gink1:var(--g1);
+  --gink2:var(--g2);
+  --gink3:var(--g3);
+  --gink4:var(--g4);
 
   /* the two chart lines (PASTE 731): completion is the headline series and reads as a calm GREEN,
      drawn dashed; the rating carries the warm AMBER and is drawn solid — so a first-time reader tells

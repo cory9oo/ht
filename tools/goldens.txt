@@ -33,3 +33,5 @@ golden_ht704_topspace.py
 golden_ht816_name.py
 golden_ht816_hold.py
 golden_ht816_charts.py
+# paste 820 — one scale for every ranking (percent bands, five colours, letters gone), one scoreboard
+golden_ht820_scale.py

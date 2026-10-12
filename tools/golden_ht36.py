@@ -9,17 +9,18 @@ Cory, Thursday 2026-09-24 23:27 CDT: "these percentages on the bottom belong to 
 tab ... clearly show ... the daily percent and make it color coded. Same request for desktop. It's too
 hidden and doesn't trigger enough emotion."
 
-  S1  THE HERO CARD - the day's percent as ONE big numeral, band-inked, first under Insights on the
-      phone and first in the desktop right block; the sub-line is the same numbers it always had; and
-      the numeral clears 4.5:1 on its card in every scheme.
-  S2  THE FOOT BAR AND THE MASTHEAD FIGURE - the grey strip is the day-percent bar on the phone, and
-      the masthead figure on the desktop is >=28px, band-inked and the largest text in .mast; the old
-      three-number markup is GONE (not hidden).
+  S1  THE SCOREBOARD CARD (PASTE 820) - the day's percent as ONE big numeral in its band ink, first
+      under Insights on the phone and in the charts quadrant on the desktop; THREE EQUAL tiles
+      (7 days · 30 days · streak) and one `need 80%` caption; the numeral clears 4.5:1 on its card in
+      every scheme (the ratio table for the receipt).
+  S2  THE BAR AND MAST ARE RETIRED (PASTE 820) - the Today-tab foot bar and the masthead figure are
+      GONE at both widths (the ranking has one home, the scoreboard); the old #tStrip / .hero-bar /
+      .hero-mast markup and style are gone, not hidden.
 
 134 R1: this file prints its assertion count; a section that asserts nothing is a FAIL, not a pass.
 Every colour asserted is what the BROWSER resolved (getComputedStyle), never the text of a file. The
-band is the MONTH CHART's (__HT16.rampIx) and the ink is the scheme's own token by band family
-(--bad / --st-atrisk / --good), never grade()/gcol().
+band is the ONE band table (__HT16.rampIx, steps of 20) and the figure ink is that band's text-safe
+shade (--gink0..--gink4), never grade()/gcol().
 """
 import argparse, asyncio, io, os, re, sys
 from playwright.async_api import async_playwright
@@ -56,9 +57,11 @@ def fixture_dir(estate):
 FIX = fixture_dir(ESTATE)
 BASE = 'file://' + os.path.join(FIX, 'index.html').replace(os.sep, '/')
 
-THEMES = ['classic', 'crimson', 'moss', 'gilt', 'orchid']
-# pct -> (month-chart band it carries, the family token that inks it) - S1.5
-CASES = [(68, 2, '--st-atrisk'), (95, 4, '--good'), (10, 0, '--bad')]
+THEMES = ['crimson', 'moss', 'graphite']
+# PASTE 820: pct -> (the one band table's band, the figure TEXT ink for it: --gink0..--gink4). Every
+# ranking colour is the one scale now; the figure ink is the band's text-safe shade (band 0 red is the
+# nearest passing shade, --gink0), proven to clear 4.5:1 on the card below (S1l).
+CASES = [(90, 4, '--gink4'), (70, 3, '--gink3'), (50, 2, '--gink2'), (30, 1, '--gink1'), (10, 0, '--gink0')]
 SQL = {'__HT29_SQL': True, '__SECTION': True}
 
 RES = []
@@ -156,9 +159,9 @@ async def force(pg, pct):
 # =============================================================================================
 async def sec_s1(pw):
     CUR[0] = 'S1'
-    print("\n--- S1 . the hero: one renderer, band-inked, first on both widths ---")
+    print("\n--- S1 . the scoreboard: one renderer, band-inked, first on both widths (PASTE 820) ---")
 
-    # ---- the band the month chart carries, the ink the scheme gives it (phone card) ----------
+    # ---- the band the one table gives, the figure ink that band carries (phone card) ----------
     b, pg, errs = await open_page(pw, 390, 844)
     await open_insights(pg)
     for pct, band, tok in CASES:
@@ -171,30 +174,31 @@ async def sec_s1(pw):
                      tok:getComputedStyle(document.documentElement).getPropertyValue(a.tok).trim() }; }"""
             % BG, {'pct': pct, 'tok': tok})
         ok = r is not None
-        chk('S1a.%d%% . the numeral carries the month chart\'s band %d' % (pct, band),
+        chk('S1a.%d%% . the numeral carries the one band table\'s band %d' % (pct, band),
             ok and r['band'] == band, r)
-        chk('S1b.%d%% . and is inked %s, the scheme token (not a grade colour)' % (pct, tok),
+        chk('S1b.%d%% . and is inked %s, the band\'s text-safe shade (not a grade letter colour)' % (pct, tok),
             ok and rgb(r['color']) is not None and rgb(r['color']) == rgb(r['tok']),
             ok and [r['color'], r['tok']])
         chk('S1c.%d%% . the numeral is >=64px at 390 wide' % pct, ok and r['fs'] >= 64, ok and r['fs'])
-    chk('S1d . zero page errors building the phone hero', not errs, errs[:2])
+    chk('S1d . zero page errors building the phone scoreboard', not errs, errs[:2])
     await b.close()
 
-    # ---- the sub-line is the same numbers it always had --------------------------------------
+    # ---- three EQUAL tiles (7 days · 30 days · streak) and one `need 80%` caption -------------
     b, pg, errs = await open_page(pw, 390, 844)
     await open_insights(pg)
-    d = await pg.evaluate("""() => { const s=window.__HT26.strip(); let m=null, wk=null;
+    await force(pg, 68)
+    d = await pg.evaluate("""() => { const s=window.__HT26.strip(); let m=null;
         try{ m=window.__HT29GRP.you().m; }catch(e){}
-        try{ const n=window.__HT32NEED.compute(); wk=window.__HT32WEEK.needLabel(n); }catch(e){}
-        const sub=document.querySelector('#h228Hero .sh-sub');
-        return { week:s.week, streak:s.streak, m:m, wk:wk, sub: sub?sub.innerText:null }; }""")
-    subU = (d['sub'] or '').upper()
-    chk('S1e . the sub-line carries the 7-day figure from __HT26.strip()',
-        d['sub'] is not None and (str(d['week']) + '%') in d['sub'], d)
-    chk('S1f . and the 30-day figure from __HT29GRP.you().m',
-        d['m'] is None or (str(d['m']) + '%') in d['sub'], d)
-    chk('S1g . and the streak and the week figure from __HT32NEED.compute()',
-        ('STREAK' in subU) and (d['wk'] is None or any(w in subU for w in ('SECURED', 'BEST', 'NEED'))), d)
+        const keys=[...document.querySelectorAll('#h228Hero .sh-tile .sh-k')].map(k=>(k.textContent||'').trim().toLowerCase());
+        const vals=[...document.querySelectorAll('#h228Hero .sh-tile .sh-v')].map(v=>(v.textContent||'').trim());
+        const caps=[...document.querySelectorAll('#h228Hero .sh-cap')].map(c=>(c.textContent||'').trim().toLowerCase());
+        return { week:s.week, streak:s.streak, m:m, keys:keys, vals:vals, caps:caps }; }""")
+    chk('S1e . three tiles labelled 7 days · 30 days · streak',
+        d['keys'] == ['7 days', '30 days', 'streak'], d['keys'])
+    chk('S1f . the 7-day tile carries __HT26.strip()\'s week figure',
+        (str(d['week']) + '%') in d['vals'], d)
+    chk('S1g . the streak tile reads the streak with a trailing d, and the only caption is `need 80%`',
+        (str(d['streak']) + 'd') in d['vals'] and d['caps'] == ['need 80%'], d)
     await b.close()
 
     # ---- FIRST under the Insights title on the phone -----------------------------------------
@@ -204,30 +208,26 @@ async def sec_s1(pw):
         const first=body && [...body.children].filter(n=>n.offsetParent)[0];
         return { firstId: first?first.id:null, heroVis: (()=>{const h=document.getElementById('h228Hero');
                  return !!h && !!h.offsetParent;})() }; }""")
-    chk('S1h . phone . the hero is the first card under the Insights title',
+    chk('S1h . phone . the scoreboard is the first card under the Insights title',
         place['firstId'] == 'h228Hero' and place['heroVis'], place)
     await b.close()
 
-    # ---- the desktop hero is the MASTHEAD figure, and the LIFE quadrant is NOT encroached ----
-    # #h16Ins is the full-height LIFE quadrant (golden_ht18); its grid already sits at the ht18 cell
-    # floor, so the day's-percent CARD is NOT injected there (it would drop the life cell below floor,
-    # and ht18 is never loosened). On the desktop the hero is the large band-inked masthead figure -
-    # measured in full in S2 (>=28px, band-inked, largest text in .mast, left of the version stamp).
+    # ---- the desktop scoreboard is the SAME card, in the charts quadrant (#h18Charts) ---------
+    # PASTE 820: ONE renderer, both widths. On the desktop the card is the first thing in the charts
+    # quadrant (the month/year line charts sit in the row beneath it); the life quadrant is untouched.
     b, pg, errs = await open_page(pw, 1695, 900)
-    dk = await pg.evaluate("""() => {
-        const ins=document.getElementById('h16Ins');
-        const num=document.querySelector('#tStrip .hero-num');
-        const cs=num?getComputedStyle(num):null;
-        return { insHasCard: !!(ins && ins.querySelector('#h228Hero')),
-                 mastFs: cs?parseFloat(cs.fontSize):null }; }""")
+    dk = await pg.evaluate("""() => { const tr=document.getElementById('h18Charts');
+        const card=document.getElementById('h228Hero');
+        const pct=card?card.querySelector('.sh-pct'):null;
+        const tiles=card?card.querySelectorAll('.sh-tile').length:0;
+        return { inCharts: !!(tr && card && tr.contains(card) && card.offsetParent),
+                 hasPct: !!(pct && pct.offsetParent), tiles:tiles }; }""")
     ok = dk is not None
-    chk('S1i . desktop . the LIFE quadrant (#h16Ins) carries NO hero card, so ht18\'s cell floor holds',
-        ok and dk['insHasCard'] is False, dk)
-    chk('S1j . desktop . the day\'s hero is the masthead figure, >=28px (full test in S2)',
-        ok and dk['mastFs'] and dk['mastFs'] >= 28, ok and dk)
+    chk('S1i . desktop . the scoreboard renders in the charts quadrant, the same card markup',
+        ok and dk['inCharts'] and dk['hasPct'] and dk['tiles'] == 3, dk)
     await b.close()
 
-    # ---- contrast: numeral vs its card, every scheme, all three inks (the table for the receipt) ---
+    # ---- contrast: numeral vs its card, every scheme, all five band inks (the table for the receipt) ---
     print("  --- contrast table (numeral vs card background), 4.5:1 floor ---")
     for t in THEMES:
         b, pg, errs = await open_page(pw, 390, 844, storage={'ht_theme': t})
@@ -239,7 +239,7 @@ async def sec_s1(pw):
                 if(!el) return null; const cs=getComputedStyle(el); return { color:cs.color, bg:bgOf(el) }; }""" % BG)
             cr = ratio(rgb(r['color']), rgb(r['bg'])) if r and rgb(r['color']) and rgb(r['bg']) else 0
             row.append((tok, round(cr, 2)))
-            chk('S1l . %-7s . %s (%d%%) clears 4.5:1 on its card' % (t, tok, pct), cr >= 4.5, cr)
+            chk('S1l . %-8s . %s (%d%%) clears 4.5:1 on its card' % (t, tok, pct), cr >= 4.5, cr)
         print("        %-8s %s" % (t, '  '.join('%s=%.2f' % (k.replace('--', ''), v) for k, v in row)))
         await b.close()
 
@@ -249,74 +249,39 @@ async def sec_s1(pw):
 # =============================================================================================
 async def sec_s2(pw):
     CUR[0] = 'S2'
-    print("\n--- S2 . the foot of Today is the bar; the masthead is the figure ---")
+    print("\n--- S2 . the bar and the masthead figure are RETIRED; the scoreboard is the one home ---")
 
-    # ---- the phone foot bar ------------------------------------------------------------------
+    # ---- phone: no foot bar, Today is inputs only --------------------------------------------
     b, pg, errs = await open_page(pw, 390, 844)
-    bar = await pg.evaluate("""() => { const s=document.getElementById('tStrip');
-        if(!s) return null; const cs=getComputedStyle(s);
-        const fill=s.querySelector('.hero-fill'), pctN=s.querySelector('.hero-num'),
-              go=s.querySelector('.go');
-        return { cls:s.className, w:Math.round(s.getBoundingClientRect().width),
-                 cw:document.querySelector('.colL')?Math.round(document.querySelector('.colL').getBoundingClientRect().width):null,
-                 fillW: fill?fill.style.width:null, pct: pctN?pctN.textContent.trim():null,
-                 go: go?go.textContent.trim():null,
-                 nums: window.__HT26.strip() }; }""")
-    ok = bar is not None
-    chk('S2a . phone . #tStrip is the day-percent bar (hero-bar)', ok and bar['cls'] == 'hero-bar', ok and bar['cls'])
-    chk('S2b . phone . it is full width of the column',
-        ok and bar['cw'] and abs(bar['w'] - bar['cw']) <= 2, ok and [bar['w'], bar['cw']])
-    chk('S2c . phone . the bar percent equals the day\'s completion (the hero\'s)',
-        ok and bar['pct'] == (str(bar['nums']['today']) + '%'), ok and [bar['pct'], bar['nums']])
-    chk('S2d . phone . the fill is as wide as the percent', ok and bar['fillW'] == (str(bar['nums']['today']) + '%'), ok and bar['fillW'])
-    # AMENDED BY PASTE 293 S2.1 (R67.2, Cory 2026-09-28: "you can remove the insights ... verbiage on the today's tab. It is
-    # a duplicate because I can already get to insights by clicking on the tab at the bottom"): the words are GONE; the
-    # bar's tap still opens Insights (the next check).
-    chk('S2e . phone . the bar carries no "Insights" words any more', ok and not bar['go'], ok and bar['go'])
-    # the tap opens Insights
-    await pg.click('#tStrip')
-    await pg.wait_for_timeout(700)
-    opened = await pg.evaluate("() => { const n=document.getElementById('h30Ins'); return !!(n && n.offsetParent); }")
-    chk('S2f . phone . a tap on the bar opens Insights', opened, opened)
-    chk('S2g . phone . zero page errors', not errs, errs[:2])
+    t = await pg.evaluate("""() => { const col=document.querySelector('.colL');
+        return { strip: !!document.getElementById('tStrip'),
+                 bar: !!document.querySelector('.hero-bar, .hero-mast'),
+                 colPct: !!(col && col.querySelector('.sh-pct')),
+                 log: !!document.getElementById('log'), dump: !!document.getElementById('iDump') }; }""")
+    chk('S2a . phone . the day-percent foot bar (#tStrip / .hero-bar) is gone from Today',
+        not t['strip'] and not t['bar'], t)
+    chk('S2b . phone . no ranking percent in the Today column', not t['colPct'], t)
+    chk('S2c . phone . Today keeps its inputs: the checklist (#log) and the brain dump (#iDump)',
+        t['log'] and t['dump'], t)
+    chk('S2d . phone . zero page errors', not errs, errs[:2])
     await b.close()
 
-    # ---- the desktop masthead figure ---------------------------------------------------------
+    # ---- desktop: no masthead figure, the scoreboard is the one home --------------------------
     b, pg, errs = await open_page(pw, 1695, 900)
-    m = await pg.evaluate("""() => { const s=document.getElementById('tStrip');
-        if(!s) return null; const num=s.querySelector('.hero-num');
-        const cs=num?getComputedStyle(num):null;
-        // largest text in .mast
-        const mast=document.querySelector('.mast'); let maxfs=0;
-        if(mast){ const w=document.createTreeWalker(mast, NodeFilter.SHOW_TEXT,
-            {acceptNode:n=>n.textContent.trim()?1:3}); let x;
-          while((x=w.nextNode())){ const e=x.parentElement, c=e&&getComputedStyle(e);
-            if(!c||c.visibility==='hidden'||c.display==='none') continue;
-            maxfs=Math.max(maxfs, parseFloat(c.fontSize)||0); } }
-        const stamp=document.getElementById('h185sync');
-        const nr=num?num.getBoundingClientRect():null, sr=stamp?stamp.getBoundingClientRect():null;
-        return { cls:s.className, inMast: !!s.closest('.mast'), fs: cs?parseFloat(cs.fontSize):null,
-                 maxfs:maxfs, numLeft: nr?nr.left:null, stampLeft: sr?sr.left:null,
-                 stampSeen: !!stamp }; }""")
-    ok = m is not None
-    chk('S2h . desktop . #tStrip is the masthead figure (hero-mast), inside .mast',
-        ok and m['cls'] == 'hero-mast' and m['inMast'], ok and m)
-    chk('S2i . desktop . the figure is >=28px', ok and m['fs'] and m['fs'] >= 28, ok and m['fs'])
-    chk('S2j . desktop . and it is the largest text in the masthead',
-        ok and m['fs'] and m['maxfs'] and m['fs'] >= m['maxfs'] - 0.5, ok and [m['fs'], m['maxfs']])
-    chk('S2k . desktop . the figure sits left of the version stamp',
-        ok and (not m['stampSeen'] or (m['numLeft'] is not None and m['stampLeft'] is not None and m['numLeft'] < m['stampLeft'])),
-        ok and [m['numLeft'], m['stampLeft']])
-    chk('S2l . desktop . zero page errors', not errs, errs[:2])
+    m = await pg.evaluate("""() => ({ strip: !!document.getElementById('tStrip'),
+        mast: !!document.querySelector('.hero-mast'),
+        card: !!(document.getElementById('h18Charts') && document.querySelector('#h18Charts #h228Hero')) })""")
+    chk('S2e . desktop . the masthead figure (#tStrip / .hero-mast) is gone', not m['strip'] and not m['mast'], m)
+    chk('S2f . desktop . the one scoreboard is in the charts quadrant instead', m['card'], m)
+    chk('S2g . desktop . zero page errors', not errs, errs[:2])
     await b.close()
 
-    # ---- the old markup is GONE, not hidden (S2.3) -------------------------------------------
+    # ---- the old bar/mast renderer is GONE, not hidden (PASTE 820 CONSOLIDATE/RETIRE) ----------
     appjs = src(os.path.join(REPO, 'app.js'))
-    appcss = src(os.path.join(REPO, 'app.css'))
-    chk('S2m . the old strip markup is gone: no `class="k">Streak` in app.js',
-        appjs.count('class="k">Streak') == 0, appjs.count('class="k">Streak'))
-    chk('S2n . the old strip style is gone: no `.tstrip` in app.css',
-        appcss.count('.tstrip') == 0, appcss.count('.tstrip'))
+    chk('S2h . the bar/mast renderer is gone from app.js (no hero-bar / hero-mast className set)',
+        "'hero-bar'" not in appjs and "'hero-mast'" not in appjs, None)
+    chk('S2i . the .sh-sub sub-line markup is retired in app.js (the three tiles replace it)',
+        appjs.count('sh-sub') == 0, appjs.count('sh-sub'))
 
 
 async def main():

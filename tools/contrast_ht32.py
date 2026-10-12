@@ -40,8 +40,14 @@ TEXT = ('--ink', '--ink2', '--good', '--bad',
         # paste 179 S6: one colour per group member, and a member's NAME is text
         '--m1', '--m2', '--m3', '--m4',
         # paste 185 S3: a section header, its rail and its `+ Add` line are text in the section colour
-        '--sec-morning', '--sec-night', '--sec-weekly', '--sec-standards')
-BG = ('--ground', '--sheet', '--sunk', '--sel')
+        '--sec-morning', '--sec-night', '--sec-weekly', '--sec-standards',
+        # PASTE 820: the one scale's FIGURE inks. A ranking percent (the big Today figure, a scoreboard
+        # tile, a ledger cell) is TEXT, drawn in its band's text-safe shade --gink0..--gink4, so every
+        # ranking number must clear the text floor. The pure band SWATCH stays in NON_TEXT below.
+        '--gink0', '--gink1', '--gink2', '--gink3', '--gink4')
+# PASTE 820 adds `--surface` (the scoreboard/Insights card ground, --ht-panel #10131A) so the five
+# figure inks are measured on the ground they actually sit on, at every width and theme.
+BG = ('--ground', '--sheet', '--sunk', '--sel', '--surface')
 
 # Measured, but NOT held to the text floor - these are rules, hairlines and dividers.
 NON_TEXT = ('--ink3', '--rule', '--rule2', '--g0', '--g1', '--g2', '--g3', '--g4', '--g5')
@@ -85,16 +91,20 @@ def main():
         return 1
 
     # the source palette, so a theme may point at --ht-* names
-    base, _ = read_theme(os.path.join(REPO, 'tokens.css'))
+    base, base_refs = read_theme(os.path.join(REPO, 'tokens.css'))
 
     pairs = bad = unresolved = 0
     for f in files:
         name = os.path.splitext(os.path.basename(f))[0]
         t, refs = read_theme(f)
         merged = dict(base); merged.update(t)
-        for k, v in refs.items():
-            if k not in merged and v in merged:
-                merged[k] = merged[v]
+        # Resolve the theme's own var() refs, then the base's — a base token may point at a token the
+        # THEME declares (PASTE 820: `--gink1..4` live in tokens.css as `var(--g1..4)`, and `--g1..4`
+        # live in each theme file), so base refs must be resolved against the MERGED map, never dropped.
+        for _pass in range(4):
+            for k, v in list(refs.items()) + list(base_refs.items()):
+                if k not in merged and v in merged:
+                    merged[k] = merged[v]
 
         rows, miss = [], []
         for tk in TEXT:

@@ -71,6 +71,12 @@ var WD    = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
 var WD2   = ['S','M','T','W','T','F','S'];
 var MO    = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 var GRADE = [[97,'A+',5],[90,'A',4],[80,'B',3],[70,'C',2],[60,'D',1],[0,'F',0]];
+/* PASTE 820 — ONE SCALE. `NEED` is the single top-band edge for every ranking colour in the app: the
+   five-band table steps by 20 and its top band is `>= NEED`. It is the one home for the number (HT-32's
+   target reads it too), so code and page can never disagree. The five colours are the A..F swatches Cory
+   likes (teal-green --g4 · lime --g3 · yellow --g2 · orange --g1 · red --g0); `__HT16.rampIx`/`rampFill`
+   is the whole rule and everything reads it. */
+var NEED = 80;
 /* HT-22's `SKINS` list is RETIRED by HT-32 S6: the four raw skin names it held are now the keys of
    `SKIN2THEME` below, which is live code rather than a second list to keep in step. Nothing reads a
    raw skin name any more; the old `data-skin` VALUES still resolve in CSS, which is what actually
@@ -101,13 +107,19 @@ function fmt(m){ m=Math.round(m||0); if(!m) return '—';
 function grade(p){ if(p==null) return ['—',null];
   for(var i=0;i<GRADE.length;i++) if(p>=GRADE[i][0]) return [GRADE[i][1],GRADE[i][2]];
   return ['F',0]; }
-function gcol(p){ var g=grade(p); return g[1]==null?'var(--rule2)':'var(--g'+g[1]+')'; }
-/* PASTE 678 — ONE quiet legend under the life grid, used by both renderers (desktop paintLife18 and
-   phone HT185LIFE): the five grades A B C D F in the re-tuned --g scale (A=--g4 best .. F=--g0 worst),
-   then the three non-grade states — lived (--life-lived), ahead (--life-ahead) and the now ring. It
+function gcol(p){ var H=window.__HT16; return (p!=null&&H&&H.rampFill)?H.rampFill(p):'var(--rule2)'; }
+/* PASTE 820: the TEXT ink for a ranking percent. The band SWATCH is the pure --g hex; the figure ink is
+   its band's text-safe shade (--gink0..--gink4), because some --g hexes read under 4.5:1 as text on the
+   card panel (band 0, red, especially). null is unlogged and never a bad-day colour. */
+function bandInk(p){ var H=window.__HT16, i=(H&&H.rampIx)?H.rampIx(p):null;
+  return i==null?'var(--ink3)':('var(--gink'+i+')'); }
+/* PASTE 678 / 820 — ONE quiet legend under the life grid, used by both renderers (desktop paintLife18 and
+   phone HT185LIFE): the five bands labelled by PERCENT (80+ best .. <20 worst) in the --g scale (--g4 ..
+   --g0), then the three non-grade states — lived (--life-lived), ahead (--life-ahead) and the now ring.
+   PASTE 820 took the A B C D F letters out: every ranking is a percent now, on the one band table. It
    wraps instead of scrolling (app.css .lifeleg). Decorative, so aria-hidden: the SVG already labels. */
 function lifeLegend(){
-  var g=[['A','--g4'],['B','--g3'],['C','--g2'],['D','--g1'],['F','--g0']];
+  var g=[['80+','--g4'],['60+','--g3'],['40+','--g2'],['20+','--g1'],['<20','--g0']];
   var sw=g.map(function(x){ return '<span class="lifeleg-i"><i class="lifeleg-sw" style="background:var('+
     x[1]+')"></i>'+x[0]+'</span>'; }).join('');
   function sep(){ return '<span class="lifeleg-sep">·</span>'; }
@@ -1197,7 +1209,7 @@ function paintMast(){
   var d=dnum(S.date), t=(S.date===today());
   el('mDate').textContent = WD[d.getDay()]+' '+MO[d.getMonth()]+' '+d.getDate()+(t?'':' · logging back');
   var r=S.byDate[S.date]||{}, ids=ht293Due(S.date);          /* PASTE 293 S1.4 */
-  var pct=ht293Pct(S.date); if(pct==null) pct=0; var g=grade(pct);
+  var pct=ht293Pct(S.date); if(pct==null) pct=0;            /* PASTE 820: no grade letter — the tape reads the percent */
   var wk=weekly(), wkDone=wk.filter(function(h){return weekDone(h.id,S.date);}).length;
   var r7=rolling(7), r30=rolling(30), r90=rolling(90);
   var com=committed(), rem=remaining(S.date);
@@ -1205,14 +1217,14 @@ function paintMast(){
   var done=ids.filter(function(i){return (r.checked||{})[i];}).length;
 
   el('tape').innerHTML =
-    tp('Today', '<span style="color:'+gtxt(pct)+'">'+pct+'%</span><s>'+g[0]+'</s>') +
+    tp('Today', '<span style="color:'+gtxt(pct)+'">'+pct+'%</span>') +
     tp('Done',  done+'<s>of '+ids.length+'</s>') +
     tp('Earned today', fmt(com-rem)+'<s>of '+fmt(com)+'</s>') +
     /* HT-18 S5e (R70.187): the mast said `30-day 35%` and the surface now says `ADHERENCE 34%`.
        Two numbers, one word, one screen — and they are DIFFERENT metrics: rolling() is the mean of
        the daily completion percentages, adherence is hits over opportunities. The LABEL is what was
        wrong, so the label is what changes; no data and no arithmetic moves. */
-    tp('7d mean',  (r7==null?'—':r7+'%')+'<s>'+(r7==null?'':grade(r7)[0])+'</s>') +
+    tp('7d mean',  (r7==null?'—':r7+'%')) +
     tp('30d mean', (r30==null?'—':r30+'%')) +
     tp('90d mean', (r90==null?'—':r90+'%')) +
     tp('Consistency', (function(){ var c=consistency(90);
@@ -1622,7 +1634,7 @@ function measureAndDraw(id, fn){
   }
 }
 /* fills use the density ramp; text uses ink / bad / good only */
-function gtxt(p){ return p==null?'var(--ink3)':(p<50?'var(--bad)':(p>=90?'var(--good)':'var(--ink)')); }
+function gtxt(p){ return bandInk(p); }   /* PASTE 820: every ranking percent reads on the one band scale */
 function paintRight(){
   paintSankey(); paintHeat(); paintCal(); paintChart(); paintMomo(); paintDow();
   paintByMo(); paintByYear(); paintGdist();
@@ -2006,12 +2018,13 @@ function paintDow(){
   }).join('');
 }
 
-/* ---- grade distribution ---- */
+/* ---- the days by band (PASTE 820: percent bands, the one scale — no A..F letters) ---- */
 function paintGdist(){
-  var b=[0,0,0,0,0,0];
-  S.days.forEach(function(r){ if(r.pct==null||r.date>today()) return; b[grade(r.pct)[1]]++; });
+  var H=window.__HT16, b=[0,0,0,0,0];
+  S.days.forEach(function(r){ if(r.pct==null||r.date>today()) return;
+    var i=(H&&H.rampIx)?H.rampIx(r.pct):null; if(i!=null) b[i]++; });
   var mx=Math.max.apply(null,b)||1, tot=b.reduce(function(x,y){return x+y;},0);
-  var names=['F','D','C','B','A','A+'];
+  var names=['<20','20+','40+','60+','80+'];                 /* the five bands, best last */
   el('gdist').innerHTML = names.map(function(nm,i){
     var h=Math.max(b[i]?3:1,Math.round(b[i]/mx*52));
     return '<div class="c"><b>'+(b[i]||'')+'</b><i style="height:'+h+'px;background:var(--g'+i+')'+(b[i]?'':';opacity:.25')+'"></i><u>'+nm+'</u></div>';
@@ -2484,11 +2497,11 @@ function openCircle(){
 /* ---- exports ---- */
 function csvDays(){
   var ids=S.habits.map(function(h){return h.id;});
-  var head=['date','pct','grade','rating'].concat(S.habits.map(function(h){return '"'+nameOf(h.name).replace(/"/g,'""')+'"';}));
+  var head=['date','pct','rating'].concat(S.habits.map(function(h){return '"'+nameOf(h.name).replace(/"/g,'""')+'"';}));
   var out=[head.join(',')];
   dates().forEach(function(k){
     var r=S.byDate[k], ck=r.checked||{};
-    out.push([k, r.pct==null?'':r.pct, r.pct==null?'':grade(r.pct)[0], (ratingOf(k)==null?'':ratingOf(k))]
+    out.push([k, r.pct==null?'':r.pct, (ratingOf(k)==null?'':ratingOf(k))]   /* PASTE 820: the letter grade column leaves — one percent scale */
       .concat(ids.map(function(i){return ck[i]?1:0;})).join(','));
   });
   return out.join('\n');
@@ -2668,7 +2681,7 @@ function wire(){
   el('bClose').onclick=async function(){
     await saveDay({close:true}); await load(); paintAll();     /* HT-13 G2: the explicit close */
     var p=S.byDate[S.date].pct;
-    toast('closed · '+fmt(earned(S.date))+' earned · '+p+'% · '+grade(p)[0]);
+    toast('closed · '+fmt(earned(S.date))+' earned · '+p+'%');
     /* R-B rides this action: one optional tap, about tomorrow. */
     var n=el('predict');
     if(n && S.hasPredict){ n.scrollIntoView({behavior:'smooth',block:'center'}); }
@@ -4812,7 +4825,7 @@ var HT32_CARDFIT = true;
   }
   function birth(){ var b=S.priv0&&S.priv0.birth_date; return b?new Date(b+'T12:00:00'):null; }
   /* completion colour: the app's own grade bands, so a day reads the same here as on the sheet */
-  function gfill(p){ var g=grade(p); return g[1]==null?'var(--sunk)':'var(--g'+Math.max(1,g[1])+')'; }
+  function gfill(p){ return p==null?'var(--sunk)':((window.__HT16&&window.__HT16.rampFill)?window.__HT16.rampFill(p):'var(--sunk)'); }
   function pctOn(k){ var r=S.byDate[k]; return (r&&r.pct!=null&&loggedOn(k))?r.pct:null; }
   function loggedDates(){ return dates().filter(function(k){ return pctOn(k)!=null; }); }
   function meanOf(a){ return a.length? a.reduce(function(x,y){return x+y;},0)/a.length : null; }
@@ -5296,7 +5309,7 @@ var HT32_CARDFIT = true;
   }
   function pctOn(k){ var r=S.byDate[k]; return (r&&r.pct!=null&&loggedOn(k))?r.pct:null; }
   function meanOf(a){ return a.length? a.reduce(function(x,y){return x+y;},0)/a.length : null; }
-  function gfill(p){ var g=grade(p); return g[1]==null?'var(--sunk)':'var(--g'+Math.max(1,g[1])+')'; }
+  function gfill(p){ return p==null?'var(--sunk)':((window.__HT16&&window.__HT16.rampFill)?window.__HT16.rampFill(p):'var(--sunk)'); }
   function monthKeys(y,m){
     var out=[]; for(var i=1;i<=31;i++){ var d=new Date(y,m,i); if(d.getMonth()!==m) break; out.push(dk(d)); }
     return out;
@@ -5685,27 +5698,30 @@ var HT32_CARDFIT = true;
   function birth(){ var b=S.priv0&&S.priv0.birth_date; return b?new Date(b+'T12:00:00'):null; }
 
   /* ---- S1 · THE RAMP ------------------------------------------------------------------------
-     ONE ramp, and it is a band table, not a gradient: 0-24 · 25-49 · 50-74 · 75-89 · 90-100.
+     ONE ramp, and it is a band table, not a gradient: 0-19 · 20-39 · 40-59 · 60-79 · 80-100 (PASTE 820:
+     steps of 20, the top band is `>= NEED`, read from the one constant — never a second literal).
      `rampIx` is the whole rule; everything else reads it. `null` is UNLOGGED and gets `--surface` —
      never a ramp colour, because an unlogged day must not read as a bad day. */
   function rampIx(p){
     if(p==null) return null;
-    if(p<25) return 0; if(p<50) return 1; if(p<75) return 2; if(p<90) return 3; return 4;
+    if(p<20) return 0; if(p<40) return 1; if(p<60) return 2; if(p<NEED) return 3; return 4;
   }
   function rampClass(p){ var i=rampIx(p); return i==null?'ramp-none':('ramp-'+i); }
   function rampBg(p){ var i=rampIx(p); return i==null?'rampbg-none':('rampbg-'+i); }
-  /* `--g1 … --g5` are mapped onto `--ramp-0 … --ramp-4` in theme.css, so an SVG `fill` written as a
-     `--gN` token IS a ramp token. HT-15's golden reads that attribute, and it still reads true. */
-  function rampFill(p){ var i=rampIx(p); return i==null?'var(--surface)':('var(--g'+(i+1)+')'); }
+  /* PASTE 820: the five colours Cory likes are the A..F swatches `--g0 … --g4` (red → teal-green), and
+     `--ramp-0 … --ramp-4` are re-pointed onto them in tokens.css, so an SVG `fill` written as a `--gN`
+     token and a `.ramp-N` class carry the one scale, top band = `--g4`. (`--g5` stays declared, now
+     unused by rankings — DEC-037.) */
+  function rampFill(p){ var i=rampIx(p); return i==null?'var(--surface)':('var(--g'+i+')'); }
   function rampVar(p){ var i=rampIx(p); return i==null?'var(--surface)':('var(--ramp-'+i+')'); }
-  /* PASTE 731: the colour strip becomes a LABELLED scale. The five swatches are the ramp, and the
-     numbers beneath are the ramp's OWN band edges (rampIx: 25/50/75/90) — the dots are coloured by
-     exactly these bands, so a strip labelled 0-20/20-40 would mislabel every dot it legends. The
-     caption and title say what the colour means. */
+  /* PASTE 731 / 820: the colour strip is a LABELLED scale. The five swatches are the ramp, and the
+     numbers beneath are the ramp's OWN band edges (rampIx: 20/40/60/80) — the dots are coloured by
+     exactly these bands, so the ticks must match the edges or the strip would mislabel every dot it
+     legends. The caption and title say what the colour means. */
   function legend(){
     var sw='<span class="h16leg">'+[0,1,2,3,4].map(function(i){
       return '<i class="rampbg-'+i+'"></i>'; }).join('')+'</span>';
-    var ticks='<span class="h16legsc">'+[0,25,50,75,90,100].map(function(n){
+    var ticks='<span class="h16legsc">'+[0,20,40,60,80,100].map(function(n){
       return '<u>'+n+'</u>'; }).join('')+'</span>';
     return '<span class="h16legwrap" title="dot colour = that day’s completion grade">'+
       '<span class="h16legcap">completed %</span>'+sw+ticks+'</span>';
@@ -7918,11 +7934,11 @@ var HT32_CARDFIT = true;
           s+='<rect class="lf" x="'+cx+'" y="'+yy+'" width="'+cellW+'" height="'+cellH+
              '" fill="var(--life-ahead)"/>';
         } else if(by[wi]!==undefined){
-          var pct=mean18(by[wi]), g=grade(pct);
-          var tip='week '+wi+' · '+weekRange18(wi,b)+' · '+(pct==null?'—':Math.round(pct)+'%');
+          var pct=mean18(by[wi]);
+          var tip='wk '+wi+' · '+(pct==null?'—':Math.round(pct)+'%');   /* PASTE 820: percent, no letter */
           lived++;
           s+='<rect class="lw" x="'+cx+'" y="'+yy+'" width="'+cellW+'" height="'+cellH+
-             '" fill="'+window.__HT16.rampFill(pct)+'" data-wk="'+wi+'" data-grade="'+(g&&g[0]||'')+
+             '" fill="'+window.__HT16.rampFill(pct)+'" data-wk="'+wi+
              '" data-tip="'+esc(tip)+'"><title>'+esc(tip)+'</title></rect>';
         } else {
           lived++;
@@ -8650,14 +8666,10 @@ var HT32_CARDFIT = true;
      band-inked figure in the masthead on the desktop. The element, its id and its tap into Insights are
      unchanged; the renderer chooses the size from the width. */
   function paintStrip(){
-    var b=el('tStrip');
-    if(!b){
-      b=document.createElement('button'); b.id='tStrip'; b.type='button';
-      b.setAttribute('aria-label','open Insights');
-      b.addEventListener('click', openInsights);
-    }
-    if(!placeStrip(b)) return;
-    if(window.__HT228 && window.__HT228.strip) window.__HT228.strip(b);
+    /* PASTE 820: the day's percent LEFT the Today tab — the ranking has ONE home, the Insights
+       scoreboard (#h228Hero). Any #tStrip from an older render is removed; nothing is injected into
+       the Today column, which is inputs only now (checklist · the 1-10 picker · the three journals). */
+    var b=el('tStrip'); if(b && b.parentNode) b.parentNode.removeChild(b);
   }
   /* PHONE: Insights and the Journal are panels on the Views tab. DESKTOP: the quadrants are full, so they
      open in the app's own overlay - the panel NODES are moved in (HT-13's #vInsights rides inside
@@ -14015,7 +14027,7 @@ function h31CanInvite(circle){
    Worth saying plainly, because the screen will show it: AT TARGET 80 ON A SUN-FRI WEEK, `SECURED` IS
    ONLY REACHABLE ON THE LAST DAY. Four perfect days is 400 against a 480 week, so two days out you
    still owe 40 a day. The state is correct; it is simply rare. */
-var HT32_TARGET_PCT = 80;                 /* group.target_pct */
+var HT32_TARGET_PCT = NEED;               /* group.target_pct — the one home for 80 (PASTE 820 `NEED`) */
 var HT32_WEEK = 'sun_fri';                /* Sunday..Friday; Saturday is the Sabbath and is not scored */
 (function(){
   var SECURED = 'SECURED', ON_TRACK = 'ON TRACK', AT_RISK = 'AT RISK', OUT = 'OUT OF REACH';
@@ -14163,52 +14175,37 @@ var HT32_WEEK = 'sun_fri';                /* Sunday..Friday; Saturday is the Sab
 (function(){
   var HERO = 'h228Hero';
   function bandOf(p){ return (window.__HT16 && window.__HT16.rampIx) ? window.__HT16.rampIx(p) : null; }
-  function ink(band){
-    if(band == null) return 'var(--ink3)';   /* unlogged is never a bad day */
-    if(band <= 1) return 'var(--bad)';        /* 0-49% */
-    if(band === 2) return 'var(--st-atrisk)'; /* 50-74%, the scheme's muted mid */
-    return 'var(--good)';                     /* 75-100% */
-  }
   function pctTxt(p){ return (p == null) ? '—' : (p + '%'); }
-  function heroBest(t){ return t.replace(' FOR THE WEEK', '').replace('BEST POSSIBLE ', 'BEST ').replace(' TODAY', ''); }
   function data(){
     var s = (window.__HT26 && window.__HT26.strip) ? window.__HT26.strip() : { today: 0, week: 0, streak: 0 };
     var m = null;
     try{ var y = window.__HT29GRP && window.__HT29GRP.you && window.__HT29GRP.you(); if(y) m = y.m; }catch(e){}
-    var wkTxt = null, wkCls = '';
-    try{ var n = window.__HT32NEED && window.__HT32NEED.compute && window.__HT32NEED.compute();
-      if(n && window.__HT32WEEK){ wkTxt = window.__HT32WEEK.needLabel(n); wkCls = window.__HT32WEEK.cls(n); } }catch(e){}
-    return { today: s.today, week: s.week, streak: s.streak, m: m, wkTxt: wkTxt, wkCls: wkCls };
+    return { today: s.today, week: s.week, streak: s.streak, m: m };
   }
-  function metric(lbl, val, color){
-    return '<span class="hero-m"><span class="hk">' + lbl + '</span> <b class="num"' +
-           (color ? ' style="color:' + color + '"' : '') + '>' + val + '</b></span>';
+  /* ONE SCOREBOARD, ONE RENDERER (PASTE 820). `fill(node)` writes the whole card body — the big day
+     percent in its band ink, then THREE EQUAL tiles (7 DAYS · 30 DAYS · STREAK) and one caption
+     `need NN%` — and nothing else. The same markup is used at every width (phone Insights card and the
+     desktop charts quadrant): there is no second phone-vs-desktop markup. Each ranking figure is TEXT
+     coloured by the one band table through `bandInk` (streak is the neutral ink, with a trailing `d`). */
+  function tile(lbl, val, color){
+    return '<div class="sh-tile"><span class="sh-k">' + lbl + '</span><b class="num sh-v"' +
+           (color ? ' style="color:' + color + '"' : '') + '>' + val + '</b></div>';
   }
-  function subLine(d){
-    var parts = [ metric('7 days', pctTxt(d.week), ink(bandOf(d.week))),
-                  metric('30 days', pctTxt(d.m), ink(bandOf(d.m))),
-                  metric('Streak', (d.streak == null ? '—' : String(d.streak)), null) ];
-    if(d.wkTxt) parts.push('<span class="hero-m hero-best ' + d.wkCls + '">' + heroBest(d.wkTxt) + '</span>');
-    return parts.join('<i class="hero-dot">·</i>');
+  function fill(node){
+    var d = data();
+    node.innerHTML =
+      '<div class="num sh-pct" style="color:' + bandInk(d.today) + '">' + pctTxt(d.today) + '</div>' +
+      '<div class="sh-tiles">' +
+        tile('7 days',  pctTxt(d.week), bandInk(d.week)) +
+        tile('30 days', pctTxt(d.m),    bandInk(d.m)) +
+        tile('Streak',  (d.streak == null ? '—' : (String(d.streak) + 'd')), 'var(--ink)') +
+      '</div>' +
+      '<div class="sh-cap">need ' + NEED + '%</div>';
+    return node;
   }
-  /* THE STRIP ELEMENT (#tStrip): bar on the phone, mast on the desktop. Same element, id and tap. */
-  function strip(b){
-    var d = data(), col = ink(bandOf(d.today));
-    if(window.innerWidth >= 1024){
-      b.className = 'hero-mast';
-      b.innerHTML = '<b class="num hero-num" style="color:' + col + '">' + pctTxt(d.today) + '</b>' +
-                    '<span class="hero-mrow">' + subLine(d) + '</span>';
-    } else {
-      b.className = 'hero-bar';
-      var w = (d.today == null) ? 0 : Math.max(0, Math.min(100, d.today));
-      b.innerHTML = '<span class="hero-track"><span class="hero-fill" style="width:' + w + '%;background:' + col + '"></span></span>' +
-                    '<b class="num hero-num" style="color:' + col + '">' + pctTxt(d.today) + '</b>';
-      /* PASTE 293 S2.1: the words that pointed at Insights are gone - "I can already get to insights by clicking
-         on the tab at the bottom". The bar still opens it on a tap. */
-    }
-  }
-  /* THE CARD (#h228Hero): one node, wrapped by HT-30's card builder so it keeps the .h30c/.lab shape every
-     Insights golden reads. `four()` orders it first on the phone; placeDesktop puts it first on the desktop. */
+  /* THE CARD (#h228Hero): one node, wrapped by HT-30's card builder so it keeps the .h30c/.lab shape
+     every Insights golden reads. `four()` orders it first on the phone; `placeDesktop()` puts it first in
+     the charts quadrant on the desktop — the SAME node, the SAME markup. */
   var heroInner = null;
   function innerNode(){
     if(!heroInner){ heroInner = document.createElement('div'); heroInner.className = 'stat-hero'; }
@@ -14216,25 +14213,30 @@ var HT32_WEEK = 'sun_fri';                /* Sunday..Friday; Saturday is the Sab
   }
   function paintCard(){
     if(!(window.__HT30INS && window.__HT30INS.card)) return null;
-    var d = data(), col = ink(bandOf(d.today));
-    var node = innerNode();
-    node.innerHTML = '<div class="num sh-pct" style="color:' + col + '">' + pctTxt(d.today) + '</div>' +
-                     '<div class="sh-sub">' + subLine(d) + '</div>';
-    return window.__HT30INS.card(HERO, 'Today', node);
+    return window.__HT30INS.card(HERO, 'Today', fill(innerNode()));
   }
-  /* THE DESKTOP HERO IS THE MASTHEAD FIGURE, not a card in #h16Ins. #h16Ins is the full-height LIFE
-     quadrant (golden_ht18): its life grid `#vWeeks` fills the box EXACTLY (measured main: 525px at
-     1920x855, the life cell already at ht18's floor of 4), so ANY card placed there drops the cell
-     below floor - and ht18 is never loosened (paste S2, stress 3/4). So on the desktop the day's
-     percent is the large band-inked `mast` figure at the head of the masthead (S2), the first thing
-     the eye lands on; the CARD size is the phone's Insights hero (four() places it) and the desktop
-     right-block card is NOT injected. (FOR SPEC in the receipt.) */
+  /* THE DESKTOP HOME IS THE CHARTS QUADRANT (#h18Charts, which holds the month and year line charts): the
+     one scoreboard card sits at its head, the same markup the phone draws. The life quadrant (#h16Ins) is
+     full to ht18's floor, so the card goes with the charts, not there. */
+  function placeDesktop(){
+    if(window.innerWidth < 1024) return;
+    var card = paintCard(); if(!card) return;
+    var tr = document.getElementById('h18Charts');
+    if(tr && card.parentNode !== tr) tr.insertBefore(card, tr.firstChild);
+  }
+  if(typeof paintAll === 'function'){
+    var _pa = paintAll;
+    paintAll = function(){ var out = _pa.apply(null, arguments);
+      try{ if(window.innerWidth >= 1024) placeDesktop(); }catch(e){ if(window.console) console.warn('HT-228 desk', e); }
+      return out; };
+  }
   var rt = null;
   window.addEventListener('resize', function(){ clearTimeout(rt); rt = setTimeout(function(){
-    try{ if(window.innerWidth < 1024 && window.__HT31INS && window.__HT31INS.four) window.__HT31INS.four(); }catch(e){}
+    try{ if(window.innerWidth < 1024){ if(window.__HT31INS && window.__HT31INS.four) window.__HT31INS.four(); }
+         else placeDesktop(); }catch(e){}
   }, 170); });
-  window.__HT228 = { strip: strip, phoneCard: paintCard, card: paintCard,
-                     data: data, ink: ink, band: bandOf, id: HERO };
+  window.__HT228 = { phoneCard: paintCard, card: paintCard, fill: fill,
+                     data: data, ink: bandInk, band: bandOf, id: HERO };
 })();
 
 
@@ -14850,10 +14852,10 @@ var HT185LIFE = (function(){
           s += '<rect class="h185ahead" x="' + cx + '" y="' + yy + '" width="' + cell +
                '" height="' + cell + '" fill="var(--life-ahead)"/>';
         } else if(by[wi] !== undefined){
-          var a = by[wi], m = a.reduce(function(x, v){ return x + v; }, 0) / a.length, g = grade(m);
-          s += '<rect class="h185wk" data-wk="' + wi + '" data-grade="' + (g && g[0] || '') + '" x="' + cx +
+          var a = by[wi], m = a.reduce(function(x, v){ return x + v; }, 0) / a.length;
+          s += '<rect class="h185wk" data-wk="' + wi + '" x="' + cx +
                '" y="' + yy + '" width="' + cell + '" height="' + cell + '" fill="' + fill(m) +
-               '"><title>week ' + wi + ' · ' + Math.round(m) + '%</title></rect>';
+               '"><title>wk ' + wi + ' · ' + Math.round(m) + '%</title></rect>';
         } else {
           s += '<rect class="h185lv" x="' + cx + '" y="' + yy + '" width="' + cell +
                '" height="' + cell + '" fill="var(--life-lived)"/>';

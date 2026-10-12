@@ -111,9 +111,12 @@ async def s2(pw):
     await pg.evaluate("() => { const r = [...document.querySelectorAll('#log .li')].find(r => r.offsetParent); r.querySelector('[data-tog]').click(); }")
     await pg.wait_for_timeout(120)                    # well inside saveDay's 450 ms debounce
     after = await pg.evaluate("(k) => window.__HT293.pct(k)", k)
-    bar = await pg.evaluate("() => (document.getElementById('tStrip')||{}).textContent || ''")
-    chk('S2c . one tap moves the day between 0% and 100%, and the bar says so BEFORE the save lands (the reported 0%)',
-        {before, after} == {0, 100} and bar.strip().startswith(str(after)), [before, after, bar])
+    # PASTE 820: the Today-tab bar is retired — the live day figure the Insights scoreboard reads is
+    # __HT26.strip().today, and it moves BEFORE the 450 ms save lands (the scoreboard's own render is
+    # proven in golden_ht36 / golden_ht820).
+    live = await pg.evaluate("() => { try{ return window.__HT26.strip().today; }catch(e){ return null; } }")
+    chk('S2c . one tap moves the day between 0% and 100%, and the live figure says so BEFORE the save lands',
+        {before, after} == {0, 100} and live == after, [before, after, live])
     await no_errors(G, pg, errs, 'S2 (Sabbath)')
     await b.close()
     # a flagged standard shows on the Sabbath beside the Sabbath row
