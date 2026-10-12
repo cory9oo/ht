@@ -48,7 +48,12 @@ TEXT = ('--ink', '--ink2', '--good', '--bad',
         # PASTE 821: --gold is the rare-reward ink (the `new best` flash, the `perfect day`/`perfect
         # week` words). It is TEXT in those places, so it must clear the 4.5:1 floor on every theme's
         # grounds. Declared once in tokens.css; measured here against --ground/--sheet/--sunk/--surface.
-        '--gold')
+        '--gold',
+        # PASTE 823: the month/year chart axes are now labelled by COLOUR — the left numbers in the
+        # completion line's green (--line-completion), the right numbers in the rating line's amber
+        # (--line-rating). Those numbers are TEXT a person reads, so both inks must clear the 4.5:1 floor
+        # on every theme's grounds (the gate's "contrast green for both axis inks on the three themes").
+        '--line-completion', '--line-rating')
 # PASTE 820 adds `--surface` (the scoreboard/Insights card ground, --ht-panel #10131A) so the five
 # figure inks are measured on the ground they actually sit on, at every width and theme.
 BG = ('--ground', '--sheet', '--sunk', '--sel', '--surface')

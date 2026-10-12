@@ -827,6 +827,15 @@ text.bl-needl.bl-need-gold{ fill:var(--gold) }
 .bl-ring{ fill:none; stroke:var(--ink3); stroke-width:1; opacity:.55 }  /* today's soft ring */
 .bl-xl{ fill:var(--ink3); font:400 8px/1 var(--mono); cursor:pointer }
 .bl-xl.xl-today{ fill:var(--text); font-weight:700 }   /* today in the body ink (golden_ht38 reads this) */
+/* PASTE 823 S1 · the two axes labelled by COLOUR, not words: the LEFT numbers (0..100, 100% at the top)
+   are the completion green, the RIGHT numbers (0..10, the rating) the rating amber — the ink alone says
+   which line each belongs to. The data-simple rules beat the muted `.ayl` default by carrying it too
+   (`.ayl.bl-ayl`); the `.chart text.*` rules carry the colour in Advanced. Both inks are proven as text
+   on every theme's grounds by contrast_ht32.py. */
+.chart text.bl-ayl{ fill:var(--line-completion) }
+.chart text.bl-ayr{ fill:var(--line-rating) }
+html[data-simple] .chart .ayl.bl-ayl{ fill:var(--line-completion) }
+html[data-simple] .chart .bl-ayr{ font:400 8.5px/1 var(--mono); fill:var(--line-rating) }
 /* the two-word legend + the small header figures, both inside the nav (.gnav) */
 html[data-simple] .gnav{ flex-wrap:wrap }
 html[data-simple] .bl-hdr{ margin-left:auto; font:400 10px/1.2 var(--mono); color:var(--ink3); white-space:nowrap }
@@ -3384,9 +3393,12 @@ svg.h185life text{ font:500 8.5px/1 var(--mono); fill:var(--ink3) }
 /* ---- PASTE 678 · the life chart's one quiet legend, under the grid, phone as on desktop ----
    A B C D F (the re-tuned --g grades) · lived (--life-lived) · ahead (--life-ahead) · now (the ring).
    It wraps; it never scrolls sideways. Swatches are squares, like the cells they name. */
-.lifeleg{ display:flex; flex-wrap:wrap; align-items:center; gap:4px 9px; padding:7px 2px 2px;
-  font:400 10.5px/1.25 var(--sans); color:var(--ink2); min-width:0 }
-.lifeleg-i{ display:inline-flex; align-items:center; gap:4px; white-space:nowrap }
+/* PASTE 823 S1b · the gaps and type are tightened (col gap 9→6, item gap 4→3, 10.5→10px) so the whole
+   row '80+ 60+ 40+ 20+ <20 · lived · ahead · now' holds ONE line at 390 — 'now' no longer wraps — and,
+   being only smaller, it is identical at the wider widths. It still wraps rather than scroll. */
+.lifeleg{ display:flex; flex-wrap:wrap; align-items:center; gap:3px 6px; padding:7px 2px 2px;
+  font:400 10px/1.25 var(--sans); color:var(--ink2); min-width:0 }
+.lifeleg-i{ display:inline-flex; align-items:center; gap:3px; white-space:nowrap }
 .lifeleg-sep{ color:var(--ink3) }
 .lifeleg-sw{ display:inline-block; width:9px; height:9px; border-radius:2px; box-sizing:border-box; flex:0 0 auto }
 .lifeleg-lived{ background:var(--life-lived) }

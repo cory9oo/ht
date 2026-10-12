@@ -5953,7 +5953,7 @@ var HT32_CARDFIT = true;
     svg.removeAttribute('width'); svg.style.width='';
     if(!svg.getClientRects().length) return 0;        /* hidden surface: measureAndDraw calls back */
     var H=opts.height||200, W=fitSvg(svgId,H); if(W==null) return 0;   /* S5: month ~200, year ~180 */
-    var L=24, R=12, TOP=8, BOT=16, PB=H-BOT;          /* one panel: 0 at PB (bottom), 100 at TOP */
+    var L=24, R=22, TOP=8, BOT=16, PB=H-BOT;          /* one panel: 0 at PB (bottom), 100 at TOP; R was 12 — PASTE 823 S1 grew it to hold the right (rating) axis inside W */
     var n=pts.length; if(!n) return 0;
     var NEED=(typeof HT32_TARGET_PCT==='number'?HT32_TARGET_PCT:80);   /* the ONE constant, no second literal */
     var colW=(W-L-R)/n;
@@ -5961,10 +5961,16 @@ var HT32_CARDFIT = true;
     function ay(v){ return PB-(v/100)*(PB-TOP); }
     function tipFor(p){ return tipOf(p.logged?p.c:null, p.rv); }       /* S3: '36% · 7/10', em-dashes when absent */
     var s='';
-    /* S2 · one left axis 0..100: a faint gridline AND a muted label at EVERY 10 (eleven of each) */
+    /* S2 · one left axis 0..100: a faint gridline AND a muted label at EVERY 10 (eleven of each).
+       PASTE 823 S1 · TWO AXES, COLOUR SAYS WHICH. The LEFT numbers (0,10..100) are the COMPLETION
+       line's green (class bl-ayl), the top one alone reading '100%'; a RIGHT axis on the SAME gridlines
+       reads 0,1..10 (10=100, 5=50, 1=10) in the RATING line's amber (class bl-ayr) — no title, no words,
+       the ink is the only legend. The left keeps class `ayl` so its count stays eleven; the right carries
+       `bl-ayr`, never `ayl`, so it is a second axis, not a second set of left labels. */
     for(var g=0; g<=100; g+=10){
       s+='<line class="bl-grid'+(g===0?' bl-grid0':'')+'" x1="'+L+'" y1="'+ay(g).toFixed(1)+'" x2="'+(W-R)+'" y2="'+ay(g).toFixed(1)+'"/>';
-      s+='<text class="ayl" x="'+(L-4)+'" y="'+(ay(g)+3).toFixed(1)+'" text-anchor="end">'+g+'</text>';
+      s+='<text class="ayl bl-ayl" x="'+(L-4)+'" y="'+(ay(g)+3).toFixed(1)+'" text-anchor="end">'+(g===100?'100%':g)+'</text>';
+      s+='<text class="bl-ayr" x="'+(W-R+4).toFixed(1)+'" y="'+(ay(g)+3).toFixed(1)+'" text-anchor="start">'+(g/10)+'</text>';
     }
     /* the dashed need line at the shared threshold, one tiny label at its right end - nothing else written on the plot.
        PASTE 821 S5: when the trailing 7-day completion is AT OR ABOVE need, the line itself turns from

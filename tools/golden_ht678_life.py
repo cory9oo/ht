@@ -20,7 +20,8 @@ rgb() the maths can weigh — this golden never reads a raw attribute string.
   S5  CELLS, NOT BARS: a cell's drawn width is strictly less than the column pitch — a real gap, not a
       one-pixel line (the brief: squares only).
   S6  the one-line legend under the grid carries the five bands by PERCENT (80+ · 60+ · 40+ · 20+ · <20,
-      PASTE 820 — no A..F letters) + lived + ahead + now, and it wraps (it never scrolls sideways).
+      PASTE 820 — no A..F letters) + lived + ahead + now, and it wraps (it never scrolls sideways). PASTE
+      823 S1b amends this by name: at 390 it must also hold ONE LINE (no wrap), the gaps/type tightened.
   S7  zero page errors at either width.
 
 R134 R1: prints its assertion count; a section that asserts nothing is a FAIL.
@@ -172,7 +173,11 @@ JS_STATES = """
                  ahead: !!leg.querySelector('.lifeleg-ahead'),
                  now: !!leg.querySelector('.lifeleg-now'),
                  text: (leg.textContent||'').replace(/\\s+/g,' ').trim(),
-                 overflow: leg.scrollWidth - leg.clientWidth } : null
+                 overflow: leg.scrollWidth - leg.clientWidth,
+                 // PASTE 823 S1b: how many rows the row of items occupies — distinct offsetTop bands of the
+                 // top-level items/separators. One row = it holds a single line (no wrap).
+                 rows: (function(){ var items = Array.prototype.slice.call(leg.querySelectorAll('.lifeleg-i,.lifeleg-sep'));
+                   var tops = {}; items.forEach(function(e){ tops[Math.round(e.offsetTop)] = 1; }); return Object.keys(tops).length; })() } : null
   };
 }
 """
@@ -244,6 +249,12 @@ async def run(pw, w, h, label):
     chk("%s · a legend carries 80+ 60+ 40+ 20+ <20 · lived · ahead · now (no letters)" % label, legok, leg)
     chk("%s · the legend wraps, never scrolls sideways" % label,
         bool(leg) and leg['overflow'] <= 1, leg and leg.get('overflow'))
+    # PASTE 823 S1b (amended by name): the whole row '80+ 60+ 40+ 20+ <20 · lived · ahead · now' HOLDS
+    # ONE LINE at 390 — 'now' no longer wraps to a second row. Checked only on the phone width, where the
+    # space is tightest; the wider widths were never at risk.
+    if w < 1024:
+        chk("%s · the legend is ONE line at 390 (no wrap)" % label,
+            bool(leg) and leg.get('rows') == 1, leg and leg.get('rows'))
 
     # S7 — no page errors
     chk("%s · zero page errors" % label, not errs, errs)
