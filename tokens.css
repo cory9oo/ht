@@ -141,6 +141,15 @@
   --gink3:var(--g3);
   --gink4:var(--g4);
 
+  /* PASTE 821 — GOLD, the ONE new colour, declared once (R70.282, one address). It is the rare-reward
+     ink: the ring that appears outside the arc at 100, the 100-day star on the month/year charts, the
+     gold baseline of a perfect week and the `new best` flash. It is NOT a ranking band — a band is
+     always one of --g0..--g4 — so gold never decides a percent's colour; it only ever says "a record /
+     a perfect day". A warm saturated gold, clearly above the yellow band (--g2 #D7B24A). Shared across
+     the three themes (their grounds are all dark); `contrast_ht32.py` proves it clears 4.5:1 as TEXT
+     on every theme's grounds. */
+  --gold:#EBB338;
+
   /* the two chart lines (PASTE 731): completion is the headline series and reads as a calm GREEN,
      drawn dashed; the rating carries the warm AMBER and is drawn solid — so a first-time reader tells
      them apart by both hue and dash. No blue (Cory dislikes it). These were the other way round. */

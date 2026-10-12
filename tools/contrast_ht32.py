@@ -44,7 +44,11 @@ TEXT = ('--ink', '--ink2', '--good', '--bad',
         # PASTE 820: the one scale's FIGURE inks. A ranking percent (the big Today figure, a scoreboard
         # tile, a ledger cell) is TEXT, drawn in its band's text-safe shade --gink0..--gink4, so every
         # ranking number must clear the text floor. The pure band SWATCH stays in NON_TEXT below.
-        '--gink0', '--gink1', '--gink2', '--gink3', '--gink4')
+        '--gink0', '--gink1', '--gink2', '--gink3', '--gink4',
+        # PASTE 821: --gold is the rare-reward ink (the `new best` flash, the `perfect day`/`perfect
+        # week` words). It is TEXT in those places, so it must clear the 4.5:1 floor on every theme's
+        # grounds. Declared once in tokens.css; measured here against --ground/--sheet/--sunk/--surface.
+        '--gold')
 # PASTE 820 adds `--surface` (the scoreboard/Insights card ground, --ht-panel #10131A) so the five
 # figure inks are measured on the ground they actually sit on, at every width and theme.
 BG = ('--ground', '--sheet', '--sunk', '--sel', '--surface')
