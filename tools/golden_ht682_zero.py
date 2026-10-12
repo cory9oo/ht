@@ -1,27 +1,30 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""PASTE 682 GOLDEN — AMENDED BY NAME, PASTE 816 (R67.2): the month/year charts are BARS now, and the
-zero rule is a STUB, not a dot. Run at 1280 and 390.
+"""PASTE 682 GOLDEN — AMENDED BY NAME, PASTE 819 (R67.2): the month/year charts are ONE LINE CHART now,
+and the zero rule is a GAP or a hollow point, not a stub. Run at 1280 and 390.
 
-816 (Cory 2026-10-11): the fat red zero dot and the x10 rating line are gone. Completion is bars banded
-against the 80% need; the rating is an amber dot/line strip beneath. The zero rule becomes:
-  - an unlogged PAST day is a DIM baseline stub (it still counts as 0 in the average, so it stays visible);
-  - a LOGGED 0% is a solid RED stub;
+819 (Cory 2026-10-11): back to a line chart, both series on one 0-100 axis, and "remove the points for
+zero days". The zero rule becomes:
+  - an unlogged PAST day is a GAP — NO completion point (it still counts as 0 in the average, so the
+    header figure still sees it, but no dot is drawn and the line breaks across it);
+  - a LOGGED 0% is a small HOLLOW point at 0 (the truth stays visible, quietly);
   - a FUTURE day (out of span) is NOTHING;
-  - a rating a day never had is a GAP on panel B — a rating is never 0.
+  - a rating a day never had is a GAP on the rating line — a rating is never 0.
 
   DATA — the real point builders `window.__HT16.monthPoints` / `yearPoints`, driven by the fixture's
          `__GAP=40` (nothing logged in the last 40 days, so the current month and its sibling months are
-         empty-but-in-span). Expectations are computed from the PAGE'S OWN `today()`:
+         empty-but-in-span). Expectations are computed from the PAGE'S OWN `today()` (UNCHANGED by 819 —
+         the data is the same; only the DRAWING changed from stubs to gaps/points):
     D1  every in-span day of the current month has completion c===0 (unlogged counts as 0) AND the
         rating rv===null (an unrated day is a GAP, never a 0);
     D2  every day after today is blank (c===null) — a future day shows no point;
     D3  the year: a month is blank (c===null) iff out of span (before first / ahead), else a point;
-    D4  at least one in-span month has c===0 (the empty-but-in-span month, a dim stub, not a gap).
+    D4  at least one in-span month has c===0 (the empty-but-in-span month).
 
   RENDER — a crafted series through `window.__HT16.barLineChart`, independent of the clock:
-    R1  two logged positive days draw two BARS, and there is NO completion line at all;
-    R2  an unlogged in-span day draws a DIM stub (.bl-stub) and a logged 0% a RED stub (.bl-stub-zero);
+    R1  the logged days draw completion POINTS and a line, and there are NO bars (.bl-bar count 0);
+    R2  an unlogged in-span day is a GAP (no completion point) and a logged 0% is a HOLLOW point at 0
+        (one .bl-cdot.bl-hollow; three .bl-cdot total for the three logged days, none for the unlogged);
     R3  a rating dot only on rated days, and NO line across the gap between two non-adjacent rated days;
     R4  there is NO right axis (.ax2);
     R5  the dashed need line (.bl-need) is drawn;
@@ -107,12 +110,11 @@ RENDER = """() => {
   H.barLineChart('ztSvg', series, { attr:'data-vgd' });
   const svg = document.getElementById('ztSvg');
   const n = s => svg.querySelectorAll(s).length;
-  const dim = Array.prototype.slice.call(svg.querySelectorAll('.bl-stub'))
-                   .filter(e => !e.classList.contains('bl-stub-zero')).length;
   return {
-    bars: n('.bl-bar'), dimStubs: dim, redStubs: n('.bl-stub-zero'),
-    rdots: n('.bl-rdot'), rlines: n('.bl-rline'),
-    complLines: n('path.ln-c') + n('.bl-cline'),
+    bars: n('.bl-bar'),
+    cdots: n('circle.bl-cdot'), hollow: n('circle.bl-cdot.bl-hollow'),
+    cline: n('path.bl-cline'),
+    rdots: n('circle.bl-rdot'), rlines: n('path.bl-rline'),
     rightAxis: n('.ax2'), needLine: n('.bl-need')
   };
 }"""
@@ -157,10 +159,10 @@ async def run(pw, w, h, label):
 
     # ---------------------------------------------------------------- RENDER (crafted series)
     r = await pg.evaluate(RENDER)
-    chk("%s · R1 two bars (the logged positive days) and NO completion line" % label,
-        r['bars'] == 2 and r['complLines'] == 0, r)
-    chk("%s · R2 an unlogged in-span day is a DIM stub, a logged 0 is a RED stub" % label,
-        r['dimStubs'] == 1 and r['redStubs'] == 1, r)
+    chk("%s · R1 the logged days draw completion points and a line, and NO bars" % label,
+        r['bars'] == 0 and r['cdots'] == 3 and r['cline'] >= 1, r)
+    chk("%s · R2 an unlogged in-span day is a GAP (no point), a logged 0 is one HOLLOW point at 0" % label,
+        r['hollow'] == 1 and r['cdots'] == 3, r)
     chk("%s · R3 a rating dot only on rated days, no line across the gap between them" % label,
         r['rdots'] == 2 and r['rlines'] == 0, r)
     chk("%s · R4 there is NO right axis" % label, r['rightAxis'] == 0, r)

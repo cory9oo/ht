@@ -804,33 +804,32 @@ html[data-simple] .gnav .lg{ display:none }                    /* the old two-wo
    A quiet subtitle, a legend that names both lines, and a labelled colour scale. All in the app's
    small mono on the dark ground; calm, few words, no blue. */
 html[data-simple] .h16sub{ font:400 11px/1.3 var(--sans); color:var(--ink2); padding:2px 0 6px }
-/* ---- 816 S3 · THE MONTH / YEAR BAR+LINE CHART ------------------------------------------------
-   Completion is bars banded against the 80% need (green/amber/red - the top-of-Insights palette);
-   the rating is an amber line/dot strip beneath. Every colour is a token: no new literal. */
-.bl-bar.bl-g{ fill:var(--good) }
-.bl-bar.bl-a{ fill:var(--st-atrisk) }
-.bl-bar.bl-r{ fill:var(--bad) }
-.bl-stub{ fill:var(--ink3); opacity:.45 }                 /* an unlogged past day: a dim baseline stub */
-.bl-stub-zero{ fill:var(--bad); opacity:1 }               /* a logged 0%: a solid red stub */
+/* ---- 819 · THE MONTH / YEAR LINE CHART -------------------------------------------------------
+   One panel, two lines on a single 0-100 axis ruled every 10: Completion in the green
+   (--line-completion), the day Rating in the amber (--line-rating) mapped as rating x10. A gridline
+   every 10 at low opacity; the dashed need line at the shared threshold. Every colour a token. The
+   816 bar/stub/second-panel rules are retired with the bar paths they styled. */
+.bl-grid{ stroke:var(--ink3); stroke-width:1; opacity:.16 }   /* a faint rule at every 10, under the lines */
+.bl-grid0{ opacity:.32 }                                      /* the 0 line, a touch stronger */
 .bl-need{ stroke:var(--ink3); stroke-width:1; stroke-dasharray:3 3; opacity:.6 }
 .bl-needl{ fill:var(--ink3); font:400 8px/1 var(--mono) }
-.bl-rline{ stroke:var(--st-atrisk); stroke-width:1.4; fill:none }
-.bl-rdot{ fill:var(--st-atrisk) }
-.bl-rdot.bl-today{ stroke:var(--ink); stroke-width:1 }
-.bl-blab{ fill:var(--ink3); font:400 8px/1 var(--mono) }
+.bl-cline{ stroke:var(--line-completion); stroke-width:2; fill:none }   /* completion: a solid green line */
+.bl-rline{ stroke:var(--line-rating); stroke-width:2; fill:none }       /* rating: a solid amber line, drawn under */
+.bl-cdot{ fill:var(--line-completion) }
+.bl-cdot.bl-hollow{ fill:var(--ground); stroke:var(--line-completion); stroke-width:1.5 }  /* a logged 0%: hollow at 0 */
+.bl-rdot{ fill:var(--line-rating) }
+.bl-ring{ fill:none; stroke:var(--ink3); stroke-width:1; opacity:.55 }  /* today's soft ring */
 .bl-xl{ fill:var(--ink3); font:400 8px/1 var(--mono); cursor:pointer }
 .bl-xl.xl-today{ fill:var(--text); font-weight:700 }   /* today in the body ink (golden_ht38 reads this) */
-.bl-xl2{ fill:var(--muted); font:400 7px/1 var(--mono) }
-/* the wrapping legend + the small header figures, both inside the nav (.gnav) */
+/* the two-word legend + the small header figures, both inside the nav (.gnav) */
 html[data-simple] .gnav{ flex-wrap:wrap }
 html[data-simple] .bl-hdr{ margin-left:auto; font:400 10px/1.2 var(--mono); color:var(--ink3); white-space:nowrap }
-html[data-simple] .bl-leg{ display:flex; flex-wrap:wrap; align-items:center; gap:4px 12px;
+html[data-simple] .bl-leg{ display:flex; flex-wrap:wrap; align-items:center; gap:4px 14px;
   width:100%; font:400 10px/1.2 var(--sans); color:var(--ink2); padding:3px 0 0 }
-html[data-simple] .bl-leg-i{ display:inline-flex; align-items:center; gap:5px; white-space:nowrap }
-.bl-sw{ display:inline-block; width:14px; height:8px; flex:0 0 auto }
-.bl-sw.bl-g{ background:var(--good) }
-.bl-sw.bl-needsw{ height:0; background:none; border-top:2px dashed var(--ink3) }
-.bl-sw.bl-rdotsw{ width:8px; height:8px; border-radius:50%; background:var(--st-atrisk) }
+html[data-simple] .bl-leg-i{ display:inline-flex; align-items:center; gap:6px; white-space:nowrap }
+.bl-sw{ display:inline-block; width:16px; height:0; flex:0 0 auto }     /* a line chip, each in its line's own stroke */
+.bl-sw.bl-cln{ border-top:2px solid var(--line-completion) }
+.bl-sw.bl-rln{ border-top:2px solid var(--line-rating) }
 /* the line legend: a dashed-green chip for completion, a solid-amber chip for rating */
 html[data-simple] .h16lines{ display:flex; flex-wrap:wrap; align-items:center; gap:4px 14px;
   font:400 10px/1.2 var(--mono); color:var(--ink2); width:100%; padding:2px 0 }

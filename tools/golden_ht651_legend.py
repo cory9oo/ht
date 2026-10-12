@@ -1,16 +1,19 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""HT-651 S2 GOLDEN — EVERY LINE IS NAMED (paste 651 S2 / 656 S3), at 390 and 1280.
+"""HT-651 S2 GOLDEN — AMENDED BY NAME, PASTE 819 (R67.2): EVERY LINE IS NAMED, in two words. 390 and 1280.
 
-Under the month and the year line charts a small legend names each line drawn, in the line's own
-stroke, from ONE place (LINE_LABELS):
+819 (Cory 2026-10-11): the month and year cards are one line chart each; the legend reads just two words,
+a green line-swatch 'Completion' and an amber line-swatch 'Rating' - no 'x10', no third item (the need
+line carries its own 'need' label on the plot). This golden is not in the fixture suite (goldens.txt),
+but it is amended by name so it reads the truth (DEC-037 — archived, never deleted).
 
-  G1  the month chart carries a legend naming Completion % and Day rating ×10.
-  G2  the year chart carries the same-worded legend.
-  G3  the completion swatch is a SOLID stroke and the rating swatch is a DASHED stroke (the line's own).
+  G1  the month chart's legend names exactly 'Completion' and 'Rating'.
+  G2  the year chart carries the same two-word legend.
+  G3  each swatch is a SOLID line chip in its line's own stroke (.bl-cln / .bl-rln, border-top solid).
   G4  at 390 px the legend overflows nowhere sideways (its scrollWidth fits, and the page does not
       scroll sideways) — it wraps to a second row instead.
-  G5  zero page errors at either width.
+  G5  the word 'x10' / '×10' appears nowhere in either legend.
+  G6  zero page errors at either width.
 
 R134 R1: prints its assertion count; a section that asserts nothing is a FAIL.
 """
@@ -64,29 +67,33 @@ async def run(pw, w, h, label):
 
     data = await pg.evaluate(
         "() => {"
-        "  const grab=id=>{ const l=document.getElementById(id);"
-        "    if(!l) return null; const sw=l.querySelector('.chleg');"
-        "    const cs=l.querySelector('.chsw-c'), rs=l.querySelector('.chsw-r');"
-        "    return { text:(l.textContent||'').trim(),"
+        "  const grab=navId=>{ const nav=document.getElementById(navId);"
+        "    if(!nav) return null; const leg=nav.querySelector('.bl-leg');"
+        "    if(!leg) return null;"
+        "    const items=Array.prototype.slice.call(leg.querySelectorAll('.bl-leg-i')).map(e=>(e.textContent||'').trim());"
+        "    const cs=leg.querySelector('.bl-sw.bl-cln'), rs=leg.querySelector('.bl-sw.bl-rln');"
+        "    return { items:items, text:(leg.textContent||'').trim(),"
         "             cStyle:cs?getComputedStyle(cs).borderTopStyle:'',"
         "             rStyle:rs?getComputedStyle(rs).borderTopStyle:'',"
-        "             overflow: sw ? (sw.scrollWidth - sw.clientWidth) : -999 }; };"
-        "  return { month:grab('vMonthLeg'), year:grab('vYearLeg'),"
+        "             overflow: leg.scrollWidth - leg.clientWidth }; };"
+        "  return { month:grab('vMonthNav'), year:grab('vYearNav'),"
         "           pageOverflow: document.documentElement.scrollWidth - window.innerWidth }; }")
 
     m, y = data.get('month'), data.get('year')
-    chk("%s · the month chart has a legend naming Completion %% and Day rating" % label,
-        bool(m) and 'Completion %' in m['text'] and 'Day rating' in m['text'], m)
-    chk("%s · the year chart has the same-worded legend" % label,
-        bool(y) and 'Completion %' in y['text'] and 'Day rating' in y['text'], y)
-    chk("%s · the completion swatch is solid, the rating swatch is dashed (the line's own stroke)" % label,
-        bool(m) and m['cStyle'] == 'solid' and m['rStyle'] == 'dashed', m)
-    # no sideways scroll: the legend does not overflow its box, and the page does not scroll sideways
+    chk("%s · the month chart's legend names exactly 'Completion' and 'Rating'" % label,
+        bool(m) and m['items'] == ['Completion', 'Rating'], m)
+    chk("%s · the year chart carries the same two-word legend" % label,
+        bool(y) and y['items'] == ['Completion', 'Rating'], y)
+    chk("%s · each swatch is a solid line chip in its line's own stroke" % label,
+        bool(m) and m['cStyle'] == 'solid' and m['rStyle'] == 'solid', m)
     legok = bool(m) and m['overflow'] <= 1 and (not y or y['overflow'] <= 1)
     chk("%s · the legend overflows nowhere sideways (wraps instead)" % label, legok,
         {'m': m and m.get('overflow'), 'y': y and y.get('overflow')})
     chk("%s · the page does not scroll sideways" % label,
         (data.get('pageOverflow') or 0) <= 1, data.get('pageOverflow'))
+    noX10 = bool(m) and 'x10' not in m['text'].lower() and '×10' not in m['text'] \
+        and (not y or ('x10' not in y['text'].lower() and '×10' not in y['text']))
+    chk("%s · no 'x10' text in either legend" % label, noX10, {'m': m and m.get('text'), 'y': y and y.get('text')})
 
     chk("%s · zero page errors" % label, not errs, errs)
     await b.close()

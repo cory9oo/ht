@@ -1,23 +1,34 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""PASTE 816 GOLDEN — THE MONTH AND YEAR CARDS ARE CLEAN BARS (Cory 2026-10-11). Run at 390 and 1280.
+"""PASTE 816 GOLDEN — AMENDED BY NAME, PASTE 819 (R67.2): THE MONTH AND YEAR CARDS ARE ONE LINE CHART
+EACH. Run at 390 and 1280.
 
-The redesign: completion is BARS banded against the 80% need (green/amber/red - the top-of-Insights
-palette), the day rating is an amber dot/line strip beneath. No x10, no right axis, no fat red zero
-dot, no clipped legend.
+819 (Cory 2026-10-11, from his phone): "put both back to a line chart and map both on the same Y axis
+... less wording the better ... for the Y axis I like seeing more like points. Like by 10." So 817's
+bars become ONE line renderer: one panel, two lines on a single 0-100 axis ruled every 10 - Completion
+a solid green line with a point on each logged day, the day Rating a solid amber line (rating x10 on
+the same axis, never written "x10"). An unlogged past day is a GAP (no point); a logged 0% keeps a
+HOLLOW point at 0; a future day is nothing. No bars, no right axis, a two-word legend.
 
   RENDER (a crafted series through window.__HT16.barLineChart, clock-independent):
-    R1  the month renders BARS and NO completion line (no path.ln-c);
+    R1  the month renders a completion LINE and points, and NO bars (.bl-bar count 0);
     R2  NO right axis (.ax2 count 0);
-    R3  the dashed need line is drawn at the shared threshold (HT32_TARGET_PCT);
-    R4  an unlogged past day is a STUB, never a dot at 0 (a dim .bl-stub, and no completion circle);
-    R5  an unrated day has NO rating point (a gap).
+    R3  the dashed need line is drawn (.bl-need count 1);
+    R4  an unlogged past day has NO completion point (3 logged days -> 3 .bl-cdot, not 4);
+    R5  a logged 0% day keeps ONE hollow point at 0 (.bl-cdot.bl-hollow count 1);
+    R6  an unrated day has NO rating point (2 rated of 3 logged -> 2 .bl-rdot);
+    R7  eleven axis labels, one at every 10 (0,10,...,100 -> 11 text.ayl);
+    R8  the word "x10" / "×10" appears nowhere in the rendered svg.
   LIVE (the real month/year cards on the Insights tab):
-    L1  the month card draws bars (or stubs) and no completion line, no right axis, a need line;
-    L2  the year card likewise;
-    L3  the legend's width is <= the card's width and the card does not scroll sideways at 390;
-    L4  the month header figure equals the top-of-Insights arithmetic for the same span (mean of the
-        in-span days' completion, unlogged counted as 0 - recomputed from __HT16.monthPoints).
+    L1  the month card draws a completion line/points and no bars, no right axis, a need line,
+        eleven axis labels;
+    L2  the year card likewise (line/points, no bars, no right axis);
+    L3  the two-word legend reads exactly 'Completion' and 'Rating', fits (no sideways scroll at 390),
+        and carries no "x10";
+    L4  the month header figure 'avg N%' equals the in-span mean (unlogged counted as 0);
+    L5  the description sentence under each title is GONE (#vMonthSub / #vYearSub absent) and the
+        weekday-initials row is GONE (no .bl-xl2 in the month svg);
+    L6  zero page errors.
 
 R134 R1: prints its assertion count; a section that asserts nothing is a FAIL.
 """
@@ -56,8 +67,8 @@ SERIES = """[
   {x:'1',x2:'Mon',key:'z-1',c:null, rv:null, logged:false},
   {x:'2',x2:'Tue',key:'z-2',c:90,   rv:8,    logged:true},
   {x:'3',x2:'Wed',key:'z-3',c:0,    rv:null, logged:false},
-  {x:'4',x2:'Thu',key:'z-4',c:60,   rv:null, logged:true},
-  {x:'5',x2:'Fri',key:'z-5',c:30,   rv:4,    logged:true},
+  {x:'4',x2:'Thu',key:'z-4',c:0,    rv:null, logged:true},
+  {x:'5',x2:'Fri',key:'z-5',c:60,   rv:5,    logged:true},
   {x:'6',x2:'Sat',key:'z-6',c:null, rv:null, logged:false}
 ]"""
 
@@ -70,34 +81,39 @@ RENDER = """() => {
   H.barLineChart('ztSvg', series, { attr:'data-vgd' });
   const svg = document.getElementById('ztSvg');
   const n = s => svg.querySelectorAll(s).length;
-  const dim = Array.prototype.slice.call(svg.querySelectorAll('.bl-stub'))
-                   .filter(e => !e.classList.contains('bl-stub-zero')).length;
-  // the completion panel has bars/stubs but NO completion circle (a dot at 0 is what we killed)
-  const complDots = n('circle.dot-c') + n('.ln-c-d');
-  return { bars: n('.bl-bar'), dim: dim, complLines: n('path.ln-c') + n('.bl-cline'),
-           complDots: complDots, rightAxis: n('.ax2'), needLine: n('.bl-need'),
-           rdots: n('.bl-rdot'), bandG: n('.bl-bar.bl-g'), bandA: n('.bl-bar.bl-a'), bandR: n('.bl-bar.bl-r') };
+  const txt = (svg.textContent||'');
+  return { bars: n('.bl-bar'),
+           cdots: n('circle.bl-cdot'), hollow: n('circle.bl-cdot.bl-hollow'),
+           cline: n('path.bl-cline'), rdots: n('circle.bl-rdot'),
+           rightAxis: n('.ax2'), needLine: n('.bl-need'),
+           axLabels: n('text.ayl'), hasX10: /x10|\\u00d710/i.test(txt) };
 }"""
 
 LIVE = """() => {
   const H = window.__HT16;
   const m = document.getElementById('vMonth'), y = document.getElementById('vYear');
+  const mnav = document.getElementById('vMonthNav');
+  const leg = mnav ? mnav.querySelector('.bl-leg') : null;
+  const legItems = leg ? Array.prototype.slice.call(leg.querySelectorAll('.bl-leg-i')).map(e => (e.textContent||'').trim()) : null;
   const card = document.getElementById('h16Month');
-  const leg = card ? card.querySelector('.bl-leg') : null;
-  const hdr = card ? card.querySelector('.bl-hdr') : null;
+  const hdr = mnav ? mnav.querySelector('.bl-hdr') : null;
   const n = (svg,s) => svg ? svg.querySelectorAll(s).length : -1;
-  // recompute the month average the way the top-of-Insights figure does: mean of in-span days'
-  // completion, unlogged counted as 0 (monthPoints already sets c=0 for an unlogged in-span day).
   const mp = H.monthPoints();
   const cs = mp.filter(p => p.c != null).map(p => p.c);
   const avg = cs.length ? Math.round(cs.reduce((a,b)=>a+b,0)/cs.length) : null;
   return {
-    mBars: n(m,'.bl-bar') + n(m,'.bl-stub'), mComplLine: n(m,'path.ln-c'), mRightAxis: n(m,'.ax2'),
-    mNeed: n(m,'.bl-need'),
-    yBars: n(y,'.bl-bar') + n(y,'.bl-stub'), yComplLine: n(y,'path.ln-c'), yRightAxis: n(y,'.ax2'),
-    cardW: card ? Math.round(card.getBoundingClientRect().width) : null,
+    mLine: n(m,'path.bl-cline') + n(m,'circle.bl-cdot'), mBars: n(m,'.bl-bar'),
+    mRightAxis: n(m,'.ax2'), mNeed: n(m,'.bl-need'), mAxLabels: n(m,'text.ayl'),
+    mX2: n(m,'.bl-xl2'),
+    yLine: n(y,'path.bl-cline') + n(y,'circle.bl-cdot'), yBars: n(y,'.bl-bar'),
+    yRightAxis: n(y,'.ax2'),
+    legItems: legItems, legHasX10: leg ? /x10|\\u00d710/i.test(leg.textContent||'') : null,
+    cardHasX10: card ? /x10|\\u00d710/i.test(card.textContent||'') : null,
     legW: leg ? Math.round(leg.getBoundingClientRect().width) : null,
-    cardScrollX: card ? (card.scrollWidth - card.clientWidth) : null,
+    cardW: card ? Math.round(card.getBoundingClientRect().width) : null,
+    legOverflow: leg ? (leg.scrollWidth - leg.clientWidth) : null,
+    pageOverflow: document.documentElement.scrollWidth - window.innerWidth,
+    mSub: !!document.getElementById('vMonthSub'), ySub: !!document.getElementById('vYearSub'),
     hdr: hdr ? hdr.textContent : null, avg: avg
   };
 }"""
@@ -115,30 +131,35 @@ async def run(pw, w, h, label):
 
     # ---- RENDER (crafted series) ----
     r = await pg.evaluate(RENDER)
-    chk("%s · R1 the month renders bars and NO completion line" % label,
-        r['bars'] >= 2 and r['complLines'] == 0, r)
+    chk("%s · R1 the month renders a completion line/points and NO bars" % label,
+        (r['cline'] >= 1 or r['cdots'] >= 1) and r['bars'] == 0, r)
     chk("%s · R2 no right axis" % label, r['rightAxis'] == 0, r)
     chk("%s · R3 the dashed need line is drawn" % label, r['needLine'] == 1, r)
-    chk("%s · R4 an unlogged past day is a dim stub, not a dot at 0" % label,
-        r['dim'] == 1 and r['complDots'] == 0, r)
-    chk("%s · R5 an unrated day has no rating point (2 rated of 3 logged)" % label, r['rdots'] == 2, r)
-    chk("%s · R6 the bars are banded (a 90 green, a 60 amber, a 30 red)" % label,
-        r['bandG'] == 1 and r['bandA'] == 1 and r['bandR'] == 1, r)
+    chk("%s · R4 an unlogged past day has no completion point (3 logged -> 3 dots, not 4)" % label,
+        r['cdots'] == 3, r)
+    chk("%s · R5 a logged 0%% day keeps one hollow point at 0" % label, r['hollow'] == 1, r)
+    chk("%s · R6 an unrated day has no rating point (2 rated of 3 logged)" % label, r['rdots'] == 2, r)
+    chk("%s · R7 eleven axis labels, one at every 10 (0..100)" % label, r['axLabels'] == 11, r)
+    chk("%s · R8 no 'x10' text anywhere in the rendered svg" % label, not r['hasX10'], r)
 
     # ---- LIVE (the real cards) ----
     await pg.evaluate("() => { try{ if(window.__HT13_TAB) window.__HT13_TAB('views'); }catch(e){} }")
     await pg.wait_for_timeout(1500)
     d = await pg.evaluate(LIVE)
-    chk("%s · L1 the live month card draws bars/stubs, no completion line, no right axis, a need line" % label,
-        d['mBars'] > 0 and d['mComplLine'] == 0 and d['mRightAxis'] == 0 and d['mNeed'] == 1, d)
-    chk("%s · L2 the live year card draws bars/stubs, no completion line, no right axis" % label,
-        d['yBars'] > 0 and d['yComplLine'] == 0 and d['yRightAxis'] == 0, d)
-    chk("%s · L3 the legend fits the card and the card never scrolls sideways" % label,
-        d['legW'] is not None and d['cardW'] is not None and d['legW'] <= d['cardW'] + 1
-        and (d['cardScrollX'] is None or d['cardScrollX'] <= 1), d)
+    chk("%s · L1 the live month card draws a line/points, no bars, no right axis, a need line, 11 labels" % label,
+        d['mLine'] > 0 and d['mBars'] == 0 and d['mRightAxis'] == 0 and d['mNeed'] == 1 and d['mAxLabels'] == 11, d)
+    chk("%s · L2 the live year card draws a line/points, no bars, no right axis" % label,
+        d['yLine'] > 0 and d['yBars'] == 0 and d['yRightAxis'] == 0, d)
+    chk("%s · L3 the legend reads exactly 'Completion' and 'Rating', fits, no 'x10'" % label,
+        d['legItems'] == ['Completion', 'Rating'] and not d['legHasX10'] and not d['cardHasX10']
+        and (d['legOverflow'] is None or d['legOverflow'] <= 1)
+        and (d['pageOverflow'] or 0) <= 1
+        and (d['legW'] is None or d['cardW'] is None or d['legW'] <= d['cardW'] + 1), d)
     chk("%s · L4 the month header 'avg N%%' equals the in-span mean (unlogged=0)" % label,
         d['hdr'] is not None and d['avg'] is not None and ('avg %d%%' % d['avg']) in d['hdr'], d)
-    chk("%s · L5 zero page errors" % label, not errs, errs[:3])
+    chk("%s · L5 the description sentence and the weekday row are absent" % label,
+        (not d['mSub']) and (not d['ySub']) and d['mX2'] == 0, d)
+    chk("%s · L6 zero page errors" % label, not errs, errs[:3])
     await b.close()
 
 

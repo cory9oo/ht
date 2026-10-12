@@ -5519,14 +5519,12 @@ var HT32_CARDFIT = true;
       wrap.innerHTML=
         '<div class="sh"><h2>The Month</h2><span class="ln"></span>'+
           '<span class="c" id="vMonthTip"></span></div>'+
-        /* PASTE 731: one plain subtitle so the chart reads at a glance. It travels with the
-           panel (squareLayout moves it); on the phone it sits under HT-31's card title. */
-        '<div class="h16sub" id="vMonthSub">How much of each day’s habits you completed, and how you rated the day.</div>'+
+        /* 819 S4: the description sentence under the title is removed - less wording (Cory 2026-10-11).
+           #vMonthTip stays as the hover readout only; squareLayout is null-safe for the absent sub. */
         '<div class="gnav" id="vMonthNav"></div>'+
         '<div class="pan flat"><svg id="vMonth" class="chart"></svg></div>'+
         '<div class="sh"><h2>The Year</h2><span class="ln"></span>'+
           '<span class="c" id="vYearTip"></span></div>'+
-        '<div class="h16sub" id="vYearSub">Each month’s average completion and rating, across the year.</div>'+
         '<div class="gnav" id="vYearNav"></div>'+
         '<div class="pan flat"><svg id="vYear" class="chart"></svg></div>';
       views.insertBefore(wrap, views.firstChild);       /* the graphs lead the Views surface */
@@ -5908,88 +5906,84 @@ var HT32_CARDFIT = true;
     }catch(e){}
     return Math.max(140, Math.min(cap, Math.max(dflt, Math.round(h))));
   }
-  /* ---- 816 S3 · ONE BAR+LINE RENDERER FOR THE MONTH AND YEAR CARDS --------------------------
-     Cory 2026-10-11: "the month and the year graphs still look really bad ... clean ... remove the
-     points ... for zero-completion days." The shape the best daily-metric apps use (Apple Health,
-     Oura, Whoop, Streaks): discrete days are BARS, not a line. Two stacked panels in one svg -
-     PANEL A completion as bars banded against the 80% need (green/amber/red, the top-of-Insights
-     palette), PANEL B the day rating as amber dots joined only across CONSECUTIVE rated days.
-     Replaces h16Chart for THESE TWO CARDS; h16Chart is retired (no other caller). No x10 on one
-     axis, no right axis, no fat red zero dot: an unlogged past day is a dim baseline stub (it still
-     counts as 0 in the average), a logged 0% is a red stub, a future day is nothing, and a rating a
-     day never had is a GAP (a rating cannot be 0). */
+  /* ---- 819 S1-S3 · ONE LINE RENDERER FOR THE MONTH AND YEAR CARDS ----------------------------
+     Cory 2026-10-11, from his phone looking at 817's bars: "put both back to a line chart and map
+     both on the same Y axis ... less wording the better ... for the Y axis I like seeing more like
+     points. Like by 10." So 817's bar+line renderer BECOMES this ONE line renderer
+     (TEMPLATE/CONSOLIDATE): one panel, two lines on a single 0-100 axis ruled every 10 - Completion
+     in the green (--line-completion), the day Rating in the amber (--line-rating) mapped as rating
+     x10 (and the word "x10" appears nowhere). The bar, stub and second-panel paths it replaced are
+     RETIRED in this same commit; no second renderer. A line joins only CONSECUTIVE logged (or rated)
+     days: an unlogged past day is a GAP, never a zero dot (Cory: "remove the points for zero days");
+     a logged 0% keeps a small HOLLOW point at 0 (the truth stays visible, quietly); a future day is
+     nothing; today's point is larger with a soft ring. The rating line is drawn UNDER the completion
+     line. The name stays `barLineChart` - it is the one renderer the goldens and the paints call. */
   function barLineChart(svgId, pts, opts){
     opts = opts || {};
     var svg=document.getElementById(svgId); if(!svg) return 0;
     var host=svg.parentNode; if(host) host.classList.remove('h16scroll');
     svg.removeAttribute('width'); svg.style.width='';
     if(!svg.getClientRects().length) return 0;        /* hidden surface: measureAndDraw calls back */
-    var H=246, W=fitSvg(svgId,H); if(W==null) return 0;
-    var L=24, R=10, TOP=12;
-    var AH=150, Abase=TOP+AH;                          /* completion panel: 0 at Abase, 100 at TOP */
-    var GAP=14, Btop=Abase+GAP, BH=44, Bbase=Btop+BH;  /* rating panel: 1 at Bbase, 10 at Btop */
+    var H=opts.height||200, W=fitSvg(svgId,H); if(W==null) return 0;   /* S5: month ~200, year ~180 */
+    var L=24, R=12, TOP=8, BOT=16, PB=H-BOT;          /* one panel: 0 at PB (bottom), 100 at TOP */
     var n=pts.length; if(!n) return 0;
-    var NEED=(typeof HT32_TARGET_PCT==='number'?HT32_TARGET_PCT:80);  /* the ONE constant, no second literal */
+    var NEED=(typeof HT32_TARGET_PCT==='number'?HT32_TARGET_PCT:80);   /* the ONE constant, no second literal */
     var colW=(W-L-R)/n;
     function cx(i){ return L+colW*(i+0.5); }
-    function ay(v){ return Abase-(v/100)*AH; }
-    function ry(v){ return Bbase-((v-1)/9)*BH; }
-    function band(c){ return c>=NEED?'bl-g':(c>=50?'bl-a':'bl-r'); }
+    function ay(v){ return PB-(v/100)*(PB-TOP); }
+    function tipFor(p){ return tipOf(p.logged?p.c:null, p.rv); }       /* S3: '36% · 7/10', em-dashes when absent */
     var s='';
-    /* panel A left axis 0 / 50 / 100 - NO right axis */
-    [0,50,100].forEach(function(v){
-      s+='<line class="ax'+(v===0?' ax0':'')+'" x1="'+L+'" y1="'+ay(v).toFixed(1)+'" x2="'+(W-R)+'" y2="'+ay(v).toFixed(1)+'"/>';
-      s+='<text class="ayl" x="'+(L-4)+'" y="'+(ay(v)+3).toFixed(1)+'" text-anchor="end">'+v+'</text>';
-    });
-    /* the dashed need line at the shared threshold, labelled at its right end */
+    /* S2 · one left axis 0..100: a faint gridline AND a muted label at EVERY 10 (eleven of each) */
+    for(var g=0; g<=100; g+=10){
+      s+='<line class="bl-grid'+(g===0?' bl-grid0':'')+'" x1="'+L+'" y1="'+ay(g).toFixed(1)+'" x2="'+(W-R)+'" y2="'+ay(g).toFixed(1)+'"/>';
+      s+='<text class="ayl" x="'+(L-4)+'" y="'+(ay(g)+3).toFixed(1)+'" text-anchor="end">'+g+'</text>';
+    }
+    /* the dashed need line at the shared threshold, one tiny label at its right end - nothing else written on the plot */
     s+='<line class="bl-need" x1="'+L+'" y1="'+ay(NEED).toFixed(1)+'" x2="'+(W-R)+'" y2="'+ay(NEED).toFixed(1)+'"/>';
     s+='<text class="bl-needl" x="'+(W-R).toFixed(1)+'" y="'+(ay(NEED)-2).toFixed(1)+'" text-anchor="end">need</text>';
     var todayIx=-1;
     pts.forEach(function(p,i){ if(p.key===today()) todayIx=i; });
     if(todayIx<0 && opts.attr==='data-vgy' && String(S.vYear||'')===String(dnum(today()).getFullYear()))
       pts.forEach(function(p,i){ if(p.key===String(dnum(today()).getMonth())) todayIx=i; });
-    var barW=Math.max(3, Math.min(colW-2, colW*0.68));
-    /* tap columns first (behind), the full height so a tap anywhere on a day's column goes to it */
+    /* tap columns first (behind), full height so a tap anywhere on a day's column goes to it
+       (>= 24px wide on the 12-month year card, R70.69) */
     pts.forEach(function(p,i){
-      if(p.c==null && p.rv==null) return;
-      var tip=p.readout || tipOf(p.c, p.rv!=null?p.rv:null), at=opts.attr+'="'+p.key+'"';
-      s+='<rect class="hitcol" '+at+' data-tip="'+esc(tip)+'" x="'+(cx(i)-colW/2).toFixed(1)+'" y="0" width="'+colW.toFixed(1)+'" height="'+H+'" fill="transparent"/>';
+      if(p.c==null && p.rv==null) return;             /* out of span / future: no hit */
+      s+='<rect class="hitcol" '+opts.attr+'="'+p.key+'" data-tip="'+esc(tipFor(p))+'" x="'+(cx(i)-colW/2).toFixed(1)+'" y="0" width="'+colW.toFixed(1)+'" height="'+H+'" fill="transparent"/>';
     });
-    /* PANEL A · the bars and the stubs */
-    pts.forEach(function(p,i){
-      if(p.c==null) return;                                   /* out of span / future: nothing */
-      var at=opts.attr+'="'+p.key+'"', x=cx(i);
-      if(p.logged && p.c>0){
-        var y=ay(p.c), h=Math.max(1, Abase-y);
-        s+='<rect class="bl-bar '+band(p.c)+'" '+at+' x="'+(x-barW/2).toFixed(1)+'" y="'+y.toFixed(1)+'" width="'+barW.toFixed(1)+'" height="'+h.toFixed(1)+'"/>';
-      } else {
-        /* a logged 0% is a solid red stub; an unlogged past day is a dim stub (counts as 0, stays visible) */
-        var cls=(p.logged && p.c===0) ? 'bl-stub bl-stub-zero' : 'bl-stub';
-        s+='<rect class="'+cls+'" '+at+' x="'+(x-barW/2).toFixed(1)+'" y="'+(Abase-2).toFixed(1)+'" width="'+barW.toFixed(1)+'" height="2"/>';
-      }
+    /* runs of CONSECUTIVE points (a gap breaks the line, never interpolated) */
+    function runsOf(get){
+      var cur=[], out=[];
+      pts.forEach(function(p,i){ var v=get(p);
+        if(v==null){ if(cur.length){ out.push(cur); cur=[]; } return; }
+        cur.push([i,v]); });
+      if(cur.length) out.push(cur);
+      return out;
+    }
+    function path(runs, cls, yv){
+      return runs.map(function(r){
+        if(r.length<2) return '';                     /* a lone point draws no path across nothing */
+        return '<path class="'+cls+'" d="'+r.map(function(pt,j){ return (j?'L':'M')+cx(pt[0]).toFixed(1)+' '+yv(pt[1]).toFixed(1); }).join(' ')+'"/>';
+      }).join('');
+    }
+    /* the RATING line and dots, drawn UNDER (rated days only; rv is the real rating, null = a gap) */
+    s+=path(runsOf(function(p){ return p.rv; }), 'bl-rline', function(v){ return ay(v*10); });
+    pts.forEach(function(p,i){ if(p.rv==null) return; var big=(i===todayIx), y=ay(p.rv*10);
+      if(big) s+='<circle class="bl-ring" cx="'+cx(i).toFixed(1)+'" cy="'+y.toFixed(1)+'" r="7"/>';
+      s+='<circle class="bl-rdot'+(big?' bl-today':'')+'" cx="'+cx(i).toFixed(1)+'" cy="'+y.toFixed(1)+'" r="'+(big?5:3)+'"/>';
     });
-    /* PANEL B · the rating, 1-10, an amber dot per rated day and a line across CONSECUTIVE rated days */
-    [1,5,10].forEach(function(v){
-      s+='<text class="ayl" x="'+(L-4)+'" y="'+(ry(v)+3).toFixed(1)+'" text-anchor="end">'+v+'</text>';
+    /* the COMPLETION line and dots, drawn ON TOP (logged days only; an unlogged in-span day is a GAP) */
+    s+=path(runsOf(function(p){ return p.logged?p.c:null; }), 'bl-cline', ay);
+    pts.forEach(function(p,i){ if(!p.logged) return; var big=(i===todayIx), hollow=(p.c===0), y=ay(p.c);
+      if(big) s+='<circle class="bl-ring" cx="'+cx(i).toFixed(1)+'" cy="'+y.toFixed(1)+'" r="7"/>';
+      s+='<circle class="bl-cdot'+(hollow?' bl-hollow':'')+(big?' bl-today':'')+'" cx="'+cx(i).toFixed(1)+'" cy="'+y.toFixed(1)+'" r="'+(big?5:3)+'"/>';
     });
-    s+='<line class="ax ax0" x1="'+L+'" y1="'+Bbase.toFixed(1)+'" x2="'+(W-R)+'" y2="'+Bbase.toFixed(1)+'"/>';
-    s+='<text class="bl-blab" x="'+L+'" y="'+(Btop-3).toFixed(1)+'">Day rating</text>';
-    var run=[], runs=[];
-    pts.forEach(function(p,i){ if(p.rv!=null) run.push([i,p.rv]); else { if(run.length){ runs.push(run); run=[]; } } });
-    if(run.length) runs.push(run);
-    runs.forEach(function(r){
-      if(r.length>1) s+='<path class="bl-rline" d="'+r.map(function(pt,j){ return (j?'L':'M')+cx(pt[0]).toFixed(1)+' '+ry(pt[1]).toFixed(1); }).join(' ')+'"/>';
-    });
-    pts.forEach(function(p,i){ if(p.rv==null) return;
-      s+='<circle class="bl-rdot'+(i===todayIx?' bl-today':'')+'" cx="'+cx(i).toFixed(1)+'" cy="'+ry(p.rv).toFixed(1)+'" r="'+(i===todayIx?3:2.4)+'"/>';
-    });
-    /* x labels, drawn ONCE under panel B: day numbers (every other when crowded), the weekday row */
+    /* S4 · x labels under the plot: DAY NUMBERS ONLY (every other when crowded), today bold; no weekday row */
     var crowd = n>16;
     pts.forEach(function(p,i){
       var showNum = !crowd || (i%2===0) || i===todayIx || i===0 || i===n-1;
-      /* 816: today's label is bold in the body ink and carries `xl-today` - the class golden_ht38 reads. */
-      if(showNum) s+='<text class="bl-xl'+(i===todayIx?' xl-today':'')+'" '+opts.attr+'="'+p.key+'" x="'+cx(i).toFixed(1)+'" y="'+(Bbase+13).toFixed(1)+'" text-anchor="middle">'+esc(p.x)+'</text>';
-      if(p.x2) s+='<text class="bl-xl2'+(/^sat/i.test(String(p.x2))?' bl-xl-sat':'')+'" x="'+cx(i).toFixed(1)+'" y="'+(Bbase+21).toFixed(1)+'" text-anchor="middle">'+esc(String(p.x2).charAt(0))+'</text>';
+      /* today's label is bold in the body ink and carries `xl-today` - the class golden_ht38 reads */
+      if(showNum) s+='<text class="bl-xl'+(i===todayIx?' xl-today':'')+'" '+opts.attr+'="'+p.key+'" x="'+cx(i).toFixed(1)+'" y="'+(PB+13).toFixed(1)+'" text-anchor="middle">'+esc(p.x)+'</text>';
     });
     svg.innerHTML=s;
     return pts.filter(function(p){ return p.logged; }).length;
@@ -6067,14 +6061,13 @@ var HT32_CARDFIT = true;
     return out;
   }
 
-  /* 816 S3: the wrapping legend (never clips at 390) and the small header figures. The threshold
-     word comes from the one constant, so "need 80%" can never disagree with the dashed line. */
+  /* 819 S3: the two-word wrapping legend (never clips at 390) and the small header figures. Just two
+     words, each a line-swatch in its line's own stroke - the need line carries its own `need` label on
+     the plot, so the legend needs no third item. */
   function barLegend(){
-    var need=(typeof HT32_TARGET_PCT==='number'?HT32_TARGET_PCT:80);
     return '<span class="bl-leg">'+
-      '<span class="bl-leg-i"><i class="bl-sw bl-g"></i>Completion</span>'+
-      '<span class="bl-leg-i"><i class="bl-sw bl-needsw"></i>need '+need+'%</span>'+
-      '<span class="bl-leg-i"><i class="bl-sw bl-rdotsw"></i>Day rating</span>'+
+      '<span class="bl-leg-i"><i class="bl-sw bl-cln"></i>Completion</span>'+
+      '<span class="bl-leg-i"><i class="bl-sw bl-rln"></i>Rating</span>'+
       '</span>';
   }
   /* avg completion and mean rating for the header. MONTH: over the span's past days, unlogged counted
@@ -6094,35 +6087,33 @@ var HT32_CARDFIT = true;
     var pts=monthPoints();
     var ym=S.calYM||[dnum(today()).getFullYear(),dnum(today()).getMonth()];
     /* B0.2: draw now if the panel is already measurable, and again after layout / fonts / resize */
-    measureAndDraw('vMonth', function(){ barLineChart('vMonth', monthPoints(), { attr:'data-vgd' }); });
-    barLineChart('vMonth', pts, { attr:'data-vgd' });
+    measureAndDraw('vMonth', function(){ barLineChart('vMonth', monthPoints(), { attr:'data-vgd', height:200 }); });
+    barLineChart('vMonth', pts, { attr:'data-vgd', height:200 });    /* S5: ~200px tall on the phone */
     var nav=document.getElementById('vMonthNav');
     if(nav) nav.innerHTML='<button class="mv" data-vgm="-1">\u2039</button>'+
       '<b>'+MO[ym[1]].toUpperCase()+' '+ym[0]+'</b>'+
       '<button class="mv" data-vgm="1">\u203a</button>'+headFig(pts,false)+barLegend();
-    /* PASTE 682: count ACTUALLY-logged days (p.logged), never the drawn 0s. */
-    var got=pts.filter(function(p){ return p.logged; }).length;
+    /* 819 S4: the static tip line goes; the element stays for the hover readout only (bindPanels fills it) */
     var tip=document.getElementById('vMonthTip');
-    if(tip) tip.textContent = got? got+' logged' : 'nothing logged';
+    if(tip) tip.textContent='';
     return pts;
   }
   function paintYear16(){
     var pts=yearPoints();
-    measureAndDraw('vYear', function(){ barLineChart('vYear', yearPoints(), { attr:'data-vgy' }); });
-    barLineChart('vYear', pts, { attr:'data-vgy' });
+    measureAndDraw('vYear', function(){ barLineChart('vYear', yearPoints(), { attr:'data-vgy', height:180 }); });
+    barLineChart('vYear', pts, { attr:'data-vgy', height:180 });     /* S5: ~180px tall on the phone */
     var nav=document.getElementById('vYearNav');
     if(nav) nav.innerHTML='<button class="mv" data-vgyn="-1">\u2039</button>'+
       '<b>'+(S.vYear||dnum(today()).getFullYear())+'</b>'+
       '<button class="mv" data-vgyn="1">\u203a</button>'+headFig(pts,true)+barLegend();
-    /* PASTE 682: count months with a real logged day (p.logged), never the drawn 0s. */
-    var got=pts.filter(function(p){ return p.logged; }).length;
+    /* 819 S4: the static tip line goes; the element stays for the hover readout only (bindPanels fills it) */
     var tip=document.getElementById('vYearTip');
-    if(tip) tip.textContent=got+' of 12 months logged';
+    if(tip) tip.textContent='';
     return pts;
   }
   window.__HT16.monthPoints = monthPoints;
   window.__HT16.yearPoints  = yearPoints;
-  window.__HT16.barLineChart = barLineChart;  /* 816 S3: the one bar+line renderer, exposed for the golden */
+  window.__HT16.barLineChart = barLineChart;  /* 819: the one LINE renderer for both cards, exposed for the golden */
   window.__HT16.tipOf       = tipOf;
 
   /* ---- S4 · LIFE IN WEEKS (R70.95 · R70.96) ---------------------------------------------
