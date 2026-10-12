@@ -71,13 +71,20 @@ HERO_JS = """
   const c = document.getElementById('h228Hero');
   if(!c) return null;
   const lab = c.querySelector('.lab');
-  const pct = c.querySelector('.sh-pct');
+  // PASTE 821 amended by name (R67.2): the big percent is now the RING (.sh-ring, with .sh-ring-pct in
+  // its centre), not a flat .sh-pct; the card also carries the week row (.sh-week). The three tiles and
+  // the one caption are unchanged.
+  const ring = c.querySelector('.sh-ring');
+  const pct = c.querySelector('.sh-ring-pct');
+  const week = c.querySelector('.sh-week');
   const tiles = Array.prototype.slice.call(c.querySelectorAll('.sh-tile'));
   const caps = Array.prototype.slice.call(c.querySelectorAll('.sh-cap'));
   return {
     present: true,
     lab: lab ? (lab.textContent||'').trim() : null,
+    hasRing: !!ring,
     hasPct: !!pct,
+    hasWeek: !!week,
     nTiles: tiles.length,
     tileKeys: tiles.map(t => { const k=t.querySelector('.sh-k'); return k ? (k.textContent||'').trim().toLowerCase() : ''; }),
     caps: caps.map(x => (x.textContent||'').trim().toLowerCase())
@@ -123,7 +130,7 @@ TODAY_JS = """
   return {
     strip: !!document.getElementById('tStrip'),
     heroBar: !!document.querySelector('.hero-bar, .hero-mast'),
-    colHasPct: !!(col && col.querySelector('.sh-pct')),
+    colHasPct: !!(col && col.querySelector('.sh-pct, .sh-ring, .sh-ring-pct')),
     log: !!document.getElementById('log'),
     dump: !!document.getElementById('iDump'),
     rate: !!(document.getElementById('rateWrap') || document.getElementById('rate') || document.querySelector('[data-r]'))
@@ -171,13 +178,13 @@ async def run(pw, w, h, label):
     hero = await pg.evaluate(HERO_JS)
     sig = None
     if hero:
-        okcard = (hero['hasPct'] and hero['nTiles'] == 3
+        okcard = (hero['hasRing'] and hero['hasPct'] and hero['hasWeek'] and hero['nTiles'] == 3
                   and 'need 80%' in hero['caps'] and hero['caps'].count('need 80%') == 1
                   and (hero['lab'] or '').lower() == 'today'
                   and hero['tileKeys'] == ['7 days', '30 days', 'streak'])
-        chk("%s · the scoreboard: TODAY + big %% + three tiles (7d·30d·streak) + one 'need 80%%' caption"
+        chk("%s · the scoreboard: TODAY + the RING + the week row + three tiles (7d·30d·streak) + one 'need 80%%' caption"
             % label, okcard, hero)
-        sig = (hero['hasPct'], hero['nTiles'], tuple(hero['tileKeys']),
+        sig = (hero['hasRing'], hero['hasWeek'], hero['nTiles'], tuple(hero['tileKeys']),
                'need 80%' in hero['caps'], (hero['lab'] or '').lower())
     else:
         chk("%s · the scoreboard #h228Hero renders" % label, False, hero)

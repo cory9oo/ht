@@ -1280,17 +1280,25 @@ html[data-simple] .li .bx, html[data-simple] .li .edp{ align-self:center }
   /* PASTE 820 — the one scoreboard card is the desktop's ranking home: a full-width header across the top
      of the charts quadrant (row 1), the two line charts in the row beneath it (row 2). The SAME node and
      markup the phone Insights draws; compact and horizontal here so the charts keep their room. */
-  html[data-simple] #h18Charts{ grid-template-rows:66px minmax(0,1fr) }
+  /* PASTE 821 — the desktop draws the SAME elements the phone does (ring · week · tiles · records ·
+     caption), laid out horizontally so the two line charts keep their room: the ring on the left, the
+     week row and tiles beside it, the records line wrapping under. The row height follows the content
+     (the ring is ~104px here), and it never scrolls sideways (flex-wrap). */
+  html[data-simple] #h18Charts{ grid-template-rows:auto minmax(0,1fr) }
   html[data-simple] #h18Charts > #h228Hero{ grid-column:1 / -1; grid-row:1; margin:0 0 6px; overflow:hidden;
-    border:1px solid var(--rule); border-radius:10px; background:var(--surface); padding:6px 12px }
+    border:1px solid var(--rule); border-radius:10px; background:var(--surface); padding:8px 12px }
   html[data-simple] #h18Charts > #h228Hero > .lab{ display:block; font:500 9px/1 var(--mono);
     letter-spacing:.14em; text-transform:uppercase; color:var(--ink3); padding-bottom:5px }
-  html[data-simple] #h18Charts > #h228Hero .stat-hero{ flex-direction:row; align-items:baseline;
+  html[data-simple] #h18Charts > #h228Hero .stat-hero{ flex-direction:row; align-items:center;
     gap:18px; flex-wrap:wrap }
-  html[data-simple] #h18Charts > #h228Hero .sh-pct{ font-size:30px }
+  html[data-simple] #h18Charts > #h228Hero .sh-ringwrap{ width:104px; height:104px; margin:0; flex:0 0 auto }
+  html[data-simple] #h18Charts > #h228Hero .sh-ring{ width:104px; height:104px }
+  html[data-simple] #h18Charts > #h228Hero .sh-ring-pct{ font-size:30px }
+  html[data-simple] #h18Charts > #h228Hero .sh-week{ flex:1 1 180px; margin-top:0; max-width:320px }
   html[data-simple] #h18Charts > #h228Hero .sh-tiles{ margin-top:0; gap:16px;
-    grid-template-columns:repeat(3,auto) }
+    grid-template-columns:repeat(3,auto); flex:0 0 auto }
   html[data-simple] #h18Charts > #h228Hero .sh-v{ font-size:15px }
+  html[data-simple] #h18Charts > #h228Hero .sh-rec{ flex:1 1 100%; margin-top:2px; justify-content:flex-start }
   html[data-simple] #h18Charts > #h228Hero .sh-cap{ margin-top:0; align-self:center }
 }
 /* S1c · THE FRAME GOES TO 1680 AT >=1600 (D-HT-18-2). At 1920 a 1440 frame leaves 240px of margin
@@ -2293,7 +2301,42 @@ textarea{ -webkit-overflow-scrolling:touch }
    desktop charts quadrant. The numeral is the emotion: >=64px on the phone, 30px horizontal on the
    desktop (below). Its colour is set inline (the band ink). */
 .stat-hero{ display:flex; flex-direction:column; gap:6px; min-width:0 }
-.stat-hero .sh-pct{ font:600 64px/1 var(--mono); letter-spacing:-.03em }
+/* PASTE 821 — THE RING (the hero): a dim track, a filled arc coloured by the current value's band, the
+   big percent in the centre in its band ink, and a thin gold ring OUTSIDE the arc at 100. The arc fills
+   once on open and advances on a check-off (applyRing, JS); reduced-motion gets the final state only. */
+.stat-hero .sh-ringwrap{ position:relative; width:140px; height:140px; margin:2px auto }
+.stat-hero .sh-ring{ width:140px; height:140px; transform:rotate(-90deg); overflow:visible }
+.sh-ring-trk{ fill:none; stroke:var(--rule2); stroke-width:9 }
+.sh-ring-arc{ fill:none; stroke-width:9; stroke-linecap:round }
+.sh-ring-gold{ fill:none; stroke:var(--gold); stroke-width:2.5 }
+.stat-hero .sh-ring-pct{ position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
+  font:600 40px/1 var(--mono); letter-spacing:-.03em }
+.stat-hero .sh-ring-lab{ text-align:center; min-height:12px; font:600 10px/1 var(--mono); letter-spacing:.14em;
+  text-transform:uppercase; color:var(--gold) }
+/* the 100 burst: 24 particles fly out once (~900ms) then are gone; none emitted under reduced motion */
+@media (prefers-reduced-motion: no-preference){
+  .sh-burst .sh-p{ animation:sh-burst .9s var(--ease) forwards; animation-delay:var(--pd,0ms) }
+  .sh-wk-today .sh-wk-trk{ animation:sh-pulse 1.2s var(--ease) 1 }
+}
+@keyframes sh-burst{ 0%{ transform:translate(0,0); opacity:1 } 100%{ transform:translate(var(--px),var(--py)); opacity:0 } }
+@keyframes sh-pulse{ 0%,100%{ filter:none } 50%{ filter:drop-shadow(0 0 4px var(--accent)) } }
+/* S3 · THE WEEK ROW: seven mini rings, Monday first, the letters the only text */
+.stat-hero .sh-week{ display:grid; grid-template-columns:repeat(7,1fr); gap:6px; margin-top:2px; padding-bottom:4px }
+.stat-hero .sh-week.perfect{ border-bottom:2px solid var(--gold) }
+.sh-wkc{ display:flex; flex-direction:column; align-items:center; gap:2px; min-width:0 }
+.sh-wk{ width:100%; max-width:30px; aspect-ratio:1; transform:rotate(-90deg); overflow:visible }
+.sh-wk-trk{ fill:none; stroke:var(--rule2); stroke-width:3 }
+.sh-wk-arc{ fill:none; stroke-width:3; stroke-linecap:round }
+.sh-wk-future .sh-wk-trk{ opacity:.35 }
+.sh-wk-l{ font:500 8.5px/1 var(--mono); letter-spacing:.06em; color:var(--ink3) }
+/* S4 · THE RECORDS LINE: muted, small; a new best flashes gold once and keeps `new best` for the day */
+.stat-hero .sh-rec{ margin-top:6px; font:500 9.5px/1.4 var(--mono); letter-spacing:.04em; color:var(--ink3);
+  display:flex; flex-wrap:wrap; gap:0 2px; justify-content:center; text-align:center }
+.sh-rec-new{ font-style:normal; color:var(--gold); margin-left:3px }
+.sh-rec-gold{ color:var(--gold) }
+.sh-rec-flash{ color:var(--gold) }
+@media (prefers-reduced-motion: no-preference){ .sh-rec-flash{ animation:sh-flash 1s var(--ease) 1 } }
+@keyframes sh-flash{ 0%,100%{ opacity:1 } 50%{ opacity:.4 } }
 /* PASTE 820 — the one scoreboard body: big percent, three EQUAL tiles (7 days · 30 days · streak), one
    caption. Equal widths and gaps (R70.306); each figure in its band ink, streak the neutral ink with `d`. */
 .stat-hero .sh-tiles{ display:grid; grid-template-columns:repeat(3,1fr); gap:8px; margin-top:4px }
@@ -3665,7 +3708,7 @@ body{
    proportional. Re-declared here at matching-or-higher specificity, LAST in the cascade, for the number
    surfaces that ship: the scoreboard big % and tiles, and the ledger. golden_ht41 T5 holds it.
    (PASTE 820: the `.hero-mast/.hero-bar .hero-num` selectors are gone with the retired bar/mast.) */
-.stat-hero .sh-pct, .stat-hero .sh-v,
+.stat-hero .sh-ring-pct, .stat-hero .sh-v,
 .h16sc, .h16sc td, .h16sc td.num, #log .li{
   font-variant-numeric:tabular-nums;
 }

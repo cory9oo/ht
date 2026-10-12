@@ -774,7 +774,11 @@ function ht293Streak(th){
   return n;
 }
 window.__HT293 = { due:ht293Due, pct:ht293Pct, sync:ht293Sync, avg:ht293Avg, avgMap:ht293AvgMap,
-                   streak:ht293Streak, first:ht293First, isSab:ht293IsSab, sabDow:ht293SabDow, showSab:ht293ShowSab };
+                   streak:ht293Streak, first:ht293First, isSab:ht293IsSab, sabDow:ht293SabDow, showSab:ht293ShowSab,
+                   /* PASTE 821 S4: the ONE streak definition - consecutive logged days at or above NEED (80),
+                      through yesterday plus today if today qualifies. The scoreboard tile and the records line
+                      both read THIS, so the number means one thing everywhere. */
+                   needStreak:function(){ return ht293Streak(NEED); } };
 /* PASTE 293 S2.8 · THE LIFE CHART'S AXES, DECLARED ONCE for the desktop grid (paintLife18) and the phone's
    (HT185LIFE): 100 rows, ages every ten with 100 at the foot, weeks 0 10 20 30 40 and 52 across the top */
 var HT293_LIFE_ROWS = 100, HT293_LIFE_WEEK_TICKS = [0, 10, 20, 30, 40];
@@ -14212,27 +14216,177 @@ var HT32_WEEK = 'sun_fri';                /* Sunday..Friday; Saturday is the Sab
     var s = (window.__HT26 && window.__HT26.strip) ? window.__HT26.strip() : { today: 0, week: 0, streak: 0 };
     var m = null;
     try{ var y = window.__HT29GRP && window.__HT29GRP.you && window.__HT29GRP.you(); if(y) m = y.m; }catch(e){}
-    return { today: s.today, week: s.week, streak: s.streak, m: m };
+    /* PASTE 821 S4: the Streak tile is the ONE streak definition - consecutive logged days at or above
+       NEED (80) - not the old 100%-only streak. */
+    var streak = (window.__HT293 && window.__HT293.needStreak) ? window.__HT293.needStreak() : s.streak;
+    return { today: s.today, week: s.week, streak: streak, m: m };
   }
-  /* ONE SCOREBOARD, ONE RENDERER (PASTE 820). `fill(node)` writes the whole card body — the big day
-     percent in its band ink, then THREE EQUAL tiles (7 DAYS · 30 DAYS · STREAK) and one caption
-     `need NN%` — and nothing else. The same markup is used at every width (phone Insights card and the
-     desktop charts quadrant): there is no second phone-vs-desktop markup. Each ranking figure is TEXT
-     coloured by the one band table through `bandInk` (streak is the neutral ink, with a trailing `d`). */
   function tile(lbl, val, color){
     return '<div class="sh-tile"><span class="sh-k">' + lbl + '</span><b class="num sh-v"' +
            (color ? ' style="color:' + color + '"' : '') + '>' + val + '</b></div>';
   }
+
+  /* ================= PASTE 821 · THE RING, THE WEEK, THE RECORDS =================================
+     The scoreboard body (#h228Hero) is one renderer at every width (820). This job turns the big
+     percent into a RING THE PERSON WANTS TO CLOSE (the hero), adds a seven-ring week row and a quiet
+     records line, and keeps the three tiles and the `need 80%` caption. One hero mechanic, rare
+     rewards tied to the real goal, no sound, no looping animation. Reduced-motion gets the same final
+     state with no motion. All of it derives from the days the app already stores - no new column. */
+  var RING_R = 52, RING_C = 2 * Math.PI * RING_R;      /* the big ring */
+  var WK_R = 15, WK_C = 2 * Math.PI * WK_R;            /* a week mini-ring */
+  var _filled = false, _lastShown = null, _lastPct = null;   /* animation memory (one hero node) */
+  function rampFill(p){ return (window.__HT16 && window.__HT16.rampFill) ? window.__HT16.rampFill(p) : 'var(--rule2)'; }
+  function reducedMotion(){ try{ return !!(window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches); }catch(e){ return false; } }
+
+  /* the days the app stores, as a {date:pct} map through the one engine (ht293Map): logged days + today */
+  function recMap(){ try{ return (typeof ht293Map === 'function') ? ht293Map() : {}; }catch(e){ return {}; } }
+  function wkMonday(k){ var d = dnum(k), off = (d.getDay() + 6) % 7; return shift(k, -off); }
+  /* S4 · the records, every one derived (no new column). best streak = longest run of consecutive
+     logged days >= NEED; 100% days = count of logged days at 100; best week = highest Monday-anchored
+     weekly mean; perfect weeks = complete Mon..Sun weeks whose seven days are each >= NEED. */
+  function records(){
+    var M = recMap(), keys = Object.keys(M).filter(function(k){ return k <= today(); }).sort();
+    var hundred = keys.filter(function(k){ return M[k] === 100; }).length;
+    var best = 0;
+    if(keys.length){
+      var k = keys[0], run = 0, guard = 0;
+      while(k <= today() && guard++ < 100000){
+        var v = (k in M) ? M[k] : 0;                 /* an unopened in-span day is a 0 and breaks */
+        if(v == null){ k = shift(k, 1); continue; }  /* nothing due: skip, neither extends nor breaks */
+        if(v >= NEED){ run++; if(run > best) best = run; } else run = 0;
+        k = shift(k, 1);
+      }
+    }
+    var wk = {};
+    keys.forEach(function(kk){ var mon = wkMonday(kk); (wk[mon] = wk[mon] || []).push(M[kk]); });
+    var bestWeek = null, perfect = 0;
+    Object.keys(wk).forEach(function(mon){
+      var vals = wk[mon].filter(function(v){ return v != null; });
+      if(vals.length){ var avg = Math.round(vals.reduce(function(a, b){ return a + b; }, 0) / vals.length);
+        if(bestWeek == null || avg > bestWeek) bestWeek = avg; }
+      var cnt = 0, ok = true;
+      for(var i = 0; i < 7; i++){ var dk2 = shift(mon, i), vv = (dk2 in M) ? M[dk2] : null;
+        if(vv == null || vv < NEED) ok = false; else cnt++; }
+      if(ok && cnt === 7) perfect++;
+    });
+    return { streak: best, hundred: hundred, bestWeek: bestWeek, perfect: perfect };
+  }
+  /* a new personal best flashes gold once and shows `new best` for the rest of the day. The baseline is
+     recorded silently the first time (a first record is not a "new best"); only a BEAT celebrates.
+     localStorage keyed by date, never the database. */
+  function newBest(f, val){
+    try{
+      var key = 'ht821_best_' + f, nf = 'ht821_newbest_' + f + '_' + today();
+      var raw = localStorage.getItem(key), prev = (raw == null) ? null : +raw;
+      if(prev == null) localStorage.setItem(key, String(val));
+      else if(val > prev){ localStorage.setItem(key, String(val)); localStorage.setItem(nf, '1'); }
+      return localStorage.getItem(nf) === '1';
+    }catch(e){ return false; }
+  }
+  function recordsLine(r){
+    var parts = [];
+    function fact(f, label, val){
+      if(val == null || val <= 0) return;
+      var nb = newBest(f, val);
+      parts.push('<span class="sh-rec-f' + (nb ? ' sh-rec-flash' : '') + '">' + label +
+                 (nb ? ' <i class="sh-rec-new">new best</i>' : '') + '</span>');
+    }
+    fact('streak', 'best streak ' + r.streak + 'd', r.streak);
+    fact('hundred', '100% days ' + r.hundred, r.hundred);
+    fact('week', 'best week ' + r.bestWeek + '%', r.bestWeek);
+    if(r.perfect >= 1) parts.push('<span class="sh-rec-f sh-rec-gold">perfect weeks: ' + r.perfect + '</span>');
+    if(!parts.length) return '';
+    return '<div class="sh-rec">' + parts.join('<span class="sh-rec-sep"> · </span>') + '</div>';
+  }
+
+  /* S3 · THIS WEEK AT A GLANCE: seven mini rings, this calendar week, Monday first, the letters the only text. */
+  function weekData(){
+    var out = [], off = (dnum(today()).getDay() + 6) % 7, mon = shift(today(), -off), L = 'MTWTFSS';
+    for(var i = 0; i < 7; i++){
+      var k = shift(mon, i), future = k > today();
+      var v = (!future && (typeof loggedOn !== 'function' || loggedOn(k))) ? ht293Pct(k) : null;
+      out.push({ k: k, future: future, isToday: k === today(), v: v, letter: L[i] });
+    }
+    return out;
+  }
+  function wkRing(x){
+    var cls = 'sh-wk' + (x.future ? ' sh-wk-future' : '') + (x.isToday ? ' sh-wk-today' : '');
+    var arc = (x.v != null)
+      ? '<circle class="sh-wk-arc" cx="18" cy="18" r="' + WK_R + '" stroke="' + rampFill(x.v) +
+        '" stroke-dasharray="' + WK_C.toFixed(1) + '" stroke-dashoffset="' + (WK_C * (1 - x.v / 100)).toFixed(1) + '"/>'
+      : '';
+    return '<div class="sh-wkc"><svg class="' + cls + '" viewBox="0 0 36 36" aria-hidden="true">' +
+           '<circle class="sh-wk-trk" cx="18" cy="18" r="' + WK_R + '"/>' + arc + '</svg>' +
+           '<span class="sh-wk-l">' + x.letter + '</span></div>';
+  }
+
+  /* S2 · the 100-day burst: 24 particles in the band colours from the ring centre, ONCE per day, never
+     under reduced motion (localStorage-guarded). */
+  function canBurst(){ try{ return !reducedMotion() && !localStorage.getItem('ht821_burst_' + today()); }catch(e){ return false; } }
+  function markBurst(){ try{ localStorage.setItem('ht821_burst_' + today(), '1'); }catch(e){} }
+  function burstSvg(){
+    var out = '<g class="sh-burst">', i, n = 24;
+    for(i = 0; i < n; i++){
+      var a = (i / n) * 2 * Math.PI, px = (46 * Math.cos(a)).toFixed(1), py = (46 * Math.sin(a)).toFixed(1);
+      out += '<circle class="sh-p" cx="60" cy="60" r="2.4" fill="var(--g' + (i % 5) + ')" ' +
+             'style="--px:' + px + 'px;--py:' + py + 'px;--pd:' + (i % 6 * 20) + 'ms"/>';
+    }
+    return out + '</g>';
+  }
+  /* the one-shot fill/advance of the arc. First open: 0 -> value (~600ms ease-out); later: the last
+     shown -> the new value (a check-off advances it). A band crossing taps the phone once. Reduced
+     motion: the final state, set directly, no transition. */
+  function applyRing(node, pct){
+    var arc = node.querySelector('.sh-ring-arc'); if(!arc) return;
+    var target = RING_C * (1 - (pct || 0) / 100);
+    if(reducedMotion()){ arc.style.strokeDashoffset = target; _filled = true; _lastShown = target; _lastPct = pct; return; }
+    var from = _filled ? (_lastShown == null ? target : _lastShown) : RING_C;   /* first open starts empty */
+    try{ if(_filled && _lastPct != null && bandOf(_lastPct) !== bandOf(pct) && navigator.vibrate) navigator.vibrate(10); }catch(e){}
+    arc.style.transition = 'none';
+    arc.style.strokeDashoffset = from;
+    (window.requestAnimationFrame || function(f){ setTimeout(f, 16); })(function(){
+      arc.style.transition = 'stroke-dashoffset .6s var(--ease)';
+      arc.style.strokeDashoffset = target;
+    });
+    _filled = true; _lastShown = target; _lastPct = pct;
+  }
+
+  /* ONE RENDERER (820), parameterised by VALUE (821): `scoreHtml(o)` is the pure markup builder - the
+     ring (hero), the week row, the three tiles, the records line, the caption - the SAME markup at every
+     width. `fill(node)` reads the live day and hands it here; golden_ht821 hands it crafted values, so
+     the ring/week/records can be proven at any state (100, a perfect week, a new best) without the
+     fixture happening to hold that day. o = {today, week, m, streak, wk:[…], rec:{…}, burst}. */
+  function scoreHtml(o){
+    var pct = o.today, perfect = (pct === 100);
+    var arcOff = RING_C * (1 - (pct || 0) / 100);
+    var gold = perfect ? '<circle class="sh-ring-gold" cx="60" cy="60" r="59"/>' : '';
+    var burst = o.burst ? burstSvg() : '';
+    var ring =
+      '<div class="sh-ringwrap">' +
+        '<svg class="sh-ring" viewBox="0 0 120 120" aria-hidden="true">' +
+          '<circle class="sh-ring-trk" cx="60" cy="60" r="' + RING_R + '"/>' +
+          '<circle class="sh-ring-arc" cx="60" cy="60" r="' + RING_R + '" stroke="' + rampFill(pct) +
+            '" stroke-dasharray="' + RING_C.toFixed(1) + '" stroke-dashoffset="' + arcOff.toFixed(1) + '"/>' +
+          gold + burst +
+        '</svg>' +
+        '<div class="sh-ring-pct num" style="color:' + bandInk(pct) + '">' + pctTxt(pct) + '</div>' +
+        '<div class="sh-ring-lab">' + (perfect ? 'perfect day' : '') + '</div>' +
+      '</div>';
+    var wk = o.wk || [], perfectWk = wk.length === 7 && wk.every(function(x){ return !x.future && x.v != null && x.v >= NEED; });
+    var week = '<div class="sh-week' + (perfectWk ? ' perfect' : '') + '">' + wk.map(wkRing).join('') + '</div>';
+    var tiles = '<div class="sh-tiles">' +
+        tile('7 days',  pctTxt(o.week), bandInk(o.week)) +
+        tile('30 days', pctTxt(o.m),    bandInk(o.m)) +
+        tile('Streak',  (o.streak == null ? '—' : (String(o.streak) + 'd')), 'var(--ink)') +
+      '</div>';
+    return ring + week + tiles + recordsLine(o.rec || {}) + '<div class="sh-cap">need ' + NEED + '%</div>';
+  }
   function fill(node){
-    var d = data();
-    node.innerHTML =
-      '<div class="num sh-pct" style="color:' + bandInk(d.today) + '">' + pctTxt(d.today) + '</div>' +
-      '<div class="sh-tiles">' +
-        tile('7 days',  pctTxt(d.week), bandInk(d.week)) +
-        tile('30 days', pctTxt(d.m),    bandInk(d.m)) +
-        tile('Streak',  (d.streak == null ? '—' : (String(d.streak) + 'd')), 'var(--ink)') +
-      '</div>' +
-      '<div class="sh-cap">need ' + NEED + '%</div>';
+    var d = data(), pct = d.today, perfect = (pct === 100);
+    var doBurst = perfect && canBurst(); if(doBurst) markBurst();   /* once per day, never under reduced motion */
+    node.innerHTML = scoreHtml({ today: pct, week: d.week, m: d.m, streak: d.streak,
+                                 wk: weekData(), rec: records(), burst: doBurst });
+    try{ applyRing(node, pct); }catch(e){}
     return node;
   }
   /* THE CARD (#h228Hero): one node, wrapped by HT-30's card builder so it keeps the .h30c/.lab shape
@@ -14268,7 +14422,10 @@ var HT32_WEEK = 'sun_fri';                /* Sunday..Friday; Saturday is the Sab
          else placeDesktop(); }catch(e){}
   }, 170); });
   window.__HT228 = { phoneCard: paintCard, card: paintCard, fill: fill,
-                     data: data, ink: bandInk, band: bandOf, id: HERO };
+                     data: data, ink: bandInk, band: bandOf, id: HERO,
+                     /* PASTE 821: the pure renderer and derivations, exposed for golden_ht821_ring */
+                     scoreHtml: scoreHtml, records: records, weekData: weekData,
+                     canBurst: canBurst, markBurst: markBurst, ringC: RING_C, wkC: WK_C };
 })();
 
 

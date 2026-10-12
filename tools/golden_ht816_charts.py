@@ -85,6 +85,7 @@ RENDER = """() => {
   return { bars: n('.bl-bar'),
            cdots: n('circle.bl-cdot'), hollow: n('circle.bl-cdot.bl-hollow'),
            cline: n('path.bl-cline'), rdots: n('circle.bl-rdot'),
+           cbridge: n('path.bl-cbridge'), rbridge: n('path.bl-rbridge'),
            rightAxis: n('.ax2'), needLine: n('.bl-need'),
            axLabels: n('text.ayl'), hasX10: /x10|\\u00d710/i.test(txt) };
 }"""
@@ -141,6 +142,12 @@ async def run(pw, w, h, label):
     chk("%s · R6 an unrated day has no rating point (2 rated of 3 logged)" % label, r['rdots'] == 2, r)
     chk("%s · R7 eleven axis labels, one at every 10 (0..100)" % label, r['axLabels'] == 11, r)
     chk("%s · R8 no 'x10' text anywhere in the rendered svg" % label, not r['hasX10'], r)
+    # PASTE 821 amended by name (R67.2): across one or more unlogged days the line continues as a DOTTED
+    # bridge, point to point - a path, never a point, so R4/R5/R6's dot counts are unchanged above. In
+    # this series the logged days are i1,i3,i4: i1->i3 spans an unlogged day (one completion bridge) and
+    # the rated days i1,i4 span two (one rating bridge).
+    chk("%s · R9 a dotted completion bridge crosses the unlogged gap (and a rating bridge too)" % label,
+        r['cbridge'] == 1 and r['rbridge'] == 1, r)
 
     # ---- LIVE (the real cards) ----
     await pg.evaluate("() => { try{ if(window.__HT13_TAB) window.__HT13_TAB('views'); }catch(e){} }")
