@@ -5954,9 +5954,12 @@ var HT32_CARDFIT = true;
       s+='<line class="bl-grid'+(g===0?' bl-grid0':'')+'" x1="'+L+'" y1="'+ay(g).toFixed(1)+'" x2="'+(W-R)+'" y2="'+ay(g).toFixed(1)+'"/>';
       s+='<text class="ayl" x="'+(L-4)+'" y="'+(ay(g)+3).toFixed(1)+'" text-anchor="end">'+g+'</text>';
     }
-    /* the dashed need line at the shared threshold, one tiny label at its right end - nothing else written on the plot */
-    s+='<line class="bl-need" x1="'+L+'" y1="'+ay(NEED).toFixed(1)+'" x2="'+(W-R)+'" y2="'+ay(NEED).toFixed(1)+'"/>';
-    s+='<text class="bl-needl" x="'+(W-R).toFixed(1)+'" y="'+(ay(NEED)-2).toFixed(1)+'" text-anchor="end">need</text>';
+    /* the dashed need line at the shared threshold, one tiny label at its right end - nothing else written on the plot.
+       PASTE 821 S5: when the trailing 7-day completion is AT OR ABOVE need, the line itself turns from
+       muted to gold - it says "you are on it". The caller passes opts.needGold (ht293Avg(7) >= NEED). */
+    var needGold = !!opts.needGold;
+    s+='<line class="bl-need'+(needGold?' bl-need-gold':'')+'" x1="'+L+'" y1="'+ay(NEED).toFixed(1)+'" x2="'+(W-R)+'" y2="'+ay(NEED).toFixed(1)+'"/>';
+    s+='<text class="bl-needl'+(needGold?' bl-need-gold':'')+'" x="'+(W-R).toFixed(1)+'" y="'+(ay(NEED)-2).toFixed(1)+'" text-anchor="end">need</text>';
     var todayIx=-1;
     pts.forEach(function(p,i){ if(p.key===today()) todayIx=i; });
     if(todayIx<0 && opts.attr==='data-vgy' && String(S.vYear||'')===String(dnum(today()).getFullYear()))
@@ -5982,17 +5985,43 @@ var HT32_CARDFIT = true;
         return '<path class="'+cls+'" d="'+r.map(function(pt,j){ return (j?'L':'M')+cx(pt[0]).toFixed(1)+' '+yv(pt[1]).toFixed(1); }).join(' ')+'"/>';
       }).join('');
     }
+    /* PASTE 821 S1 · THE LINE READS AS ONE STORY. Across one or more unlogged days the line continues
+       as a thin DOTTED bridge in the same colour, point to point - so the eye follows one line while the
+       dotted stretch still says "no log here". An unlogged day still gets NO point and no zero (Cory's
+       rule stands): a bridge is a PATH only, never a point, so every dot/point count is unchanged. The
+       bridge also rescues a LONE logged day (one point, no run) - it is joined to its neighbours. */
+    function bridges(get, cls, yv){
+      var flat=[]; pts.forEach(function(p,i){ var v=get(p); if(v!=null) flat.push([i,v]); });
+      var out='';
+      for(var k=1;k<flat.length;k++){
+        if(flat[k][0]-flat[k-1][0] > 1)               /* one or more unlogged days between two kept points */
+          out+='<path class="'+cls+'" d="M'+cx(flat[k-1][0]).toFixed(1)+' '+yv(flat[k-1][1]).toFixed(1)+
+               ' L'+cx(flat[k][0]).toFixed(1)+' '+yv(flat[k][1]).toFixed(1)+'"/>';
+      }
+      return out;
+    }
+    /* PASTE 821 S5 · a day at 100% is a GOLD STAR, not a green dot (a rare reward tied to the real goal).
+       A five-point star centred on the point, in --gold. */
+    function star(x,y,r){
+      var d=[], i, a, rr;
+      for(i=0;i<10;i++){ a=-Math.PI/2 + i*Math.PI/5; rr=(i%2?r*0.42:r);
+        d.push((i?'L':'M')+(x+rr*Math.cos(a)).toFixed(1)+' '+(y+rr*Math.sin(a)).toFixed(1)); }
+      return '<path class="bl-star" d="'+d.join(' ')+'Z"/>';
+    }
     /* the RATING line and dots, drawn UNDER (rated days only; rv is the real rating, null = a gap) */
+    s+=bridges(function(p){ return p.rv; }, 'bl-rbridge', function(v){ return ay(v*10); });
     s+=path(runsOf(function(p){ return p.rv; }), 'bl-rline', function(v){ return ay(v*10); });
     pts.forEach(function(p,i){ if(p.rv==null) return; var big=(i===todayIx), y=ay(p.rv*10);
       if(big) s+='<circle class="bl-ring" cx="'+cx(i).toFixed(1)+'" cy="'+y.toFixed(1)+'" r="7"/>';
       s+='<circle class="bl-rdot'+(big?' bl-today':'')+'" cx="'+cx(i).toFixed(1)+'" cy="'+y.toFixed(1)+'" r="'+(big?5:3)+'"/>';
     });
     /* the COMPLETION line and dots, drawn ON TOP (logged days only; an unlogged in-span day is a GAP) */
+    s+=bridges(function(p){ return p.logged?p.c:null; }, 'bl-cbridge', ay);
     s+=path(runsOf(function(p){ return p.logged?p.c:null; }), 'bl-cline', ay);
     pts.forEach(function(p,i){ if(!p.logged) return; var big=(i===todayIx), hollow=(p.c===0), y=ay(p.c);
       if(big) s+='<circle class="bl-ring" cx="'+cx(i).toFixed(1)+'" cy="'+y.toFixed(1)+'" r="7"/>';
-      s+='<circle class="bl-cdot'+(hollow?' bl-hollow':'')+(big?' bl-today':'')+'" cx="'+cx(i).toFixed(1)+'" cy="'+y.toFixed(1)+'" r="'+(big?5:3)+'"/>';
+      if(p.c===100) s+=star(cx(i), y, big?6.8:5.2);   /* S5: a 100 day is a gold star, not a dot */
+      else s+='<circle class="bl-cdot'+(hollow?' bl-hollow':'')+(big?' bl-today':'')+'" cx="'+cx(i).toFixed(1)+'" cy="'+y.toFixed(1)+'" r="'+(big?5:3)+'"/>';
     });
     /* S4 · x labels under the plot: DAY NUMBERS ONLY (every other when crowded), today bold; no weekday row */
     var crowd = n>16;
@@ -6099,12 +6128,15 @@ var HT32_CARDFIT = true;
     return '<span class="bl-hdr">avg '+avg+'%'+(rat!=null? ' \u00b7 rating '+rat : '')+'</span>';
   }
 
+  /* PASTE 821 S5: the need line is gold when the trailing 7-day completion is at or above NEED - one
+     fact, read once, passed to both cards so they agree. The 80 is the one home (global NEED). */
+  function needGoldNow(){ var w=(typeof ht293Avg==='function')?ht293Avg(7):null; return w!=null && w>=NEED; }
   function paintMonth16(){
-    var pts=monthPoints();
+    var pts=monthPoints(), ng=needGoldNow();
     var ym=S.calYM||[dnum(today()).getFullYear(),dnum(today()).getMonth()];
     /* B0.2: draw now if the panel is already measurable, and again after layout / fonts / resize */
-    measureAndDraw('vMonth', function(){ barLineChart('vMonth', monthPoints(), { attr:'data-vgd', height:200 }); });
-    barLineChart('vMonth', pts, { attr:'data-vgd', height:200 });    /* S5: ~200px tall on the phone */
+    measureAndDraw('vMonth', function(){ barLineChart('vMonth', monthPoints(), { attr:'data-vgd', height:200, needGold:needGoldNow() }); });
+    barLineChart('vMonth', pts, { attr:'data-vgd', height:200, needGold:ng });    /* S5: ~200px tall on the phone */
     var nav=document.getElementById('vMonthNav');
     if(nav) nav.innerHTML='<button class="mv" data-vgm="-1">\u2039</button>'+
       '<b>'+MO[ym[1]].toUpperCase()+' '+ym[0]+'</b>'+
@@ -6115,9 +6147,9 @@ var HT32_CARDFIT = true;
     return pts;
   }
   function paintYear16(){
-    var pts=yearPoints();
-    measureAndDraw('vYear', function(){ barLineChart('vYear', yearPoints(), { attr:'data-vgy', height:180 }); });
-    barLineChart('vYear', pts, { attr:'data-vgy', height:180 });     /* S5: ~180px tall on the phone */
+    var pts=yearPoints(), ng=needGoldNow();
+    measureAndDraw('vYear', function(){ barLineChart('vYear', yearPoints(), { attr:'data-vgy', height:180, needGold:needGoldNow() }); });
+    barLineChart('vYear', pts, { attr:'data-vgy', height:180, needGold:ng });     /* S5: ~180px tall on the phone */
     var nav=document.getElementById('vYearNav');
     if(nav) nav.innerHTML='<button class="mv" data-vgyn="-1">\u2039</button>'+
       '<b>'+(S.vYear||dnum(today()).getFullYear())+'</b>'+

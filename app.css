@@ -813,10 +813,16 @@ html[data-simple] .h16sub{ font:400 11px/1.3 var(--sans); color:var(--ink2); pad
 .bl-grid0{ opacity:.32 }                                      /* the 0 line, a touch stronger */
 .bl-need{ stroke:var(--ink3); stroke-width:1; stroke-dasharray:3 3; opacity:.6 }
 .bl-needl{ fill:var(--ink3); font:400 8px/1 var(--mono) }
+line.bl-need.bl-need-gold{ stroke:var(--gold); opacity:.9 }   /* PASTE 821 S5: on it -> the need line is gold */
+text.bl-needl.bl-need-gold{ fill:var(--gold) }
 .bl-cline{ stroke:var(--line-completion); stroke-width:2; fill:none }   /* completion: a solid green line */
 .bl-rline{ stroke:var(--line-rating); stroke-width:2; fill:none }       /* rating: a solid amber line, drawn under */
+/* PASTE 821 S1: dotted bridges across unlogged days - each the same colour as its line, dashed, half-lit */
+.bl-cbridge{ stroke:var(--line-completion); stroke-width:1.5; fill:none; stroke-dasharray:2 3; opacity:.5 }
+.bl-rbridge{ stroke:var(--line-rating); stroke-width:1.5; fill:none; stroke-dasharray:2 3; opacity:.5 }
 .bl-cdot{ fill:var(--line-completion) }
 .bl-cdot.bl-hollow{ fill:var(--ground); stroke:var(--line-completion); stroke-width:1.5 }  /* a logged 0%: hollow at 0 */
+.bl-star{ fill:var(--gold) }                                            /* PASTE 821 S5: a 100% day */
 .bl-rdot{ fill:var(--line-rating) }
 .bl-ring{ fill:none; stroke:var(--ink3); stroke-width:1; opacity:.55 }  /* today's soft ring */
 .bl-xl{ fill:var(--ink3); font:400 8px/1 var(--mono); cursor:pointer }
