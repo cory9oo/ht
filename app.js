@@ -63,6 +63,10 @@ window.ST = { sb: sb };
    `ST.fiveInputsOnly`. */
 var FIVE_INPUTS_ONLY = true;
 window.ST.fiveInputsOnly = FIVE_INPUTS_ONLY;
+/* HT-33 S1 · PRAYER JOURNAL — default off (R70.138: hidden, never removed; Cory Monday 2026-10-12) */
+var HT33_PRAYER_JOURNAL = false;
+function h33Prayer(){ return HT33_PRAYER_JOURNAL || window.__HT33_PRAYER === true; }
+window.__HT33PRAY = { on: h33Prayer };
 /* HT-29 S1 (PASTE 133): HT-9a kept the brain dump in localStorage because its column did not exist yet. It does,
    and the stopgap was overwriting the box with '' after every check-off. Retired here, kept whole below. */
 var HT9A_DUMP_STOPGAP = false;
@@ -1020,8 +1024,9 @@ function htWhisper(word){
     n.classList.remove('h32whisper');
     /* back to the line that says what this field does, never to an empty corner */
     var c = 0; var pv = S.priv || {};
-    ['brain_dump','tasks','prayer'].forEach(function(k){ if(pv[k]) c++; });
-    n.textContent = c ? c + ' of 3 written \u00b7 autosaves' : 'saves as you type';
+    var wflds = h33Prayer() ? ['brain_dump','tasks','prayer'] : ['brain_dump','tasks'];
+    wflds.forEach(function(k){ if(pv[k]) c++; });
+    n.textContent = c ? c + ' of ' + wflds.length + ' written \u00b7 autosaves' : 'saves as you type';
   }, HT32_WHISPER_MS);
 }
 
@@ -1424,9 +1429,10 @@ function paintRating(){
 function paintJournalInputs(){
   el('iWhy').value    = (S.priv&&S.priv.why)||'';
   el('iTasks').value  = (S.priv&&S.priv.tasks)||'';
-  el('iPrayer').value = (S.priv&&S.priv.prayer)||'';
-  var n=0; ['why','tasks','prayer'].forEach(function(k){ if(S.priv&&S.priv[k]) n++; });
-  el('jrnC').textContent = n? n+' of 3 written · autosaves' : 'saves as you type';
+  if(h33Prayer()) el('iPrayer').value = (S.priv&&S.priv.prayer)||'';
+  var flds = h33Prayer() ? ['why','tasks','prayer'] : ['why','tasks'];
+  var n=0; flds.forEach(function(k){ if(S.priv&&S.priv[k]) n++; });
+  el('jrnC').textContent = n? n+' of '+flds.length+' written · autosaves' : 'saves as you type';
   paintInputs3();
 }
 /* ---- HT-22 S1 · THE THREE INPUTS ARE RENDERED, NOT MARKED UP ---------------------------
@@ -1829,7 +1835,7 @@ function paintByYear(){
 }
 function paintJournal(){
   var ks=Object.keys(S.privAll).filter(function(k){
-    var p=S.privAll[k]; return p && (p.why||p.tasks||p.prayer);
+    var p=S.privAll[k]; return p && (p.why||p.tasks||(h33Prayer()&&p.prayer));
   }).sort().reverse().slice(0,14);
   if(!ks.length){ el('jArc').innerHTML='<div class="empty">Nothing written yet. The journal on the left lands here.</div>';
     el('jArcC').textContent=''; return; }
@@ -1838,7 +1844,7 @@ function paintJournal(){
     var body='';
     if(p.why)    body+='<p class="q">'+esc(p.why)+'</p>';
     if(p.tasks)  body+='<p>'+esc(p.tasks)+'</p>';
-    if(p.prayer) body+='<p class="q">'+esc(p.prayer)+'</p>';
+    if(p.prayer && h33Prayer()) body+='<p class="q">'+esc(p.prayer)+'</p>';
     return '<button class="jr" data-jd="'+k+'" style="display:block;width:100%">'+
       '<span class="h"><b>'+WD[d.getDay()]+' '+MO[d.getMonth()]+' '+d.getDate()+'</b>'+
       (p.rating!=null?'<s style="color:'+gtxt(p.rating*10)+'">'+p.rating+'/10</s>':'')+
@@ -2574,6 +2580,8 @@ function goDay(k){
 
 /* ============================ events ============================ */
 function wire(){
+  /* HT-33 S1: prayer row hidden when flag is off — element stays in DOM */
+  (function(){ var pb=el('prayerBox'); if(pb) pb.style.display = h33Prayer() ? '' : 'none'; })();
   /* the tray is painted with `data-skin2` now (theme names, not raw skin names), and it is only
      rendered in the advanced view - so the container may legitimately be absent. */
   var skinHost = el('skins');
