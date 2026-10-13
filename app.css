@@ -3914,6 +3914,7 @@ textarea.htj-box{ padding-top: calc(3 * 1.5em) !important; }
   html[data-simple] #h19Right > #h228Hero .sh-v{ font-size:15px }
   html[data-simple] #h19Right > #h228Hero .sh-rec{ flex:0 0 auto; margin-top:0; justify-content:flex-start }
   html[data-simple] #h19Right > #h228Hero .sh-cap{ margin-top:0; align-self:center }
+  html[data-simple] #h19Right > #h228Hero .sh-ring-lab{ display:none }
   /* cap chart SVGs so the charts block fits in the column at short viewports;
      the viewBox is ~217×280 so width:100% on a ~300px panel scales them to ~387px —
      capping at 220px keeps D4 floor exactly and trims ~167px from the block height. */

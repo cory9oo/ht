@@ -3665,6 +3665,7 @@ var HT32_CARDFIT = true;
       lab.innerHTML = '<span class="lab">Journal</span>' +
                       '<textarea id="iDump" rows="3"></textarea>';
       host.insertBefore(lab, host.firstChild);
+      if (!h876Journal()) lab.style.display = 'none';
       var ta = lab.querySelector('#iDump'), t = null;
       ta.addEventListener('input', function(){
         if(!HT9A_DUMP_STOPGAP) return;                 /* HT-29 S1: the column exists; the row is the only home */
