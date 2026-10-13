@@ -62,16 +62,18 @@ def chk(name, ok, got=""):
     RES.append((bool(ok), name))
     print("  %-6s %s%s" % ("PASS" if ok else "FAIL", name, "" if ok else ("   -> " + str(got)[:220])))
 
-async def open_page(pw, w, h, prayer_on=False):
+async def open_page(pw, w, h, prayer_on=False, journal_on=True):
     b = await pw.chromium.launch()
     ctx = await b.new_context(viewport={'width': w, 'height': h},
                               has_touch=(w < 1024), is_mobile=(w < 1024), device_scale_factor=1)
     pg = await ctx.new_page()
     errs = []
     pg.on('pageerror', lambda e: errs.append(str(e)))
+    # HT876: the Journal row is off by default; on when this override is set before load.
+    if journal_on:
+        await pg.add_init_script("window.__HT876_JOURNAL=true")
     # PASTE 856: the Prayer journal is a flag (HT33, job 850) — off by default (the box hidden, so a finger
     # cannot tap it), on when this override is set before load.
-    await pg.add_init_script("window.__HT876_JOURNAL=true")
     if prayer_on:
         await pg.add_init_script("window.__HT33_PRAYER=true")
     await pg.goto(BASE)
@@ -270,6 +272,12 @@ async def main():
         await run(pw, 390, 844, "390x844", use_esc=False)     # phone: × and the back gesture
         # PASTE 856: the flag-on side — the Prayer box returns and opens the canvas like the others.
         await run(pw, 390, 844, "390x844 · prayer on", use_esc=False, prayer_on=True)
+        # HT876: the flag-off side — the Journal box (iDump) is not reachable by a finger when the flag is off.
+        b_joff, pg_joff, _ = await open_page(pw, 390, 844, journal_on=False)
+        pr_joff = await present(pg_joff, 'iDump')
+        chk("journal off · by default (HT876_JOURNAL off) the iDump box is not present (hidden)",
+            not pr_joff, pr_joff)
+        await b_joff.close()
     npass = sum(1 for ok, _ in RES if ok)
     print("\nGOLDEN HT-683-CANVAS: %d/%d PASS, %d FAIL" % (npass, len(RES), len(RES) - npass))
     sys.exit(0 if npass == len(RES) and RES else 1)

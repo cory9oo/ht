@@ -58,7 +58,7 @@ def chk(name, ok, got=""):
     print("  %-6s %s%s" % ("PASS" if ok else "FAIL", name, "" if ok else ("   -> " + str(got)[:220])))
 
 
-async def open_page(pw, w, h, prayer_on=False):
+async def open_page(pw, w, h, prayer_on=False, journal_on=True):
     b = await pw.chromium.launch()
     ctx = await b.new_context(viewport={'width': w, 'height': h},
                               has_touch=(w < 1024), is_mobile=(w < 1024), device_scale_factor=1)
@@ -66,7 +66,9 @@ async def open_page(pw, w, h, prayer_on=False):
     errs = []
     pg.on('pageerror', lambda e: errs.append(str(e)))
     await pg.add_init_script("; ".join("window.%s=true" % k for k in ('__BIGSET', '__BLOCKS', '__INPUTS3')))
-    await pg.add_init_script("window.__HT876_JOURNAL=true")
+    # HT876: the Journal row is off by default; on when this override is set before load.
+    if journal_on:
+        await pg.add_init_script("window.__HT876_JOURNAL=true")
     # PASTE 856: the Prayer journal is a flag (HT33, job 850). Off by default (the shipping app, the
     # Prayer row hidden); on when this override is set before load (the row returns).
     if prayer_on:
@@ -205,6 +207,13 @@ async def main():
         # PASTE 856: the flag-on side — the Prayer row returns at phone and desktop widths.
         await run(pw, 390, 844, "390x844 · prayer on", prayer_on=True)
         await run(pw, 1695, 900, "1695 · prayer on", prayer_on=True)
+        # HT876: the flag-off side — the Journal row is hidden by default (journal_on=False).
+        b_joff, pg_joff, _ = await open_page(pw, 390, 844, journal_on=False)
+        rows_joff = await pg_joff.evaluate(ROWS_JS)
+        jn = rows_joff.get('iDump') if rows_joff else None
+        chk("journal off · by default (HT876_JOURNAL off) the Journal row is hidden (fld 0)",
+            (jn is None) or jn.get('fld', 1) == 0, jn)
+        await b_joff.close()
     npass = sum(1 for ok, _ in RES if ok)
     print("\nGOLDEN HT-822-LAYOUT: %d/%d PASS, %d FAIL" % (npass, len(RES), len(RES) - npass))
     sys.exit(0 if npass == len(RES) and RES else 1)

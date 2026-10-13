@@ -71,7 +71,7 @@ def src(p):
     return io.open(p, encoding='utf-8', errors='replace').read()
 
 
-async def open_page(pw, w=390, h=844, touch=True):
+async def open_page(pw, w=390, h=844, touch=True, journal_on=True):
     b = await pw.chromium.launch()
     ctx = await b.new_context(viewport={'width': w, 'height': h},
                               has_touch=touch, is_mobile=touch,
@@ -81,7 +81,9 @@ async def open_page(pw, w=390, h=844, touch=True):
     pg.on('pageerror', lambda e: errs.append(str(e)))
     pg.on('console', lambda m: errs.append('console:' + m.text)
           if m.type == 'error' and 'net::' not in m.text else None)
-    await pg.add_init_script("window.__HT876_JOURNAL=true")
+    # HT876: the Journal row is off by default; on when this override is set before load.
+    if journal_on:
+        await pg.add_init_script("window.__HT876_JOURNAL=true")
     await pg.goto(BASE)
     await pg.wait_for_timeout(3300)
     return b, pg, errs
@@ -348,6 +350,21 @@ async def s3(pw):
 SECTIONS = {'S2': s2, 'S3': s3, 'S6': s6}
 
 
+async def _journal_off_side(pw):
+    """HT876: flag-off side — iDump is hidden by default (no __HT876_JOURNAL set)."""
+    b, pg, _ = await open_page(pw, journal_on=False)
+    try:
+        got = await pg.evaluate("""() => {
+          const t = document.getElementById('iDump');
+          if(!t) return {no:'iDump missing'};
+          return {clientH: t.clientHeight};
+        }""")
+        chk('HT876_JOURNAL off · the Journal box is hidden by default (clientH == 0)',
+            got.get('clientH', 1) == 0, got)
+    finally:
+        await b.close()
+
+
 async def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('--only', default=None)
@@ -359,6 +376,9 @@ async def main():
                 raise SystemExit('unknown section %s' % s)
             print('\n== %s ==' % s)
             await SECTIONS[s](pw)
+        if not a.only:
+            print('\n== HT876 flag-off ==')
+            await _journal_off_side(pw)
     bad = [n for ok, n in RES if not ok]
     print('\nGOLDEN HT-25: %d/%d PASS, %d FAIL' % (len(RES) - len(bad), len(RES), len(bad)))
     return 1 if bad else 0
