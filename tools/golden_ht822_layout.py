@@ -66,6 +66,7 @@ async def open_page(pw, w, h, prayer_on=False):
     errs = []
     pg.on('pageerror', lambda e: errs.append(str(e)))
     await pg.add_init_script("; ".join("window.%s=true" % k for k in ('__BIGSET', '__BLOCKS', '__INPUTS3')))
+    await pg.add_init_script("window.__HT876_JOURNAL=true")
     # PASTE 856: the Prayer journal is a flag (HT33, job 850). Off by default (the shipping app, the
     # Prayer row hidden); on when this override is set before load (the row returns).
     if prayer_on:

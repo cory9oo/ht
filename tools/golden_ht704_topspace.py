@@ -69,6 +69,7 @@ async def open_page(pw, w, h, prayer_on=False):
     pg.on('pageerror', lambda e: errs.append(str(e)))
     # PASTE 856: the Prayer journal is a flag (HT33, job 850) — off by default (the box hidden), on when
     # this override is set before load.
+    await pg.add_init_script("window.__HT876_JOURNAL=true")
     if prayer_on:
         await pg.add_init_script("window.__HT33_PRAYER=true")
     await pg.goto(BASE)

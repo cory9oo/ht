@@ -81,6 +81,7 @@ async def open_page(pw, w=390, h=844, touch=True):
     pg.on('pageerror', lambda e: errs.append(str(e)))
     pg.on('console', lambda m: errs.append('console:' + m.text)
           if m.type == 'error' and 'net::' not in m.text else None)
+    await pg.add_init_script("window.__HT876_JOURNAL=true")
     await pg.goto(BASE)
     await pg.wait_for_timeout(3300)
     return b, pg, errs
