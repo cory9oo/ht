@@ -3810,6 +3810,13 @@ textarea.htj-box{
 }
 .htjx:hover{ color:var(--ink); }
 
+/* PASTE 857 · THE JOURNAL'S DAILY PROMPT — the three seeded lines (Spiritually / Emotionally /
+   Physically) are the theme's MUTED ink while the box holds only the untouched seed, so they read as
+   a quiet grey prompt; app.js adds `.ht857-seed` then and removes it the moment real text is typed,
+   when the box returns to the normal `--ink`. `--muted` (=`--ht-muted`) is the existing muted token
+   every theme sets — never a new colour. Wins in both the compact row and the full-screen canvas. */
+textarea.ht857-seed{ color:var(--muted) !important; -webkit-text-fill-color:var(--muted) !important; }
+
 /* ---- PASTE 704 — FREE SPACE AT THE TOP OF EVERY WRITING BOX ----
    Cory writes newest-first ("I type bottom up not top down"), so every multi-line writing box on the
    Journal card keeps a clear top area — about three lines of its own type — above the first line, to

@@ -3651,7 +3651,10 @@ var HT32_CARDFIT = true;
       var lab = document.createElement('label');
       lab.className = 'fld';
       /* HT-30 S4.10 (Cory 9/20): the box is the JOURNAL, and it carries no placeholder - an empty
-         box with a quiet border, and the label above it is the only text on it. */
+         box with a quiet border, and the label above it is the only text on it.
+         SUPERSEDED by PASTE 857 (Cory 2026-10-13) for #iDump ONLY: the empty Journal box now shows a
+         three-line grey prompt (Spiritually / Emotionally / Physically), seeded as the box's own text
+         on the first tap. See the PASTE 857 section above bindDump. S4.10 still holds for #iTasks/#iPrayer. */
       lab.innerHTML = '<span class="lab">Journal</span>' +
                       '<textarea id="iDump" rows="3"></textarea>';
       host.insertBefore(lab, host.firstChild);
@@ -3782,6 +3785,58 @@ var HT32_CARDFIT = true;
 })();
 
 
+/* ======================= PASTE 857 · THE JOURNAL'S DAILY PROMPT ==========================
+   Cory, 2026-10-13: "can you make it to where there is the grey background ... that prompts the
+   user to type how they're feeling Spiritually, Emotionally, and Physically." An empty Journal box
+   (#iDump) is seeded with three quiet grey lines on the first tap; the writer types after each.
+   This is the ONE shared place: the words, the seed, the empty test, the store and the split all
+   live here, so both surfaces (card row and the 683/685 full-screen canvas — the same textarea,
+   never moved) change together and every downstream path reads the same emptiness rule.
+
+   STORAGE CHOICE (receipt): the three sections ride the ONE existing `brain_dump` column, split by
+   the labels at read time — NOT three new columns. This keeps every invariant the brief protects
+   with zero migration and one save path: 683/685 (one #iDump textarea), the N3 debounce (one-column
+   upsert) and HT-28c (one-column ops/replay/mirrors). ht857Sections() recovers {spirit,emotion,body}.
+
+   SUPERSEDES HT-30 S4.10 for #iDump only (see the two S4.10 comments in the HT-9a and HT-10 layers):
+   that box carried no placeholder; it now carries this three-line grey prompt. */
+var HT857_PROMPT = ['Spiritually', 'Emotionally', 'Physically'];   /* the one string table */
+var HT857_RX = /^\s*(Spiritually|Emotionally|Physically)\s*-\s?(.*)$/;
+function ht857Seed(){ return HT857_PROMPT.map(function(w){ return w + ' - '; }).join('\n'); }
+function ht857Caret(){ return (HT857_PROMPT[0] + ' - ').length; }   /* caret after 'Spiritually - ' */
+/* THE SINGLE HOME for "is this box empty": blank, or only the untouched labels with nothing typed
+   after any dash. Strip each line's label scaffold; if what remains is all whitespace it is empty.
+   Deleting a label cannot make a blank day read as written; one real character makes it written. */
+function ht857Empty(text){
+  var t = String(text == null ? '' : text).replace(/\r\n/g, '\n');
+  var content = t.split('\n').map(function(ln){ var m = HT857_RX.exec(ln); return m ? m[2] : ln; }).join('');
+  return !content.trim();
+}
+/* what a box stores: '' when it holds only the untouched seed, the full text (labels + answers)
+   otherwise — so a seed-only box is EMPTY to every path that reads the stored brain_dump. */
+function ht857Store(text){ return ht857Empty(text) ? '' : String(text == null ? '' : text); }
+/* the three sections, machine-readable, split on the label lines */
+function ht857Sections(text){
+  var map = { Spiritually: 'spirit', Emotionally: 'emotion', Physically: 'body' };
+  var out = { spirit: '', emotion: '', body: '' }, buf = { spirit: [], emotion: [], body: [] }, cur = null;
+  String(text == null ? '' : text).replace(/\r\n/g, '\n').split('\n').forEach(function(ln){
+    var m = HT857_RX.exec(ln);
+    if(m){ cur = map[m[1]]; if(m[2]) buf[cur].push(m[2]); return; }
+    if(cur) buf[cur].push(ln);
+  });
+  Object.keys(buf).forEach(function(k){ out[k] = buf[k].join('\n').trim(); });
+  return out;
+}
+/* the grey is the theme's muted ink (app.css .ht857-seed): on while the box holds only the
+   untouched seed, off the moment real text is typed. */
+function ht857Grey(ta){
+  if(!ta) return;
+  var seedShown = String(ta.value || '').trim() !== '' && ht857Empty(ta.value);
+  ta.classList.toggle('ht857-seed', seedShown);
+}
+window.__HT857 = { PROMPT: HT857_PROMPT, seed: ht857Seed, caret: ht857Caret,
+                   empty: ht857Empty, store: ht857Store, sections: ht857Sections };
+
 
 /* ======================= HT-10 · JOURNAL LAYER (PASTE 32 §A) =======================
    One section, four fields, every day editable. Appended to the HT-9a layer's scope, inside the same
@@ -3848,7 +3903,9 @@ var HT32_CARDFIT = true;
     });
     /* HT-30 S4.10 (Cory 9/20): no placeholder text in any of the three boxes. This line put one back
        on Prayer after index.html gave it up, which is why the box still showed a lone ellipsis. The
-       attribute is REMOVED rather than set to '', so nothing renders a blank hint either. */
+       attribute is REMOVED rather than set to '', so nothing renders a blank hint either.
+       PASTE 857 SUPERSEDES S4.10 for #iDump only — the Journal box now shows the three-line grey
+       prompt (seeded on first tap, PASTE 857 section) — and leaves #iPrayer's no-placeholder rule intact. */
     var pray = document.getElementById('iPrayer');
     if(pray) pray.removeAttribute('placeholder');
     document.documentElement.setAttribute('data-ht10','1');
@@ -3858,6 +3915,28 @@ var HT32_CARDFIT = true;
   function bindDump(){
     var t = document.getElementById('iDump'); if(!t || t.dataset.bound) return;
     t.dataset.bound = '1';
+    /* PASTE 857 · THE PROMPT STAYS. A native placeholder vanishes at the first keystroke, so the
+       three are seeded as the box's OWN text on the first tap into an empty box — one per line,
+       caret after 'Spiritually - '. The seed is written WITHOUT an input event and WITHOUT touching
+       S.priv, so seeding stores and queues nothing; the box reads EMPTY until a real character lands. */
+    t.addEventListener('focus', function(){
+      if(String(t.value || '').trim() !== '') return;         /* only a truly empty box is seeded */
+      t.value = ht857Seed(); ht857Grey(t); grow(t);
+      var c = ht857Caret();
+      try{ t.setSelectionRange(c, c); }catch(e){}
+      /* a native click places the caret at the tapped pixel AFTER this focus handler, so re-place it
+         after 'Spiritually - ' on the next tick — but only while the box still holds the untouched seed. */
+      setTimeout(function(){ if(ht857Empty(t.value)){ try{ t.setSelectionRange(c, c); }catch(e){} } }, 0);
+    });
+    /* PASTE 857 · clear an UNTOUCHED seed on blur so the grey prompt (and the 822 'tap to write'
+       placeholder) returns; a box with real writing is left exactly as typed. Registered BEFORE the
+       shared save-on-blur below, so the field is already '' when savePriv() runs. */
+    t.addEventListener('blur', function(){
+      if(ht857Empty(t.value)){ t.value = ''; ht857Grey(t); S.priv = S.priv || {}; S.priv.brain_dump = ''; grow(t); }
+    });
+    /* NOTE: HT-29 S1's one input path (the capture listener, ~line 10216) stops the input event before
+       this bubble listener runs, so THIS handler is dead for #iDump; brain_dump is written there, and
+       PASTE 857's ht857Store/ht857Grey live there. Kept unchanged for the record. */
     t.addEventListener('input', function(){
       S.priv = S.priv || {}; S.priv.brain_dump = t.value; grow(t); queuePriv();
       /* the brain dump is the longest thing anyone types here, so it is the field with the most to
@@ -10143,7 +10222,14 @@ var HT32_CARDFIT = true;
     if(!field) return;
     e.stopImmediatePropagation();
     S.priv = S.priv || {};
-    S.priv[field] = t.value;
+    /* PASTE 857 · this is the ONE write path for every journal box (the capture listener above stops the
+       event here, so HT-10's bindDump input never runs). So the three-line prompt's emptiness rule lives
+       HERE: a Journal box holding only the untouched seed stores '' (ht857Store), which makes a
+       template-only day empty to this one write and therefore to every reader of brain_dump — the N3
+       save, HT-28c's op diff/replay, the mirrors, the archive, the whisper and the weekly count. The
+       grey (ht857Grey) drops the moment real text is typed. Other boxes are unchanged. */
+    S.priv[field] = (field === 'brain_dump') ? ht857Store(t.value) : t.value;
+    if(field === 'brain_dump') ht857Grey(t);
     queuePriv();                                                /* HT-28c records the op and arms a 700 ms save… */
     clearTimeout(pvT);                                          /* …which this path replaces with one at 500 ms */
     clearTimeout(saveT);

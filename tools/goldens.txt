@@ -40,3 +40,7 @@ golden_ht821_ring.py
 # paste 822 — the desktop shows everything (no clip, ring first, charts >=220) and the journal boxes
 # are one-line entry points on desktop and phone that open the canvas on a tap
 golden_ht822_layout.py
+# paste 857 — the Journal's daily prompt: an empty #iDump seeds three grey lines (Spiritually /
+# Emotionally / Physically) on the first tap; a seed-only box is empty to every path; blur clears it;
+# a typed day stores the full text in the one brain_dump column, split into three at read time
+golden_ht857_prompt.py

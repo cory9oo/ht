@@ -10,6 +10,13 @@ exported, queries Supabase for counts and the rating, writes one JSON per day to
 NO journal text (brain_dump, prayer, why) is exported — the export branch is public; those
 columns are Cory's journal and never leave his database (R47.3).
 
+PASTE 857 (the three daily sections — Spiritually / Emotionally / Physically) rides INSIDE the
+brain_dump column (the labels split at read time; see app.js ht857Sections), so it is journal text
+and stays private too: it is NOT added here. The three sections reach the BEV only by the journal's
+own private path (the HT293 Google-Docs / Obsidian copier, which carries brain_dump verbatim once
+armed), where a later job can split them for a chart. Putting the three feelings on this public
+branch would need Cory to relax R47.3 — his ruling, not a wire's.
+
     python tools/export_day.py --out-dir /tmp/ht-export        # new days only
     python tools/export_day.py --out-dir /tmp/ht-export --all  # re-export all days
 """
