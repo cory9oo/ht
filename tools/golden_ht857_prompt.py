@@ -113,8 +113,27 @@ async def type_into(pg, v):
         "e.dispatchEvent(new Event('input', {bubbles:true})); }", v)
 
 
+async def run_flag_off(pw, w, h, label):
+    """HT-876 flag-off case: journal row hidden by default; #iDump still in DOM."""
+    b, pg, errs = await open_page(pw, w, h)
+    db_display = await pg.evaluate(
+        "() => { var db=document.getElementById('dumpBox'); "
+        "return db ? window.getComputedStyle(db).display : 'MISSING'; }")
+    chk("%s · flag-off · dumpBox is hidden (display:none) by default" % label,
+        db_display == 'none', db_display)
+    dump_present = await pg.evaluate("() => !!document.getElementById('iDump')")
+    chk("%s · flag-off · #iDump still exists in the DOM (element kept, only hidden)" % label,
+        dump_present, dump_present)
+    chk("%s · flag-off · zero page errors" % label, not errs, errs[:3])
+    await b.close()
+
+
 async def run(pw, w, h, label):
     b, pg, errs = await open_page(pw, w, h)
+    # HT-876: enable the journal flag so the 857 prompt tests run against the visible box
+    await pg.evaluate("() => { window.__HT876_JOURNAL = true; "
+                      "var db=document.getElementById('dumpBox'); "
+                      "if(db) db.style.display=''; }")
 
     present = await pg.evaluate("() => !!document.getElementById('iDump') && !!window.__HT857")
     chk("%s · #iDump and the __HT857 handle are present" % label, present)
@@ -180,6 +199,9 @@ async def run(pw, w, h, label):
 
 async def main():
     async with async_playwright() as pw:
+        # HT-876: flag-off cases first, then flag-on (prompt behaviour)
+        await run_flag_off(pw, 1280, 720, "1280x720")
+        await run_flag_off(pw, 390, 844, "390x844")
         await run(pw, 1280, 720, "1280x720")
         await run(pw, 390, 844, "390x844")
     npass = sum(1 for ok, _ in RES if ok)

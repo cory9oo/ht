@@ -67,6 +67,10 @@ window.ST.fiveInputsOnly = FIVE_INPUTS_ONLY;
 var HT33_PRAYER_JOURNAL = false;
 function h33Prayer(){ return HT33_PRAYER_JOURNAL || window.__HT33_PRAYER === true; }
 window.__HT33PRAY = { on: h33Prayer };
+/* HT-876 S1 · JOURNAL BOX (#iDump) — default off (R70.138: hidden, never removed; Cory Tuesday 2026-10-13) */
+var HT876_JOURNAL = false;
+function h876Journal(){ return HT876_JOURNAL || window.__HT876_JOURNAL === true; }
+window.__HT876J = { on: h876Journal };
 /* HT-29 S1 (PASTE 133): HT-9a kept the brain dump in localStorage because its column did not exist yet. It does,
    and the stopgap was overwriting the box with '' after every check-off. Retired here, kept whole below. */
 var HT9A_DUMP_STOPGAP = false;
@@ -2582,6 +2586,8 @@ function goDay(k){
 function wire(){
   /* HT-33 S1: prayer row hidden when flag is off — element stays in DOM */
   (function(){ var pb=el('prayerBox'); if(pb) pb.style.display = h33Prayer() ? '' : 'none'; })();
+  /* HT-876 S1: journal row hidden when flag is off — element stays in DOM */
+  (function(){ var db=el('dumpBox'); if(db) db.style.display = h876Journal() ? '' : 'none'; })();
   /* the tray is painted with `data-skin2` now (theme names, not raw skin names), and it is only
      rendered in the advanced view - so the container may legitimately be absent. */
   var skinHost = el('skins');
@@ -3650,6 +3656,7 @@ var HT32_CARDFIT = true;
       var host = pray.closest('.pan') || pray.closest('.blk') || pray.parentNode.parentNode;
       var lab = document.createElement('label');
       lab.className = 'fld';
+      lab.id = 'dumpBox';
       /* HT-30 S4.10 (Cory 9/20): the box is the JOURNAL, and it carries no placeholder - an empty
          box with a quiet border, and the label above it is the only text on it.
          SUPERSEDED by PASTE 857 (Cory 2026-10-13) for #iDump ONLY: the empty Journal box now shows a
