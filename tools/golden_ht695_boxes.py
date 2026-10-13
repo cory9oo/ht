@@ -57,7 +57,7 @@ def chk(name, ok, got=""):
     RES.append((bool(ok), name))
     print("  %-6s %s%s" % ("PASS" if ok else "FAIL", name, "" if ok else ("   -> " + str(got)[:220])))
 
-async def open_page(pw, w, h):
+async def open_page(pw, w, h, prayer_on=False):
     b = await pw.chromium.launch()
     # has_touch at BOTH widths: this golden drives real touch gestures through CDP at each.
     ctx = await b.new_context(viewport={'width': w, 'height': h},
@@ -65,6 +65,10 @@ async def open_page(pw, w, h):
     pg = await ctx.new_page()
     errs = []
     pg.on('pageerror', lambda e: errs.append(str(e)))
+    # PASTE 856: the Prayer journal is a flag (HT33, job 850) — off by default (the box hidden, so a finger
+    # cannot tap it), on when this override is set before load.
+    if prayer_on:
+        await pg.add_init_script("window.__HT33_PRAYER=true")
     await pg.goto(BASE)
     await pg.wait_for_timeout(2600)
     return b, pg, errs
@@ -128,8 +132,8 @@ def near(a, b, eps=0.01):
 LONGTEXT = ("\n".join("line %d of the journal, long enough to need a vertical scroll" % i
                       for i in range(200))) + "\n" + ("x" * 600)
 
-async def run(pw, w, h, label):
-    b, pg, errs = await open_page(pw, w, h)
+async def run(pw, w, h, label, prayer_on=False):
+    b, pg, errs = await open_page(pw, w, h, prayer_on=prayer_on)
     cdp = await pg.context.new_cdp_session(pg)
 
     # --- LAW 2a: the viewport meta carries the three required tokens ---
@@ -160,7 +164,15 @@ async def run(pw, w, h, label):
     # --- per writing box: the seam (card == canvas to the pixel) + LAW 2 guards. Fresh page per box:
     # leaving the canvas does not reset a box's grown height (a pre-683 grow() behaviour), so a clean
     # page per box keeps the geometry honest. ---
-    writing = [t for t in ids if t != 'iWhy']
+    # PASTE 856: #iPrayer ships hidden behind HT33 (job 850); a display:none box cannot be tapped, so the
+    # per-box LAW-2 loop runs only on the VISIBLE writing boxes (Journal + Completed by default, + Prayer
+    # when the flag is on). LAW 1a above still measures every box IN THE DOM, hidden or not.
+    vis = await pg.evaluate("(ws)=>ws.filter(function(id){var e=document.getElementById(id);"
+                            "if(!e)return false;var r=e.getBoundingClientRect();return r.width>0&&r.height>0;})",
+                            [t for t in ids if t != 'iWhy'])
+    chk("%s · the Prayer box is a tappable writing box only with HT33_PRAYER on (visible=%s, flag=%s)"
+        % (label, 'iPrayer' in vis, prayer_on), ('iPrayer' in vis) == prayer_on, {'vis': vis})
+    writing = vis
     cx, cy = w / 2.0, h / 2.0
     for tid in writing:
         await pg.goto(BASE); await pg.wait_for_timeout(2600)
@@ -227,6 +239,8 @@ async def main():
     async with async_playwright() as pw:
         await run(pw, 1280, 720, "1280x720")
         await run(pw, 390, 844, "390x844")
+        # PASTE 856: the flag-on side — the Prayer box returns and obeys the one-size / no-zoom laws too.
+        await run(pw, 390, 844, "390x844 · prayer on", prayer_on=True)
     npass = sum(1 for ok, _ in RES if ok)
     print("\nGOLDEN HT-695-BOXES: %d/%d PASS, %d FAIL" % (npass, len(RES), len(RES) - npass))
     sys.exit(0 if npass == len(RES) and RES else 1)

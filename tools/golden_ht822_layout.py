@@ -58,7 +58,7 @@ def chk(name, ok, got=""):
     print("  %-6s %s%s" % ("PASS" if ok else "FAIL", name, "" if ok else ("   -> " + str(got)[:220])))
 
 
-async def open_page(pw, w, h):
+async def open_page(pw, w, h, prayer_on=False):
     b = await pw.chromium.launch()
     ctx = await b.new_context(viewport={'width': w, 'height': h},
                               has_touch=(w < 1024), is_mobile=(w < 1024), device_scale_factor=1)
@@ -66,6 +66,10 @@ async def open_page(pw, w, h):
     errs = []
     pg.on('pageerror', lambda e: errs.append(str(e)))
     await pg.add_init_script("; ".join("window.%s=true" % k for k in ('__BIGSET', '__BLOCKS', '__INPUTS3')))
+    # PASTE 856: the Prayer journal is a flag (HT33, job 850). Off by default (the shipping app, the
+    # Prayer row hidden); on when this override is set before load (the row returns).
+    if prayer_on:
+        await pg.add_init_script("window.__HT33_PRAYER=true")
     await pg.goto(BASE)
     await pg.wait_for_timeout(2600)
     return b, pg, errs
@@ -113,22 +117,33 @@ CHART_JS = """(id)=>{ var e=document.getElementById(id);
   if(!e) return null; return Math.round(e.getBoundingClientRect().height); }"""
 
 
-async def run(pw, w, h, label):
+async def run(pw, w, h, label, prayer_on=False):
     desktop = w >= 1024
-    b, pg, errs = await open_page(pw, w, h)
+    b, pg, errs = await open_page(pw, w, h, prayer_on=prayer_on)
     if not desktop:
         await show(pg, 'today')
 
-    # B1 — each journal row is a one-line row, at most 56px, with the 'tap to write' placeholder
+    # B1 — each VISIBLE journal row is a one-line row, at most 56px, with the 'tap to write' placeholder.
+    # PASTE 856: the Prayer row (#iPrayer) ships hidden behind HT33 (job 850), so by default the journal
+    # rows are Journal + Completed; with the flag on the Prayer row returns and is asserted like the others.
+    want = ('iDump', 'iTasks', 'iPrayer') if prayer_on else ('iDump', 'iTasks')
     rows = await pg.evaluate(ROWS_JS)
-    present = rows and all(rows[k] for k in ('iDump', 'iTasks', 'iPrayer'))
-    chk("%s · the three journal rows are present" % label, present, rows)
+    present = rows and all(rows[k] for k in want)
+    chk("%s · the journal rows are present (%s)" % (label, ', '.join(want)), present, rows)
     if present:
-        heights = [rows[k]['fld'] for k in ('iDump', 'iTasks', 'iPrayer')]
+        heights = [rows[k]['fld'] for k in want]
         chk("%s · each journal row is at most 56px tall unfocused (%s)" % (label, heights),
             all(0 < x <= 56 for x in heights), rows)
         chk("%s · each empty journal row shows the 'tap to write' placeholder" % label,
-            all(rows[k]['ph'] == 'tap to write' for k in ('iDump', 'iTasks', 'iPrayer')), rows)
+            all(rows[k]['ph'] == 'tap to write' for k in want), rows)
+    # the flag's two sides: by default the Prayer row is hidden (fld 0); with the flag on it is a sized row.
+    pr = rows.get('iPrayer') if rows else None
+    if prayer_on:
+        chk("%s · with HT33_PRAYER on, the Prayer row is present and sized" % label,
+            bool(pr) and 0 < pr['fld'] <= 56, pr)
+    else:
+        chk("%s · by default (HT33_PRAYER off) the Prayer row is hidden (fld 0)" % label,
+            (pr is None) or pr['fld'] == 0, pr)
 
     # B3 — no horizontal scroll at any width
     hs = await pg.evaluate("()=>({sw:document.documentElement.scrollWidth, cw:document.documentElement.clientWidth})")
@@ -186,6 +201,9 @@ async def main():
         await run(pw, 1440, 900, "1440")
         await run(pw, 1695, 900, "1695")
         await run(pw, 1920, 1080, "1920")
+        # PASTE 856: the flag-on side — the Prayer row returns at phone and desktop widths.
+        await run(pw, 390, 844, "390x844 · prayer on", prayer_on=True)
+        await run(pw, 1695, 900, "1695 · prayer on", prayer_on=True)
     npass = sum(1 for ok, _ in RES if ok)
     print("\nGOLDEN HT-822-LAYOUT: %d/%d PASS, %d FAIL" % (npass, len(RES), len(RES) - npass))
     sys.exit(0 if npass == len(RES) and RES else 1)

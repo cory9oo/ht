@@ -247,11 +247,15 @@ async def s4(pw):
       const moved = E.roll(); return [was, S.date, moved, E.dk(new Date())]; }""")
     chk('S4b . a page left open on today rolls to the new day at midnight (visible only, a local clock)',
         rolled[2] is True and rolled[1] == rolled[3] and rolled[0] != rolled[1], rolled)
-    # REVIEW OF 293's DIFF: never mid-sentence - with a journal box focused the roll waits for the next tick
+    # REVIEW OF 293's DIFF: never mid-sentence - with a journal box focused the roll waits for the next tick.
+    # PASTE 856: focus #iTasks (Completed), not #iPrayer. The roll-hold is a GENERAL journal-box behaviour
+    # (textFocus() covers every journal textarea), and #iPrayer no longer ships by default (HT33 flag off,
+    # job 850), so a hidden box cannot hold focus and the day rolled under the test. #iTasks is present in
+    # every flag state, so the same behaviour is proven on the shipping app.
     held = await pg.evaluate("""() => { const E = window.__HT293, S = E.S();
       const y = (d => { d.setDate(d.getDate() - 1); return E.dk(d); })(new Date());
       E.__setLastToday(y); window.__HT293_goDay(y);
-      const t = document.getElementById('iPrayer'); t.focus();
+      const t = document.getElementById('iTasks'); t.focus();
       const moved = E.roll(); const stayed = S.date === y; t.blur(); const later = E.roll();
       return [moved, stayed, later, S.date === E.dk(new Date())]; }""")
     chk('S4b2 . with a journal box focused the day does NOT roll under his fingers; it rolls once he leaves the box',

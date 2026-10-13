@@ -60,13 +60,17 @@ def chk(name, ok, got=""):
     RES.append((bool(ok), name))
     print("  %-6s %s%s" % ("PASS" if ok else "FAIL", name, "" if ok else ("   -> " + str(got)[:240])))
 
-async def open_page(pw, w, h):
+async def open_page(pw, w, h, prayer_on=False):
     b = await pw.chromium.launch()
     ctx = await b.new_context(viewport={'width': w, 'height': h},
                               has_touch=True, is_mobile=(w < 1024), device_scale_factor=1)
     pg = await ctx.new_page()
     errs = []
     pg.on('pageerror', lambda e: errs.append(str(e)))
+    # PASTE 856: the Prayer journal is a flag (HT33, job 850) — off by default (the box hidden), on when
+    # this override is set before load.
+    if prayer_on:
+        await pg.add_init_script("window.__HT33_PRAYER=true")
     await pg.goto(BASE)
     await pg.wait_for_timeout(2600)
     return b, pg, errs
@@ -132,12 +136,24 @@ async def box_value(pg, fid):
 FIELD = {'iDump': 'brain_dump', 'iTasks': 'tasks', 'iPrayer': 'prayer'}
 WRITING = ('iDump', 'iTasks', 'iPrayer')
 
-async def run(pw, w, h, label, desktop):
-    b, pg, errs = await open_page(pw, w, h)
+async def run(pw, w, h, label, desktop, prayer_on=False):
+    b, pg, errs = await open_page(pw, w, h, prayer_on=prayer_on)
 
-    # ---- CARD (PASTE 822): the three boxes are compact one-line rows now — a row at most 56px, NO
+    # PASTE 856: #iPrayer ships hidden behind HT33 (job 850). By default the writing boxes are Journal +
+    # Completed; with the flag on the Prayer box returns and is measured like the others.
+    writing = WRITING if prayer_on else ('iDump', 'iTasks')
+    prfld = await pg.evaluate("(id)=>{ var e=document.getElementById(id); var f=e&&e.closest('.fld');"
+                              " return f?Math.round(f.getBoundingClientRect().height):null; }", 'iPrayer')
+    if prayer_on:
+        chk("%s · with HT33_PRAYER on, the Prayer box is a sized row (fld %s)" % (label, prfld),
+            prfld is not None and 0 < prfld <= 56, prfld)
+    else:
+        chk("%s · by default (HT33_PRAYER off) the Prayer box is hidden (fld %s ~ 0)" % (label, prfld),
+            (prfld or 0) == 0, prfld)
+
+    # ---- CARD (PASTE 822): the boxes are compact one-line rows now — a row at most 56px, NO
     #      top padding, type still <= 15px. The top space moved to the canvas (asserted below). ----
-    for tid in WRITING:
+    for tid in writing:
         m = await pg.evaluate(CARD_MEASURE, tid)
         fldh = await pg.evaluate("(id)=>{ var e=document.getElementById(id); var f=e&&e.closest('.fld');"
                                  " return f?Math.round(f.getBoundingClientRect().height):null; }", tid)
@@ -148,7 +164,7 @@ async def run(pw, w, h, label, desktop):
             ok, {'m': m, 'fld': fldh})
 
     # ---- CANVAS: the uniform writing surface, for every box, on both sizes ----
-    for tid in WRITING:
+    for tid in writing:
         key = FIELD[tid]
         await pg.goto(BASE); await pg.wait_for_timeout(2600)
         await seed(pg, tid, LONGTEXT)
@@ -207,6 +223,8 @@ async def main():
     async with async_playwright() as pw:
         await run(pw, 1280, 720, "1280x720", True)
         await run(pw, 390, 844, "390x844", False)
+        # PASTE 856: the flag-on side — the Prayer box returns and opens/measures like the others.
+        await run(pw, 390, 844, "390x844 · prayer on", False, prayer_on=True)
     npass = sum(1 for ok, _ in RES if ok)
     print("\nGOLDEN HT-704-TOPSPACE: %d/%d PASS, %d FAIL" % (npass, len(RES), len(RES) - npass))
     sys.exit(0 if npass == len(RES) and RES else 1)

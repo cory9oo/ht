@@ -62,13 +62,17 @@ def chk(name, ok, got=""):
     RES.append((bool(ok), name))
     print("  %-6s %s%s" % ("PASS" if ok else "FAIL", name, "" if ok else ("   -> " + str(got)[:220])))
 
-async def open_page(pw, w, h):
+async def open_page(pw, w, h, prayer_on=False):
     b = await pw.chromium.launch()
     ctx = await b.new_context(viewport={'width': w, 'height': h},
                               has_touch=(w < 1024), is_mobile=(w < 1024), device_scale_factor=1)
     pg = await ctx.new_page()
     errs = []
     pg.on('pageerror', lambda e: errs.append(str(e)))
+    # PASTE 856: the Prayer journal is a flag (HT33, job 850) — off by default (the box hidden, so a finger
+    # cannot tap it), on when this override is set before load.
+    if prayer_on:
+        await pg.add_init_script("window.__HT33_PRAYER=true")
     await pg.goto(BASE)
     await pg.wait_for_timeout(2600)
     return b, pg, errs
@@ -147,7 +151,7 @@ async def card_box_ids(pg):
         "return c ? Array.prototype.map.call(c.querySelectorAll('textarea'), function(t){return t.id;}) : null; }")
 
 
-async def every_box_wired(pg, label):
+async def every_box_wired(pg, label, prayer_on=False):
     """685 — the wiring is by class, not by a fixed id list. The card holds every writing box
     (Journal, Completed, Prayer, and any added later); a tap on EACH opens the canvas on that same
     element. The Rate-the-day "why" (#iWhy) is ALSO on the card — whyBack() moves it in (#h18Btm on
@@ -162,13 +166,24 @@ async def every_box_wired(pg, label):
     await pg.wait_for_timeout(2600)
     ids = await card_box_ids(pg)
     is_list = isinstance(ids, list)
-    writing = [t for t in ids if t != 'iWhy'] if is_list else []
-    chk("%s · the Journal card holds the writing boxes as a class (>= 3 incl. Journal/Completed/Prayer)" % label,
-        is_list and len(writing) >= 3 and all(x in ids for x in ('iDump', 'iTasks', 'iPrayer')),
-        ids)
+    # PASTE 856: #iPrayer is gated by HT33 (job 850) — it is ALWAYS in the DOM (hidden, never removed,
+    # R70.138), so it is always in `ids`; but a display:none box cannot be tapped. The class-wiring claim
+    # is tested over the boxes a finger can reach: Journal + Completed by default, + Prayer when the flag
+    # is on. The expected count follows the flag.
+    writing = []
+    if is_list:
+        vis = await pg.evaluate("(ws)=>ws.filter(function(id){var e=document.getElementById(id);"
+                                "if(!e)return false;var r=e.getBoundingClientRect();return r.width>0&&r.height>0;})",
+                                [t for t in ids if t != 'iWhy'])
+        writing = vis
+    want = ['iDump', 'iTasks', 'iPrayer'] if prayer_on else ['iDump', 'iTasks']
+    chk("%s · the Journal card holds the writing boxes as a class (%s visible; iPrayer %s)"
+        % (label, ', '.join(want), 'on' if prayer_on else 'hidden by HT33'),
+        is_list and sorted(writing) == sorted(want) and all(x in ids for x in ('iDump', 'iTasks', 'iPrayer')),
+        {'ids': ids, 'visible_writing': writing})
     if not is_list:
         return
-    for tid in writing:                              # a tap on EVERY writing box on the card opens the canvas on itself
+    for tid in writing:                              # a tap on EVERY VISIBLE writing box on the card opens the canvas on itself
         await pg.click('#' + tid)
         await pg.wait_for_timeout(120)
         s = await pg.evaluate(PROBE, tid)
@@ -221,21 +236,28 @@ async def nested(pg, label):
     after2 = await pg.evaluate("()=>({ htf: !!(window.__HTF&&window.__HTF.on()), htj: !!(window.__HTJ&&window.__HTJ.on()) })")
     chk("%s · nested · a second back leaves 677" % label, not after2['htf'], after2)
 
-async def run(pw, w, h, label, use_esc):
-    b, pg, errs = await open_page(pw, w, h)
+async def run(pw, w, h, label, use_esc, prayer_on=False):
+    b, pg, errs = await open_page(pw, w, h, prayer_on=prayer_on)
 
     # P1 — opens closed
     s0 = await pg.evaluate(PROBE, 'iDump')
     chk("%s · the canvas is OFF at load" % label, (not s0['on']) and (not s0['bodyOn']), s0)
 
-    for fid, key in FIELD_KEY:
+    # PASTE 856: the Prayer box ships hidden behind HT33 (job 850). By default the writing boxes are
+    # Journal + Completed; with the flag on the Prayer box returns and runs the full cycle like the others.
+    fields = FIELD_KEY if prayer_on else FIELD_KEY[:2]
+    pr_present = await present(pg, 'iPrayer')
+    chk("%s · the Prayer box is present only with HT33_PRAYER on (present=%s, flag=%s)" % (label, pr_present, prayer_on),
+        pr_present == prayer_on, pr_present)
+
+    for fid, key in fields:
         chk("%s · the %s box is present" % (label, fid), await present(pg, fid))
         await one_cycle(pg, label, fid, key, 'x')
         await one_cycle(pg, label, fid, key, 'back')
         if use_esc:
             await one_cycle(pg, label, fid, key, 'esc')
 
-    await every_box_wired(pg, label)
+    await every_box_wired(pg, label, prayer_on)
     await nested(pg, label)
 
     chk("%s · zero page errors" % label, not errs, errs)
@@ -245,6 +267,8 @@ async def main():
     async with async_playwright() as pw:
         await run(pw, 1280, 720, "1280x720", use_esc=True)    # desk: ×, back and Esc
         await run(pw, 390, 844, "390x844", use_esc=False)     # phone: × and the back gesture
+        # PASTE 856: the flag-on side — the Prayer box returns and opens the canvas like the others.
+        await run(pw, 390, 844, "390x844 · prayer on", use_esc=False, prayer_on=True)
     npass = sum(1 for ok, _ in RES if ok)
     print("\nGOLDEN HT-683-CANVAS: %d/%d PASS, %d FAIL" % (npass, len(RES), len(RES) - npass))
     sys.exit(0 if npass == len(RES) and RES else 1)
