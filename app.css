@@ -1899,8 +1899,8 @@ html[data-simple] .li .bx, html[data-simple] .li .edp{ align-self:center }
   /* the two charts share the LAST row of the middle block, side by side, each at least 220px tall
      (S3); the renderer measures the real panel via availHeight (app.js). */
   html[data-simple] #h19Right > #h18Charts{ display:grid; grid-template-columns:1fr 1fr;
-    grid-template-rows:auto; column-gap:var(--h18gut); row-gap:0; min-height:248px }
-  html[data-simple] #h19Right > #h18Charts > .h16p{ min-height:248px }
+    grid-template-rows:auto; column-gap:var(--h18gut); row-gap:0; min-height:220px }
+  html[data-simple] #h19Right > #h18Charts > .h16p{ min-height:220px }
 
   /* ONE task column now: the completions column is 30% wide and two sub-columns of ~230px cannot
      hold a standard's name. The list keeps its inner scroll (R70.186) and the receipt states
@@ -3893,3 +3893,67 @@ textarea.htj-box{ padding-top: calc(3 * 1.5em) !important; }
   html[data-simple] #h18Btm textarea:focus{ height:40px }
 }
 
+
+/* ======================= PASTE 862 · DESKTOP FIT (no scroll on #h19Right at 768-1080px) =====
+   S2 — COMPACT RING CARD IN #h19Right.
+   The hero moved from #h18Charts to #h19Right (paste 822 / placeDesktop). The old
+   `#h18Charts > #h228Hero` horizontal overrides (paste 820/821) no longer match. The base
+   .stat-hero is a 140px-ring vertical stack that alone exceeds half the 768px column height.
+   Ring: 88px (from 140px). Layout: row (ring on left, week+tiles+records+cap on right).
+   Nothing is hidden; all font-sizes >= 10px; no existing golden is weakened. */
+@media(min-width:1024px){
+  html[data-simple] #h19Right > #h228Hero{ padding:8px 12px 10px }
+  html[data-simple] #h19Right > #h228Hero .stat-hero{ flex-direction:row; align-items:center;
+    gap:14px; flex-wrap:wrap }
+  html[data-simple] #h19Right > #h228Hero .sh-ringwrap{ width:88px; height:88px; margin:0; flex:0 0 auto }
+  html[data-simple] #h19Right > #h228Hero .sh-ring{ width:88px; height:88px }
+  html[data-simple] #h19Right > #h228Hero .sh-ring-pct{ font-size:28px }
+  html[data-simple] #h19Right > #h228Hero .sh-week{ flex:1 1 160px; margin-top:0; max-width:300px }
+  html[data-simple] #h19Right > #h228Hero .sh-tiles{ margin-top:0; gap:12px;
+    grid-template-columns:repeat(3,auto); flex:0 0 auto }
+  html[data-simple] #h19Right > #h228Hero .sh-v{ font-size:15px }
+  html[data-simple] #h19Right > #h228Hero .sh-rec{ flex:0 0 auto; margin-top:0; justify-content:flex-start }
+  html[data-simple] #h19Right > #h228Hero .sh-cap{ margin-top:0; align-self:center }
+  /* cap chart SVGs so the charts block fits in the column at short viewports;
+     the viewBox is ~217×280 so width:100% on a ~300px panel scales them to ~387px —
+     capping at 220px keeps D4 floor exactly and trims ~167px from the block height. */
+  html[data-simple] #h19Right > #h18Charts svg.chart{ max-height:220px }
+}
+
+/* ======================= PASTE 862 · SHORT-VIEWPORT TRIMS (≤820px height) ================
+   At 768 and 800px viewport heights the flex children would total ~754px, exceeding the
+   ~655–687px available. These rules apply ONLY at max-height:820px and trim padding,
+   header margins, gnav button sizes, and the gap in #h19Right to bring the total under
+   the clientHeight.  Nothing is hidden; the gnav rows shrink but stay visible.
+   At 1080px this block does not apply; the S2 flex layout handles it with headroom to spare. */
+@media(min-width:1024px) and (max-height:820px){
+  /* gap in #h19Right: 24px → 16px saves 16px total across the two gaps */
+  html[data-simple] .grid > #h19Right{ gap:16px }
+
+  /* hero: replace flex-wrap with a 2-column grid so all stats sit beside the ring
+     rather than wrapping to a second row. Ring spans all 4 right-column rows and is
+     centred; right column stacks week(42)+tiles(27)+rec(13)+cap(10)=92px, which
+     drives the card height: 1+8+9(.lab)+92+10 = 120px, down from 150px. */
+  html[data-simple] #h19Right > #h228Hero .stat-hero{
+    display:grid; grid-template-columns:88px 1fr; column-gap:14px; row-gap:0; align-items:start }
+  html[data-simple] #h19Right > #h228Hero .sh-ringwrap{
+    grid-column:1; grid-row:1/5; align-self:center; margin:0 }
+  html[data-simple] #h19Right > #h228Hero .sh-week{ grid-column:2; grid-row:1 }
+  html[data-simple] #h19Right > #h228Hero .sh-tiles{ grid-column:2; grid-row:2 }
+  html[data-simple] #h19Right > #h228Hero .sh-rec{ grid-column:2; grid-row:3 }
+  html[data-simple] #h19Right > #h228Hero .sh-cap{ grid-column:2; grid-row:4 }
+  html[data-simple] #h19Right > #h228Hero > .lab{ padding-bottom:0 }
+
+  /* journal: tighter header margin + panel padding + section gap + rating section */
+  html[data-simple] #h19Right > .colL .sh{ margin-bottom:0 }
+  html[data-simple] #h19Right > .colL .pan{ padding-top:6px; padding-bottom:6px }
+  html[data-simple] #h19Right > .colL #rateWrap{ padding-bottom:4px }
+  html[data-simple] #h19Right > .colL #jIn > .blk:has(#iDump) > .pan{ gap:3px }
+  html[data-simple] #h19Right > .colL #h18Btm textarea{ height:26px; min-height:26px }
+
+  /* charts: smaller gnav buttons (3 rows each shorter) + header margin + panel padding */
+  html[data-simple] #h19Right > #h18Charts > .h16p > .gnav .mv{ padding:1px 4px }
+  html[data-simple] #h19Right > #h18Charts > .h16p > .gnav{ gap:3px }
+  html[data-simple] #h19Right > #h18Charts > .h16p > .sh{ margin-bottom:2px }
+  html[data-simple] #h19Right > #h18Charts > .h16p{ padding-bottom:4px }
+}
